@@ -103,19 +103,18 @@ export function useAgentComposerSend(
     if (classification !== 'chat' && imagePaths.length === 0) {
       pendingHandle =
         bridges?.sendTypedCommand?.(target, text) ??
-        sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
+        sendNativeChatMessage(target, text, sendOptions)
     } else if (imagePaths.length > 0) {
       pendingHandle = sendNativeChatMessageWithImageAttachments(
-        target.settings,
-        target.ptyId,
+        target,
         text,
         imagePaths,
         sendOptions
       )
     } else if (text.trim().length > 0) {
-      pendingHandle = sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
+      pendingHandle = sendNativeChatMessage(target, text, sendOptions)
     } else {
-      submitNativeChatPrompt(target.settings, target.ptyId)
+      submitNativeChatPrompt(target)
     }
     if (classification !== 'chat') {
       if (pendingHandle) {

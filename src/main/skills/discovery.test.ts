@@ -48,11 +48,16 @@ function makeRepo(path: string, connectionId: string | null = null): Repo {
 beforeEach(() => {
   // Roots are shared between scans for a few seconds; each case owns its own tree.
   clearSkillRootScanCache()
+  // Why: the Hermes root is the only home root that env vars can move outside the
+  // per-case tree, so a developer's real install must not leak into these scans.
+  vi.stubEnv('HERMES_HOME', '')
+  vi.stubEnv('LOCALAPPDATA', '')
   vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
   unavailableRootPath = null
+  vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
 
@@ -204,6 +209,46 @@ describe('skill discovery', () => {
     expect(result.skills.find((skill) => skill.name === 'Docs')?.providers).toEqual(['claude'])
     expect(result.skills.find((skill) => skill.name === 'Planning')?.providers).toEqual([
       'agent-skills'
+    ])
+  })
+
+  it('filters discovery by requested directory name and source kind', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-skills-'))
+    const home = join(root, 'home')
+    const repo = join(root, 'repo')
+    const homeSkill = join(home, '.agents', 'skills', 'orchestration')
+    const repoSkill = join(repo, '.agents', 'skills', 'orchestration')
+    const unrelatedSkill = join(home, '.agents', 'skills', 'computer-use')
+    await mkdir(homeSkill, { recursive: true })
+    await mkdir(repoSkill, { recursive: true })
+    await mkdir(unrelatedSkill, { recursive: true })
+    await writeFile(join(homeSkill, 'SKILL.md'), '---\nname: Agent Orchestration\n---\n')
+    await writeFile(join(repoSkill, 'SKILL.md'), '# orchestration')
+    await writeFile(join(unrelatedSkill, 'SKILL.md'), '# computer-use')
+
+    const result = await discoverSkills({
+      homeDir: home,
+      cwd: repo,
+      repos: [],
+      names: ['orchestration'],
+      sourceKinds: ['home']
+    })
+
+    expect(result.skills).toMatchObject([
+      { name: 'Agent Orchestration', sourceKind: 'home', directoryPath: homeSkill }
+    ])
+    expect(result.sources.every((source) => source.sourceKind === 'home')).toBe(true)
+
+    const unfiltered = await discoverSkills({
+      homeDir: home,
+      cwd: repo,
+      repos: [],
+      sourceKinds: []
+    })
+    expect(unfiltered.skills.map((skill) => skill.name).sort()).toEqual([
+      'Agent Orchestration',
+      'computer-use',
+      'orchestration'
     ])
   })
 
@@ -367,6 +412,7 @@ describe('skill discovery', () => {
         '/home/test/.config/opencode/skills',
         '/home/test/.pi/agent/skills',
         '/home/test/.omp/agent/skills',
+        '/home/test/.hermes/skills',
         '/home/test/.gemini/skills',
         '/home/test/.gemini/antigravity/skills',
         '/home/test/.cursor/skills',
@@ -393,6 +439,9 @@ describe('skill discovery', () => {
     expect(
       roots.find((root) => root.path.replace(/\\/g, '/') === '/home/test/.omp/agent/skills')?.owner
     ).toBe('omp')
+    expect(
+      roots.find((root) => root.path.replace(/\\/g, '/') === '/home/test/.hermes/skills')?.owner
+    ).toBe('hermes')
   })
 
   it('does not add runtime-owned repository paths to local scan roots', () => {
@@ -469,6 +518,72 @@ describe('skill discovery', () => {
     expect(skill?.sourceKind).toBe('home')
     expect(skill?.directoryPath).toBe(linkedSkill)
     expect(skill?.providers).toEqual(['agent-skills'])
+  })
+
+  it('discovers Skills installed in the Hermes home', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-skills-'))
+    const home = join(root, 'home')
+    const skillDir = join(home, '.hermes', 'skills', 'social-media', 'research')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(
+      join(skillDir, 'SKILL.md'),
+      ['---', 'name: social-research', 'description: Research social sources.', '---', ''].join(
+        '\n'
+      )
+    )
+
+    const result = await discoverSkills({
+      homeDir: home,
+      cwd: join(root, 'missing-cwd')
+    })
+
+    expect(result.skills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'social-research',
+          sourceKind: 'home',
+          sourceLabel: 'Hermes home',
+          directoryPath: skillDir,
+          providers: ['agent-skills']
+        })
+      ])
+    )
+    expect(result.sources.find((source) => source.id === 'home-hermes')).toMatchObject({
+      owner: 'hermes',
+      exists: true
+    })
+  })
+
+  it('discovers Hermes Skills under a relocated HERMES_HOME profile', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-skills-'))
+    const home = join(root, 'home')
+    const hermesHome = join(root, 'profiles', 'coder')
+    const skillDir = join(hermesHome, 'skills', 'research')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(
+      join(skillDir, 'SKILL.md'),
+      ['---', 'name: profile-research', 'description: Research sources.', '---', ''].join('\n')
+    )
+    vi.stubEnv('HERMES_HOME', hermesHome)
+
+    const result = await discoverSkills({
+      homeDir: home,
+      cwd: join(root, 'missing-cwd')
+    })
+
+    expect(result.skills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'profile-research',
+          sourceLabel: 'Hermes home',
+          directoryPath: skillDir
+        })
+      ])
+    )
+    expect(result.sources.find((source) => source.id === 'home-hermes')).toMatchObject({
+      path: join(hermesHome, 'skills'),
+      exists: true
+    })
   })
 
   it('discovers worktree .agents skill symlinks from the requested cwd', async () => {

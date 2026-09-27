@@ -67,6 +67,27 @@ own keys live in per-feature bundles under the feature directories, which a feat
 that split: a fork entry duplicating a key upstream defines shadows upstream's real translation with
 the English fallback `sync:localization-catalog` wrote, and that locale silently renders English.
 
+**A release that adds a language breaks every fork bundle written before it.** The check requires one
+file per locale in each fork bundle, so a fork feature that merged while the locale set was smaller
+now fails `verify:localization-catalog` with
+`Fork catalog <dir>/locales is missing <lang>.json` — v1.4.198 added French, and a feature merged the
+day before had only en/es/ja/ko/zh. Sweep after resolution:
+
+```sh
+comm -23 <(ls src/renderer/src/locales/*.json | xargs -n1 basename | sort) \
+         <(ls <fork bundle dir> | sort)
+```
+
+`pnpm sync:localization-catalog` will **not** fix this — `--fix` only repairs catalog registration
+and leaves the missing file missing, reporting the same error it was run to clear. Write it by hand:
+the file is exactly `{}` and a newline, matching every existing fork bundle, and
+`fork-localization-catalogs.ts` imports no French at all, so the keys fall through to English until
+someone translates them.
+
+Worth knowing where this surfaces: the failing step is inside `static analysis`, whose three ratchets
+all report *0 new findings* first. Read past them to the `verify:localization-catalog` step. `verify`
+then fails two seconds later purely as its downstream aggregate — it is not a second problem.
+
 ## Tier-2 forked-copy replay
 
 Complete this checklist for **every** copy headed by `FORK-COPY-OF` and `FORK-COPY-SHA` after
@@ -231,6 +252,31 @@ git show <target-ref>:.oxlintrc.json > .oxlintrc.json
 pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
 ```
 
+## When upstream ratchets a chokepoint
+
+The same shape reaches the fork through tests rather than the linter, and the local gate cannot see
+it at all. Upstream routes a whole class of call onto one module, then pins it with a boundary test
+that scans every source file and asserts the offender list is empty and its count has not grown.
+v1.4.190 did this twice — `runWslProcess` for `wsl.exe` and `runProcess`/`spawnProcess` for child
+processes — and the fork's one non-conforming file failed five checks from that single cause.
+
+The tell is a boundary or ratchet test naming a `fork-*` path in its diff, e.g.
+`expected [ Array(1) ] to deeply equal []` with a fork file as the only received element. Read the
+detector to see what it matches before changing anything: it may key on a string literal, so a
+doc comment mentioning the binary can be a false positive, and it may mask calls that already pin
+the right option.
+
+Migrating the fork file is in scope and is the whole fix — never allowlist a fork path to quiet the
+ratchet. Take the idiom from the upstream sibling the fork file was modelled on, which upstream
+migrated in the same release, and carry every option it pins across; a payload authored for bash
+must keep saying so, because the new runner's default interpreter is usually `sh`.
+
+Two follow-on effects are easy to miss. A fork file that bypasses the new chokepoint also bypasses
+the **mock** in upstream's own tests, so an upstream test can fail with a parse error far from the
+fork — the fork's direct call skipped a queued mock response and the next consumer read the wrong
+frame. And the fork's own tests mock whatever the fork used to call, so they have to move to the new
+module too.
+
 ## Verifying
 
 Two manifest checks run against the new release, and the second one is where a sync goes quietly
@@ -251,19 +297,40 @@ absorbed a line the fork was carrying, and the seam should be re-read before the
 Re-baseline by rerunning the recorder and committing the new numbers with the resolution, never as a
 sweep to make the check quiet.
 
-`pnpm typecheck` and `pnpm lint` are absolute — no baseline differential. `pnpm test` is
-baseline-differential: a failure counts only if the same test passes at the pre-merge SHA.
+`pnpm typecheck` and `pnpm lint` are absolute: a failure is a failure. Neither is run against a
+baseline for comparison, and there is nothing to compare against — the tree either compiles and
+lints or it does not.
+
+The gate does **not** run the test suite. Vitest cannot run on this machine, and the remote host it
+would run on reports failures the code did not cause. `SKILL.md` § Step 8 has the reasoning; the
+short version is that PR CI runs the same suite on clean hosted runners as a required check, so the
+sync PR is where a test failure is found and fixed.
 
 The one exception to lint being absolute is the rule-tightening case above, and it is an exception
 about *how the tree is fixed*, not about tolerating a failure: lint must still pass before the push.
 
 Traps that fake results:
 
-- `rm -f config/*.tsbuildinfo` before every typecheck. Composite projects cache errors across
-  `git checkout` swaps.
-- `pnpm test` never builds the CLI, and ambient Git configuration can alter fixture commits.
-  Build the CLI first, then replace global/system config with one controlled empty file while also
-  stripping every inherited Git-config environment channel:
+- Clear the composite build cache before every typecheck — composite projects cache errors across
+  `git checkout` swaps. Use `find`, never the glob:
+
+  ```sh
+  find config -maxdepth 1 -name '*.tsbuildinfo' -delete
+  ```
+
+  `rm -f config/*.tsbuildinfo` is the obvious form and it is unsafe here. This machine's shell is
+  zsh, where an unmatched glob is a hard error (`nomatch`) rather than a literal word, and the error
+  aborts the **whole** command list — so `rm -f config/*.tsbuildinfo && pnpm run typecheck:node`
+  prints `no matches found` and never runs `tsc`. `-f` does not help: zsh fails before `rm` is
+  reached. A fresh worktree has no `.tsbuildinfo` at all, and every later clear leaves none behind,
+  so the unmatched case is the normal one. The tell is a typecheck step that emits
+  `no matches found: config/*.tsbuildinfo` and then nothing — no `$ tsc --noEmit -p …` line, no
+  errors — which reads exactly like a pass.
+- Running the suite locally to diagnose something is a deliberate detour, not part of the gate — and
+  it goes through `pnpm test:sandbox` (`AGENTS.md`), which a `PreToolUse` hook enforces. Two traps
+  bite whichever way it is invoked: the run never builds the CLI, and ambient Git configuration can
+  alter fixture commits. Build the CLI first, then replace global/system config with one controlled
+  empty file while also stripping every inherited Git-config environment channel:
 
   ```sh
   empty_git_config=$(mktemp)

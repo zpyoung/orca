@@ -10,11 +10,14 @@ import {
   type SetStateAction
 } from 'react'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
+import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
+import { useNativeChatComposerAppMenuSelection } from '../use-native-chat-composer-app-menu-selection'
 import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat-runtime-send'
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
 import { useNativeChatTypedInsertion } from '../use-native-chat-typed-insertion'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
+import { isTerminalInputQuarantined } from '../../terminal-pane/terminal-input-quarantine'
 import type {
   ComposerAutocomplete,
   NativeChatPickerItem,
@@ -51,7 +54,7 @@ type PasteEventLike = Parameters<AgentComposerHandle['handlePasteEvent']>[0]
 
 export type AgentComposerCoreState = {
   textareaRef: RefObject<HTMLTextAreaElement | null>
-  isComposingRef: RefObject<boolean>
+  imeEnterGesture: ReturnType<typeof useImeEnterGestureOwnership>
   draft: string
   setDraft: (next: string | ((previous: string) => string)) => void
   caret: number
@@ -81,6 +84,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     paneKey,
     targetPtyId,
     canSend = true,
+    allowWithoutTarget = false,
     isWorking = false,
     onStop,
     onOptimisticSendCanceled
@@ -90,8 +94,14 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   const { history, setHistory } = useAgentComposerHistory(paneKey)
   const [activeSuggestion, setActiveSuggestion] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const isComposingRef = useRef(false)
+  const imeEnterGesture = useImeEnterGestureOwnership()
+  // Why: v1.4.200 widened the app-menu ref to NativeChatComposerInput for upstream's
+  // contenteditable editor. This composer's field is a real <textarea>, so the ref
+  // only ever holds one, and the overlay and scroll sync need the element itself.
+  const { textareaRef: composerInputRef } = useNativeChatComposerAppMenuSelection(
+    imeEnterGesture.isComposing
+  )
+  const textareaRef = composerInputRef as RefObject<HTMLTextAreaElement | null>
   const { cancelPendingSends, trackPendingSend } = useNativeChatSendLifecycle(
     terminalTabId,
     targetPtyId,
@@ -109,14 +119,18 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   }
 
   const resolveTarget = useCallback((): NativeChatResolvedTarget | null => {
-    if (!targetPtyId) {
+    if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
       return null
     }
-    return { ptyId: targetPtyId, settings: getSettingsForAgentTabRuntimeOwner(terminalTabId) }
+    return {
+      terminalTabId,
+      ptyId: targetPtyId,
+      settings: getSettingsForAgentTabRuntimeOwner(terminalTabId)
+    }
   }, [targetPtyId, terminalTabId])
 
-  const hasPty = targetPtyId !== null
-  const disabled = targetPtyId === null || !canSend
+  const hasPty = allowWithoutTarget || targetPtyId !== null
+  const disabled = (!allowWithoutTarget && targetPtyId === null) || !canSend
 
   const syncCaret = useCallback((element: HTMLTextAreaElement) => {
     setCaret(element.selectionStart ?? element.value.length)
@@ -147,7 +161,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
 
   return {
     textareaRef,
-    isComposingRef,
+    imeEnterGesture,
     draft,
     setDraft,
     caret,
@@ -174,6 +188,8 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
  *  this still gets a working compose-and-send composer. */
 export type AgentComposerHostBridges = {
   autocomplete?: ComposerAutocomplete
+  /** Applies attachments the host deferred while an IME composition was live. */
+  flushPendingAttachments?: () => void
   pickerListboxId?: string
   classifySend?: (draft: string) => NativeChatSendClassification
   clearSkillOrigin?: () => void
@@ -205,6 +221,8 @@ export type AgentComposerHostBridges = {
   isDispatchingSessionOption?: boolean
 
   onSlashCommand?: (command: string) => void
+  /** Replaces the PTY send entirely; for a host whose transport is not a PTY. */
+  sendOverride?: () => void
   /** Notified with the dispatched text when a send classifies as a command. */
   onCommandDispatched?: (command: string) => void
   /** Sends a classified command as typed keystrokes rather than a paste, for
@@ -235,7 +253,17 @@ export function useAgentComposerCompose(
   const imageAttachments = bridges?.imageAttachments ?? EMPTY_ATTACHMENTS
   const autocomplete = bridges?.autocomplete ?? DEFAULT_AUTOCOMPLETE
 
-  const send = useAgentComposerSend(core, props, bridges, imageAttachments)
+  // A pasted image has no agent-readable path until its save lands; sending
+  // mid-save would ship the message without the image the chip promises.
+  const hasPendingAttachment = imageAttachments.some((attachment) => attachment.pending)
+  const ptySend = useAgentComposerSend(core, props, bridges, imageAttachments)
+  const hostSend = bridges?.sendOverride ?? ptySend
+  const send = useCallback(() => {
+    if (hasPendingAttachment) {
+      return
+    }
+    hostSend()
+  }, [hasPendingAttachment, hostSend])
 
   const handleDraftChange = useCallback(
     (value: string, element: HTMLTextAreaElement) => {
@@ -253,7 +281,7 @@ export function useAgentComposerCompose(
     activeSuggestion: core.activeSuggestion,
     draft: core.draft,
     history: core.history,
-    isComposing: () => core.isComposingRef.current,
+    isComposing: core.imeEnterGesture.isComposing,
     completePickerItem: bridges?.completeItem ?? noop,
     dispatchPickerCommand: bridges?.dispatchPickerCommand ?? noop,
     dismissPicker: bridges?.dismissPicker ?? noop,
@@ -305,9 +333,12 @@ export function useAgentComposerCompose(
   const sendButtonDisabled =
     core.disabled ||
     props.sendDisabled ||
+    hasPendingAttachment ||
     (core.draft.trim() === '' && imageAttachments.length === 0)
 
   const fieldProps: AgentComposerFieldProps = {
+    terminalTabId: props.terminalTabId,
+    paneKey: props.paneKey,
     textareaRef: core.textareaRef,
     draft: core.draft,
     disabled: core.disabled,
@@ -334,14 +365,12 @@ export function useAgentComposerCompose(
       core.setActiveSuggestion(0)
     },
     onKeyDown: handleKeyDown,
-    onCompositionStart: () => {
-      core.isComposingRef.current = true
-    },
-    onCompositionEnd: (event) => {
-      core.isComposingRef.current = false
-      if (event.currentTarget.value !== core.draft) {
-        handleDraftChange(event.currentTarget.value, event.currentTarget)
+    imeEnterGesture: core.imeEnterGesture,
+    onImeSettled: (element) => {
+      if (element.value !== core.draft) {
+        handleDraftChange(element.value, element)
       }
+      bridges?.flushPendingAttachments?.()
     },
     onPaste: (event) => handlePasteEvent(event),
     pickerListboxId: bridges?.pickerListboxId ?? generatedListboxId,

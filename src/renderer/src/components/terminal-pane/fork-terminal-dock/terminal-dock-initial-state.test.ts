@@ -6,6 +6,7 @@ describe('shouldDockTerminalComposerByDefault', () => {
     expect(
       shouldDockTerminalComposerByDefault({
         enabled: true,
+        autoDockNewPanes: true,
         agent: 'gemini',
         hasPersistedDecision: false
       })
@@ -16,6 +17,7 @@ describe('shouldDockTerminalComposerByDefault', () => {
     expect(
       shouldDockTerminalComposerByDefault({
         enabled: true,
+        autoDockNewPanes: true,
         agent: 'claude',
         hasPersistedDecision: true
       })
@@ -23,6 +25,7 @@ describe('shouldDockTerminalComposerByDefault', () => {
     expect(
       shouldDockTerminalComposerByDefault({
         enabled: false,
+        autoDockNewPanes: true,
         agent: 'claude',
         hasPersistedDecision: false
       })
@@ -30,8 +33,31 @@ describe('shouldDockTerminalComposerByDefault', () => {
     expect(
       shouldDockTerminalComposerByDefault({
         enabled: true,
+        autoDockNewPanes: true,
         agent: 'custom-agent',
         hasPersistedDecision: false
+      })
+    ).toBe(false)
+  })
+
+  it('does not dock a fresh recognized pane when automatic opening is off', () => {
+    expect(
+      shouldDockTerminalComposerByDefault({
+        enabled: true,
+        autoDockNewPanes: false,
+        agent: 'claude',
+        hasPersistedDecision: false
+      })
+    ).toBe(false)
+  })
+
+  it('does not dock a persisted pane when automatic opening is off', () => {
+    expect(
+      shouldDockTerminalComposerByDefault({
+        enabled: true,
+        autoDockNewPanes: false,
+        agent: 'claude',
+        hasPersistedDecision: true
       })
     ).toBe(false)
   })

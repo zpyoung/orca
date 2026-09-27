@@ -9,6 +9,7 @@ import {
   selectRuntimePaneTitlesForWorktree
 } from './worktree-card-status-inputs'
 import { selectWorktreeAgentActivitySummary } from './worktree-agent-activity-summary'
+import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
 
 type WorktreeActivityStatusState = Pick<
   AppState,
@@ -33,9 +34,12 @@ export function selectWorktreeActivityStatuses(
     const {
       hasPermission,
       hasLiveWorking,
+      hasLiveMonitoring,
+      hasInterrupted,
       hasLiveDone,
       hasRetainedDone,
-      agentStatusPaneIdsByTabId
+      agentStatusPaneIdsByTabId,
+      stalePaneIdsByTabId
     } = selectWorktreeAgentActivitySummary(statusInputs, worktreeId)
     statuses.set(
       worktreeId,
@@ -45,9 +49,12 @@ export function selectWorktreeActivityStatuses(
         ptyIdsByTabId: selectLivePtyIdsForWorktree(statusInputs, worktreeId),
         runtimePaneTitlesByTabId: selectRuntimePaneTitlesForWorktree(statusInputs, worktreeId),
         agentStatusPaneIdsByTabId,
+        stalePaneIdsByTabId,
         terminalLayoutRootsByTabId: selectTerminalLayoutRootsForWorktree(statusInputs, worktreeId),
-        hasPermission,
+        hasPermission: hasPermission || selectWorktreeHasPendingAsk(statusInputs, worktreeId),
         hasLiveWorking,
+        hasLiveMonitoring,
+        hasInterrupted,
         hasLiveDone,
         hasRetainedDone
       })

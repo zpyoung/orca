@@ -26,6 +26,14 @@ export async function tearDownRemovedWorktreeRendererState(args: {
 }): Promise<void> {
   const { set, get, worktreeId, hostId, requiredExecutionHostId, terminalPtyIdsBeforeRemoval } =
     args
+  for (const tab of get().unifiedTabsByWorktree[worktreeId] ?? []) {
+    if (tab.contentType === 'agent-session') {
+      get().closeUnifiedTab(tab.id, {
+        preserveWorktreeSelection: true,
+        recordInteraction: false
+      })
+    }
+  }
   // Why: renderer state follows the successful backend result, so blocked dirty deletes keep their terminals intact.
   // Why browsers first: unregister Chromium guests before other teardown can intercept them (avoids a browser-state race).
   await get().shutdownWorktreeBrowsers(worktreeId)
@@ -59,7 +67,7 @@ export async function tearDownRemovedWorktreeRendererState(args: {
 
   // Why: dispose parked terminal watchers only on explicit deletion; identity migration/remounts must keep buffered PTY state.
   disposeRemovedWorktreeParkedTerminalWatchers(worktreeId, terminalPtyIdsBeforeRemoval)
-  applyRemoveWorktreeSuccessState(set, worktreeId, tabIds)
+  applyRemoveWorktreeSuccessState(set, worktreeId, tabIds, requiredExecutionHostId ?? hostId)
   get().removeWorkspaceSpaceWorktrees?.(
     hostId ? [{ id: worktreeId, executionHostId: hostId }] : [worktreeId]
   )

@@ -1,3 +1,4 @@
+import './mock-descendant-sweep'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SubprocessHandle } from './session-subprocess-handle'
 import { TerminalHost } from './terminal-host'
@@ -18,6 +19,7 @@ function createSubprocess(): SubprocessHandle & { exit: () => void } {
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn(),
+    terminateOwnedTree: () => 'unavailable' as const,
     forceKill: vi.fn(),
     signal: vi.fn(),
     onData: () => {},

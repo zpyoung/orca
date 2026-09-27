@@ -12,7 +12,8 @@ import type {
 const { liveSession } = vi.hoisted(() => ({ liveSession: vi.fn() }))
 
 vi.mock('./fork-native-chat-relay/use-native-chat-live-session', () => ({
-  useNativeChatLiveSession: liveSession
+  useNativeChatLiveSession: liveSession,
+  isNativeChatTranscriptUnsettled: (phase: string) => phase === 'loading' || phase === 'awaiting'
 }))
 
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'

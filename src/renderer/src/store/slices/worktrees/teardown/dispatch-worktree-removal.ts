@@ -1,8 +1,9 @@
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import { callRuntimeRpc, type getActiveRuntimeTarget } from '../../../../runtime/runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from '../../../../runtime/runtime-worktree-selector'
 import type { RemoveWorktreeOptions } from '../../worktree-removal-options'
+import { ARCHIVE_HOOK_TIMEOUT_MS } from '../../../../../../shared/worktree/archive-hook-removal-gate'
 
 /**
  * Sends the destructive removal over whichever transport owns this workspace.
@@ -36,20 +37,48 @@ export async function dispatchWorktreeRemoval(args: {
       hostId,
       force,
       allowUnverifiedPtyStop: options?.allowUnverifiedPtyStop === true,
+      allowFailedArchiveHook: options?.allowFailedArchiveHook === true,
       skipArchive,
       ...snapshotPruneBatch
     })
   }
+  const effectiveHostId =
+    options?.sameIdSurvivingHostId != null ? hostId : qualifyRuntimeCallHost(target, hostId)
   return callRuntimeRpc<RemoveWorktreeResult>(
     target,
     'worktree.rm',
     {
       worktree: toRuntimeWorktreeSelector(worktreeId),
-      ...(hostId ? { hostId } : {}),
+      ...(effectiveHostId ? { hostId: effectiveHostId } : {}),
       force,
       allowUnverifiedPtyStop: options?.allowUnverifiedPtyStop === true,
+      // Why only when set, unlike the IPC branch: this crosses a version boundary, and a host
+      // that predates the gate drops unknown params silently. Send it when it means something.
+      ...(options?.allowFailedArchiveHook === true ? { allowFailedArchiveHook: true } : {}),
       runHooks: !skipArchive
     },
-    { timeoutMs: 60_000 }
+    {
+      // Why not a flat 60s (#19334): the host may run an archive hook for up to
+      // ARCHIVE_HOOK_TIMEOUT_MS before it decides anything. A client that gives up first reports a
+      // failure for a removal that is still in progress — and if the hook then succeeds, the host
+      // deletes the checkout while the user has been told the delete failed. Outlast the hook when
+      // one can run; keep the short budget when none will.
+      timeoutMs: skipArchive ? 60_000 : ARCHIVE_HOOK_TIMEOUT_MS + 60_000
+    }
   )
+}
+
+function qualifyRuntimeCallHost(
+  target: ReturnType<typeof getActiveRuntimeTarget>,
+  hostId: ExecutionHostId | undefined
+): ExecutionHostId | undefined {
+  const parsedHost = parseExecutionHostId(hostId)
+  if (
+    target.kind === 'environment' &&
+    parsedHost?.kind === 'runtime' &&
+    parsedHost.environmentId === target.environmentId
+  ) {
+    return undefined
+  }
+  return hostId
 }

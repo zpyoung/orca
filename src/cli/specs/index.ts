@@ -1,4 +1,5 @@
 import type { CommandSpec } from '../args'
+import { ASK_COMMAND_SPECS } from '../fork-ask-question-tool/specs'
 import { ACCOUNT_COMMAND_SPECS } from './account'
 import { BROWSER_ADVANCED_COMMAND_SPECS } from './browser-advanced'
 import { BROWSER_BASIC_COMMAND_SPECS } from './browser-basic'
@@ -17,9 +18,12 @@ import { LINEAR_COMMAND_SPECS } from './linear'
 import { VM_COMMAND_SPECS } from './vm'
 import { SKILL_COMMAND_SPECS } from './skills'
 import { ARTIFACT_COMMAND_SPECS } from './artifacts'
+import { LEDGER_COMMAND_SPECS } from './ledger'
+import { SEARCH_COMMAND_SPECS } from './search'
 
 export const COMMAND_SPECS: CommandSpec[] = [
   ...CORE_COMMAND_SPECS,
+  ...ASK_COMMAND_SPECS,
   ...ARTIFACT_COMMAND_SPECS,
   ...ACCOUNT_COMMAND_SPECS,
   ...PROJECT_COMMAND_SPECS,
@@ -36,5 +40,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...LINEAR_COMMAND_SPECS,
   ...VM_COMMAND_SPECS,
   ...EMULATOR_COMMAND_SPECS,
-  ...SKILL_COMMAND_SPECS
+  ...SKILL_COMMAND_SPECS,
+  ...LEDGER_COMMAND_SPECS,
+  ...SEARCH_COMMAND_SPECS
 ]

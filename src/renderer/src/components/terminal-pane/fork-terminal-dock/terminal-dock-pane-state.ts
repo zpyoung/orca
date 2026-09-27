@@ -29,9 +29,12 @@ function isUnsafeObjectKey(key: string): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype'
 }
 
-function isValidStoredEntry(
-  value: unknown
-): value is { docked: boolean; gutterRows: number; lastAgent?: unknown } {
+function isValidStoredEntry(value: unknown): value is {
+  docked: boolean
+  gutterRows: number
+  lastAgent?: unknown
+  userUndocked?: unknown
+} {
   if (typeof value !== 'object' || value === null) {
     return false
   }
@@ -41,6 +44,10 @@ function isValidStoredEntry(
 
 function sanitizeStoredAgent(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
+}
+
+function sanitizeStoredUserUndocked(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
 }
 
 function readStoredMap(): StoredMap {
@@ -63,7 +70,8 @@ function readStoredMap(): StoredMap {
       next[key] = {
         docked: value.docked,
         gutterRows: clampGutterRows(value.gutterRows),
-        lastAgent: sanitizeStoredAgent(value.lastAgent)
+        lastAgent: sanitizeStoredAgent(value.lastAgent),
+        userUndocked: sanitizeStoredUserUndocked(value.userUndocked)
       }
     }
     return next
@@ -105,7 +113,11 @@ export function readTerminalDockPaneState(paneKey: string): TerminalDockPaneStat
   }
   const entry = readStoredMap()[paneKey]
   return entry
-    ? { docked: entry.docked, gutterRows: entry.gutterRows }
+    ? {
+        docked: entry.docked,
+        gutterRows: entry.gutterRows,
+        ...(entry.userUndocked !== undefined ? { userUndocked: entry.userUndocked } : {})
+      }
     : DEFAULT_TERMINAL_DOCK_PANE_STATE
 }
 
@@ -132,18 +144,37 @@ export function writeTerminalDockPaneAgent(paneKey: string, agent: AgentType): v
   map[paneKey] = {
     docked: existing?.docked ?? DEFAULT_TERMINAL_DOCK_PANE_STATE.docked,
     gutterRows: existing?.gutterRows ?? DEFAULT_TERMINAL_DOCK_PANE_STATE.gutterRows,
-    lastAgent: agent
+    lastAgent: agent,
+    userUndocked: existing?.userUndocked
   }
   evictOldestEntries(map)
   writeStoredMap(map)
 }
 
-/** Distinguishes a deliberate local undock from the absent-state default. */
-export function hasTerminalDockPaneState(paneKey: string): boolean {
+/** Returns whether the user explicitly closed this pane's dock. */
+export function readTerminalDockPaneUserUndocked(paneKey: string): boolean {
   if (isUnsafeObjectKey(paneKey)) {
     return false
   }
-  return Object.hasOwn(readStoredMap(), paneKey)
+  return readStoredMap()[paneKey]?.userUndocked === true
+}
+
+/** Records or clears the user decision that suppresses automatic docking. */
+export function writeTerminalDockPaneUserUndocked(paneKey: string, value: boolean): void {
+  if (isUnsafeObjectKey(paneKey)) {
+    return
+  }
+  const map = readStoredMap()
+  const existing = map[paneKey]
+  delete map[paneKey]
+  map[paneKey] = {
+    docked: existing?.docked ?? DEFAULT_TERMINAL_DOCK_PANE_STATE.docked,
+    gutterRows: existing?.gutterRows ?? DEFAULT_TERMINAL_DOCK_PANE_STATE.gutterRows,
+    lastAgent: existing?.lastAgent,
+    userUndocked: value
+  }
+  evictOldestEntries(map)
+  writeStoredMap(map)
 }
 
 export function writeTerminalDockPaneState(paneKey: string, state: TerminalDockPaneState): void {
@@ -151,14 +182,15 @@ export function writeTerminalDockPaneState(paneKey: string, state: TerminalDockP
     return
   }
   const map = readStoredMap()
-  const existingAgent = map[paneKey]?.lastAgent
+  const existing = map[paneKey]
   // delete-then-set moves an existing key to the newest end of insertion order, so a rewrite
   // of a live pane refreshes its recency instead of leaving it eligible for eviction.
   delete map[paneKey]
   map[paneKey] = {
     docked: state.docked,
     gutterRows: clampGutterRows(state.gutterRows),
-    lastAgent: existingAgent
+    lastAgent: existing?.lastAgent,
+    userUndocked: state.userUndocked ?? existing?.userUndocked
   }
   evictOldestEntries(map)
   writeStoredMap(map)

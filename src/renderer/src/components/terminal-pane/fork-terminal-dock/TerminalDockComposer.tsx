@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type RefObject } from 'react'
 import { useAppStore } from '../../../store'
 import type { AgentType } from '../../../../../shared/agent-status-types'
 import { isNativeChatSupportedAgent } from '../../../../../shared/native-chat-agent-support'
@@ -24,10 +24,17 @@ export type TerminalDockComposerProps = {
   canSend: boolean
   sendTier: ComposerSendTier
   readTerminalScreen?: () => string | null
+  /** The question card's free-text row. The dock keeps its composer mounted
+   *  beside an active card, so pane-level Paste needs this to tell the two
+   *  apart by focus. */
+  answerInputRef?: RefObject<HTMLInputElement | null>
   onSendOutcome?: (outcome: SendOutcome) => void
 }
 
-export function TerminalDockComposer(props: TerminalDockComposerProps): React.JSX.Element {
+export function TerminalDockComposer({
+  answerInputRef,
+  ...props
+}: TerminalDockComposerProps): React.JSX.Element {
   const status = useAppStore((state) => state.agentStatusByPaneKey[props.paneKey])
   const isWorking = status?.state === 'working'
   const interactiveSend = useNativeChatInteractiveSend(
@@ -40,6 +47,7 @@ export function TerminalDockComposer(props: TerminalDockComposerProps): React.JS
     return (
       <TerminalDockCardComposer
         {...props}
+        answerInputRef={answerInputRef}
         isWorking={isWorking}
         interactiveSend={interactiveSend}
       />
@@ -55,12 +63,13 @@ export function TerminalDockComposer(props: TerminalDockComposerProps): React.JS
   )
 }
 
-function TerminalDockCardComposer(
-  props: TerminalDockComposerProps & {
-    isWorking: boolean
-    interactiveSend: NativeChatInteractiveSend
-  }
-): React.JSX.Element {
+function TerminalDockCardComposer({
+  answerInputRef,
+  ...props
+}: TerminalDockComposerProps & {
+  isWorking: boolean
+  interactiveSend: NativeChatInteractiveSend
+}): React.JSX.Element {
   const status = useAppStore((state) => state.agentStatusByPaneKey[props.paneKey])
   const runtimeEnvironmentId = useAppStore((state) =>
     selectNativeChatRuntimeEnvironmentId(state, props.terminalTabId)
@@ -89,6 +98,7 @@ function TerminalDockCardComposer(
           messages={session.messages}
           transcriptSettled={session.readPhase === 'ready'}
           onShowingCardChange={setCardActive}
+          answerInputRef={answerInputRef}
         />
       </div>
       <NativeChatComposer

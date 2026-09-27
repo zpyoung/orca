@@ -6,18 +6,21 @@ import type { Repo } from '../../shared/repo-types'
 import type {
   DiscoveredSkill,
   SkillDiscoveryResult,
-  SkillDiscoverySource
+  SkillDiscoverySource,
+  SkillSourceKind
 } from '../../shared/skills'
 import {
   buildSkillDiscoverySources,
-  compareSkills,
+  sortDiscoveredSkills,
+  sortSkillDiscoverySources,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
   type SkillScanRoot
 } from './skill-discovery-sources'
+import { rootMayContainSourceKind } from './skill-discovery-source-filter'
 import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
-import { discoverClaudePluginSkillSources } from './claude-plugin-skill-sources'
+import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'
 import { findSkillFiles } from './skill-root-file-walk'
 import { runSkillCandidateTasks } from './skill-candidate-concurrency'
 import {
@@ -26,6 +29,7 @@ import {
   type SkillScanOutcome
 } from './skill-scan-coalescer'
 import type { SkillProviderRootOverrides } from './skill-provider-destinations'
+import { skillDirectoryMaxDepth } from '../../shared/skill-discovery-depth'
 
 export { buildSkillDiscoverySources } from './skill-discovery-sources'
 
@@ -35,11 +39,11 @@ const MAX_MARKDOWN_BYTES = 256 * 1024
 // them for a few seconds is what bounds that fan-out.
 export const SKILL_ROOT_SCAN_TTL_MS = 10_000
 // Why: sized off the root formula, not a round number. One scan builds
-// `12 fixed home roots + 2 per local repo (+ cwd) + plugin roots`, so a bound
+// `17 fixed home roots + 7 per local repo (+ cwd) + plugin roots`, so a bound
 // smaller than a single scan's root count makes that scan evict its own earlier
 // entries and the cache degrades to a ~0% hit rate — exactly the walk this
 // exists to prevent. The live key space is the union across targets — the fixed
-// home roots plus two per repo plus two per distinct workspace cwd — so this holds
+// home roots plus seven per repo plus seven per distinct workspace cwd — so this holds
 // a few hundred repos with panes open, not an unbounded install. Past that the LRU
 // keeps the hot home roots and the repo roots thrash, which degrades rather than
 // breaks. Most repo roots do not exist, and a missing root caches as
@@ -137,7 +141,7 @@ async function readSkillSummary(skillFilePath: string): Promise<{
 type ScannedSkill = DiscoveredSkill & { canonicalSkillFilePath: string }
 
 async function scanRoot(root: SkillScanRoot, signal: AbortSignal): Promise<ScannedSkill[]> {
-  const maxDepth = root.sourceKind === 'plugin' ? 9 : 4
+  const maxDepth = skillDirectoryMaxDepth(root.sourceKind)
   const skillFiles = await findSkillFiles(root.path, maxDepth, signal)
   // Why: a root can hold many packages and each one costs a summary read plus a
   // package walk. Unbounded fan-out here is what turned one scan into a burst of
@@ -265,6 +269,8 @@ export async function discoverSkills(args: {
   includeCwd?: boolean
   providerRootOverrides?: SkillProviderRootOverrides
   refresh?: boolean
+  names?: string[]
+  sourceKinds?: SkillSourceKind[]
 }): Promise<SkillDiscoveryResult> {
   const startedAt = Date.now()
   const homeDir = args.homeDir ?? homedir()
@@ -273,10 +279,12 @@ export async function discoverSkills(args: {
     ...buildSkillDiscoverySources({ ...args, homeDir }),
     // Why: plugin discovery is native-chat data keyed to an explicit workspace.
     // Untargeted scans (Settings) keep their pre-picker inventory and cost.
-    ...(args.cwd && args.includeCwd !== false
-      ? await discoverClaudePluginSkillSources({ homeDir, cwd: args.cwd })
+    ...(args.cwd &&
+    args.includeCwd !== false &&
+    (!args.sourceKinds?.length || args.sourceKinds.includes('plugin'))
+      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })
       : [])
-  ]
+  ].filter((root) => rootMayContainSourceKind(root, args.sourceKinds))
   const scans = await Promise.all(roots.map((root) => scanRootShared(root, refresh)))
   const sources: SkillDiscoverySource[] = roots.map((root, index) => ({
     ...root,
@@ -288,13 +296,25 @@ export async function discoverSkills(args: {
         ? undefined
         : 'missing'
   }))
+  const normalizedNames = args.names?.map((name) => name.trim().toLowerCase()).filter(Boolean)
+  const expectedNames = normalizedNames?.length ? new Set(normalizedNames) : undefined
   const seen = new Map<string, DiscoveredSkill>()
   for (const { value } of scans) {
     for (const skill of value.skills) {
+      if (args.sourceKinds?.length && !args.sourceKinds.includes(skill.sourceKind)) {
+        continue
+      }
+      if (
+        expectedNames &&
+        !expectedNames.has(skill.name.trim().toLowerCase()) &&
+        !expectedNames.has(basename(skill.directoryPath).trim().toLowerCase())
+      ) {
+        continue
+      }
       mergeScannedSkill(seen, skill)
     }
   }
-  const skills = Array.from(seen.values()).sort(compareSkills)
+  const skills = sortDiscoveredSkills(Array.from(seen.values()))
   // Why: root *ids* — a repo/plugin id is already a hash, while its label carries
   // the repo or plugin name and its path carries the user's directory names. A
   // fully cached scan did no filesystem work, so it stays silent rather than
@@ -311,9 +331,7 @@ export async function discoverSkills(args: {
   }
   return {
     skills,
-    sources: sources.sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
-    ),
+    sources: sortSkillDiscoverySources(sources),
     scannedAt: Date.now()
   }
 }

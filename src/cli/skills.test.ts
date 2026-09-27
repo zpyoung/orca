@@ -1,6 +1,8 @@
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { delimiter } from 'node:path'
+import { delimiter, join } from 'node:path'
 import type * as CodexCliCommandModule from '../shared/node-cli-command-resolution'
 import { WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL } from '../shared/windows-batch-spawn'
 
@@ -89,6 +91,7 @@ vi.mock('./runtime-client', async () => {
 
 import { dispatch } from './dispatch'
 import { main } from './index'
+import { ORCA_SKILLS_REPOSITORY_URL } from '../shared/fork-skills-repository/skills-repository-url'
 
 describe('orca skills CLI', () => {
   beforeEach(() => {
@@ -211,7 +214,7 @@ describe('orca skills CLI', () => {
     await main(['--help'], '/tmp/repo')
 
     expect(String(logSpy.mock.calls[0]?.[0])).toContain(
-      'Usage: orca skills get <topic> [--full] [--json]'
+      'Usage: orca skills get <topic> [--full | --reference <name>] [--json]'
     )
     expect(String(logSpy.mock.calls[1]?.[0])).toContain(
       'Commands:\n  installed          List installed skill selectors'
@@ -301,7 +304,7 @@ describe('orca skills CLI', () => {
     await main(['skills', 'install', '--skill'], '/tmp/repo')
 
     expect(process.exitCode).toBe(1)
-    expect(errorSpy).toHaveBeenCalledWith('Missing required --skill')
+    expect(errorSpy).toHaveBeenCalledWith('--skill requires a value; it was passed with none.')
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
@@ -337,7 +340,7 @@ describe('orca skills CLI', () => {
     await main(['skills', 'install', '--skill', 'alpha', '--dry-run'], '/tmp/repo')
 
     expect(stdoutText(stdoutSpy)).toBe(
-      'npx --yes skills add https://github.com/stablyai/orca --skill alpha --global --agent claude-code --agent universal -y\n\n' +
+      `npx --yes skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
         'Rerun without --dry-run to install now.\n'
     )
     expect(spawnMock).not.toHaveBeenCalled()
@@ -351,8 +354,7 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command:
-            'npx --yes skills add https://github.com/stablyai/orca --skill alpha --global --agent claude-code --agent universal -y',
+          command: `npx --yes skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill alpha --global --agent claude-code --agent universal -y`,
           skills: ['alpha'],
           global: true,
           executed: false
@@ -369,7 +371,7 @@ describe('orca skills CLI', () => {
     await main(['skills', 'install', '--skill', 'alpha', '--local', '--dry-run'], '/tmp/repo')
 
     expect(stdoutText(stdoutSpy)).toBe(
-      'npx --yes skills add https://github.com/stablyai/orca --skill alpha --agent claude-code --agent universal -y\n\n' +
+      `npx --yes skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill alpha --agent claude-code --agent universal -y\n\n` +
         'Rerun without --dry-run to install now.\n'
     )
 
@@ -382,8 +384,7 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command:
-            'npx --yes skills add https://github.com/stablyai/orca --skill alpha --agent claude-code --agent universal -y',
+          command: `npx --yes skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill alpha --agent claude-code --agent universal -y`,
           skills: ['alpha'],
           global: false,
           executed: false
@@ -410,7 +411,7 @@ describe('orca skills CLI', () => {
         '--yes',
         'skills',
         'add',
-        'https://github.com/stablyai/orca',
+        ORCA_SKILLS_REPOSITORY_URL,
         '--skill',
         'alpha',
         '--agent',
@@ -445,7 +446,7 @@ describe('orca skills CLI', () => {
         '--yes',
         'skills',
         'add',
-        'https://github.com/stablyai/orca',
+        ORCA_SKILLS_REPOSITORY_URL,
         '--skill',
         'alpha',
         '--global',
@@ -493,7 +494,7 @@ describe('orca skills CLI', () => {
         '--yes',
         'skills',
         'add',
-        'https://github.com/stablyai/orca',
+        ORCA_SKILLS_REPOSITORY_URL,
         '--skill',
         'alpha',
         '--global',
@@ -523,7 +524,7 @@ describe('orca skills CLI', () => {
         '--yes',
         'skills',
         'add',
-        'https://github.com/stablyai/orca',
+        ORCA_SKILLS_REPOSITORY_URL,
         '--skill',
         'alpha',
         '--skill',
@@ -656,9 +657,16 @@ describe('orca skills CLI', () => {
   })
 
   it('puts the resolved npx directory on the child PATH', async () => {
+    // Why a real directory with a real sibling node: pairing only fires when the
+    // node it would add actually exists, so a fictional path proves nothing.
+    const npxBin = mkdtempSync(join(tmpdir(), 'orca-npx-'))
+    for (const name of ['node', 'npx']) {
+      writeFileSync(join(npxBin, name), '')
+      chmodSync(join(npxBin, name), 0o755)
+    }
     const child = createFakeChild()
     spawnMock.mockReturnValue(child)
-    resolveCliCommandMock.mockReturnValue('/home/alice/.nvm/versions/node/v22/bin/npx')
+    resolveCliCommandMock.mockReturnValue(join(npxBin, 'npx'))
     vi.stubEnv('PATH', `/usr/bin${delimiter}/bin`)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
@@ -672,10 +680,28 @@ describe('orca skills CLI', () => {
     const env = spawnMock.mock.calls[0]?.[2]?.env
     // Why: the child still needs the inherited PATH and the rest of the parent
     // environment; replacing it outright breaks git, node, HOME and npm config.
-    expect(env?.PATH).toBe(
-      `/home/alice/.nvm/versions/node/v22/bin${delimiter}/usr/bin${delimiter}/bin`
-    )
+    expect(env?.PATH).toBe(`${npxBin}${delimiter}/usr/bin${delimiter}/bin`)
     expect(env?.HOME ?? env?.USERPROFILE).toBe(process.env.HOME ?? process.env.USERPROFILE)
+  })
+
+  it('leaves PATH untouched when no node ships beside the resolved npx', async () => {
+    // Why: prepending a directory that has no node buys nothing and would shadow
+    // the caller's own ordering for every other binary the child resolves.
+    const npxBin = mkdtempSync(join(tmpdir(), 'orca-npx-bare-'))
+    writeFileSync(join(npxBin, 'npx'), '')
+    chmodSync(join(npxBin, 'npx'), 0o755)
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    resolveCliCommandMock.mockReturnValue(join(npxBin, 'npx'))
+    vi.stubEnv('PATH', `/usr/bin${delimiter}/bin`)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const resultPromise = main(['skills', 'install', '--skill', 'alpha'], '/tmp/repo')
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled())
+    child.emit('exit', 0, null)
+    await resultPromise
+
+    expect(spawnMock.mock.calls[0]?.[2]?.env?.PATH).toBe(`/usr/bin${delimiter}/bin`)
   })
 
   it('reports a Windows npx path cmd.exe would reinterpret', async () => {
@@ -870,7 +896,7 @@ describe('orca skills CLI', () => {
         '--yes',
         'skills',
         'add',
-        'https://github.com/stablyai/orca',
+        ORCA_SKILLS_REPOSITORY_URL,
         '--skill',
         'alpha',
         '--skill',
@@ -895,7 +921,7 @@ describe('orca skills CLI', () => {
     )
 
     expect(stdoutText(stdoutSpy)).toBe(
-      'npx --yes skills add https://github.com/stablyai/orca --skill alpha --global --agent claude-code --agent universal -y\n\n' +
+      `npx --yes skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
         'Rerun without --dry-run to install now.\n'
     )
     expect(spawnMock).not.toHaveBeenCalled()
@@ -913,7 +939,7 @@ describe('orca skills CLI', () => {
 
     // Why: stdout belongs to the child, so this record has to go to stderr.
     expect(stderrSpy).toHaveBeenCalledWith(
-      'Running: npx --yes skills add https://github.com/stablyai/orca --skill alpha --global --agent claude-code --agent universal -y\n'
+      `Running: npx --yes skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill alpha --global --agent claude-code --agent universal -y\n`
     )
   })
 

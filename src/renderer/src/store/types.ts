@@ -1,7 +1,7 @@
-import type { RepoSlice } from './slices/repos'
+import type { RepoSlice } from './repos/repo-state'
 import type { SparsePresetsSlice } from './slices/sparse-presets'
 import type { WorktreeSlice } from './slices/worktrees'
-import type { TerminalSlice } from './slices/terminals'
+import type { TerminalSlice } from './terminals/terminal-state'
 import type { TabsSlice } from './slices/tabs'
 import type { UISlice } from './slices/ui'
 import type { SettingsSlice } from './slices/settings'
@@ -43,6 +43,8 @@ import type { NewIssueDraftSlice } from './slices/new-issue-draft'
 import type { TaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import type { TerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
+import type { AsksSlice } from './slices/fork-ask-question-tool/asks'
+import type { LedgerSlice } from './slices/ledger'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -86,4 +88,6 @@ export type AppState = RepoSlice &
   NewIssueDraftSlice &
   TaskCreationDraftsSlice &
   RemoteServerUpdatesSlice &
-  TerminalQuickCommandHostsSlice
+  TerminalQuickCommandHostsSlice &
+  LedgerSlice &
+  AsksSlice

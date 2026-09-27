@@ -23,6 +23,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
   },
   {
+    name: 'ask',
+    keys: ['ask', 'ask wait', 'ask cancel'],
+    load: async () => (await import('./fork-ask-question-tool/handlers.js')).ASK_HANDLERS
+  },
+  {
     name: 'artifacts',
     keys: [
       'artifacts list',
@@ -32,6 +37,20 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'artifacts delete'
     ],
     load: async () => (await import('./handlers/artifacts.js')).ARTIFACT_HANDLERS
+  },
+  {
+    name: 'ledger',
+    keys: [
+      'ledger file',
+      'ledger list',
+      'ledger show',
+      'ledger edit',
+      'ledger state',
+      'ledger review',
+      'ledger revert',
+      'ledger import'
+    ],
+    load: async () => (await import('./handlers/ledger.js')).LEDGER_HANDLERS
   },
   {
     name: 'automations',
@@ -128,6 +147,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'orchestration dispatch-show',
       'orchestration coordinator-start',
       'orchestration coordinator-stop',
+      'orchestration request-show',
       'orchestration gate-create',
       'orchestration gate-resolve',
       'orchestration gate-list',
@@ -250,5 +270,10 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'skills',
     keys: ['skills list', 'skills get', 'skills install', 'skills update'],
     load: async () => (await import('./handlers/skills.js')).SKILL_HANDLERS
+  },
+  {
+    name: 'search',
+    keys: ['search'],
+    load: async () => (await import('./handlers/search.js')).SEARCH_HANDLERS
   }
 ]

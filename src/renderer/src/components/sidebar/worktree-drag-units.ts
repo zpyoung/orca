@@ -1,5 +1,6 @@
 import type { WorktreeDragGroup } from './worktree-manual-order'
 import { PINNED_GROUP_KEY } from './worktree-list/grouping/group-keys'
+import { getNaturalWorktreeIds } from './natural-worktree-ids'
 import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'
 
 export type WorktreeDragUnitGroup = WorktreeDragGroup & {
@@ -20,11 +21,7 @@ export function getWorktreeDragUnitGroups(
 ): WorktreeDragUnitGroup[] {
   const groups: WorktreeDragUnitGroup[] = []
   let current: { key: string; units: WorktreeDragUnitGroup['units'] } | null = null
-  const naturalWorktreeIds = new Set(
-    rows.flatMap((row) =>
-      row.type === 'item' && row.sectionKey !== PINNED_GROUP_KEY ? [row.worktree.id] : []
-    )
-  )
+  const naturalWorktreeIds = getNaturalWorktreeIds(rows)
 
   for (const row of rows) {
     if (row.type === 'header') {

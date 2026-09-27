@@ -7,7 +7,6 @@ import {
   type PasteTerminalTextDetail
 } from '@/constants/terminal'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
-import type { PaneFocusOwnership } from './pane-helpers'
 import type { PtyTransport } from './pty-transport'
 import type { IDisposable } from '@xterm/xterm'
 import { handleTerminalFileDrop } from './terminal-drop-handler'
@@ -27,13 +26,15 @@ import {
   releaseRendererPtyVisibilityClaim,
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
+import { activePaneIsCoveredByNativeChat } from './native-chat-covered-pane'
 
-type UseTerminalPaneGlobalEffectsArgs = Partial<PaneFocusOwnership> & {
+type UseTerminalPaneGlobalEffectsArgs = {
   tabId: string
   worktreeId: string
   cwd?: string
   isActive: boolean
   isVisible: boolean
+  isChatViewMode?: boolean
   isWorktreeActive?: boolean
   isSyncFitEnabled: boolean
   paneCount: number
@@ -63,11 +64,11 @@ function reportRendererPtyVisibility(
 
 export function useTerminalPaneGlobalEffects({
   tabId,
-  paneDockOwnsFocus,
   worktreeId,
   cwd,
   isActive,
   isVisible,
+  isChatViewMode = false,
   isWorktreeActive = isVisible,
   isSyncFitEnabled,
   paneCount,
@@ -123,8 +124,8 @@ export function useTerminalPaneGlobalEffects({
   })
   useTerminalWindowWakeRecovery({
     tabId,
-    paneDockOwnsFocus,
     isVisible: rendererVisible,
+    isChatViewMode,
     managerRef,
     isActiveRef,
     isVisibleRef,
@@ -160,8 +161,10 @@ export function useTerminalPaneGlobalEffects({
       resumeTerminalVisibility({
         manager,
         tabId,
-        paneDockOwnsFocus,
         isActive,
+        // Why: chat mode is tab-wide, but only the chat leaf's xterm is covered;
+        // a split terminal leaf that is active must still regain focus on reveal.
+        isChatViewMode: isChatViewMode && activePaneIsCoveredByNativeChat(manager),
         wasVisible,
         shouldUseLightTabResume,
         captureViewportPositions,
@@ -189,7 +192,7 @@ export function useTerminalPaneGlobalEffects({
     wasVisibleRef.current = false
     wasWorktreeActiveRef.current = isWorktreeActive
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isWorktreeActive, rendererVisible])
+  }, [isActive, isChatViewMode, isWorktreeActive, rendererVisible])
 
   useEffect(() => {
     const ptyId = isActive && isVisible && isWorktreeActive ? activeLeafPtyId : null

@@ -1,0 +1,12 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceReviewFilterRows": {
+          "hideCompleted": "병합/종료된 리뷰 숨기기",
+          "hidePassing": "통과한 검사 숨기기"
+        }
+      }
+    }
+  }
+}

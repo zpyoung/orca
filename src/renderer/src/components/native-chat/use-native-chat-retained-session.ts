@@ -4,6 +4,7 @@ import {
   encodeNativeChatTranscriptIdentity
 } from '../../../../shared/native-chat-transcript-retention'
 import {
+  isNativeChatTranscriptUnsettled,
   useNativeChatLiveSession,
   type NativeChatLiveSession,
   type UseNativeChatLiveSessionArgs
@@ -25,7 +26,8 @@ export function useNativeChatRetainedSession(
     args.transcriptPath ?? null
   ])
   const activeIdentityRef = useRef(identity)
-  const retentionRef = useRef(createNativeChatTranscriptRetention())
+  const retentionRef = useRef<ReturnType<typeof createNativeChatTranscriptRetention>>(undefined!)
+  retentionRef.current ??= createNativeChatTranscriptRetention()
   const sessionMatchesIdentity = activeIdentityRef.current === identity
   // The live hook clears its list synchronously when it rebinds, but that is a
   // queued update: a higher-priority render can observe a matching identity while
@@ -54,7 +56,7 @@ export function useNativeChatRetainedSession(
     identity,
     messages: session.messages,
     settled: readPhase === 'ready',
-    loading: readPhase === 'loading'
+    loading: isNativeChatTranscriptUnsettled(readPhase)
   })
   // A retrying or errored base read still carries live subscribe appends, so falling
   // through to them beats showing nothing — but only for a list already proven ours.

@@ -57,3 +57,49 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: M
 - **Priority**: P3
 - **Proposed owner**: terminal-dock feature owner
+
+## DEFER-6: Evaluate whether focused handoffs open transcript references
+- **Deferred**: 2026-08-24
+- **Session context**: implementing customizable session handoffs with focused context as the default
+- **Why deferred**: Orca has no cross-platform signal that a receiving agent opened the referenced transcript. The approved design excludes runtime instrumentation and requires a periodic live-agent evaluation with a synthetic transcript fact instead of a CI check.
+- **Estimated effort**: M
+- **Priority**: P2
+- **Proposed owner**: session-handoff feature owner
+
+## DEFER-7: Branch-age filter from git committerdate
+- **Deferred**: 2026-09-09
+- **Session context**: designing the sidebar workspace activity window (recency filtering)
+- **Why deferred**: the activity clock the filter uses is Orca-side (`lastActivityAt`/`lastVisitedAt`); a branch's real commit recency is captured nowhere. `repo-base-ref-search.ts:36-42` builds a `for-each-ref --sort=-committerdate` argv but its `--format` only captures refname, so the date is used for git's own sort order and discarded. Adding it means a new capture plus a sidecar cache, because `user-data-path.ts:29` records that anything refreshed on a poll cycle must not live in `orca-data.json` — that is why `githubCache` was moved out. It is also N/A for folder workspaces and unreachable on a disconnected SSH host, where `docs/reference/ssh-execution-boundary.md` requires the verdict be `unverifiable` rather than stale. Revisit once someone wants "this branch hasn't moved in 90 days" as distinct from "I haven't worked here in 90 days".
+- **Estimated effort**: M
+- **Priority**: P3
+- **Proposed owner**: workspace-activity-window feature owner
+
+## DEFER-8: Dirty/uncommitted-changes filter needs a sidebar-wide git status sweep
+- **Deferred**: 2026-09-09
+- **Session context**: designing the sidebar workspace activity window (recency filtering)
+- **Why deferred**: `gitStatusByWorktree` (`editor-git-slice.ts:27`) is populated lazily and keyed off `activeWorktreeId` — every reader is active-workspace-scoped (`use-worktree-context.ts:42`, `use-checks-panel-controller-state.tsx:65`), so there is no sidebar-wide dirty signal to filter on. `fork-dirty-branch-indicator` does not supply one either; it is a right-sidebar source-control icon override. PR/CI state is the counter-example that already works this way (`refresh-sweep-actions.ts:70` sweeps every worktree, prioritized by `lastActivityAt`), so that sweep is the pattern to copy — but it costs real IPC per workspace and a round trip per remote workspace on SSH hosts.
+- **Estimated effort**: L
+- **Priority**: P3
+- **Proposed owner**: workspace-activity-window feature owner
+
+## DEFER-9: Fold the activity-window hidden count into a single visibility pass
+- **Deferred**: 2026-09-10
+- **Why deferred**: computeActivityVisibility (src/renderer/src/components/sidebar/fork-workspace-activity-window/compute-activity-visibility.ts:16) runs computeVisibleWorktrees twice on every recompute — once filtered, once with the activity context stripped — purely to derive the hidden count, including the sort and lineage-ancestor injection both times, on a path that also re-keys on agentStatusEpoch. Folding the count into one pass changes ancestor-reinjection semantics, so it is not a mechanical refactor and was out of scope for the review-fix pass. Found during /code-review high --fix on branch zpyoung/project-filters (reviewer finding 10).
+- **Estimated effort**: M
+- **Priority**: P3
+
+
+## DEFER-10: 60 upstream files carry undeclared ledger edits that the next sync reverts
+- **Deferred**: 2026-09-12
+- **Session context**: fixing the failing checks on PR #55 (typed project and group ledgers)
+- **Why deferred**: the `fork ownership guard` does not block a fork edit to an upstream-owned file, so PR #55 is green with 60 upstream files modified but declared in neither `seams` nor `exceptions` in `config/fork-ownership.json`. Per `AGENTS.md`, an undeclared edit is reset to the upstream tag at the next sync and silently reverted — `src/shared/top-level-view.ts` (the `'ledger'` member of `TopLevelView`), `src/main/runtime/rpc/core.ts`, `src/renderer/src/store/types.ts`, and `src/shared/keybindings/definitions-core-1.ts` are representative. Declaring them means ~60 new seam entries with verbatim `lines` plus a `residuals` budget each, which is a large change unrelated to the failing checks and has its own seam-integrity failure modes. Regenerate the list with `git diff --name-only --diff-filter=M <base> HEAD`, intersected with `git ls-tree -r --name-only <upstream tag>`, minus the declared seam and exception paths.
+- **Estimated effort**: L
+- **Priority**: P2
+- **Proposed owner**: project-ledger feature owner
+## DEFER-11: AskUserQuestion suppression does not reach SSH-remote Claude launches
+- **Deferred**: 2026-09-11
+- **Session context**: wiring tech.md C6 so the suppression gate actually feeds launch composition
+- **Why deferred**: the verdict is a version read of the binary the launch will run, and for a remote launch that binary lives on the far host. Main can only run fixed relay RPCs there (`mux.request('preflight.detectAgents', …)`), so probing `claude --version` needs a new method — a wire-compatibility change that has to be capability-negotiated per `docs/reference/remote-wire-compatibility.md`, because an older host silently drops what it does not know. A remote launch therefore resolves to `'pending'`: no flags injected, no captured command stripped, byte-identical to today. The gate already keys SSH hosts by provider identity (`AskGateHostKey`), so the remaining work is the probe channel plus threading the explicit verdict at the launch sites that know their connection id.
+- **Estimated effort**: M
+- **Priority**: P3
+- **Proposed owner**: ask-question-tool feature owner

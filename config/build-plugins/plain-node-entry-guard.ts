@@ -24,8 +24,7 @@ const PLAIN_NODE_ENTRY_NAMES = [
   'parcel-watcher-process-entry',
   'computer-sidecar',
   'wsl-transcript-fs-process-entry',
-  'agent-hooks/managed-agent-hook-controls',
-  'codex/codex-app-server-grant-entry'
+  'agent-hooks/managed-agent-hook-controls'
 ] as const
 
 // Entries executed as worker threads of the main process. Electron's module is
@@ -41,7 +40,8 @@ const WORKER_THREAD_ENTRY_NAMES = [
   'session-scanner-opencode-sqlite-worker-entry',
   'session-scanner-worker-entry',
   'main-thread-hang-watchdog-entry',
-  'port-scan-command-worker-entry'
+  'port-scan-command-worker-entry',
+  'usage-scan-worker-entry'
 ] as const
 
 export const GUARDED_ENTRY_NAMES = [

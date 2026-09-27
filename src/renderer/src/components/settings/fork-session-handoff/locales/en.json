@@ -1,0 +1,43 @@
+{
+  "components": {
+    "settings": {
+      "forkSessionHandoff": {
+        "title": "Session handoff",
+        "description": "Create reusable instructions for continuing work in a new Agent session.",
+        "searchTitle": "Session handoff",
+        "searchDescription": "Create reusable instruction templates for continuing work in a new Agent session.",
+        "keywordHandoff": "handoff",
+        "keywordSession": "session",
+        "keywordTemplate": "template",
+        "keywordReusable": "reusable",
+        "keywordPrompt": "prompt",
+        "keywordInstructions": "instructions",
+        "templates": "Templates",
+        "templatesDescription": "Add a saved instruction block to any new-session handoff brief.",
+        "add": "Add template",
+        "editTemplate": "Edit {{name}}",
+        "removeTemplate": "Remove {{name}}",
+        "limitReached": "The template limit has been reached.",
+        "count": "{{count}} of {{limit}} templates",
+        "reset": "Reset to defaults",
+        "addTitle": "Add template",
+        "editTitle": "Edit template",
+        "editorDescription": "Add reusable instructions to the brief for a new Agent session.",
+        "name": "Name",
+        "duplicateName": "Another template uses this name. Both templates will remain available.",
+        "body": "Instructions",
+        "variables": "Variables: {{gitStatus}}, {{changedPaths}}, and {{openEditorTabs}}. SCREAMING_CASE aliases also work.",
+        "cancel": "Cancel",
+        "saving": "Saving…",
+        "save": "Save template",
+        "saveFailed": "Could not save templates",
+        "deleteTitle": "Delete “{{name}}”?",
+        "deleteDescription": "This template will no longer be available in the handoff dialog.",
+        "delete": "Delete",
+        "resetTitle": "Reset handoff templates?",
+        "resetDescription": "Custom templates and edits will be removed. The latest built-in defaults will return.",
+        "resetConfirm": "Reset to defaults"
+      }
+    }
+  }
+}

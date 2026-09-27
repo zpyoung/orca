@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: f32ce859047a85a3ea4f507f633604dfbf596a0e
+// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
 import { ArrowUp, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -9,6 +9,7 @@ import type {
   SessionOptionsSurface
 } from '../../../../../shared/native-chat-session-options'
 import { NativeChatSessionOptionPickers } from '../NativeChatSessionOptionPickers'
+import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 
 export type AgentComposerActionsProps = {
   attachDisabled: boolean
@@ -25,6 +26,7 @@ export type AgentComposerActionsProps = {
   onStop?: () => void
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
+  sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
 }
 
 export function AgentComposerActions({
@@ -41,7 +43,8 @@ export function AgentComposerActions({
   onSend,
   onStop,
   sessionOptionsSurface,
-  sessionOptionsSnapshot
+  sessionOptionsSnapshot,
+  sessionOptionsPickerRequest
 }: AgentComposerActionsProps): React.JSX.Element {
   const dictationLabel = isDictating
     ? translate('components.native-chat.composer.stopDictation', 'Stop dictation')
@@ -75,6 +78,7 @@ export function AgentComposerActions({
           surface={sessionOptionsSurface}
           snapshot={sessionOptionsSnapshot}
           isWorking={isWorking}
+          pickerRequest={sessionOptionsPickerRequest}
         />
         <Tooltip>
           <TooltipTrigger asChild>

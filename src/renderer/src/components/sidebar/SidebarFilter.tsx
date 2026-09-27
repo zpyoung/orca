@@ -6,7 +6,6 @@ import {
   GitBranch,
   GitCommitHorizontal,
   ListFilter,
-  Moon,
   Server,
   SquareTerminal
 } from 'lucide-react'
@@ -28,7 +27,9 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import RepoBadgeLabel from '@/components/repo/RepoBadgeLabel'
 import { FilterToggleRow } from './FilterToggleRow'
-import { useShortcutLabel } from '@/hooks/useShortcutLabel'
+import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'
+import { WorkspaceReviewFilterRows } from './fork-workspace-review-filters/WorkspaceReviewFilterRows'
+import { useWorkspaceFilterChrome } from './fork-workspace-activity-window/use-workspace-filter-chrome'
 import { searchRepos } from '@/lib/repo-search'
 import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
 import { isSleepingSweepExemptionNarrowingList } from './visible-worktrees'
@@ -49,9 +50,8 @@ const SidebarFilter = React.memo(function SidebarFilter({
 }: SidebarFilterProps) {
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
   const setShowSleepingWorkspaces = useAppStore((s) => s.setShowSleepingWorkspaces)
-  // Surface the user-assigned shortcut here so the filter menu doubles as its
-  // discovery point ('Unassigned' until they bind one in Settings → Shortcuts).
-  const sleepingShortcut = useShortcutLabel('sidebar.sleepingWorkspaces.toggle')
+  const { activeCount: forkFilterCount, clearFilters: clearForkFilters } =
+    useWorkspaceFilterChrome()
   const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
   const setHideDefaultBranchWorkspace = useAppStore((s) => s.setHideDefaultBranchWorkspace)
   const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
@@ -111,7 +111,6 @@ const SidebarFilter = React.memo(function SidebarFilter({
   }, [repos, filterRepoIds])
   const selectedCount = selectedRepoIdSet.size
   const hasRepoFilter = selectedCount > 0
-  const hasSleepingFilter = showSleepingWorkspaces !== DEFAULT_SHOW_SLEEPING_WORKSPACES
   // Why counted: turning the exemption off is the only way that row narrows the
   // list — but only while its parent row is on, which is also when it renders.
   const hasSleepingExemptionFilter = isSleepingSweepExemptionNarrowingList(
@@ -119,7 +118,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
     alwaysShowDefaultBranchWorkspace
   )
   const hasAnyFilter =
-    hasSleepingFilter ||
+    forkFilterCount > 0 ||
     hideDefaultBranchWorkspace ||
     hideAutomationGeneratedWorkspaces ||
     hideCliCreatedWorkspaces ||
@@ -127,23 +126,22 @@ const SidebarFilter = React.memo(function SidebarFilter({
     hasSleepingExemptionFilter ||
     hasRepoFilter
   const activeFilterCount =
-    (hasSleepingFilter ? 1 : 0) +
+    forkFilterCount +
     (hideDefaultBranchWorkspace ? 1 : 0) +
     (hideAutomationGeneratedWorkspaces ? 1 : 0) +
     (hideCliCreatedWorkspaces ? 1 : 0) +
     (hideDetachedHeadWorkspaces ? 1 : 0) +
     (hasSleepingExemptionFilter ? 1 : 0) +
     selectedCount
-
   const filteredRepos = useMemo(() => searchRepos(repos, query), [repos, query])
   const commandValue =
     commandValueOverride && filteredRepos.some((repo) => repo.id === commandValueOverride)
       ? commandValueOverride
       : (filteredRepos[0]?.id ?? '')
   const allSelected = canFilterRepos && selectedCount === repos.length
-
   const clearAll = useCallback(() => {
     setShowSleepingWorkspaces(DEFAULT_SHOW_SLEEPING_WORKSPACES)
+    clearForkFilters()
     setHideDefaultBranchWorkspace(false)
     setHideAutomationGeneratedWorkspaces(false)
     setHideCliCreatedWorkspaces(false)
@@ -152,6 +150,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
     setFilterRepoIds([])
   }, [
     setShowSleepingWorkspaces,
+    clearForkFilters,
     setHideDefaultBranchWorkspace,
     setHideAutomationGeneratedWorkspaces,
     setHideCliCreatedWorkspaces,
@@ -159,7 +158,6 @@ const SidebarFilter = React.memo(function SidebarFilter({
     setAlwaysShowDefaultBranchWorkspace,
     setFilterRepoIds
   ])
-
   // Why: derive ids from the live repos list at click time so a repo added
   // while the popover is open is included immediately.
   const selectAllRepos = useCallback(() => {
@@ -167,7 +165,6 @@ const SidebarFilter = React.memo(function SidebarFilter({
   }, [repos, setFilterRepoIds])
 
   const clearRepos = useCallback(() => setFilterRepoIds([]), [setFilterRepoIds])
-
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={handleOpenChange}>
       <Tooltip>
@@ -219,13 +216,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
         className="w-72"
         data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
       >
-        <FilterToggleRow
-          icon={<Moon className="size-3.5" />}
-          label={translate('auto.components.sidebar.SidebarFilter.638a2d221d', 'Hide sleeping')}
-          checked={!showSleepingWorkspaces}
-          onChange={(hideSleeping) => setShowSleepingWorkspaces(!hideSleeping)}
-          shortcutLabel={sleepingShortcut === 'Unassigned' ? undefined : sleepingShortcut}
-        />
+        <WorkspaceActivityWindowControl />
         {/* Why gated: the exemption only has an effect while sleeping workspaces
             are being swept, so it stays hidden until its parent row is on. */}
         {!showSleepingWorkspaces && (
@@ -244,6 +235,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
             onChange={setAlwaysShowDefaultBranchWorkspace}
           />
         )}
+        <WorkspaceReviewFilterRows />
         <FilterToggleRow
           icon={<GitBranch className="size-3.5" />}
           label={translate(

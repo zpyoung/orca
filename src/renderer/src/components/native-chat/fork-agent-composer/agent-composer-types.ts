@@ -12,6 +12,9 @@ export type AgentComposerCoreProps = {
   agent: AgentType
   /** Guard desktop input while a mobile client owns the terminal input lease. */
   canSend?: boolean
+  /** Host sends through its own transport rather than a PTY, so a null targetPtyId
+   *  must not disable the composer. */
+  allowWithoutTarget?: boolean
   /** Disables submission without disabling draft editing or attachments. */
   sendDisabled?: boolean
   /** Host-specific fixed-height layout; omitted by native chat. */

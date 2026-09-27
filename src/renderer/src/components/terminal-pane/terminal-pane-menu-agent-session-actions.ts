@@ -5,7 +5,7 @@ import {
   prepareAgentSessionForkFromPane,
   type PreparedAgentSessionFork
 } from './terminal-agent-session-fork'
-import { prepareAgentSessionContinuationFromPane } from './terminal-agent-session-continuation'
+import { prepareAgentSessionContinuationFromPane } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-pane'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
 
 export type TerminalPaneMenuAgentSessionContext = {

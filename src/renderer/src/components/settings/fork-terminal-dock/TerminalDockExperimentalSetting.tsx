@@ -15,6 +15,7 @@ export function TerminalDockExperimentalSetting({
   updateSettings
 }: TerminalDockExperimentalSettingProps): React.JSX.Element {
   const enabled = settings.experimentalTerminalDock === true
+  const autoOpen = settings.dockTerminalComposerByDefault !== false
 
   return (
     <SearchableSetting
@@ -58,6 +59,38 @@ export function TerminalDockExperimentalSetting({
           }
         />
       </div>
+      {enabled ? (
+        <div className="ml-4 space-y-3 border-l border-border pl-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 shrink space-y-0.5">
+              <Label>
+                {translate(
+                  'auto.components.settings.ExperimentalPane.terminalDock.autoOpenTitle',
+                  'Open automatically for new sessions'
+                )}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {translate(
+                  'auto.components.settings.ExperimentalPane.terminalDock.autoOpenCopy',
+                  'Open the composer dock automatically when a supported coding-agent session starts.'
+                )}
+              </p>
+            </div>
+            <SettingsSwitch
+              checked={autoOpen}
+              ariaLabel={translate(
+                'auto.components.settings.ExperimentalPane.terminalDock.autoOpenToggleLabel',
+                'Toggle automatic terminal dock opening'
+              )}
+              onChange={() =>
+                updateSettings({
+                  dockTerminalComposerByDefault: !autoOpen
+                })
+              }
+            />
+          </div>
+        </div>
+      ) : null}
     </SearchableSetting>
   )
 }

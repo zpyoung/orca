@@ -5,7 +5,7 @@ import { useWorktreeCardActivationActions } from './use-worktree-card-activation
 import { useWorktreeCardFoundation } from './use-worktree-card-foundation'
 import { useWorktreeCardLifecycleEffects } from './use-worktree-card-lifecycle-effects'
 import { useWorktreeCardLinkedDetails } from './use-worktree-card-linked-details'
-import { useWorktreeCardReviewDetails } from './use-worktree-card-review-details'
+import { useWorktreeCardReviewDetails } from './fork-workspace-review-filters/use-worktree-card-review-details'
 import { useWorktreeCardSecondaryDetails } from './use-worktree-card-secondary-details'
 import { useWorktreeCardWorkspaceActions } from './use-worktree-card-workspace-actions'
 
@@ -74,6 +74,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     isActive: props.isActive,
     activationRowKey: props.activationRowKey,
     onActivate: props.onActivate,
+    onWorktreeCardClick: props.onWorktreeCardClick,
     onImmediateActivate: props.onImmediateActivate,
     isDeleting: linked.isDeleting,
     isSshDisconnected: foundation.isSshDisconnected,

@@ -64,11 +64,14 @@ export function normalizeRightSidebarTab(tab: unknown): PersistedState['ui']['ri
     tab === 'explorer' ||
     tab === 'search' ||
     tab === 'vault' ||
+    tab === 'session-info' ||
+    tab === 'ask' ||
     tab === 'workspaces' ||
     tab === 'pr-checks' ||
     tab === 'source-control' ||
     tab === 'checks' ||
-    tab === 'ports'
+    tab === 'ports' ||
+    tab === 'ledger'
   ) {
     return tab
   }

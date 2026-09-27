@@ -112,6 +112,9 @@ export function SidebarWorktreeListDialogs({
           }
         }}
         onConfirm={dialogs.handleConfirmDeleteProjectGroup}
+        ledgerPreview={deleteDialog?.ledgerPreview}
+        ledgerPreviewLoading={deleteDialog?.ledgerPreviewLoading}
+        ledgerPreviewError={deleteDialog?.ledgerPreviewError}
       />
     </>
   )

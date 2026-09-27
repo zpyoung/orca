@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
+import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { AgentType } from '../../../../../shared/agent-status-types'
 import { isTuiAgent } from '../../../../../shared/tui-agent-config'
 import { cn } from '@/lib/utils'
@@ -8,13 +8,14 @@ import { TerminalDockComposer } from './TerminalDockComposer'
 import type { AgentComposerHandle } from '../../native-chat/fork-agent-composer/agent-composer-types'
 import { resolveComposerSendTier } from '../../native-chat/fork-agent-composer/composer-send-tier'
 import { DEFAULT_GUTTER_ROWS } from './terminal-dock-pane-state'
+import { useNativeChatPasteBridge } from '../../native-chat/use-native-chat-paste-bridge'
 
 // Row height mirrors the composer field's text-sm/leading-5 (20px) so a
 // gutterRows count tracks visible textarea lines; the remainder covers the
 // composer's own card padding and action row, which don't scale with rows.
 export const TERMINAL_DOCK_ROW_HEIGHT_PX = 20
 const ROW_HEIGHT_PX = TERMINAL_DOCK_ROW_HEIGHT_PX
-const CHROME_HEIGHT_PX = 96
+const CHROME_HEIGHT_PX = 80
 
 // A gutter that fits exactly is still useless — the terminal above it is the
 // ground truth the user watches their text land in, so undocking must leave
@@ -115,6 +116,16 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
         })
       : 'input'
     const composerRef = useRef<AgentComposerHandle>(null)
+    // Why: the root only exists once auto-undock lets the dock render, and a ref mutation
+    // would not re-run the bridge's subscribe effect — so track the node as state and hand
+    // the bridge a fresh ref identity each time it appears.
+    const [rootNode, setRootNode] = useState<HTMLDivElement | null>(null)
+    const rootRef = useMemo(() => ({ current: rootNode }), [rootNode])
+    // Why: TerminalPane owns Cmd/Ctrl+V for the whole pane and preventDefaults the keydown
+    // before a paste event exists; the root's data-native-chat-root marker makes it yield,
+    // and this bridge is what then claims the event for the composer.
+    const questionAnswerInputRef = useRef<HTMLInputElement>(null)
+    useNativeChatPasteBridge({ rootRef, composerRef, questionAnswerInputRef })
     // Why: exposes the mounted composer's imperative handle to the host so it can move
     // keyboard focus onto the dock (dock entry, passthrough exit) without reaching past this
     // component's own mount/auto-undock gating.
@@ -150,9 +161,11 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
 
     return (
       <div
+        ref={setRootNode}
         className="flex shrink-0 flex-col border-t border-border bg-background"
         style={{ height: terminalDockGutterHeightPx(gutterRows) }}
         data-pane-prevent-terminal-focus
+        data-native-chat-root="true"
         data-terminal-dock=""
         data-terminal-dock-passthrough={props.passthroughActive ? '' : undefined}
       >
@@ -182,6 +195,7 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
               canSend={disabledReason === null && !props.passthroughActive}
               sendTier={sendTier}
               readTerminalScreen={props.readTerminalScreen}
+              answerInputRef={questionAnswerInputRef}
               onSendOutcome={(outcome) => emitTerminalDockSendOutcome({ outcome, agent })}
             />
           </div>

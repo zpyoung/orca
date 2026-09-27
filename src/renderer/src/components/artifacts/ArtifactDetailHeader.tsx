@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Globe, X } from 'lucide-react'
 import type { ArtifactListItem } from '../../../../shared/artifacts'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { ArtifactActions } from './ArtifactActions'
 import {
@@ -10,6 +10,7 @@ import {
   formatArtifactUpdatedAt,
   formatByteSize
 } from './artifact-display-labels'
+import { ArtifactLinkAudience } from './fork-artifact-passwords/artifact-protection-display'
 
 export function ArtifactDetailHeader({
   deleting,
@@ -36,19 +37,8 @@ export function ArtifactDetailHeader({
             <TooltipTrigger asChild>
               <Globe className="size-3 shrink-0 text-muted-foreground" />
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {translate(
-                'auto.components.artifacts.ArtifactDetailHeader.publicLink',
-                'Anyone with this link can view it'
-              )}
-            </TooltipContent>
+            <ArtifactLinkAudience item={item} />
           </Tooltip>
-          <span className="sr-only">
-            {translate(
-              'auto.components.artifacts.ArtifactDetailHeader.publicLink',
-              'Anyone with this link can view it'
-            )}
-          </span>
           <p className="truncate font-mono text-xs text-muted-foreground">{item.shareUrl}</p>
         </div>
         <p className="truncate text-[11px] text-muted-foreground">

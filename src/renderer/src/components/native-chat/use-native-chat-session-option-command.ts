@@ -13,6 +13,7 @@ import {
   type ClaudeModelSwitchConfirmationObserver
 } from './claude-model-switch-confirmation'
 import type { NativeChatSessionOptionDispatchCommand } from './native-chat-session-option-command-dispatch'
+import { subscribeTerminalInputQuarantine } from '../terminal-pane/terminal-input-quarantine'
 
 export function useNativeChatSessionOptionCommand(args: {
   agent: AgentType
@@ -48,7 +49,7 @@ export function useNativeChatSessionOptionCommand(args: {
     }
   }, [])
 
-  const dispatch = useCallback(
+  const dispatch = useCallback<NativeChatSessionOptionDispatchCommand>(
     async (command, options) => {
       const target = resolveTarget()
       if (!target || disabled) {
@@ -59,7 +60,19 @@ export function useNativeChatSessionOptionCommand(args: {
       // Why: block composer chat sends for the whole drain+observe+verify window.
       setIsDispatching(true)
       let observer: ClaudeModelSwitchConfirmationObserver | null = null
+      const unsubscribeQuarantine = subscribeTerminalInputQuarantine(
+        target.terminalTabId,
+        (armed) => {
+          if (armed) {
+            sendController.abort()
+            observer?.dispose()
+          }
+        }
+      )
       try {
+        if (!mountedRef.current || sendController.signal.aborted) {
+          throw new Error('Chat UI command was canceled because the composer closed.')
+        }
         // Why: chat sends keep a delayed Enter for 500ms. Drain them *before*
         // arming the model-switch observer so (a) that Enter cannot hit Claude's
         // confirmation UI and (b) any Ctrl+U cleanup is outside the observation
@@ -88,18 +101,8 @@ export function useNativeChatSessionOptionCommand(args: {
         }
         const accepted =
           agent === 'codex'
-            ? await typeNativeChatCommand(
-                target.settings,
-                target.ptyId,
-                command,
-                sendController.signal
-              )
-            : await sendNativeChatMessageVerified(
-                target.settings,
-                target.ptyId,
-                command,
-                sendController.signal
-              )
+            ? await typeNativeChatCommand(target, command, sendController.signal)
+            : await sendNativeChatMessageVerified(target, command, sendController.signal)
         if (!accepted) {
           throw new Error('The terminal did not accept the command.')
         }
@@ -116,6 +119,7 @@ export function useNativeChatSessionOptionCommand(args: {
         const outcome = observer ? await observer.result : undefined
         return { outcome }
       } finally {
+        unsubscribeQuarantine()
         activeSendsRef.current.delete(sendController)
         setIsDispatching(activeSendsRef.current.size > 0)
         if (observer) {

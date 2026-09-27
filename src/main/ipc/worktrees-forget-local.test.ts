@@ -52,6 +52,9 @@ vi.mock('./worktree-symlinks', async () =>
   (await import('./worktrees-test-module-mocks')).worktreeSymlinksModuleMock()
 )
 vi.mock('./ssh', async () => (await import('./worktrees-test-module-mocks')).sshModuleMock())
+vi.mock('../ssh/ssh-target-registry', async () =>
+  (await import('./worktrees-test-module-mocks')).sshTargetRegistryModuleMock()
+)
 vi.mock('../hooks', async () => (await import('./worktrees-test-module-mocks')).hooksModuleMock())
 vi.mock('../setup-runner-script-text', async (importOriginal) =>
   (await import('./worktrees-test-module-mocks')).setupRunnerScriptTextModuleMock(
@@ -135,6 +138,7 @@ describe('registerWorktreeHandlers', () => {
         resolvedConnectionId: 'ssh-dead',
         localProvider: ptyProvider,
         onPtyStopped: clearProviderPtyStateMock,
+        closeStructuredSessions: true,
         includeProviderInventory: false,
         includeLocalRegistry: false
       })
@@ -150,6 +154,22 @@ describe('registerWorktreeHandlers', () => {
       expect(getSshGitProviderMock).not.toHaveBeenCalled()
       expect(getSshFilesystemProviderMock).not.toHaveBeenCalled()
       expect(listWorktreesMock).not.toHaveBeenCalled()
+      expect(removeWorktreeMock).not.toHaveBeenCalled()
+    })
+
+    it('purges metadata after a rejected best-effort PTY sweep', async () => {
+      const worktreeId = 'repo-1::/workspace/feature-wt'
+      killAllProcessesForWorktreeMock.mockRejectedValue(new Error('terminal inventory unavailable'))
+
+      await expect(handlers['worktrees:forgetLocal'](null, { worktreeId })).resolves.toEqual({})
+
+      expect(store.removeWorktreeMeta).toHaveBeenCalledWith(worktreeId, 'local')
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('worktrees:changed', {
+        repoId: 'repo-1'
+      })
+      expect(store.removeWorktreeMeta.mock.invocationCallOrder[0]).toBeLessThan(
+        mainWindow.webContents.send.mock.invocationCallOrder[0]
+      )
       expect(removeWorktreeMock).not.toHaveBeenCalled()
     })
 
@@ -172,6 +192,7 @@ describe('registerWorktreeHandlers', () => {
         resolvedConnectionId: 'ssh-live',
         localProvider: sshProvider,
         onPtyStopped: clearProviderPtyStateMock,
+        closeStructuredSessions: true,
         includeProviderInventory: true,
         includeLocalRegistry: false
       })

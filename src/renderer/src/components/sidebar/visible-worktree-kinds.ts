@@ -1,4 +1,6 @@
 import type { ExecutionHostId, ExecutionHostScope } from '../../../../shared/execution-host'
+import type { WorkspaceActivityWindowState } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'
+import type { WorkspaceReviewFilterState } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
 
@@ -48,8 +50,7 @@ export function isDetachedHeadWorkspace(worktree: Worktree): boolean {
   return getWorktreeGitIdentityDisplay(worktree)?.kind === 'detached'
 }
 
-/** Inputs describing sidebar filter settings that the Clear Filters path owns. */
-export type SidebarFilterState = {
+type BaseSidebarFilterState = {
   showSleepingWorkspaces: boolean
   filterRepoIds: readonly string[]
   hideDefaultBranchWorkspace: boolean
@@ -62,6 +63,10 @@ export type SidebarFilterState = {
   visibleWorkspaceHostIds?: readonly ExecutionHostId[] | null
   workspaceHostScope?: ExecutionHostScope
 }
+
+export type SidebarFilterState = BaseSidebarFilterState &
+  Partial<WorkspaceActivityWindowState> &
+  Partial<WorkspaceReviewFilterState>
 
 /**
  * Whether at least one sidebar filter is active — drives the "Clear Filters"

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react'
 import { useAppStore } from '../../store'
 import { sendNativeChatTypedCommand } from './native-chat-runtime-send'
 import { isSlashCommandDraft } from '../../../../shared/native-chat-slash-commands'
@@ -10,7 +10,6 @@ import {
   type AgentComposerHostBridges
 } from './fork-agent-composer/AgentComposer'
 import { resolveNativeChatLaunchDraftSend } from './native-chat-launch-draft-send'
-import { getVerifiedNativeChatCommands } from '../../../../shared/native-chat-agent-profiles'
 import { useNativeChatLaunchDraftAdoption } from './use-native-chat-launch-draft-adoption'
 import { AgentComposerField } from './fork-agent-composer/AgentComposerField'
 import { nativeChatComposerTargetIsRemote } from './native-chat-composer-target'
@@ -23,6 +22,9 @@ import { useNativeChatDictationActions } from './use-native-chat-dictation-actio
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
 import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
+import { useNativeChatComposerCatalog } from './use-native-chat-composer-catalog'
+import { useNativeChatStructuredComposerSend } from './use-native-chat-structured-composer-send'
+import { useNativeChatWorkspaceFileDrop } from './use-native-chat-workspace-file-drop'
 import { seedHistory } from './fork-agent-composer/agent-composer-history'
 import type {
   NativeChatComposerHandle,
@@ -48,8 +50,8 @@ export type {
  * session-option wiring) and builds its bridges from the exact same core
  * state it renders, so draft and caret never desync from another host.
  */
-export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
-  function NativeChatComposer(
+const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
+  function NativeChatComposerPane(
     {
       terminalTabId,
       paneKey,
@@ -68,9 +70,9 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       onSlashCommand,
       onSwitchToTerminal,
       readTerminalScreen,
-      launchDraft,
-      launchDraftResolved = false,
-      reportedSessionOptions
+      launchSeed,
+      reportedSessionOptions,
+      structuredTransport
     },
     ref
   ): React.JSX.Element {
@@ -80,6 +82,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       targetPtyId,
       agent,
       canSend,
+      allowWithoutTarget: Boolean(structuredTransport),
       sendDisabled,
       layout,
       isWorking,
@@ -100,14 +103,18 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
     useNativeChatLaunchDraftAdoption({
       terminalTabId,
       agent,
-      launchDraft,
-      launchDraftResolved,
+      launchDraft: launchSeed?.launchDraft,
+      launchDraftResolved: launchSeed?.launchDraftResolved === true,
+      ownsTabWideLaunchDraft: launchSeed?.ownsTabWideLaunchDraft === true,
       draft: core.draft,
       setDraft: core.setDraft,
       setCaret: core.setCaret
     })
 
-    const agentCommands = useMemo(() => getVerifiedNativeChatCommands(agent), [agent])
+    const { agentCommands, sessionSkillNames } = useNativeChatComposerCatalog(
+      agent,
+      structuredTransport
+    )
     const picker = useNativeChatPickerState({
       agent,
       terminalTabId,
@@ -115,6 +122,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       draft: core.draft,
       caret: core.caret,
       agentCommands,
+      sessionSkillNames,
       textareaRef: core.textareaRef,
       setDraft: core.setDraft,
       setCaret: core.setCaret,
@@ -125,20 +133,36 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       imageAttachments,
       attachResolvedPaths,
       clearImageAttachments,
+      flushPendingAttachments,
       restoreImageAttachments,
-      removeImageAttachment
+      removeImageAttachment,
+      beginPendingImageAttachment,
+      resolvePendingImageAttachment,
+      dropPendingImageAttachment
     } = useNativeChatComposerAttachments({
       attachmentScopeKey: paneKey,
+      allowWithoutTarget: Boolean(structuredTransport),
       caret: core.caret,
+      disabled: core.disabled,
+      isComposing: core.imeEnterGesture.isComposing,
       resolveTarget: core.resolveTarget,
       textareaRef: core.textareaRef,
       setCaret: core.setCaret,
       setDraft: core.setDraft,
       setNotice: core.setNotice
     })
+    useNativeChatWorkspaceFileDrop({
+      terminalTabId,
+      structuredWorktreeId: structuredTransport?.worktreeId,
+      disabled: core.disabled,
+      paneKey,
+      attachResolvedPaths,
+      setNotice: core.setNotice
+    })
 
     const { attachExternalPaths, resolveAttachmentOwner } = useNativeChatExternalAttachments({
       terminalTabId,
+      structuredWorktreeId: structuredTransport?.worktreeId,
       disabled: core.disabled,
       attachResolvedPaths,
       setNotice: core.setNotice
@@ -150,12 +174,15 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       caret: core.caret,
       resolveAttachmentOwner,
       attachResolvedPaths,
+      beginPendingImageAttachment,
+      resolvePendingImageAttachment,
+      dropPendingImageAttachment,
       insertTypedText: core.insertTypedText,
       setCaret: core.setCaret,
       setNotice: core.setNotice
     })
 
-    const { pickAttachment } = useNativeChatFileAttachmentActions(attachExternalPaths)
+    const { pickAttachment } = useNativeChatFileAttachmentActions(paneKey, attachExternalPaths)
     const [dictationPressed, setDictationPressed] = useState(false)
     const { toggleDictation, startHoldDictation, stopHoldDictation } =
       useNativeChatDictationActions({ textareaRef: core.textareaRef, setDictationPressed })
@@ -178,7 +205,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         setHistory: core.setHistory
       })
 
-    const { surface: sessionOptionsSurface, snapshot: sessionOptionsSnapshot } =
+    const { surface: ptySessionOptionsSurface, snapshot: ptySessionOptionsSnapshot } =
       useNativeChatSessionOptions({
         agent,
         terminalTabId,
@@ -188,8 +215,22 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         readTerminalScreen,
         reportedSessionOptions
       })
+    const sessionOptionsSurface = structuredTransport?.optionsSurface ?? ptySessionOptionsSurface
+    const sessionOptionsSnapshot = structuredTransport?.optionSnapshot ?? ptySessionOptionsSnapshot
 
-    const dispatchPickerCommand = useNativeChatPickerCommandDispatch({
+    const sendStructured = useNativeChatStructuredComposerSend({
+      agent,
+      draft: core.draft,
+      imageAttachments,
+      structuredTransport,
+      clearImageAttachments,
+      clearSkillOrigin: picker.clearSkillOrigin,
+      setHistory: core.setHistory,
+      setDraft: core.setDraft,
+      setCaret: core.setCaret
+    })
+
+    const dispatchPtyPickerCommand = useNativeChatPickerCommandDispatch({
       agent,
       disabled: core.disabled,
       isDispatchingSessionOption,
@@ -199,7 +240,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       readTerminalScreen,
       resolveTarget: core.resolveTarget,
       onSlashCommand,
-      sessionOptionsSurface,
+      sessionOptionsSurface: ptySessionOptionsSurface,
       trackPendingSend: core.trackPendingSend,
       setHistory: core.setHistory,
       setDraft: core.setDraft,
@@ -211,8 +252,29 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       restoreImageAttachments,
       setNotice: core.setNotice
     })
+    const dispatchPickerCommand = useCallback(
+      (command: Parameters<typeof dispatchPtyPickerCommand>[0]) => {
+        if (structuredTransport) {
+          sendStructured(`/${command.name}`)
+          return
+        }
+        dispatchPtyPickerCommand(command)
+      },
+      [dispatchPtyPickerCommand, sendStructured, structuredTransport]
+    )
 
     const bridges: AgentComposerHostBridges = {
+      // A structured session sends over its own journal transport, never the PTY.
+      ...(structuredTransport
+        ? {
+            sendOverride: () => {
+              if ((core.draft.trim() !== '' || imageAttachments.length > 0) && !core.disabled) {
+                sendStructured(core.draft, imageAttachments)
+              }
+            }
+          }
+        : {}),
+      flushPendingAttachments,
       autocomplete: picker.autocomplete,
       pickerListboxId: picker.listboxId,
       classifySend: picker.classifySend,
@@ -250,17 +312,17 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       sessionOptionsSnapshot,
       isDispatchingSessionOption,
       onSlashCommand,
-      onCommandDispatched: (command) => sessionOptionsSurface?.recordOutgoingCommand(command),
+      onCommandDispatched: (command) => ptySessionOptionsSurface?.recordOutgoingCommand(command),
       // Codex's TUI only autocompletes a slash command it sees typed; a pasted
       // one lands as literal text.
       sendTypedCommand: (target, text) =>
         agent === 'codex' && isSlashCommandDraft(text)
-          ? sendNativeChatTypedCommand(target.settings, target.ptyId, text)
+          ? sendNativeChatTypedCommand(target, text)
           : null,
       buildSendOptions: () =>
         resolveNativeChatLaunchDraftSend({
-          launchDraft,
-          launchDraftResolved,
+          launchDraft: launchSeed?.launchDraft,
+          launchDraftResolved: launchSeed?.launchDraftResolved === true,
           agent,
           readScreen: () => readTerminalScreen?.() ?? null
         }).sendOptions,
@@ -288,6 +350,17 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       [core.focus, core.insertTypedText, handlePaste, pasteFromClipboard]
     )
 
-    return <AgentComposerField {...fieldProps} />
+    return (
+      <AgentComposerField
+        {...fieldProps}
+        sessionOptionsPickerRequest={structuredTransport?.optionPickerRequest ?? null}
+      />
+    )
+  }
+)
+
+export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
+  function NativeChatComposer(props, ref): React.JSX.Element {
+    return <NativeChatComposerPane key={props.paneKey} {...props} ref={ref} />
   }
 )

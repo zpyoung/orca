@@ -24,10 +24,12 @@ import {
 } from '../listing/detected-worktree-meta'
 import { persistPassiveWorktreeMetaForOwner } from '../listing/worktree-owner-settings'
 import { resolveActivatedWorktreeSurface } from './active-worktree-surface'
+import { clearWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import {
   pendingActivationTerminalPrepCancels,
   shouldDeferActivationTerminalPrep
 } from './activation-terminal-prep'
+import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'
 
 export function createSetActiveWorktree(
   set: WorktreeSliceSet,
@@ -42,6 +44,8 @@ export function createSetActiveWorktree(
       return false
     }
     const workspaceScope = worktreeId ? parseWorkspaceKey(worktreeId) : null
+    const previousWorkspaceId = get().activeWorktreeId
+    const previousHostId = get().activeWorkspaceExecutionHostId
     if (worktreeId && shouldDeferActivationTerminalPrep()) {
       markInputQuietSchedulerInput()
     }
@@ -74,7 +78,14 @@ export function createSetActiveWorktree(
           activeWorkspaceKey: null,
           activeWorkspaceExecutionHostId: null,
           // Why: clearing/activating a worktree must dismiss the background-creation panel so the user isn't stranded on it.
-          activePendingCreationId: null
+          activePendingCreationId: null,
+          ...workspaceActivityExitPatchForActivation(
+            s,
+            previousWorkspaceId,
+            previousHostId,
+            null,
+            null
+          )
         }
       }
 
@@ -202,24 +213,36 @@ export function createSetActiveWorktree(
         ...(nextFolderWorkspaces !== s.folderWorkspaces
           ? { folderWorkspaces: nextFolderWorkspaces }
           : {}),
-        ...tabsByWorktreeUpdate
+        ...tabsByWorktreeUpdate,
+        ...workspaceActivityExitPatchForActivation(
+          s,
+          previousWorkspaceId,
+          previousHostId,
+          worktreeId,
+          executionHostId ?? null
+        )
       }
     })
+
+    // Why: any activation is an explicit wake (null is the sleep flow clearing selection).
+    // Cleared after the set() above so a pane still waiting on the marker connects once,
+    // in the remounted generation, instead of connecting and then being remounted.
+    clearWorktreeSleepIntent(worktreeId)
 
     if (worktreeId && shouldPrepareTerminalTabs) {
       const prepareTerminalTabs = (): void => {
         pendingActivationTerminalPrepCancels.delete(worktreeId)
         set((s) => {
           if (s.activeWorktreeId !== worktreeId) {
-            return {}
+            return s
           }
           const tabs = s.tabsByWorktree[worktreeId] ?? []
           if (tabs.length === 0) {
-            return {}
+            return s
           }
           const allDead = tabs.every((tab) => !tabHasLivePty(s.ptyIdsByTabId, tab.id))
           if (!allDead && !shouldTagTerminalTabs) {
-            return {}
+            return s
           }
           return {
             tabsByWorktree: {

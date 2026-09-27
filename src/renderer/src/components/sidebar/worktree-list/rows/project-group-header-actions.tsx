@@ -1,5 +1,5 @@
 import React from 'react'
-import { Ellipsis, Plus } from 'lucide-react'
+import { BookOpen, Ellipsis, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -13,6 +13,7 @@ import { translate } from '@/i18n/i18n'
 import { getFolderWorkspacePathStatusDescription } from '@/lib/folder-workspace-path-status'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { FolderWorkspacePathStatus } from '../../../../../../shared/folder-workspace-path-status'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { REPO_HEADER_ACTION_BUTTON_CLASS } from '../../repo-header-action-button-class'
 import {
   handleRepoHeaderActionPointerDown,
@@ -22,14 +23,19 @@ import {
 
 export function ProjectGroupHeaderMenu({
   groupId,
+  hostId,
   label,
   onRename,
-  onDelete
+  onDelete,
+  onOpenLedger
 }: {
   groupId: string
+  /** Owner host of the group row, so rename/delete route to the host that holds it. */
+  hostId?: ExecutionHostId
   label: string
-  onRename: (groupId: string, currentName: string) => void
-  onDelete: (groupId: string, groupName: string) => void
+  onRename: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
+  onDelete: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
+  onOpenLedger?: () => void
 }): React.JSX.Element {
   return (
     <DropdownMenu modal={false}>
@@ -64,10 +70,16 @@ export function ProjectGroupHeaderMenu({
         onClick={stopRepoHeaderMenuEvent}
         onKeyDown={stopRepoHeaderMenuEvent}
       >
-        <DropdownMenuItem onSelect={() => onRename(groupId, label)}>
+        {onOpenLedger ? (
+          <DropdownMenuItem onSelect={onOpenLedger}>
+            <BookOpen className="size-3.5" />
+            {translate('auto.components.sidebar.WorktreeList.openLedger', 'Open ledger')}
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onSelect={() => onRename(groupId, label, hostId)}>
           {translate('auto.components.sidebar.WorktreeList.4d7b73658c', 'Rename group')}
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onSelect={() => onDelete(groupId, label)}>
+        <DropdownMenuItem variant="destructive" onSelect={() => onDelete(groupId, label, hostId)}>
           {translate('auto.components.sidebar.WorktreeList.902115cdbe', 'Delete group')}
         </DropdownMenuItem>
       </DropdownMenuContent>

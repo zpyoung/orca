@@ -3,7 +3,12 @@ import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTime, formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 
 export function artifactName(item: ArtifactListItem): string {
-  return item.artifact.title || item.artifact.originalFileName || item.artifact.slug
+  return (
+    item.local?.displayName ||
+    item.artifact.title ||
+    item.artifact.originalFileName ||
+    item.artifact.slug
+  )
 }
 
 export function formatByteSize(value: number): string {
@@ -55,10 +60,10 @@ export function formatArtifactExpiryCompact(value: string): string {
 }
 
 export function artifactTypeLabel(item: ArtifactListItem): string {
-  if (item.artifact.sourceContentType === 'text/markdown') {
+  if ((item.local?.sourceContentType ?? item.artifact.sourceContentType) === 'text/markdown') {
     return translate('auto.components.artifacts.typeMarkdown', 'Markdown')
   }
-  if (item.artifact.sourceContentType === 'text/html') {
+  if ((item.local?.sourceContentType ?? item.artifact.sourceContentType) === 'text/html') {
     return translate('auto.components.artifacts.typeHtml', 'HTML')
   }
   return item.artifact.sourceContentType

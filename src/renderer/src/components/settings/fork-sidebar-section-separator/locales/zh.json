@@ -1,0 +1,13 @@
+{
+  "fork": {
+    "sidebarSectionSeparator": {
+      "title": "侧边栏分区分隔线",
+      "description": "在顶级项目和分组之间显示分隔线。",
+      "keywordSidebar": "侧边栏",
+      "keywordSeparator": "分隔线",
+      "keywordDivider": "分隔符",
+      "keywordProject": "项目",
+      "keywordGroup": "分组"
+    }
+  }
+}

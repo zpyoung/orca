@@ -1,0 +1,11 @@
+{
+  "components": {
+    "rightSidebar": {
+      "dirtyBranchIndicator": {
+        "oneChange": "Control de código fuente — 1 cambio sin confirmar",
+        "manyChanges": "Control de código fuente — {{value0}} cambios sin confirmar",
+        "cappedChanges": "Control de código fuente — {{value0}}+ cambios sin confirmar"
+      }
+    }
+  }
+}

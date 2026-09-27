@@ -7,6 +7,7 @@ import { translateSearchKeyword } from './settings-search-keywords'
 import { getRepositoryGitAuthorSearchEntries } from './repository-git-author-search-entries'
 import { getRepositoryGitHooksSearchEntries } from './repository-git-hooks-search-entries'
 import { getRepositoryGitWorktreeSearchEntries } from './repository-git-worktree-search-entries'
+import { getRepositoryLedgerSearchEntries } from './repository-ledger-search-entries'
 
 type RepositoryPaneSearchOptions = {
   isLocalWindowsProject?: boolean
@@ -76,6 +77,40 @@ export function getRepositoryPaneSearchEntries(
         )
       ]
     },
+    ...(!isFolder
+      ? [
+          {
+            title: translate(
+              'auto.components.settings.repository.search.githubAccount',
+              'GitHub Account'
+            ),
+            description: translate(
+              'auto.components.settings.repository.search.githubAccountDescription',
+              'Bind a keyring gh login for this project’s GitHub API calls.'
+            ),
+            keywords: [
+              repo.displayName,
+              ...translateSearchKeyword(
+                'auto.components.settings.repository.search.9dc60d7f6d',
+                'github'
+              ),
+              ...translateSearchKeyword(
+                'auto.components.settings.repository.search.githubAccountKeyword',
+                'github account'
+              ),
+              ...translateSearchKeyword(
+                'auto.components.settings.repository.search.ghAccount',
+                'gh account'
+              ),
+              ...translateSearchKeyword(
+                'auto.components.settings.repository.search.login',
+                'login'
+              ),
+              ...translateSearchKeyword('auto.components.settings.repository.search.token', 'token')
+            ]
+          }
+        ]
+      : []),
     ...(repo.upstream && !isFolder
       ? [
           {
@@ -163,6 +198,7 @@ export function getRepositoryPaneSearchEntries(
           }
         ]),
     ...(isFolder ? [] : getRepositoryGitWorktreeSearchEntries(repo)),
+    ...(isFolder ? [] : getRepositoryLedgerSearchEntries(repo)),
     {
       title: translate('auto.components.settings.repository.search.c5266c2c9d', 'Remove Project'),
       description: translate(

@@ -1,4 +1,8 @@
 import type { WorkspaceKey, WorkspaceScope } from './folder-workspace-types'
+import {
+  getWorktreeIdFromHostIdentity,
+  isWorktreeHostIdentity
+} from './worktree/host-qualified-identity'
 
 export function worktreeWorkspaceKey(worktreeId: string): WorkspaceKey {
   return `worktree:${worktreeId}`
@@ -20,6 +24,16 @@ export function parseWorkspaceKey(value: string): WorkspaceScope | null {
   return null
 }
 
+/** Bare workspace id behind a session key, which may be a WorkspaceKey, a host-qualified identity
+ *  (`ssh:target|repo::path`, used by visit recency), or already a bare id. */
+export function normalizeWorkspaceSessionKeyToWorkspaceId(value: string): string {
+  if (isWorktreeHostIdentity(value)) {
+    return getWorktreeIdFromHostIdentity(value)
+  }
+  const scope = parseWorkspaceKey(value)
+  return scope?.type === 'worktree' ? scope.worktreeId : value
+}
+
 export function isWorkspaceKey(value: string): value is WorkspaceKey {
   return parseWorkspaceKey(value) !== null
 }
@@ -38,4 +52,24 @@ export function getActiveSidebarWorkspaceId(
     return scope.worktreeId
   }
   return activeWorktreeId
+}
+
+// Why: folder workspace ids reach the ledger both bare (CLI) and `folder:`-prefixed (UI),
+// so origin/filter comparison has to happen on the scoped key, not the raw string.
+export function isSameWorkspaceId(
+  left: string | null | undefined,
+  right: string | null | undefined
+): boolean {
+  if (!left || !right) {
+    return false
+  }
+  if (left === right) {
+    return true
+  }
+  if (!left.startsWith('folder:') && !right.startsWith('folder:')) {
+    return false
+  }
+  const key = (id: string) =>
+    folderWorkspaceKey(id.startsWith('folder:') ? id.slice('folder:'.length) : id)
+  return key(left) === key(right)
 }

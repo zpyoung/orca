@@ -24,6 +24,16 @@ import dockSettingsES from '../components/settings/fork-terminal-dock/locales/es
 import dockSettingsJA from '../components/settings/fork-terminal-dock/locales/ja.json'
 import dockSettingsKO from '../components/settings/fork-terminal-dock/locales/ko.json'
 import dockSettingsZH from '../components/settings/fork-terminal-dock/locales/zh.json'
+import sidebarSeparatorEN from '../components/settings/fork-sidebar-section-separator/locales/en.json'
+import sidebarSeparatorES from '../components/settings/fork-sidebar-section-separator/locales/es.json'
+import sidebarSeparatorJA from '../components/settings/fork-sidebar-section-separator/locales/ja.json'
+import sidebarSeparatorKO from '../components/settings/fork-sidebar-section-separator/locales/ko.json'
+import sidebarSeparatorZH from '../components/settings/fork-sidebar-section-separator/locales/zh.json'
+import handoffSettingsEN from '../components/settings/fork-session-handoff/locales/en.json'
+import handoffSettingsES from '../components/settings/fork-session-handoff/locales/es.json'
+import handoffSettingsJA from '../components/settings/fork-session-handoff/locales/ja.json'
+import handoffSettingsKO from '../components/settings/fork-session-handoff/locales/ko.json'
+import handoffSettingsZH from '../components/settings/fork-session-handoff/locales/zh.json'
 import agentComposerEN from '../components/native-chat/fork-agent-composer/locales/en.json'
 import agentComposerES from '../components/native-chat/fork-agent-composer/locales/es.json'
 import agentComposerJA from '../components/native-chat/fork-agent-composer/locales/ja.json'
@@ -34,6 +44,41 @@ import skillPluginsES from '../components/native-chat/fork-skill-plugin-attribut
 import skillPluginsJA from '../components/native-chat/fork-skill-plugin-attribution/locales/ja.json'
 import skillPluginsKO from '../components/native-chat/fork-skill-plugin-attribution/locales/ko.json'
 import skillPluginsZH from '../components/native-chat/fork-skill-plugin-attribution/locales/zh.json'
+import handoffEN from '../components/agent-session-continuation/fork-session-handoff/locales/en.json'
+import handoffES from '../components/agent-session-continuation/fork-session-handoff/locales/es.json'
+import handoffJA from '../components/agent-session-continuation/fork-session-handoff/locales/ja.json'
+import handoffKO from '../components/agent-session-continuation/fork-session-handoff/locales/ko.json'
+import handoffZH from '../components/agent-session-continuation/fork-session-handoff/locales/zh.json'
+import dirtyBranchEN from '../components/right-sidebar/fork-dirty-branch-indicator/locales/en.json'
+import dirtyBranchES from '../components/right-sidebar/fork-dirty-branch-indicator/locales/es.json'
+import dirtyBranchJA from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ja.json'
+import dirtyBranchKO from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ko.json'
+import dirtyBranchZH from '../components/right-sidebar/fork-dirty-branch-indicator/locales/zh.json'
+import sessionInfoEN from '../components/right-sidebar/fork-session-info/locales/en.json'
+import sessionInfoES from '../components/right-sidebar/fork-session-info/locales/es.json'
+import sessionInfoJA from '../components/right-sidebar/fork-session-info/locales/ja.json'
+import sessionInfoKO from '../components/right-sidebar/fork-session-info/locales/ko.json'
+import sessionInfoZH from '../components/right-sidebar/fork-session-info/locales/zh.json'
+import artifactPasswordsEN from '../components/artifacts/fork-artifact-passwords/locales/en.json'
+import artifactPasswordsES from '../components/artifacts/fork-artifact-passwords/locales/es.json'
+import artifactPasswordsJA from '../components/artifacts/fork-artifact-passwords/locales/ja.json'
+import artifactPasswordsKO from '../components/artifacts/fork-artifact-passwords/locales/ko.json'
+import artifactPasswordsZH from '../components/artifacts/fork-artifact-passwords/locales/zh.json'
+import activityWindowEN from '../components/sidebar/fork-workspace-activity-window/locales/en.json'
+import activityWindowES from '../components/sidebar/fork-workspace-activity-window/locales/es.json'
+import activityWindowJA from '../components/sidebar/fork-workspace-activity-window/locales/ja.json'
+import activityWindowKO from '../components/sidebar/fork-workspace-activity-window/locales/ko.json'
+import activityWindowZH from '../components/sidebar/fork-workspace-activity-window/locales/zh.json'
+import reviewFiltersEN from '../components/sidebar/fork-workspace-review-filters/locales/en.json'
+import reviewFiltersES from '../components/sidebar/fork-workspace-review-filters/locales/es.json'
+import reviewFiltersJA from '../components/sidebar/fork-workspace-review-filters/locales/ja.json'
+import reviewFiltersKO from '../components/sidebar/fork-workspace-review-filters/locales/ko.json'
+import reviewFiltersZH from '../components/sidebar/fork-workspace-review-filters/locales/zh.json'
+import askQuestionToolEN from '../components/fork-ask-question-tool/locales/en.json'
+import askQuestionToolES from '../components/fork-ask-question-tool/locales/es.json'
+import askQuestionToolJA from '../components/fork-ask-question-tool/locales/ja.json'
+import askQuestionToolKO from '../components/fork-ask-question-tool/locales/ko.json'
+import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -52,11 +97,96 @@ type ForkCatalogRegistrar = {
 }
 
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
-  en: [relayEN, en, worktreeGroupsEN, dockEN, dockSettingsEN, agentComposerEN, skillPluginsEN],
-  es: [relayES, es, worktreeGroupsES, dockES, dockSettingsES, agentComposerES, skillPluginsES],
-  ja: [relayJA, ja, worktreeGroupsJA, dockJA, dockSettingsJA, agentComposerJA, skillPluginsJA],
-  ko: [relayKO, ko, worktreeGroupsKO, dockKO, dockSettingsKO, agentComposerKO, skillPluginsKO],
-  zh: [relayZH, zh, worktreeGroupsZH, dockZH, dockSettingsZH, agentComposerZH, skillPluginsZH]
+  en: [
+    relayEN,
+    en,
+    worktreeGroupsEN,
+    dockEN,
+    dockSettingsEN,
+    sidebarSeparatorEN,
+    handoffSettingsEN,
+    agentComposerEN,
+    skillPluginsEN,
+    handoffEN,
+    dirtyBranchEN,
+    sessionInfoEN,
+    artifactPasswordsEN,
+    activityWindowEN,
+    reviewFiltersEN,
+    askQuestionToolEN
+  ],
+  es: [
+    relayES,
+    es,
+    worktreeGroupsES,
+    dockES,
+    dockSettingsES,
+    sidebarSeparatorES,
+    handoffSettingsES,
+    agentComposerES,
+    skillPluginsES,
+    handoffES,
+    dirtyBranchES,
+    sessionInfoES,
+    artifactPasswordsES,
+    activityWindowES,
+    reviewFiltersES,
+    askQuestionToolES
+  ],
+  ja: [
+    relayJA,
+    ja,
+    worktreeGroupsJA,
+    dockJA,
+    dockSettingsJA,
+    sidebarSeparatorJA,
+    handoffSettingsJA,
+    agentComposerJA,
+    skillPluginsJA,
+    handoffJA,
+    dirtyBranchJA,
+    sessionInfoJA,
+    artifactPasswordsJA,
+    activityWindowJA,
+    reviewFiltersJA,
+    askQuestionToolJA
+  ],
+  ko: [
+    relayKO,
+    ko,
+    worktreeGroupsKO,
+    dockKO,
+    dockSettingsKO,
+    sidebarSeparatorKO,
+    handoffSettingsKO,
+    agentComposerKO,
+    skillPluginsKO,
+    handoffKO,
+    dirtyBranchKO,
+    sessionInfoKO,
+    artifactPasswordsKO,
+    activityWindowKO,
+    reviewFiltersKO,
+    askQuestionToolKO
+  ],
+  zh: [
+    relayZH,
+    zh,
+    worktreeGroupsZH,
+    dockZH,
+    dockSettingsZH,
+    sidebarSeparatorZH,
+    handoffSettingsZH,
+    agentComposerZH,
+    skillPluginsZH,
+    handoffZH,
+    dirtyBranchZH,
+    sessionInfoZH,
+    artifactPasswordsZH,
+    activityWindowZH,
+    reviewFiltersZH,
+    askQuestionToolZH
+  ]
 }
 
 export function registerForkLocalizationCatalogs(i18n: ForkCatalogRegistrar): void {

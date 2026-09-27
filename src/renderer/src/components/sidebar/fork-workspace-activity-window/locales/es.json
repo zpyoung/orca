@@ -1,0 +1,22 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceActivityWindowControl": {
+          "activityWindow": "Ventana de actividad",
+          "all": "Todo",
+          "live-only": "Solo activos",
+          "today": "Últimas 24 horas",
+          "week": "Últimos 7 días",
+          "month": "Últimos 30 días",
+          "custom": "Personalizado",
+          "customDays": "Días personalizados",
+          "customDaysError": "Introduce un número entero positivo."
+        },
+        "WorkspaceActivityHiddenCountRow": {
+          "hidden": "{{count}} espacios de trabajo ocultos por la ventana de actividad"
+        }
+      }
+    }
+  }
+}

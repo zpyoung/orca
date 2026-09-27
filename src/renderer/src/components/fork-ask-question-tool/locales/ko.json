@@ -1,0 +1,49 @@
+{
+  "components": {
+    "fork-ask-question-tool": {
+      "askCard": {
+        "cancel": "취소",
+        "submitting": "제출 중…",
+        "submit": "제출",
+        "header_one": "질문 {{count}}개",
+        "header_other": "질문 {{count}}개",
+        "statusAnswered": "답변 완료",
+        "statusPartial": "일부 답변됨",
+        "statusDeclined": "거부됨",
+        "statusTimedOut": "시간 초과됨",
+        "statusUnavailable": "사용할 수 없음",
+        "yes": "예",
+        "no": "아니요",
+        "otherPlaceholder": "직접 답변 입력",
+        "optionalHint": "(선택 사항)",
+        "requiredError": "이 질문은 필수입니다.",
+        "textEmailError": "유효한 이메일 주소를 입력하세요.",
+        "textUrlError": "유효한 URL을 입력하세요.",
+        "textPatternError": "예상한 형식과 일치하지 않습니다.",
+        "numberInvalidError": "숫자를 입력하세요.",
+        "numberIntegerError": "정수를 입력하세요.",
+        "numberMinError": "{{value0}} 이상의 숫자를 입력하세요.",
+        "numberMaxError": "{{value0}} 이하의 숫자를 입력하세요.",
+        "dateInvalidError": "유효한 날짜를 입력하세요."
+      },
+      "askPreview": {
+        "hide": "미리보기 숨기기",
+        "show": "미리보기 표시",
+        "frameTitle": "질문 미리보기"
+      },
+      "badge": {
+        "pendingCountLabel_one": "대기 중인 질문 {{count}}개",
+        "pendingCountLabel_other": "대기 중인 질문 {{count}}개"
+      },
+      "notification": {
+        "title": "{{worktreeLabel}}에 대기 중인 질문이 있습니다",
+        "body": "답변을 기다리고 있습니다."
+      },
+      "askPanel": {
+        "title": "질문",
+        "empty": "질문 없음",
+        "emptyDescription": "답변을 기다리는 질문이 여기에 표시됩니다."
+      }
+    }
+  }
+}

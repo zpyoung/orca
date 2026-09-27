@@ -9,8 +9,10 @@ import {
   selectRuntimePaneTitlesForWorktree
 } from './worktree-card-status-inputs'
 import { selectWorktreeAgentActivitySummary } from './worktree-agent-activity-summary'
+import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
 
 export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
+  const hasPendingAsk = useAppStore((s) => selectWorktreeHasPendingAsk(s, worktreeId))
   const tabs = useAppStore((s) => s.tabsByWorktree[worktreeId] ?? EMPTY_TABS)
   const browserTabs = useAppStore((s) => s.browserTabsByWorktree[worktreeId] ?? EMPTY_BROWSER_TABS)
   const runtimePaneTitlesForWorktree = useAppStore(
@@ -22,8 +24,16 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
   const terminalLayoutRootsByTabId = useAppStore(
     useShallow((s) => selectTerminalLayoutRootsForWorktree(s, worktreeId))
   )
-  const { hasPermission, hasLiveWorking, hasLiveDone, hasRetainedDone, agentStatusPaneIdsByTabId } =
-    useAppStore(useShallow((s) => selectWorktreeAgentActivitySummary(s, worktreeId)))
+  const {
+    hasPermission,
+    hasLiveWorking,
+    hasLiveMonitoring,
+    hasInterrupted,
+    hasLiveDone,
+    hasRetainedDone,
+    agentStatusPaneIdsByTabId,
+    stalePaneIdsByTabId
+  } = useAppStore(useShallow((s) => selectWorktreeAgentActivitySummary(s, worktreeId)))
 
   // Why: compact and detailed cards need the same status-dot semantics:
   // runtime liveness gates title-derived states, then explicit agent rows can
@@ -36,9 +46,12 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
         ptyIdsByTabId: ptyIdsForWorktree,
         runtimePaneTitlesByTabId: runtimePaneTitlesForWorktree,
         agentStatusPaneIdsByTabId,
+        stalePaneIdsByTabId,
         terminalLayoutRootsByTabId,
-        hasPermission,
+        hasPermission: hasPermission || hasPendingAsk,
         hasLiveWorking,
+        hasLiveMonitoring,
+        hasInterrupted,
         hasLiveDone,
         hasRetainedDone
       }),
@@ -48,9 +61,13 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
       ptyIdsForWorktree,
       runtimePaneTitlesForWorktree,
       agentStatusPaneIdsByTabId,
+      stalePaneIdsByTabId,
       terminalLayoutRootsByTabId,
       hasPermission,
+      hasPendingAsk,
       hasLiveWorking,
+      hasLiveMonitoring,
+      hasInterrupted,
       hasLiveDone,
       hasRetainedDone
     ]

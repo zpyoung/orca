@@ -8,6 +8,8 @@ import { RepoForkIndicator } from '@/components/repo/repo-fork-indicator'
 import type { FolderWorkspacePathStatus } from '../../../../../../shared/folder-workspace-path-status'
 import { isConfirmedStaleFolderPathStatus } from '../../../../../../shared/folder-workspace-path-status'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
 import type {
   WorkspaceStatus,
   WorkspaceStatusDefinition
@@ -24,6 +26,7 @@ import {
   WORKTREE_SECTION_HEADER_PADDING_LEFT
 } from './indentation'
 import { FolderPathStatusIndicator } from './FolderPathStatusIndicator'
+import { RepoScanUnavailableIndicator } from './RepoScanUnavailableIndicator'
 import {
   ProjectGroupCreateWorkspaceButton,
   ProjectGroupHeaderMenu
@@ -58,8 +61,9 @@ export type SectionHeaderRowContext = {
   }) => FolderWorkspacePathStatus | null
   toggleGroupWithScrollAnchor: (groupKey: string) => void
   projectActions: RepoHeaderProjectActions
-  onRenameProjectGroup: (groupId: string, currentName: string) => void
-  onDeleteProjectGroup: (groupId: string, groupName: string) => void
+  onRenameProjectGroup: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
+  onDeleteProjectGroup: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
+  onOpenGroupLedger: (group: ProjectGroup) => void
   onCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
   onWorkspaceStatusDragOver: (event: React.DragEvent, status: WorkspaceStatus) => void
   onWorkspaceStatusDragLeave: (event: React.DragEvent) => void
@@ -83,6 +87,7 @@ export function renderWorktreeSectionHeaderRow(args: {
   isActiveStickyHeader: boolean
   hasStickyHost: boolean
   hasHeaderTopSpacing: boolean
+  sectionSeparatorClass?: string | false
   measureVirtualRowElement: (element: HTMLDivElement | null) => void
 }): React.JSX.Element {
   const { ctx, row, vItem, isActiveStickyHeader } = args
@@ -94,6 +99,13 @@ export function renderWorktreeSectionHeaderRow(args: {
     isProjectGroupHeader && !row.repo && typeof row.projectGroup?.id === 'string'
       ? row.projectGroup.id
       : undefined
+  // Why: rename/delete must route to the host that owns this row, not to whichever host has focus.
+  const projectGroupHostIdForHeader =
+    row.projectGroup && 'createdFrom' in row.projectGroup
+      ? getProjectGroupHostId(row.projectGroup)
+      : undefined
+  const projectGroupForHeader =
+    row.projectGroup && 'createdFrom' in row.projectGroup ? row.projectGroup : undefined
   const repoHeaderIndex =
     projectIdForHeader !== undefined
       ? headerDrag.repoHeaderIndexByRepoId.get(projectIdForHeader)
@@ -185,6 +197,7 @@ export function renderWorktreeSectionHeaderRow(args: {
         'left-0 right-0',
         // Why: drop the inter-group spacer once the header pins so it sits flush at top (see getActiveStickyHeaderIndexForScroll).
         args.hasHeaderTopSpacing && !isActiveStickyHeader && 'pt-1',
+        args.sectionSeparatorClass,
         isActiveStickyHeader
           ? cn(
               'sticky z-20 bg-worktree-sidebar',
@@ -337,6 +350,7 @@ export function renderWorktreeSectionHeaderRow(args: {
               </div>
               <RepoForkIndicator upstream={row.repo?.upstream} />
               <FolderPathStatusIndicator status={projectGroupPathStatus} />
+              {isRepoHeader ? <RepoScanUnavailableIndicator repo={row.repo!} /> : null}
             </div>
           </div>
         </div>
@@ -363,9 +377,15 @@ export function renderWorktreeSectionHeaderRow(args: {
           {isProjectGroupHeader && !row.repo && projectGroupIdForHeader ? (
             <ProjectGroupHeaderMenu
               groupId={projectGroupIdForHeader}
+              hostId={projectGroupHostIdForHeader}
               label={row.label}
               onRename={ctx.onRenameProjectGroup}
               onDelete={ctx.onDeleteProjectGroup}
+              onOpenLedger={
+                projectGroupForHeader
+                  ? () => ctx.onOpenGroupLedger(projectGroupForHeader)
+                  : undefined
+              }
             />
           ) : null}
 

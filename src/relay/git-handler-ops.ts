@@ -87,8 +87,10 @@ export async function computeDiff(
   worktreePath: string,
   filePath: string,
   staged: boolean,
-  compareAgainstHead = false
+  compareAgainstHead = false,
+  signal?: AbortSignal
 ) {
+  signal?.throwIfAborted()
   let originalContent = ''
   let modifiedContent = ''
   let originalIsBinary = false
@@ -98,10 +100,12 @@ export async function computeDiff(
   try {
     if (staged) {
       const left = await readBlobAtOid(git, worktreePath, 'HEAD', filePath)
+      signal?.throwIfAborted()
       originalContent = left.content
       originalIsBinary = left.isBinary
 
       const right = await readBlobAtIndex(git, worktreePath, filePath)
+      signal?.throwIfAborted()
       modifiedContent = right.content
       modifiedIsBinary = right.isBinary
       modifiedDeleted = right.missing
@@ -109,17 +113,21 @@ export async function computeDiff(
       const left = compareAgainstHead
         ? await readBlobAtOid(git, worktreePath, 'HEAD', filePath)
         : await readUnstagedLeft(git, worktreePath, filePath)
+      signal?.throwIfAborted()
       originalContent = left.content
       originalIsBinary = left.isBinary
 
       const right = await readWorkingDiffFile(path.join(worktreePath, filePath))
+      signal?.throwIfAborted()
       modifiedContent = right.content
       modifiedIsBinary = right.isBinary
       modifiedDeleted = right.missing
     }
   } catch {
+    signal?.throwIfAborted()
     // Fallback to empty
   }
+  signal?.throwIfAborted()
 
   const result = buildDiffResult(
     originalContent,
@@ -182,6 +190,7 @@ export async function branchCompare(
       // compare error makes the source-control panel look broken.
       summary.changedFiles = 0
       summary.commitsAhead = 0
+      summary.commitsBehind = 0
       summary.status = 'ready'
       return { summary, entries: [] }
     }
@@ -215,10 +224,12 @@ export async function branchCompare(
   try {
     const [entries, { stdout: countOut }] = await Promise.all([
       loadBranchChanges(mergeBase, headOid),
-      git(['rev-list', '--count', `${baseOid}..${headOid}`], worktreePath)
+      git(['rev-list', '--left-right', '--count', `${baseOid}...${headOid}`], worktreePath)
     ])
     summary.changedFiles = entries.length
-    summary.commitsAhead = Number.parseInt(countOut.trim(), 10) || 0
+    const [behindOut = '', aheadOut = ''] = countOut.trim().split(/\s+/)
+    summary.commitsAhead = Number.parseInt(aheadOut, 10) || 0
+    summary.commitsBehind = Number.parseInt(behindOut, 10) || 0
     summary.status = 'ready'
     return { summary, entries }
   } catch (error) {
