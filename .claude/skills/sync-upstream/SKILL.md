@@ -262,7 +262,7 @@ before merging, so an install failure is never mistaken for a resolution failure
 pnpm install --frozen-lockfile
 ```
 
-If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
+If any check or the install fails, STOP and go to Step 16 with "needs attention: unusable run
 workspace (<which check failed>) — nothing merged, nothing pushed".
 
 ## Step 5 — Merge with fork priority
@@ -308,7 +308,7 @@ runs on the repaired tree.
 
 Anything else — rename/rename, rename/delete, submodule conflicts, binary files you cannot attribute
 to a side, or more than 25 conflicted paths in total — is out of scope. Do not guess. Run
-`git merge --abort` and go to Step 13 with "needs attention: merge conflicts require manual
+`git merge --abort` and go to Step 16 with "needs attention: merge conflicts require manual
 resolution (<conflict type> at <paths>)".
 
 After any completed merge, verify no conflict markers survived:
@@ -334,7 +334,7 @@ manifest's declared lines.
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
 feature-collision review**. Each can surface a decision the reference routes to a human. Under
-`--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
+`--unattended`, that is a stopping condition: go to Step 16 with "needs attention: <the decision>"
 rather than choosing a side.
 
 **`ours.txt` is the list that loses work silently, so audit it.** An exception wins the whole file,
@@ -447,7 +447,7 @@ Commit the ownership resolution as a single follow-up commit on top of the merge
 `--no-verify` for the reason in Step 5; Step 7 expects exactly one such extra commit.
 
 If the classifier fails, or `checkout.txt` is empty when the merge was not a no-op, STOP and go to
-Step 13 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
+Step 16 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
 that is the known-broken state.
 
 ## Step 7 — Commit accounting
@@ -457,7 +457,7 @@ makes this check strict and cheap: every SHA in FORK_COMMITS must still be prese
 
 For each SHA recorded in Step 2, `git merge-base --is-ancestor <sha> HEAD` must succeed. If any does
 not, something rewrote history — reset back (`git reset --hard $ORIGIN_MAIN_OLD`) and go to
-Step 13 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
+Step 16 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
 
 Also re-run the Step 2 range against the merged head —
 `git log --oneline --no-merges HEAD --not upstream/main "$UPSTREAM_TARGET"` — and confirm the count
@@ -536,7 +536,7 @@ gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks
 re-run is how a broken tree reaches the PR.
 
 If the policy says escalate, or the same failure survives your fixes, restore and bail:
-`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
+`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 16 with "needs attention: merge resolved but
 <install|manifest|typecheck|lint> failed — manual resolution required; backup at
 origin/<BACKUP_REF>". Include the first ~20 lines of the failure output.
 
