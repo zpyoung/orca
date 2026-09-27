@@ -16,16 +16,17 @@ const AUTOMATION_RUN_LAUNCH_SOURCES: readonly AutomationRunLaunchValueSource[] =
   'raw_args'
 ]
 
+function isAutomationRunLaunchValueSource(value: unknown): value is AutomationRunLaunchValueSource {
+  return AUTOMATION_RUN_LAUNCH_SOURCES.some((source) => source === value)
+}
+
 function normalizeAutomationRunLaunchSetting(value: unknown): AutomationRunLaunchSetting | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null
   }
-  const candidate = value as Record<string, unknown>
+  const candidate: Record<string, unknown> = { ...value }
   const source = candidate.source
-  if (
-    typeof source !== 'string' ||
-    !AUTOMATION_RUN_LAUNCH_SOURCES.includes(source as AutomationRunLaunchValueSource)
-  ) {
+  if (!isAutomationRunLaunchValueSource(source)) {
     return null
   }
   const raw = candidate.value
@@ -37,7 +38,7 @@ function normalizeAutomationRunLaunchSetting(value: unknown): AutomationRunLaunc
         : undefined
   return {
     ...(settingValue !== undefined ? { value: settingValue } : {}),
-    source: source as AutomationRunLaunchValueSource
+    source
   }
 }
 

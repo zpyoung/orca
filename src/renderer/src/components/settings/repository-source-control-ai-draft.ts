@@ -248,6 +248,7 @@ export function computeActionDirtyById(
   persisted: RepoSourceControlAiOverrides,
   actionTextDrafts: Partial<Record<SourceControlActionId, ActionRecipeTextDraft>>
 ): Record<SourceControlActionId, boolean> {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the entries map every SOURCE_CONTROL_ACTION_IDS member exactly once.
   return Object.fromEntries(
     SOURCE_CONTROL_ACTION_IDS.map((actionId) => {
       if (!hasOwnActionOverride(immediate.actionOverrides, actionId)) {

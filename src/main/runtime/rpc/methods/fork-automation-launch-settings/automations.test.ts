@@ -10,6 +10,7 @@ function makeRequest(method: string, params?: unknown): RpcRequest {
 
 describe('automation launch settings RPC', () => {
   it('accepts bounded launch overrides and strips unknown sibling keys', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub implements every runtime method these RPC cases reach.
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       createAutomation: vi.fn().mockResolvedValue({ id: 'auto-1' }),
@@ -58,6 +59,7 @@ describe('automation launch settings RPC', () => {
   })
 
   it('rejects launch override values outside the wire bounds', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub implements every runtime method these RPC cases reach.
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       createAutomation: vi.fn()

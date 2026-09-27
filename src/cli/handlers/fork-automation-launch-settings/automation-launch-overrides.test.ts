@@ -102,12 +102,14 @@ describe('automation CLI launch overrides', () => {
       result: { capabilities: [AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY] }
     })
     await assertAutomationLaunchOverridesRuntimeSupported(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the preflight only calls client.call, which the double provides.
       { call } as never,
       flags({ model: 'opus' })
     )
     expect(call).toHaveBeenCalledWith('status.get')
 
     call.mockClear()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the preflight only calls client.call, which the double provides.
     await assertAutomationLaunchOverridesRuntimeSupported({ call } as never, new Map())
     expect(call).not.toHaveBeenCalled()
   })
@@ -115,6 +117,7 @@ describe('automation CLI launch overrides', () => {
   it('blocks a mixed-version runtime before mutation', async () => {
     const call = vi.fn().mockResolvedValue({ result: { capabilities: [] } })
     await expect(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the preflight only calls client.call, which the double provides.
       assertAutomationLaunchOverridesRuntimeSupported({ call } as never, flags({ model: 'opus' }))
     ).rejects.toMatchObject({ code: 'capability_unsupported' })
   })

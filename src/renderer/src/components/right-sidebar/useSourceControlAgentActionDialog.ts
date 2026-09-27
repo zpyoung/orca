@@ -290,18 +290,28 @@ export function useSourceControlAgentActionDialog({
     detecting
   })
 
-  const {
-    onSelectedAgentChange,
-    onLaunchOverridesChange,
-    onCommandTemplateChange,
-    onSaveLaunchRecipeChange
-  } = useSourceControlAgentActionDraftEdits({
+  // Why: editing any launch field invalidates the previewed delivery plan.
+  const resetPlanAfter = useCallback(
+    <T>(apply: (value: T) => void) =>
+      (value: T): void => {
+        apply(value)
+        resetDeliveryPlan()
+      },
+    [resetDeliveryPlan]
+  )
+  const { onSelectedAgentChange, onLaunchOverridesChange } = useSourceControlAgentActionDraftEdits({
     resetDeliveryPlan,
     setSelectedAgent,
-    setLaunchOverrides,
-    setCommandTemplate,
-    setSaveLaunchRecipe
+    setLaunchOverrides
   })
+  const onCommandTemplateChange = useMemo(
+    () => resetPlanAfter(setCommandTemplate),
+    [resetPlanAfter]
+  )
+  const onSaveLaunchRecipeChange = useMemo(
+    () => resetPlanAfter(setSaveLaunchRecipe),
+    [resetPlanAfter]
+  )
 
   const agentScopeNote = useMemo(
     () => buildSourceControlAgentScopeNote(launchAgentScope),

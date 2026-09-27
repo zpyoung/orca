@@ -15,7 +15,7 @@ export function useStableAgentLaunchOptionSelection(
   value: AgentLaunchOptionSelection | null | undefined
 ): AgentLaunchOptionSelection | null {
   const key = JSON.stringify(value ?? null)
-  return useMemo(() => JSON.parse(key) as AgentLaunchOptionSelection | null, [key])
+  return useMemo((): AgentLaunchOptionSelection | null => JSON.parse(key), [key])
 }
 
 /** Project the structured half of a draft override for save and launch payloads. */
@@ -25,29 +25,13 @@ export function useAgentLaunchOptionSelection(
   return useMemo(() => agentLaunchOptionSelectionFromOverrides(value), [value])
 }
 
-/** Reset a planned source-control delivery whenever a launch recipe draft changes. */
+/** Reset a planned source-control delivery whenever the agent or its launch overrides change. */
 export function useSourceControlAgentActionDraftEdits(args: {
   resetDeliveryPlan: () => void
   setSelectedAgent: Dispatch<SetStateAction<TuiAgent | null>>
   setLaunchOverrides: Dispatch<SetStateAction<AgentLaunchOverrides>>
-  setCommandTemplate: Dispatch<SetStateAction<string>>
-  setSaveLaunchRecipe: Dispatch<SetStateAction<boolean>>
 }) {
-  const {
-    resetDeliveryPlan,
-    setSelectedAgent,
-    setLaunchOverrides,
-    setCommandTemplate,
-    setSaveLaunchRecipe
-  } = args
-  const resetPlanAfter = useCallback(
-    <T>(apply: (value: T) => void) =>
-      (value: T): void => {
-        apply(value)
-        resetDeliveryPlan()
-      },
-    [resetDeliveryPlan]
-  )
+  const { resetDeliveryPlan, setSelectedAgent, setLaunchOverrides } = args
   const onSelectedAgentChange = useCallback(
     (agent: TuiAgent | null): void => {
       setSelectedAgent(agent)
@@ -63,18 +47,5 @@ export function useSourceControlAgentActionDraftEdits(args: {
     },
     [resetDeliveryPlan, setLaunchOverrides]
   )
-  const onCommandTemplateChange = useMemo(
-    () => resetPlanAfter(setCommandTemplate),
-    [resetPlanAfter, setCommandTemplate]
-  )
-  const onSaveLaunchRecipeChange = useMemo(
-    () => resetPlanAfter(setSaveLaunchRecipe),
-    [resetPlanAfter, setSaveLaunchRecipe]
-  )
-  return {
-    onSelectedAgentChange,
-    onLaunchOverridesChange,
-    onCommandTemplateChange,
-    onSaveLaunchRecipeChange
-  }
+  return { onSelectedAgentChange, onLaunchOverridesChange }
 }

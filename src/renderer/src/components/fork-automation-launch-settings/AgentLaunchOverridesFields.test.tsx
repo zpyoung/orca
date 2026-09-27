@@ -16,6 +16,7 @@ vi.mock('@/i18n/i18n', () => ({
 }))
 
 vi.mock('@/components/ui/select', () => {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: vi.mock factories are hoisted above imports, so require is the only way to reach React here.
   const React = require('react') as typeof ReactModule
   const Context = React.createContext<{
     disabled: boolean
@@ -89,6 +90,7 @@ vi.mock('@/components/ui/select', () => {
 })
 
 vi.mock('@/components/ui/collapsible', () => {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: vi.mock factories are hoisted above imports, so require is the only way to reach React here.
   const React = require('react') as typeof ReactModule
   const Context = React.createContext<{ open: boolean; toggle: () => void }>({
     open: false,
@@ -193,9 +195,7 @@ describe('AgentLaunchOverridesFields', () => {
       />
     )
 
-    expect((document.getElementById('shadowed-option-effort') as HTMLButtonElement).disabled).toBe(
-      true
-    )
+    expect(document.getElementById('shadowed-option-effort')).toHaveProperty('disabled', true)
     expect(screen.getByText('Set by CLI arguments')).not.toBeNull()
   })
 
@@ -218,9 +218,7 @@ describe('AgentLaunchOverridesFields', () => {
       />
     )
 
-    expect((screen.getByRole('button', { name: 'Advanced' }) as HTMLButtonElement).disabled).toBe(
-      true
-    )
+    expect(screen.getByRole('button', { name: 'Advanced' })).toHaveProperty('disabled', true)
   })
 
   it('opens the advanced disclosure when persisted raw arguments are non-empty', () => {

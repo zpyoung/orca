@@ -395,7 +395,8 @@ describe('runSourceControlAgentActionStart CLI arguments applicability', () => {
     expect(onStart).toHaveBeenCalledWith({
       agent: 'codex',
       commandInput: 'Fix the bug',
-      agentArgs: undefined
+      agentArgs: undefined,
+      launchOptions: {}
     })
   })
 

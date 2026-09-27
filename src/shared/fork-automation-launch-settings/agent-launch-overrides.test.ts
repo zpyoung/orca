@@ -241,7 +241,7 @@ describe('normalizeAgentLaunchOverrides', () => {
       model: 'sonnet',
       optionValues: { effort: 'high' }
     })
-    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(Object.hasOwn(Object.prototype, 'polluted')).toBe(false)
   })
 
   it('reports whether any valid persisted value remains', () => {

@@ -24,6 +24,7 @@ describe('agent session launch settings RPC', () => {
   it('accepts bounded general launch option values', async () => {
     const runtime = runtimeStub()
     const dispatcher = new RpcDispatcher({
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub implements every runtime method these RPC cases reach.
       runtime: runtime as unknown as OrcaRuntimeService,
       methods: AGENT_SESSION_METHODS
     })
@@ -57,6 +58,7 @@ describe('agent session launch settings RPC', () => {
   it('rejects an oversized general launch option record', async () => {
     const runtime = runtimeStub()
     const dispatcher = new RpcDispatcher({
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub implements every runtime method these RPC cases reach.
       runtime: runtime as unknown as OrcaRuntimeService,
       methods: AGENT_SESSION_METHODS
     })

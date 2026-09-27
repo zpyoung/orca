@@ -11,13 +11,11 @@ describe('formatAutomationLaunchOverrides', () => {
           optionValues: { effort: 'high' },
           agentArgs: '--verbose'
         }
-      } as never)
+      })
     ).toBe('claude · Sonnet · Effort: high · --verbose')
   })
 
   it('omits launch output when the override is empty', () => {
-    expect(
-      formatAutomationLaunchOverrides({ agentId: 'codex', launchOverrides: null } as never)
-    ).toBeNull()
+    expect(formatAutomationLaunchOverrides({ agentId: 'codex', launchOverrides: null })).toBeNull()
   })
 })

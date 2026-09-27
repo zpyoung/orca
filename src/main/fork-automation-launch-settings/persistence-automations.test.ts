@@ -81,6 +81,7 @@ describe('automation launch settings persistence', () => {
     expect(Object.hasOwn(cleared, 'launchOverrides')).toBe(false)
     const unrelated = store.updateAutomation(automation.id, { name: 'Renamed' })
     expect(Object.hasOwn(unrelated, 'launchOverrides')).toBe(false)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the harness writes automations as an array of plain records.
     const persisted = readDataFile() as { automations: Record<string, unknown>[] }
     expect(Object.hasOwn(persisted.automations[0], 'launchOverrides')).toBe(false)
   })
@@ -139,6 +140,7 @@ describe('automation launch settings persistence', () => {
     store.updateAutomationRun({
       runId: run.id,
       status: 'dispatched',
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the payload is deliberately malformed to exercise host-side normalization.
       launchSettings: {
         agentId: 'claude',
         options: {

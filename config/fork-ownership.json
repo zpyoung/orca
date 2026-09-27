@@ -7264,8 +7264,8 @@
       "removed": 0
     },
     "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialog.test.tsx": {
-      "added": 2,
-      "removed": 1
+      "added": 6,
+      "removed": 3
     },
     "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialog.tsx": {
       "added": 7,
@@ -7292,8 +7292,8 @@
       "removed": 0
     },
     "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.test.ts": {
-      "added": 3,
-      "removed": 1
+      "added": 5,
+      "removed": 2
     },
     "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.ts": {
       "added": 16,
@@ -7360,8 +7360,8 @@
       "removed": 3
     },
     "src/renderer/src/components/right-sidebar/useSourceControlAgentActionDialog.ts": {
-      "added": 35,
-      "removed": 22
+      "added": 28,
+      "removed": 5
     },
     "src/renderer/src/components/right-sidebar/useSourceControlAgentActionStart.ts": {
       "added": 8,
@@ -7392,7 +7392,7 @@
       "removed": 7
     },
     "src/renderer/src/components/settings/repository-source-control-ai-draft.ts": {
-      "added": 22,
+      "added": 23,
       "removed": 9
     },
     "src/renderer/src/components/settings/repository-source-control-ai-global-ux.ts": {

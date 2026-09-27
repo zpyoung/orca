@@ -119,7 +119,7 @@ export function normalizeAgentLaunchOverrides(value: unknown): AgentLaunchOverri
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
   }
-  const candidate = value as Record<string, unknown>
+  const candidate: Record<string, unknown> = { ...value }
   const model = typeof candidate.model === 'string' ? candidate.model.trim() : ''
   const optionValues = normalizedOptionValues(candidate.optionValues)
   const agentArgs = typeof candidate.agentArgs === 'string' ? candidate.agentArgs : ''

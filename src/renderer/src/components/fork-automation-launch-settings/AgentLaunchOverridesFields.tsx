@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -240,11 +240,13 @@ export function AgentLaunchOverridesFields(
   props: AgentLaunchOverridesFieldsProps
 ): React.JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(Boolean(props.value.agentArgs?.trim()))
-  useEffect(() => {
+  const [seenAgentArgs, setSeenAgentArgs] = useState(props.value.agentArgs)
+  if (props.value.agentArgs !== seenAgentArgs) {
+    setSeenAgentArgs(props.value.agentArgs)
     if (props.value.agentArgs?.trim()) {
       setAdvancedOpen(true)
     }
-  }, [props.value.agentArgs])
+  }
 
   const state = buildAgentLaunchOverridesFieldState(props.agent, props.value)
   const isCataloged = state.catalog !== null
@@ -312,13 +314,7 @@ export function AgentLaunchOverridesFields(
       {!showAgentArgs ? null : isCataloged ? (
         <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
           <CollapsibleTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={props.disabled}
-              className="px-2 text-xs"
-            >
+            <Button type="button" variant="ghost" size="sm" disabled={props.disabled}>
               <ChevronDown
                 className={cn('size-4 transition-transform', advancedOpen && 'rotate-180')}
               />
@@ -328,7 +324,7 @@ export function AgentLaunchOverridesFields(
               )}
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">{rawArguments}</CollapsibleContent>
+          <CollapsibleContent className="mt-2">{rawArguments}</CollapsibleContent>
         </Collapsible>
       ) : (
         rawArguments
