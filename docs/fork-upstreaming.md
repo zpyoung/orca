@@ -108,6 +108,11 @@ and density".
 and one Vitest test imports `Buffer` from `node:buffer` — plus two rule severities added to the
 `reactDoctor` key in `package.json`.
 
+The `node:` rewrite applies to **test files only**. v1.4.206 added a `mobile web app bundle` job
+that bundles `mobile/src` for the browser, where `node:buffer` does not resolve; the rewrite had
+reached one production module (`mobile/src/browser/mobile-browser-frame-state.ts`), which is now
+back on upstream's bare `buffer` and no longer fork-owned.
+
 The `Enforce React Doctor on changed lines` job runs the `react-doctor` CLI, which reads neither
 `.oxlintrc.json` nor `config/oxlint-react-doctor.json`, so it blocks lines those configs
 deliberately allow. `mobile/.oxlintrc.json` turns `typescript/array-type` and

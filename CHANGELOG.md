@@ -1,6 +1,6 @@
 ---
-last_released_commit: 7142b25bdc89a6f96916264b07def66398972f16
-upstream_synced: v1.4.203
+last_released_commit: a45f3e27a5c8055dc283ac22002a843c094664c8
+upstream_synced: v1.4.207
 ---
 
 # Changelog
@@ -11,6 +11,73 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.208-rc.0.zy01] - 2026-09-22
+
+Synced to upstream [v1.4.207](https://github.com/stablyai/orca/releases/tag/v1.4.207).
+
+### Fixed
+- Typing in the quick-open file search or the right sidebar's file-explorer filter no longer leaves
+  the previous query's results on screen for a moment; both lists now clear and re-filter as the
+  query changes. This comes from upstream.
+
+### Changed
+- The fork's own record of which upstream files it copies wholesale was advanced to this release.
+  Nothing upstream changed in any copied file, so no fork behaviour moved with it.
+
+## [1.4.207-rc.0.zy02] - 2026-09-21
+
+Re-synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4.206). Upstream
+retracted the v1.4.206 tag that 1.4.207-rc.0.zy01 was built on and re-cut it from trunk at a
+different commit, adding 325 commits the retracted tag never carried.
+
+### Added
+- Upstream's mobile web app bundle, terminal performance work, editor diff improvements and
+  OpenCode 2 beta support arrive with the re-cut release.
+
+### Fixed
+- The docked terminal composer no longer crashes pane close in setups that report no settings
+  snapshot, which previously surfaced as a failure when closing a split or a pending pane.
+- Mobile browser frames decode image data again in the browser-served mobile app; the frame reader
+  had been importing Node's Buffer in a form the web bundle cannot resolve.
+
+### Changed
+- The fork's packaging and sandbox test inventories now describe this repository's own job set
+  rather than upstream's, so they stop reporting a Windows packaging job the fork does not run and
+  they skip the same relay region suites CI does.
+- Native chat keeps reading the agent's own session log for its model and effort while also using
+  upstream's new live agent-status model discovery, rather than one replacing the other.
+
+## [1.4.207-rc.0.zy01] - 2026-09-18
+
+Synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4.206), absorbing
+v1.4.204, v1.4.205 and v1.4.206 in one step.
+
+### Fixed
+- A parked `orca ask` no longer starves worker-to-coordinator messaging. Waiting on a human used to
+  hold one of eight shared long-poll slots for the full chunk, so eight agents waiting at once shed
+  every later `orchestration.ask` — which has no shed tolerance — and browser attach with it. Waits
+  are now metered on their own per-runtime gate of four, and overflow is reported as a resumable
+  pending ask rather than a failure.
+- Stale terminal input can no longer reach a replacement PTY after a reattach, and the same
+  quarantine now covers native-chat sends.
+- Cancelling a session handoff cancels its repository diff probes all the way through, instead of
+  leaving them running against a worktree nobody is waiting on.
+- Git errors that span several lines keep their full diagnostic text instead of being truncated to
+  the first line.
+- Interrupted release cuts can be recovered: a draft RC whose tag already exists is completed rather
+  than abandoned.
+- The packaged fork's macOS computer-use helper authorizes its own peers, so computer use works in a
+  packaged build without widening bundle-prefix trust.
+- The POSIX garbage-collection listing test no longer creates and removes 15,197 directories on the
+  test host; it feeds the real shell filter a synthetic listing instead.
+
+### Changed
+- Fork code adopts the eight `anti-slop` lint rules upstream enabled in v1.4.206, following
+  upstream's own renames for each rule. Symbol names and parameter types only — no behaviour
+  changed.
+- The sandboxed test runner tracks CI's shell-contract lane again after upstream moved the OMP
+  alias-safety suite out of the unit lane.
 
 ## [1.4.204-rc.0.zy01] - 2026-09-15
 

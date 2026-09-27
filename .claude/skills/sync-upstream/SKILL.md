@@ -254,8 +254,11 @@ handed and stop rather than adapting to a workspace that fails any of these:
 - `git symbolic-ref --short HEAD` resolves (HEAD is not detached) and is **not** `main`. Merging on
   `main` would put the resolution on the branch the PR targets.
 - `git status --porcelain` is empty.
-- No rebase/merge/cherry-pick is in progress (no `.git/rebase-merge`, `.git/rebase-apply`,
-  `.git/MERGE_HEAD`).
+- No rebase/merge/cherry-pick is in progress. Resolve each path with `git rev-parse --git-path`
+  (`MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`) and test what it prints. A
+  literal `.git/MERGE_HEAD` test can never fire here: the run always happens in a worktree, where
+  `.git` is a *file* pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
+  reads as absent no matter what is in progress.
 - `git merge-base --is-ancestor HEAD origin/main` succeeds. The branch carries no commits of its
   own, so the reset below destroys nothing. If it fails, the workspace holds someone's work.
 
@@ -288,7 +291,7 @@ Put a `pnpm` shim that execs `corepack pnpm` at the front of `PATH` for the run 
 invoke bare `pnpm` internally, so switching only your own calls is not enough. Anything else dirty
 is a stop.
 
-If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
+If any check or the install fails, STOP and go to Step 16 with "needs attention: unusable run
 workspace (<which check failed>) — nothing merged, nothing pushed".
 
 ## Step 5 — Merge with fork priority
@@ -334,7 +337,7 @@ runs on the repaired tree.
 
 Anything else — rename/rename, rename/delete, submodule conflicts, binary files you cannot attribute
 to a side, or more than 25 conflicted paths in total — is out of scope. Do not guess. Run
-`git merge --abort` and go to Step 13 with "needs attention: merge conflicts require manual
+`git merge --abort` and go to Step 16 with "needs attention: merge conflicts require manual
 resolution (<conflict type> at <paths>)".
 
 After any completed merge, verify no conflict markers survived:
@@ -360,7 +363,7 @@ manifest's declared lines.
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
 feature-collision review**. Each can surface a decision the reference routes to a human. Under
-`--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
+`--unattended`, that is a stopping condition: go to Step 16 with "needs attention: <the decision>"
 rather than choosing a side.
 
 **`ours.txt` is the list that loses work silently, so audit it.** An exception wins the whole file,
@@ -473,7 +476,7 @@ Commit the ownership resolution as a single follow-up commit on top of the merge
 `--no-verify` for the reason in Step 5; Step 7 expects exactly one such extra commit.
 
 If the classifier fails, or `checkout.txt` is empty when the merge was not a no-op, STOP and go to
-Step 13 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
+Step 16 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
 that is the known-broken state.
 
 ## Step 7 — Commit accounting
@@ -483,7 +486,7 @@ makes this check strict and cheap: every SHA in FORK_COMMITS must still be prese
 
 For each SHA recorded in Step 2, `git merge-base --is-ancestor <sha> HEAD` must succeed. If any does
 not, something rewrote history — reset back (`git reset --hard $ORIGIN_MAIN_OLD`) and go to
-Step 13 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
+Step 16 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
 
 Also re-run the Step 2 range against the merged head —
 `git log --oneline --no-merges HEAD --not upstream/main "$UPSTREAM_TARGET"` — and confirm the count
@@ -580,7 +583,7 @@ git tag "sync-resolved/${STABLE_TAG}-<stamp>" HEAD
 
 Name that tag and its SHA in the report, so the rerun after the decision starts from it instead of
 redoing hours of ownership work. Then restore and bail:
-`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
+`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 16 with "needs attention: merge resolved but
 <install|manifest|typecheck|lint> failed — manual resolution required; backup at
 origin/<BACKUP_REF>". Include the first ~20 lines of the failure output.
 
