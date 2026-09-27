@@ -1,6 +1,6 @@
 ---
-last_released_commit: d328fee766c3b0d30d32e5cd5ee6ed55cc4461e0
-upstream_synced: v1.4.206
+last_released_commit: a45f3e27a5c8055dc283ac22002a843c094664c8
+upstream_synced: v1.4.207
 ---
 
 # Changelog
@@ -11,6 +11,19 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.208-rc.0.zy01] - 2026-09-22
+
+Synced to upstream [v1.4.207](https://github.com/stablyai/orca/releases/tag/v1.4.207).
+
+### Fixed
+- Typing in the quick-open file search or the right sidebar's file-explorer filter no longer leaves
+  the previous query's results on screen for a moment; both lists now clear and re-filter as the
+  query changes. This comes from upstream.
+
+### Changed
+- The fork's own record of which upstream files it copies wholesale was advanced to this release.
+  Nothing upstream changed in any copied file, so no fork behaviour moved with it.
 
 ## [1.4.207-rc.0.zy02] - 2026-09-21
 
