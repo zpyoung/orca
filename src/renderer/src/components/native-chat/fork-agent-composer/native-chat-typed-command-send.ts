@@ -70,10 +70,14 @@ export function sendNativeChatTypedCommand(
   return enqueueNativeChatPtySend(
     target.ptyId,
     (command.length + 1) * AGENT_TUI_COMMAND_KEY_INTERVAL_MS,
-    ({ isCancelled, markSubmitted }) => {
+    ({ isCancelled, delay, markSubmitted }) => {
       const finish = (outcome: 'accepted' | 'rejected' | 'unknown'): void => {
         if (!isCancelled() && outcome !== 'accepted') {
-          clearUnsubmittedAgentInput(target.settings, target.ptyId)
+          void clearUnsubmittedAgentInput(target.settings, target.ptyId, undefined, delay).then(
+            markSubmitted,
+            markSubmitted
+          )
+          return
         }
         markSubmitted()
       }
@@ -97,9 +101,9 @@ export function sendNativeChatTypedCommand(
     },
     {
       terminalTabId: target.terminalTabId,
-      onCancelUnsubmitted: () => {
+      onCancelUnsubmitted: (cleanupDelay) => {
         controller.abort()
-        clearUnsubmittedAgentInput(target.settings, target.ptyId)
+        return clearUnsubmittedAgentInput(target.settings, target.ptyId, undefined, cleanupDelay)
       },
       onInvalidate: () => controller.abort()
     }

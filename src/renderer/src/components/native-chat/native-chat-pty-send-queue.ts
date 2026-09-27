@@ -22,9 +22,11 @@ export type EnqueueNativeChatPtySendOptions = {
   terminalTabId: string
   /**
    * Called when cancel aborts after `start` began but before Enter was marked
-   * submitted. Used to clear leftover body text from the agent TUI.
+   * submitted. Used to clear leftover body text from the agent TUI. A returned
+   * promise keeps the line held until it settles; writes paced through `delay`
+   * are dropped if the PTY is invalidated meanwhile.
    */
-  onCancelUnsubmitted?: () => void
+  onCancelUnsubmitted?: (delay: (ms: number, fn: () => void) => void) => Promise<void> | void
   /** Called for quarantine invalidation; must not write to the PTY. */
   onInvalidate?: () => void
 }
@@ -51,6 +53,7 @@ export function resetNativeChatPtySendQueuesForTests(): void {
   for (const state of ptyQueues.values()) {
     for (const handle of state.handles) {
       handle.cancel()
+      handle.invalidate()
     }
   }
   ptyQueues.clear()
@@ -195,8 +198,25 @@ export function enqueueNativeChatPtySend(
   const settled = runPromise.then(settleQueueEntry, settleQueueEntry)
   state.tail = settled
 
+  const cleanupDelay = (ms: number, fn: () => void): void => {
+    timers.push(setTimeout(fn, ms))
+  }
+
+  let cleaningUp = false
+  const endCleanup = (): void => {
+    cleaningUp = false
+    finishEntry()
+    dropHandle()
+  }
+
   const cancel = (mode: 'cancel' | 'invalidate'): void => {
     if (cancelled) {
+      if (mode === 'invalidate' && cleaningUp) {
+        for (const timer of timers) {
+          clearTimeout(timer)
+        }
+        endCleanup()
+      }
       return
     }
     cancelled = true
@@ -209,12 +229,27 @@ export function enqueueNativeChatPtySend(
     // reset would understate the next enqueue's settle time and let a send
     // card drop while a queued Enter is still pending.
     state.freeAt = Math.max(Date.now(), state.freeAt - Math.max(0, durationMs))
-    finishEntry()
-    dropHandle()
-    if (mode === 'invalidate') {
-      options?.onInvalidate?.()
-    } else if (shouldClear) {
-      options?.onCancelUnsubmitted?.()
+    if (!shouldClear) {
+      finishEntry()
+      dropHandle()
+      if (mode === 'invalidate') {
+        options?.onInvalidate?.()
+      }
+      return
+    }
+    // Why: a paced cleanup clear must land before the next send takes the line,
+    // or its late chunks erase that send's body.
+    cleaningUp = true
+    try {
+      const cleanup: unknown = options?.onCancelUnsubmitted?.(cleanupDelay)
+      if (cleanup instanceof Promise) {
+        void cleanup.then(endCleanup, endCleanup)
+      } else {
+        endCleanup()
+      }
+    } catch (error) {
+      endCleanup()
+      throw error
     }
   }
   const createdHandle: NativeChatPtySendQueueHandle = {
