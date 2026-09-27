@@ -4,7 +4,6 @@ import type {
   AttemptEntry,
   AttemptResolvedEntry,
   EscalationEntry,
-  OrchestrationEvidenceSource,
   WatcherLedger
 } from './ledger-types'
 
@@ -153,30 +152,4 @@ export function getLastDecidedContentIdentity(ledger: WatcherLedger): string | n
     }
   }
   return latest?.action.contentIdentity ?? null
-}
-
-export function hasOrchestrationSequence(ledger: WatcherLedger, sequence: number): boolean {
-  return ledger.entries.some(
-    (entry) => entry.kind === 'evidence' && entry.source?.sequence === sequence
-  )
-}
-
-export function getLastOrchestrationSource(
-  ledger: WatcherLedger
-): OrchestrationEvidenceSource | null {
-  let latest: OrchestrationEvidenceSource | null = null
-  for (const entry of ledger.entries) {
-    if (
-      entry.kind === 'evidence' &&
-      entry.source &&
-      (latest === null || entry.source.sequence >= latest.sequence)
-    ) {
-      latest = entry.source
-    }
-  }
-  return latest
-}
-
-export function hasTerminalEntry(ledger: WatcherLedger): boolean {
-  return ledger.entries.some((entry) => entry.kind === 'terminal')
 }

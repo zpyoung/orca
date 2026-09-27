@@ -1,3 +1,4 @@
+import { isFullGitObjectId } from '../git-handler-branch-diff-ops'
 import {
   OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE,
   OBJECTIVE_PATH_MODES_ALIAS,
@@ -12,13 +13,8 @@ import {
 } from './git-exec-path-allowlist'
 import { isHeimdallObjectiveLandingGitExecArgs } from './git-exec-landing-allowlist'
 
-const OBJECT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu
 const OBJECT_ID_PARENT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})\^$/iu
 const MAX_NESTED_REPOSITORY_DEPTH = 8
-
-function isObjectId(value: string | undefined): boolean {
-  return value !== undefined && OBJECT_ID_PATTERN.test(value)
-}
 
 function isAllowedStatus(args: readonly string[], offset: number): boolean {
   const length = args.length - offset
@@ -61,20 +57,20 @@ function isAllowedAlias(args: readonly string[], offset: number): boolean {
 function isAllowedLsTree(args: readonly string[], offset: number): boolean {
   const length = args.length - offset
   if (length === 3) {
-    return args[offset + 1] === '-z' && isObjectId(args[offset + 2])
+    return args[offset + 1] === '-z' && isFullGitObjectId(args[offset + 2])
   }
   if (
     length === 6 &&
     args[offset + 1] === '-r' &&
     args[offset + 2] === '-z' &&
-    isObjectId(args[offset + 3]) &&
+    isFullGitObjectId(args[offset + 3]) &&
     args[offset + 4] === '--'
   ) {
     return isSafeObjectiveLiteralPathspec(args[offset + 5])
   }
   return (
     args[offset + 1] === '-z' &&
-    isObjectId(args[offset + 2]) &&
+    isFullGitObjectId(args[offset + 2]) &&
     args[offset + 3] === '--' &&
     hasSafeObjectivePaths(args, offset + 4, OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE, true)
   )
@@ -138,7 +134,9 @@ function isAllowedObjectiveArgs(args: readonly string[]): boolean {
   switch (subcommand) {
     case 'reset':
       allowed =
-        args.length === 3 && (args[1] === '--mixed' || args[1] === '--hard') && isObjectId(args[2])
+        args.length === 3 &&
+        (args[1] === '--mixed' || args[1] === '--hard') &&
+        isFullGitObjectId(args[2])
       break
     case 'add': {
       const pathStart = args[2] === '--force' ? 4 : 3
@@ -151,14 +149,14 @@ function isAllowedObjectiveArgs(args: readonly string[]): boolean {
     case 'cherry-pick':
       allowed =
         (args.length === 2 && args[1] === '--abort') ||
-        (args.length === 3 && args[1] === '--keep-redundant-commits' && isObjectId(args[2]))
+        (args.length === 3 && args[1] === '--keep-redundant-commits' && isFullGitObjectId(args[2]))
       break
     case 'show':
       allowed =
         args.length === 4 &&
         args[1] === '--no-patch' &&
         args[2] === '--format=%an%x00%ae%x00%aI%x00%B' &&
-        isObjectId(args[3])
+        isFullGitObjectId(args[3])
       break
     case 'diff-tree': {
       const noRenamesOffset = args[3] === '--no-renames' ? 1 : 0
@@ -170,13 +168,16 @@ function isAllowedObjectiveArgs(args: readonly string[]): boolean {
         args[3 + noRenamesOffset] === '-r' &&
         args[4 + noRenamesOffset] === '-z' &&
         firstObject !== undefined &&
-        (OBJECT_ID_PATTERN.test(firstObject) || OBJECT_ID_PARENT_PATTERN.test(firstObject)) &&
-        isObjectId(args[6 + noRenamesOffset])
+        (isFullGitObjectId(firstObject) || OBJECT_ID_PARENT_PATTERN.test(firstObject)) &&
+        isFullGitObjectId(args[6 + noRenamesOffset])
       break
     }
     case 'cherry':
       allowed =
-        args.length === 4 && isObjectId(args[1]) && isObjectId(args[2]) && isObjectId(args[3])
+        args.length === 4 &&
+        isFullGitObjectId(args[1]) &&
+        isFullGitObjectId(args[2]) &&
+        isFullGitObjectId(args[3])
       break
     default:
       return false

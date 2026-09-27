@@ -4,12 +4,6 @@ import type {
   PlanReviewAssumptionBasis
 } from './plan-review-schema'
 
-export type PlanReviewBasisCounts = {
-  reverified: number
-  plannerEvidence: number
-  carried: number
-}
-
 function assessedBasis(assessment: PlanReviewAssumptionAssessment): PlanReviewAssumptionBasis {
   return assessment.basis ?? 'reverified'
 }
@@ -17,24 +11,6 @@ function assessedBasis(assessment: PlanReviewAssumptionAssessment): PlanReviewAs
 /** The spot-check floor: at least 2 of the evidenced assumptions, or a quarter of them, whichever is more. */
 export function requiredPlanReviewSpotCheckCount(evidencedCount: number): number {
   return Math.min(evidencedCount, Math.max(2, Math.ceil(evidencedCount / 4)))
-}
-
-/** Tallies how the reviewer reached each assessed basis, for the verdict summary's saving metric. */
-export function countPlanReviewBasis(
-  assessments: readonly PlanReviewAssumptionAssessment[]
-): PlanReviewBasisCounts {
-  const counts: PlanReviewBasisCounts = { reverified: 0, plannerEvidence: 0, carried: 0 }
-  for (const assessment of assessments) {
-    const basis = assessedBasis(assessment)
-    if (basis === 'reverified') {
-      counts.reverified += 1
-    } else if (basis === 'planner-evidence') {
-      counts.plannerEvidence += 1
-    } else {
-      counts.carried += 1
-    }
-  }
-  return counts
 }
 
 function describeIndices(indices: readonly number[]): string {

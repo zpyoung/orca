@@ -2,6 +2,7 @@ import { readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { JudgmentProviderSchema } from '../../../shared/fork-heimdall/judgment/types'
+import { getErrorCode } from '../../git/worktree-operation-options'
 
 const JudgmentAccessSchema = z.discriminatedUnion('enabled', [
   z.object({ enabled: z.literal(false) }).strict(),
@@ -37,7 +38,7 @@ export function readJudgmentAccess(databasePath: string): JudgmentAccess {
     }
     return parsed.data
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+    if (getErrorCode(error) === 'ENOENT') {
       return { enabled: false }
     }
     // Parse and filesystem errors can contain credentials or local paths.

@@ -48,7 +48,6 @@ import { resolveObjectiveSerialLaneTerminal } from './dispatch-session'
 import { deriveObjectiveFailureContext } from './dispatch-failure-context'
 import { deriveObjectiveRepairContext } from './dispatch-repair-context'
 import { dispatchObjectiveWorker, saveDispatchFailure } from './dispatch-worker-launch'
-export { deriveObjectiveFailureContext } from './dispatch-failure-context'
 
 type DispatchAction = Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
 

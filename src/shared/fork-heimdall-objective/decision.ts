@@ -298,5 +298,3 @@ export function decideObjective(
     }
   }
 }
-
-export const computeObjectiveAction = decideObjective

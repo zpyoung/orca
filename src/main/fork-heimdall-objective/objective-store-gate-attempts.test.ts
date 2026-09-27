@@ -182,30 +182,4 @@ describe('ObjectiveStore gate attempts', () => {
   it('returns null for an attempt that was never started', () => {
     expect(store.getGateAttempt(WATCHER_ID, 'typecheck:node', CONTENT_IDENTITY)).toBeNull()
   })
-
-  it('lists gate attempts newest first', () => {
-    store.startGateAttempt({
-      watcherId: WATCHER_ID,
-      gateName: 'typecheck:node',
-      contentIdentity: CONTENT_IDENTITY,
-      executionHostId: 'local',
-      command: 'pnpm typecheck:node',
-      epoch: 1,
-      startedAtMs: 100
-    })
-    store.startGateAttempt({
-      watcherId: WATCHER_ID,
-      gateName: 'typecheck:web',
-      contentIdentity: CONTENT_IDENTITY,
-      executionHostId: 'local',
-      command: 'pnpm typecheck:web',
-      epoch: 1,
-      startedAtMs: 200
-    })
-
-    expect(store.listGateAttempts(WATCHER_ID).map((attempt) => attempt.gateName)).toEqual([
-      'typecheck:web',
-      'typecheck:node'
-    ])
-  })
 })

@@ -18,6 +18,7 @@ import {
   type EnrollmentStore
 } from './enrollment-store'
 import type { KindEnrollmentAuthorization } from './kernel-enrollment'
+import { getErrorCode } from '../git/worktree-operation-options'
 import type { HeimdallLedgerStore } from './ledger-store'
 import type { RegisteredWatcherKind } from './registry'
 import { WatcherDeletePendingError } from './runner-control-lifecycle'
@@ -81,10 +82,7 @@ function hasSourceWorkspaceAuthority(
 
 function isDuplicateWorkspace(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    error.code === 'SQLITE_CONSTRAINT_UNIQUE' &&
+    getErrorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE' &&
     errorDetail(error).includes('heimdall_enrollment.workspace_key')
   )
 }

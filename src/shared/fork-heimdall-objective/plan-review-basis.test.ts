@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  countPlanReviewBasis,
-  requiredPlanReviewSpotCheckCount,
-  validatePlanReviewBasis
-} from './plan-review-basis'
+import { requiredPlanReviewSpotCheckCount, validatePlanReviewBasis } from './plan-review-basis'
 import type { ObjectivePlanAssumption } from './plan-schema'
 import type { PlanReviewAssumptionAssessment } from './plan-review-schema'
 
@@ -137,21 +133,5 @@ describe('validatePlanReviewBasis basis consistency', () => {
     expect(validatePlanReviewBasis(assumptions, assessments, new Set([0]))).toMatch(
       /no planner evidence/
     )
-  })
-})
-
-describe('countPlanReviewBasis', () => {
-  it('tallies each basis, treating an absent basis as reverified', () => {
-    const assessments = [
-      assessment(0),
-      assessment(1, { basis: 'planner-evidence' }),
-      assessment(2, { basis: 'carried' }),
-      assessment(3, { basis: 'reverified' })
-    ]
-    expect(countPlanReviewBasis(assessments)).toEqual({
-      reverified: 2,
-      plannerEvidence: 1,
-      carried: 1
-    })
   })
 })

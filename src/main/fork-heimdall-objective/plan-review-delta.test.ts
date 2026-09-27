@@ -3,6 +3,7 @@ import type { PlanReviewReport } from '../../shared/fork-heimdall-objective/plan
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
+import { rejectDraftRevisionInTransaction } from './objective-store-plan-patches'
 import { resolvePlanReviewDelta } from './plan-review-delta'
 
 const WATCHER_ID = 'watcher-plan-review-delta-1'
@@ -261,7 +262,10 @@ describe('resolvePlanReviewDelta', () => {
     const second = ingestRevision(2, plan(), 'planner-2')
     // second is rejected without ever recording a round-1 review of its own, so third's
     // immediate predecessor (second) has no revise review even though first does.
-    store.rejectDraftRevision({ watcherId: WATCHER_ID, revisionId: second.revisionId })
+    rejectDraftRevisionInTransaction(database.connection(), {
+      watcherId: WATCHER_ID,
+      revisionId: second.revisionId
+    })
     const third = ingestRevision(3, plan(), 'planner-3')
 
     expect(

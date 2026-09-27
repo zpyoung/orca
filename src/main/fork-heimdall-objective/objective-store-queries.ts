@@ -211,18 +211,6 @@ export class ObjectiveStoreQueries {
     return readObjectiveCheckAttempt(this.database, criterionId, contentIdentity)
   }
 
-  hasCheckAttempt(criterionId: string, contentIdentity: string, completed = false): boolean {
-    const attempt = readObjectiveCheckAttempt(this.database, criterionId, contentIdentity)
-    return Boolean(attempt && (!completed || attempt.completedAtMs !== null))
-  }
-
-  hasPlanRevision(watcherId: string, revisionId: string, digest?: string): boolean {
-    const row = this.database
-      .connection()
-      .prepare('SELECT digest FROM plan_revision WHERE watcher_id = ? AND id = ?')
-      .get(watcherId, revisionId) as { digest: string } | undefined
-    return Boolean(row && (digest === undefined || row.digest === digest))
-  }
   hasUsablePlan(watcherId: string): boolean {
     return Boolean(
       this.database

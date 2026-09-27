@@ -11,11 +11,8 @@ import {
   requireRuntimeGitProvider
 } from '../runtime/runtime-git-command-target'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
-import {
-  mapConcurrent,
-  observeGitWorkspaceState,
-  type ObjectiveWorkspaceTarget
-} from './content-identity'
+import { mapWithConcurrency } from '../../shared/map-with-concurrency'
+import { observeGitWorkspaceState, type ObjectiveWorkspaceTarget } from './content-identity'
 import { computeGitWorkspaceChangedPaths } from './git-workspace-changed-set'
 import {
   GIT_BASELINE_VERSION,
@@ -252,7 +249,7 @@ async function existingContainedPaths(
         ) ?? target.workspacePath)
   const flavor = resolveLeasePathFlavor(target.executionHostId, root)
   const canonicalRoot = provider ? await provider.realpath(root) : await realpath(root)
-  const entries = await mapConcurrent(
+  const entries = await mapWithConcurrency(
     [...paths],
     REPORTED_PATH_PROBE_CONCURRENCY,
     async (path): Promise<[string, boolean]> => {

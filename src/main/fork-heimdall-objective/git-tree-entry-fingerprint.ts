@@ -1,9 +1,9 @@
 import { posix } from 'node:path'
 import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
+import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import {
   computeGitRepositoryIdentity,
   isObjectiveMetadataPath,
-  mapConcurrent,
   type ObjectiveGitCommand,
   type ObjectiveWorkspaceTarget
 } from './content-identity'
@@ -135,7 +135,7 @@ export async function listAllTreeEntryFingerprints(
     (entry) =>
       entry.type === 'tree' && !isObjectiveMetadataPath(entry.path, request.caseInsensitivePaths)
   )
-  const nested = await mapConcurrent(subtrees, TREE_LISTING_CONCURRENCY, async (entry) =>
+  const nested = await mapWithConcurrency(subtrees, TREE_LISTING_CONCURRENCY, async (entry) =>
     parseTreeEntries(
       (
         await request.runGit([

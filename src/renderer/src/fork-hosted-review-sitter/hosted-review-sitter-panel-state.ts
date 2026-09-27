@@ -1,11 +1,11 @@
 import { translate } from '@/i18n/i18n'
 import type { HeimdallApi } from '../../../shared/fork-heimdall/api'
 import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
-import type {
-  ApprovalScope,
-  EscalationEntry,
-  WatcherLedger
-} from '../../../shared/fork-heimdall/ledger-types'
+import {
+  getLatestEscalations,
+  sameApprovalScope
+} from '../../../shared/fork-heimdall/ledger-queries'
+import type { ApprovalScope, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherListEntry } from '../../../shared/fork-heimdall/watcher-types'
 import type {
   HostedReviewEnrollmentPayload,
@@ -83,31 +83,12 @@ export function sameHostedReview(
   )
 }
 
-function sameApprovalScope(left: ApprovalScope, right: ApprovalScope): boolean {
-  return (
-    left.actionKind === right.actionKind &&
-    left.contentIdentity === right.contentIdentity &&
-    left.evidenceKey === right.evidenceKey &&
-    left.preparedCommitSha === right.preparedCommitSha
-  )
-}
-
 export function awaitingApprovalScope(ledger: WatcherLedger | null): ApprovalScope | null {
   if (!ledger) {
     return null
   }
-  const latestById = new Map<string, EscalationEntry>()
-  for (const entry of ledger.entries) {
-    if (entry.kind !== 'escalation') {
-      continue
-    }
-    const previous = latestById.get(entry.escalationId)
-    if (!previous || entry.atMs >= previous.atMs) {
-      latestById.set(entry.escalationId, entry)
-    }
-  }
   const escalation =
-    [...latestById.values()]
+    getLatestEscalations(ledger)
       .filter(
         (entry) =>
           entry.escalationKind === 'awaiting-approval' &&

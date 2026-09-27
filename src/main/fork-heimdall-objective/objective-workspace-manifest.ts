@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { lstat, readlink, readdir } from 'node:fs/promises'
 import { posix, win32 } from 'node:path'
 import { MAX_FILE_RANGE_READ_BYTES } from '../../shared/file-range-read'
+import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import type { IFilesystemProvider } from '../providers/types'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
 import { runtimeFileRouteForTarget } from '../runtime/runtime-file-command-target'
@@ -76,25 +77,6 @@ function isExcludedGitPath(path: string, caseInsensitive: boolean): boolean {
   const root = path.split('/', 1)[0]
   const normalized = caseInsensitive ? root.toLowerCase() : root
   return normalized === '.git' || normalized === '.orca'
-}
-
-async function mapConcurrent<T, R>(
-  values: readonly T[],
-  limit: number,
-  map: (value: T) => Promise<R>
-): Promise<R[]> {
-  const results = Array.from({ length: values.length }) as R[]
-  let nextIndex = 0
-  const concurrency = Math.min(limit, values.length)
-  await Promise.all(
-    Array.from({ length: concurrency }, async () => {
-      while (nextIndex < values.length) {
-        const index = nextIndex++
-        results[index] = await map(values[index]!)
-      }
-    })
-  )
-  return results
 }
 
 type GitCommand = (args: string[]) => Promise<{ stdout: string; stderr: string }>
@@ -174,7 +156,7 @@ async function gitManifest(target: ObjectiveWorkspaceTarget) {
     .filter((path) => !deletedPaths.has(path) && !isExcludedGitPath(path, caseInsensitive))
     .sort()
   const modeEvidence = await gitPathModeEvidence(runGit, paths)
-  return await mapConcurrent(
+  return await mapWithConcurrency(
     paths.map((path, index) => ({ path, evidence: modeEvidence[index]! })),
     HASH_CONCURRENCY,
     async ({ path, evidence }) => {
@@ -376,12 +358,16 @@ async function folderManifest(target: ObjectiveWorkspaceTarget) {
     provider.supportsFileRangeRead &&
     (await provider.supportsFileRangeRead())
   )
-  return await mapConcurrent(candidates, provider ? 2 : HASH_CONCURRENCY, async (candidate) => ({
-    path: candidate.path,
-    fingerprint: provider
-      ? await hashRemoteCandidate(provider, candidate, rangeReads)
-      : await hashLocalCandidate(candidate)
-  }))
+  return await mapWithConcurrency(
+    candidates,
+    provider ? 2 : HASH_CONCURRENCY,
+    async (candidate) => ({
+      path: candidate.path,
+      fingerprint: provider
+        ? await hashRemoteCandidate(provider, candidate, rangeReads)
+        : await hashLocalCandidate(candidate)
+    })
+  )
 }
 
 export async function observeObjectiveWorkspaceManifest(

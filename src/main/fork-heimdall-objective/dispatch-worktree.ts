@@ -33,7 +33,6 @@ export type PreparedObjectiveDispatchWorkspace = {
   record: ObjectiveDispatchRecord
   target: ObjectiveWorkspaceTarget
   reuseTerminal: string | null
-  isolated: true
 }
 
 function dispatchMarker(watcherId: string, attemptFingerprint: string): string {
@@ -312,8 +311,7 @@ export async function prepareObjectiveDispatchWorkspace(args: {
     return {
       record: existing,
       target: await resolveObjectiveDispatchTarget(args.runtime, args.binding, existing),
-      reuseTerminal: session.status === 'reusable' ? session.terminalHandle : null,
-      isolated: true
+      reuseTerminal: session.status === 'reusable' ? session.terminalHandle : null
     }
   }
 
@@ -382,8 +380,7 @@ export async function prepareObjectiveDispatchWorkspace(args: {
     return {
       record: pending,
       target,
-      reuseTerminal,
-      isolated: true
+      reuseTerminal
     }
   }
 
@@ -429,8 +426,7 @@ export async function prepareObjectiveDispatchWorkspace(args: {
   return {
     record: ready,
     target: await resolveObjectiveDispatchTarget(args.runtime, args.binding, ready),
-    reuseTerminal: null,
-    isolated: true
+    reuseTerminal: null
   }
 }
 export {

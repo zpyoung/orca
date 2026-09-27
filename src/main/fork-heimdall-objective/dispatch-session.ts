@@ -115,13 +115,6 @@ export async function inspectObjectiveDispatchSession(
   })
 }
 
-export function isObjectiveIsolatedAttempt(
-  objectiveStore: ObjectiveStore,
-  attempt: AttemptEntry
-): boolean {
-  return objectiveStore.getDispatch(attempt.fingerprint) !== null
-}
-
 function hasLiveRebind(
   objectiveStore: ObjectiveStore,
   record: ObjectiveDispatchRecord,

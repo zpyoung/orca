@@ -124,10 +124,6 @@ export function getWallClockActiveMs(ledger: WatcherLedger): number {
   return wallClockActiveMsSince(ledger, budgetGenerationStartIndex(ledger))
 }
 
-export function getTurnsUsed(ledger: WatcherLedger): number {
-  return turnsUsedSince(ledger, budgetGenerationStartIndex(ledger))
-}
-
 export function deriveBudgetState(ledger: WatcherLedger, policy: BudgetPolicy): BudgetState {
   const startIndex = budgetGenerationStartIndex(ledger)
   const activeMs = wallClockActiveMsSince(ledger, startIndex)

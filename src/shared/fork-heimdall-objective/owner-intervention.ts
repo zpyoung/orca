@@ -2,8 +2,7 @@ import { z } from 'zod'
 import {
   KindAgnosticInterventionSchema,
   OWNER_INTERVENTION_ID_MAX_LENGTH,
-  OWNER_INTERVENTION_TEXT_MAX_LENGTH,
-  type KindIntervention
+  OWNER_INTERVENTION_TEXT_MAX_LENGTH
 } from '../fork-heimdall/owner/intervention'
 import {
   OBJECTIVE_AGENT_ID_MAX_LENGTH,
@@ -110,9 +109,6 @@ export const ObjectiveSpecificInterventionSchema = z.discriminatedUnion('kind', 
   SetRoleAgentInterventionSchema
 ])
 export type ObjectiveSpecificIntervention = z.infer<typeof ObjectiveSpecificInterventionSchema>
-
-/** The five kind-agnostic moves plus the objective kind's own seven-member vocabulary. */
-export type ObjectiveIntervention = KindIntervention<ObjectiveSpecificIntervention>
 
 /** `OwnerAdapter.interventionSchema` for the objective kind: validates the full vocabulary above. */
 export const ObjectiveOwnerInterventionSchema = z

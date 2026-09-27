@@ -16,6 +16,7 @@ import { WorkerDispatchParams } from '../../runtime/rpc/methods/orchestration/wo
 import { ORCHESTRATION_WORKER_STOP_METHODS } from '../../runtime/rpc/methods/orchestration/worker/worker-stop'
 import { getOrchestrationMutationExecutor } from '../../runtime/rpc/orchestration-mutation-executor'
 import type { RpcRequest } from '../../runtime/rpc/core'
+import { getErrorCode } from '../../git/worktree-operation-options'
 import { coordinatorIdentityFingerprint } from './coordinator-identity'
 
 type OrchestrationWorkerListRow = {
@@ -394,12 +395,7 @@ function isOrchestrationError(error: unknown, code: string): error is Orchestrat
 }
 
 function isCoordinatorSeatLost(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    error.code === 'coordinator-seat-lost'
-  )
+  return getErrorCode(error) === 'coordinator-seat-lost'
 }
 
 function errorDetail(error: unknown): string {

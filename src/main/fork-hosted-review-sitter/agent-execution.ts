@@ -2,8 +2,6 @@ import type {
   HostedReviewPreparedCommit,
   HostedReviewSitterAction,
   HostedReviewSitterDefinition,
-  PrepareConflictResolutionAction,
-  PrepareFixAction,
   PublishConflictResolutionAction,
   PublishFixAction
 } from '../../shared/fork-hosted-review-sitter/types'
@@ -14,7 +12,6 @@ import type { HostedReviewSitterGitExecution } from './provider-git'
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40,64}$/i
 const HEIMDALL_ATTEMPT_TRAILER = 'Orca-Heimdall-Attempt'
 
-export type PrepareAction = PrepareFixAction | PrepareConflictResolutionAction
 export type PublishAction = PublishFixAction | PublishConflictResolutionAction
 
 export function assertCommitSha(sha: string, label: string): void {

@@ -195,20 +195,6 @@ export async function issueObjectiveReportPath(
   return reportPathForLocation(target, location, attemptFingerprint)
 }
 
-export async function isIssuedObjectiveReportPath(args: {
-  target: ObjectiveWorkspaceTarget
-  attemptFingerprint: string
-  mailboxReportPath: string | null | undefined
-}): Promise<boolean> {
-  if (typeof args.mailboxReportPath !== 'string') {
-    return false
-  }
-  return (
-    args.mailboxReportPath ===
-    (await resolveExpectedObjectiveReportPath(args.target, args.attemptFingerprint))
-  )
-}
-
 function errorCode(error: unknown): string | number | undefined {
   if (!error || typeof error !== 'object' || !('code' in error)) {
     return undefined

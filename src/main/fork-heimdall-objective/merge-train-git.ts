@@ -3,6 +3,7 @@ import { win32 } from 'node:path'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import { OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH } from '../../shared/fork-heimdall-objective/contract-types'
+import { isObjectiveGitObjectId } from '../../shared/fork-heimdall-objective/git-object-id'
 import { extractExecError } from '../git/exec-error'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
 import { runCriterionCheck, type CriterionCheckResult } from './check-runner'
@@ -16,7 +17,6 @@ import {
   type ObjectiveWorkspaceTarget
 } from './content-identity'
 
-const OBJECT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu
 const NODE_TASK_TRAILER = 'Orca-Heimdall-Task'
 
 /**
@@ -73,7 +73,7 @@ export type ObjectiveConflictChecksResult =
     }
 
 function assertObjectId(value: string, label: string): void {
-  if (!OBJECT_ID_PATTERN.test(value)) {
+  if (!isObjectiveGitObjectId(value)) {
     throw new ObjectiveNodeIngestRejectedError(`${label} must be a Git object id`)
   }
 }
@@ -108,7 +108,7 @@ async function readOptionalCommit(
     const sha = (
       await runGit(['rev-parse', '--verify', '--quiet', `${revision}^{commit}`])
     ).stdout.trim()
-    if (!OBJECT_ID_PATTERN.test(sha)) {
+    if (!isObjectiveGitObjectId(sha)) {
       throw new Error(`Git returned an invalid object id for ${revision}`)
     }
     return sha
@@ -471,7 +471,7 @@ export async function recoverObjectiveNodeApply(
   }
 
   const mergeBase = (await runGit(['merge-base', headSha, commitSha])).stdout.trim()
-  if (!OBJECT_ID_PATTERN.test(mergeBase)) {
+  if (!isObjectiveGitObjectId(mergeBase)) {
     throw new Error('Objective node commit and enrolled HEAD have no valid merge base')
   }
   const integratedCommitSha = await findIntegratedObjectiveCommit({

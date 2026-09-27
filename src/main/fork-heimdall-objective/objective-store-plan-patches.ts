@@ -183,14 +183,6 @@ export function rejectPlanPatchInTransaction(
   return planPatchRecord(readPlanPatchRowById(db, args.patchId)!)
 }
 
-/** Rejects a pending patch outright, e.g. after a `revise`/`escalate` plan review verdict. */
-export function rejectPlanPatch(
-  database: ObjectiveDatabase,
-  args: RejectPlanPatchArgs
-): ObjectivePlanPatchRecord {
-  return runObjectiveMutation(database, (db) => rejectPlanPatchInTransaction(db, args))
-}
-
 function mergeAssumptionsOntoRevision(
   db: Database.Database,
   revisionId: string,
@@ -349,14 +341,6 @@ export function rejectDraftRevisionInTransaction(
     args.revisionId,
     args.watcherId
   )
-}
-
-/** Frees a watcher's one-draft slot so a new draft can be ingested without waiting on owner review. */
-export function rejectDraftRevision(
-  database: ObjectiveDatabase,
-  args: { watcherId: string; revisionId: string }
-): void {
-  runObjectiveMutation(database, (db) => rejectDraftRevisionInTransaction(db, args))
 }
 
 function touchedTaskKeys(report: PlannerRepairReport): string[] {

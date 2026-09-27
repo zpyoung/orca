@@ -1,13 +1,9 @@
+import { isFullGitObjectId } from '../git-handler-branch-diff-ops'
 import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import { isSafeGitRemoteName } from '../../shared/git-push-target-validation'
 import { hasSafeObjectivePaths } from './git-exec-path-allowlist'
 
-const OBJECT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu
 const INVALID_BRANCH_CHARACTER = /[~^:?*[\]\\]/u
-
-function isObjectId(value: string | undefined): boolean {
-  return value !== undefined && OBJECT_ID_PATTERN.test(value)
-}
 
 function isSafeBranchName(value: string): boolean {
   if (
@@ -47,7 +43,7 @@ function isAllowedPush(args: readonly string[]): boolean {
   const branch = destination.startsWith('refs/heads/')
     ? destination.slice('refs/heads/'.length)
     : ''
-  if (!isObjectId(source) || !isSafeBranchName(branch)) {
+  if (!isFullGitObjectId(source) || !isSafeBranchName(branch)) {
     return false
   }
   const leasePrefix = `--force-with-lease=${destination}:`
@@ -56,7 +52,7 @@ function isAllowedPush(args: readonly string[]): boolean {
     return false
   }
   const expected = lease.slice(leasePrefix.length)
-  return expected === '' || isObjectId(expected)
+  return expected === '' || isFullGitObjectId(expected)
 }
 
 /** Exact mutating and recovery probes emitted by the objective landing ladder. */

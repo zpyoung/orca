@@ -174,20 +174,6 @@ export function getGateAttempt(
   return row ? gateAttemptRecord(row) : null
 }
 
-export function listGateAttempts(
-  database: ObjectiveDatabase,
-  watcherId: string
-): ObjectiveGateAttempt[] {
-  const rows = database
-    .connection()
-    .prepare(
-      `SELECT ${GATE_ATTEMPT_COLUMNS} FROM gate_attempt WHERE watcher_id = ?
-       ORDER BY started_at_ms DESC, id DESC`
-    )
-    .all(watcherId) as unknown as GateAttemptRow[]
-  return rows.map(gateAttemptRecord)
-}
-
 /** Read model rows for `ObjectiveProjectionSchema.gateAttempts`: the latest 64 by start time. */
 export function projectGateAttempts(
   db: Database.Database,

@@ -13,7 +13,8 @@ import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail
 import { ObjectivePlanTaskSchema } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { deriveObjectiveFailureContext, executeObjectiveDispatch } from './dispatch-executor'
+import { deriveObjectiveFailureContext } from './dispatch-failure-context'
+import { executeObjectiveDispatch } from './dispatch-executor'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
 const runtime = {} as OrcaRuntimeService

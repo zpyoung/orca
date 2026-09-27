@@ -17,6 +17,7 @@ import type {
   EscalationEntry,
   WatcherLedger
 } from '../../../shared/fork-heimdall/ledger-types'
+import { getHostedReviewEscalations } from '../../../shared/fork-hosted-review-sitter/ledger-adapter'
 import type { WatcherListEntry } from '../../../shared/fork-heimdall/watcher-types'
 import {
   formatHostedReviewSitterDuration,
@@ -84,17 +85,7 @@ function latestEscalations(ledger: WatcherLedger | null): EscalationEntry[] {
   if (!ledger) {
     return []
   }
-  const latest = new Map<string, EscalationEntry>()
-  for (const entry of ledger.entries) {
-    if (entry.kind !== 'escalation') {
-      continue
-    }
-    const previous = latest.get(entry.escalationId)
-    if (!previous || entry.atMs >= previous.atMs) {
-      latest.set(entry.escalationId, entry)
-    }
-  }
-  return [...latest.values()].filter(
+  return getHostedReviewEscalations(ledger).filter(
     (entry) => entry.status === 'open' || entry.status === 'escalated'
   )
 }

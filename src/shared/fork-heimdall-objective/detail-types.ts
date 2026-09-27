@@ -237,8 +237,7 @@ export const ObjectivePendingReportSchema = z
   })
   .strict()
 export type ObjectivePendingReport = z.infer<typeof ObjectivePendingReportSchema>
-export const ObjectiveBudgetBucketSchema = z.enum(['plenty', 'tight', 'nearly-spent', 'spent'])
-export type ObjectiveBudgetBucket = z.infer<typeof ObjectiveBudgetBucketSchema>
+export type ObjectiveBudgetBucket = 'plenty' | 'tight' | 'nearly-spent' | 'spent'
 
 export const ObjectiveLandingContextSchema = z
   .object({

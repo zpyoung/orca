@@ -131,23 +131,6 @@ function recordPlanReviewInTransaction(
 }
 
 /**
- * Records a plan-critic verdict on a revision or a patch, natural-keyed on `dispatchId` so a
- * replayed dispatch returns the original row unchanged. A second dispatch naming the same
- * (targetKind, targetId, round) is a distinct review attempt at a slot the schema allows only one
- * verdict for, so it throws rather than silently losing the first one.
- */
-export function recordPlanReview(
-  database: ObjectiveDatabase,
-  args: RecordPlanReviewArgs
-): ObjectivePlanReviewRecord {
-  const report = PlanReviewReportSchema.parse(args.report)
-  const reportJson = JSON.stringify(report)
-  return runObjectiveMutation(database, (db) =>
-    recordPlanReviewInTransaction(db, args, report, reportJson)
-  )
-}
-
-/**
  * Records a plan-critic verdict and, when it is a round-one `revise`, the target's rejection — in
  * the same transaction, so `ingest-plan-review`'s effect-certainty check (which reports the action
  * landed as soon as the review row exists) can never observe a landed review whose target was left

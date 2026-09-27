@@ -61,15 +61,15 @@ describe('ObjectiveStore plan reviews', () => {
       createdAtMs: 500
     }
 
-    const record = store.recordPlanReview(args)
+    const record = store.recordPlanReviewAndRejectRoundOneTarget(args)
     expect(record.report).toEqual(APPROVE_REPORT)
-    expect(store.recordPlanReview(args)).toEqual(record)
+    expect(store.recordPlanReviewAndRejectRoundOneTarget(args)).toEqual(record)
     expect(store.getPlanReviewReport(record.id)).toEqual(APPROVE_REPORT)
     expect(store.getPlanReviewReport('missing-id')).toBeNull()
   })
 
   it('refuses a second dispatch for the same target and round', () => {
-    store.recordPlanReview({
+    store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'revision',
       targetId: 'revision-1',
@@ -81,7 +81,7 @@ describe('ObjectiveStore plan reviews', () => {
     })
 
     expect(() =>
-      store.recordPlanReview({
+      store.recordPlanReviewAndRejectRoundOneTarget({
         watcherId: WATCHER_ID,
         targetKind: 'revision',
         targetId: 'revision-1',
@@ -95,7 +95,7 @@ describe('ObjectiveStore plan reviews', () => {
   })
 
   it('refuses replaying a dispatch with different content', () => {
-    store.recordPlanReview({
+    store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'revision',
       targetId: 'revision-1',
@@ -107,7 +107,7 @@ describe('ObjectiveStore plan reviews', () => {
     })
 
     expect(() =>
-      store.recordPlanReview({
+      store.recordPlanReviewAndRejectRoundOneTarget({
         watcherId: WATCHER_ID,
         targetKind: 'revision',
         targetId: 'revision-1',
@@ -121,17 +121,17 @@ describe('ObjectiveStore plan reviews', () => {
   })
 
   it('permits a second round for the same target, and lists reviews newest first', () => {
-    const first = store.recordPlanReview({
+    const first = store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'patch',
       targetId: 'patch-1',
       round: 1,
       dispatchId: 'plan-review-round-1',
-      report: REVISE_REPORT,
+      report: APPROVE_REPORT,
       reportDigest: 'digest-1',
       createdAtMs: 500
     })
-    const second = store.recordPlanReview({
+    const second = store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'patch',
       targetId: 'patch-1',
@@ -147,7 +147,7 @@ describe('ObjectiveStore plan reviews', () => {
 
   it('caps the projection at the newest 1,024 reviews out of 1,025 stored', () => {
     for (let i = 0; i < 1_025; i++) {
-      store.recordPlanReview({
+      store.recordPlanReviewAndRejectRoundOneTarget({
         watcherId: WATCHER_ID,
         targetKind: 'patch',
         targetId: `patch-${i}`,

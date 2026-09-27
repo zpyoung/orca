@@ -161,7 +161,7 @@ describe('buildObjectiveDetailPlanQuality', () => {
       digest: revision.digest,
       approvedAtMs: 200
     })
-    store.recordPlanReview({
+    store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'revision',
       targetId: revision.revisionId,
@@ -220,7 +220,7 @@ describe('buildObjectiveDetailPlanQuality', () => {
       digest: revision.digest,
       approvedAtMs: 200
     })
-    store.recordPlanReview({
+    store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'revision',
       targetId: revision.revisionId,
@@ -259,7 +259,7 @@ describe('buildObjectiveDetailPlanQuality', () => {
       amendedAtMs: 500,
       frozenTaskKeys: []
     })
-    store.recordPlanReview({
+    store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'patch',
       targetId: patch.id,

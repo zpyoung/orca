@@ -96,5 +96,3 @@ export function paceObjective(
   }
   return 'rapid'
 }
-
-export const objectivePacing = { pace: paceObjective }

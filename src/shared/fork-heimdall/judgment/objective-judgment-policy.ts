@@ -84,39 +84,6 @@ export function judgmentRoutedAgent(
   return answer?.type === 'choice' ? answer.choice : undefined
 }
 
-export type JudgmentEscalationTriage = {
-  taskScope: 'task-blocked' | 'optional-check'
-  authority: 'capability' | 'human-decision'
-}
-
-export function judgmentEscalationTriage(
-  world: ObjectiveWorld,
-  subjectId: string,
-  registry: JudgmentQuestionRegistry = OBJECTIVE_JUDGMENT_REGISTRY
-): JudgmentEscalationTriage | null {
-  const taskScope = getActingJudgment(
-    world.judgment,
-    OBJECTIVE_JUDGMENT_QUESTION_IDS.escalationTaskScope,
-    subjectId,
-    registry
-  )
-  const authority = getActingJudgment(
-    world.judgment,
-    OBJECTIVE_JUDGMENT_QUESTION_IDS.escalationAuthority,
-    subjectId,
-    registry
-  )
-  if (
-    taskScope?.type !== 'choice' ||
-    (taskScope.choice !== 'task-blocked' && taskScope.choice !== 'optional-check') ||
-    authority?.type !== 'choice' ||
-    (authority.choice !== 'capability' && authority.choice !== 'human-decision')
-  ) {
-    return null
-  }
-  return { taskScope: taskScope.choice, authority: authority.choice }
-}
-
 function qualityNeedsReview(
   world: ObjectiveWorld,
   questionId: string,

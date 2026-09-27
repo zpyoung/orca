@@ -4,6 +4,7 @@ import { OrchestrationError } from '../../runtime/orchestration/orchestration-er
 import { checkRunMailbox } from '../../runtime/rpc/methods/orchestration/messaging/check-run'
 import type { EvidenceEntry, LedgerEntry } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
+import { parseLifecycleRejectionPayload } from './lifecycle-rejection-payload'
 
 export type MailboxCursor = Readonly<{
   previousDeliveryId: string | null
@@ -138,7 +139,7 @@ function normalizedMailboxFact(message: MessageRow): {
     }
   }
   const lifecycleRejection =
-    message.type === 'worker_done' ? normalizedLifecycleRejection(raw) : null
+    message.type === 'worker_done' ? parseLifecycleRejectionPayload(raw) : null
   const reportRejection = lifecycleRejection
     ? { code: lifecycleRejection.code, reason: lifecycleRejection.reason }
     : null
@@ -176,29 +177,5 @@ function normalizedMailboxFact(message: MessageRow): {
     ...(message.type === 'status' || message.type === 'question' || message.type === 'escalation'
       ? { body: message.body }
       : {})
-  }
-}
-
-function normalizedLifecycleRejection(
-  payload: Record<string, unknown>
-): { code: string; reason: string; originalBody?: string } | null {
-  const marker = payload._orcaLifecycleRejection
-  if (!marker || typeof marker !== 'object') {
-    return null
-  }
-  const rejection = marker as Record<string, unknown>
-  const reason =
-    typeof rejection.originalReason === 'string'
-      ? rejection.originalReason
-      : typeof rejection.reason === 'string'
-        ? rejection.reason
-        : null
-  if (typeof rejection.code !== 'string' || !rejection.code.trim() || reason === null) {
-    return null
-  }
-  return {
-    code: rejection.code,
-    reason,
-    ...(typeof rejection.originalBody === 'string' ? { originalBody: rejection.originalBody } : {})
   }
 }

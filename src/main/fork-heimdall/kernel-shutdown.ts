@@ -3,6 +3,7 @@ import type { HeimdallKernelHost } from './kernel-host'
 import { requireLeaseStore } from './kernel-service-dependencies'
 import type { HeimdallKernelService } from './kernel-service-contract'
 import type { LeaseStore } from './lease-store'
+import { settleWithinMs } from '../quit-teardown-deadline'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { WatcherRunner } from './runner-state'
 
@@ -20,22 +21,6 @@ export type KernelShutdownInput = {
 }
 
 const DEFAULT_DRAIN_MS = 1_500
-
-async function drainOperations(
-  operations: Promise<unknown>[],
-  deadlineAtMs: number
-): Promise<void> {
-  if (operations.length === 0) {
-    return
-  }
-  let timer: NodeJS.Timeout | undefined
-  const deadline = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, Math.max(0, deadlineAtMs - Date.now()))
-    timer?.unref()
-  })
-  await Promise.race([Promise.allSettled(operations), deadline])
-  clearTimeout(timer)
-}
 
 function notifyShutdownListeners(listeners: Set<() => void>): void {
   for (const listener of listeners) {
@@ -80,9 +65,9 @@ export async function shutdownHeimdallKernel(
     }
     input.host?.detachPowerMonitor()
     input.unsubscribeLedger?.()
-    await drainOperations(
-      runners.map((runner) => runner.operationTail),
-      deadlineAtMs
+    await settleWithinMs(
+      Promise.allSettled(runners.map((runner) => runner.operationTail)),
+      Math.max(0, deadlineAtMs - Date.now())
     )
 
     const releases: Promise<void>[] = []
@@ -102,7 +87,7 @@ export async function shutdownHeimdallKernel(
           })
       )
     }
-    await drainOperations(releases, deadlineAtMs)
+    await settleWithinMs(Promise.allSettled(releases), Math.max(0, deadlineAtMs - Date.now()))
   } catch (error) {
     console.warn('[heimdall] shutdown teardown failed:', error)
   }

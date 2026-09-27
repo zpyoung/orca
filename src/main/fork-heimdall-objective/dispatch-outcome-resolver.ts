@@ -11,6 +11,7 @@ import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import { requireObjectiveOriginalDispatchFingerprint } from '../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import { judgmentFailureClassification } from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
+import { getErrorCode } from '../git/worktree-operation-options'
 import {
   classifyValidatedReportFailure,
   dispatchReportRole,
@@ -205,13 +206,7 @@ export async function resolveObjectiveDispatchOutcome(args: {
       ...(args.action.kind === 'dispatch-node' ? { taskKey: args.action.taskKey } : {})
     })
   } catch (error) {
-    const errorCode =
-      error !== null &&
-      typeof error === 'object' &&
-      'code' in error &&
-      (typeof error.code === 'string' || typeof error.code === 'number')
-        ? String(error.code)
-        : null
+    const errorCode = getErrorCode(error) ?? null
     return validationFailure(
       provenance(
         'unverifiable',
@@ -251,13 +246,7 @@ export async function resolveObjectiveDispatchOutcome(args: {
         writeTerritory: args.binding.contract.writeTerritory
       })
     } catch (error) {
-      const errorCode =
-        error !== null &&
-        typeof error === 'object' &&
-        'code' in error &&
-        (typeof error.code === 'string' || typeof error.code === 'number')
-          ? String(error.code)
-          : null
+      const errorCode = getErrorCode(error) ?? null
       return validationFailure(
         createReportValidationProvenance({
           status: 'unverifiable',

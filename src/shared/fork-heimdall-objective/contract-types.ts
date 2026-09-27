@@ -229,8 +229,6 @@ export const ObjectiveEnrollmentPayloadSchema = z
   .strict()
 export type ObjectiveEnrollmentPayload = z.infer<typeof ObjectiveEnrollmentPayloadSchema>
 
-export const objectiveEnrollmentPayloadSchema = ObjectiveEnrollmentPayloadSchema
-
 export function objectiveCapabilityModes(landingBar: ObjectiveLandingBar): ObjectiveCapabilities {
   return {
     plan: 'gated',

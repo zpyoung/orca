@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createReportValidationProvenance } from '../../shared/fork-heimdall/effect-certainty'
 import type {
@@ -70,13 +67,11 @@ const CONTRACT: ObjectiveEnrollmentPayload = {
   sitterOverrides: {}
 }
 
-let root: string
 let database: ObjectiveDatabase
 let store: ObjectiveStore
 const opened: ObjectiveDatabase[] = []
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'orca-objective-store-'))
   database = new ObjectiveDatabase(':memory:')
   opened.push(database)
   store = new ObjectiveStore(database, () => 9_999)
@@ -87,7 +82,6 @@ afterEach(() => {
     item.close()
   }
   opened.length = 0
-  rmSync(root, { recursive: true, force: true })
 })
 
 function ingest(revisionNumber = 1, dispatchId = `planner-${revisionNumber}`) {
@@ -896,7 +890,7 @@ describe('ObjectiveStore natural-key persistence', () => {
       amendedAtMs: 400,
       frozenTaskKeys: []
     })
-    store.recordPlanReview({
+    store.recordPlanReviewAndRejectRoundOneTarget({
       watcherId: WATCHER_ID,
       targetKind: 'revision',
       targetId: revision.revisionId,

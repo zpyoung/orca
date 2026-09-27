@@ -3,7 +3,11 @@ import type { PlannerRepairReport } from '../../shared/fork-heimdall-objective/p
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
-import { projectPlanPatches } from './objective-store-plan-patches'
+import {
+  projectPlanPatches,
+  rejectDraftRevisionInTransaction,
+  rejectPlanPatchInTransaction
+} from './objective-store-plan-patches'
 
 const WATCHER_ID = 'watcher-plan-patches-1'
 const REPORT: PlannerReport = {
@@ -122,17 +126,25 @@ describe('ObjectiveStore plan patches', () => {
       createdAtMs: 500
     })
 
-    const rejected = store.rejectPlanPatch({
+    const rejected = rejectPlanPatchInTransaction(database.connection(), {
       patchId: patch.id,
       rejection: 'revise-verdict',
       resolvedAtMs: 700
     })
     expect(rejected.status).toBe('rejected')
     expect(
-      store.rejectPlanPatch({ patchId: patch.id, rejection: 'revise-verdict', resolvedAtMs: 800 })
+      rejectPlanPatchInTransaction(database.connection(), {
+        patchId: patch.id,
+        rejection: 'revise-verdict',
+        resolvedAtMs: 800
+      })
     ).toEqual(rejected)
     expect(() =>
-      store.rejectPlanPatch({ patchId: patch.id, rejection: 'escalate-verdict', resolvedAtMs: 900 })
+      rejectPlanPatchInTransaction(database.connection(), {
+        patchId: patch.id,
+        rejection: 'escalate-verdict',
+        resolvedAtMs: 900
+      })
     ).toThrow(/different reason/)
   })
 
@@ -290,7 +302,11 @@ describe('ObjectiveStore plan patches', () => {
     })
 
     expect(() =>
-      store.rejectPlanPatch({ patchId: patch.id, rejection: 'too-late', resolvedAtMs: 700 })
+      rejectPlanPatchInTransaction(database.connection(), {
+        patchId: patch.id,
+        rejection: 'too-late',
+        resolvedAtMs: 700
+      })
     ).toThrow(/cannot be rejected from applied/)
   })
 
@@ -326,10 +342,16 @@ describe('ObjectiveStore plan patches', () => {
       createdAtMs: 100
     })
 
-    store.rejectDraftRevision({ watcherId: WATCHER_ID, revisionId: draft.revisionId })
+    rejectDraftRevisionInTransaction(database.connection(), {
+      watcherId: WATCHER_ID,
+      revisionId: draft.revisionId
+    })
     expect(store.project(WATCHER_ID).revisions[0]?.status).toBe('rejected')
     expect(() =>
-      store.rejectDraftRevision({ watcherId: WATCHER_ID, revisionId: draft.revisionId })
+      rejectDraftRevisionInTransaction(database.connection(), {
+        watcherId: WATCHER_ID,
+        revisionId: draft.revisionId
+      })
     ).not.toThrow()
     expect(() =>
       store.ingestPlan({
@@ -346,7 +368,10 @@ describe('ObjectiveStore plan patches', () => {
   it('refuses to reject a non-draft revision', () => {
     const revision = ingestAndActivate()
     expect(() =>
-      store.rejectDraftRevision({ watcherId: WATCHER_ID, revisionId: revision.revisionId })
+      rejectDraftRevisionInTransaction(database.connection(), {
+        watcherId: WATCHER_ID,
+        revisionId: revision.revisionId
+      })
     ).toThrow(/cannot be rejected from approved/)
   })
 

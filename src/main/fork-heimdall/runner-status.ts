@@ -5,6 +5,7 @@ import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { FiredStopPredicate } from '../../shared/fork-heimdall/stop-policy'
 import type { WatcherParkReason } from '../../shared/fork-heimdall/watcher-types'
 import { WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND } from '../../shared/fork-heimdall/worker-escalation-consumption'
+import { getErrorCode } from '../git/worktree-operation-options'
 import { durableWatcherBudget } from './debug-report'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 
@@ -24,12 +25,7 @@ export type WatcherRunnerStatusDependencies = {
 export type AutoResumableParkKind = 'park-worker-question' | 'park-worker-escalation'
 
 export function isCoordinatorSeatLost(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    error.code === 'coordinator-seat-lost'
-  )
+  return getErrorCode(error) === 'coordinator-seat-lost'
 }
 /** Owns durable stop transitions and their corresponding public status projection. */
 export class WatcherRunnerStatusLifecycle {

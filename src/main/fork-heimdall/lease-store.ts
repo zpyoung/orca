@@ -5,6 +5,7 @@ import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { WorkspaceKey } from '../../shared/fork-heimdall/watcher-types'
 import { resolveGitDir } from '../git/source-control/resolve-git-dir'
 import type { GitRuntimeOptions } from '../git/git-runtime-options'
+import { getErrorCode } from '../git/worktree-operation-options'
 import type { IFilesystemProvider } from '../providers/types'
 import { ExecutionHostNotDispatchableError } from '../providers/execution-host-provider-dispatch'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
@@ -91,18 +92,12 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function errorCode(error: unknown): string | undefined {
-  return typeof error === 'object' && error !== null && 'code' in error
-    ? String(error.code)
-    : undefined
-}
-
 function isAlreadyExists(error: unknown): boolean {
-  return errorCode(error) === 'EEXIST' || /already exists|\bEEXIST\b/i.test(errorMessage(error))
+  return getErrorCode(error) === 'EEXIST' || /already exists|\bEEXIST\b/i.test(errorMessage(error))
 }
 
 function isNotFound(error: unknown): boolean {
-  return errorCode(error) === 'ENOENT' || /not found/i.test(errorMessage(error))
+  return getErrorCode(error) === 'ENOENT' || /not found/i.test(errorMessage(error))
 }
 
 function highestEpoch(entries: readonly DirEntry[]): number {

@@ -7,6 +7,7 @@ import {
   OBJECTIVE_SYMLINK_OID_ALIAS_CONFIG
 } from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
+import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import type { IFilesystemProvider } from '../providers/types'
 import {
@@ -170,25 +171,6 @@ export function parseObjectiveDirtyPaths(
       }),
     unborn
   }
-}
-
-export async function mapConcurrent<T, R>(
-  values: readonly T[],
-  limit: number,
-  map: (value: T) => Promise<R>
-): Promise<R[]> {
-  const results = Array.from({ length: values.length }) as R[]
-  let nextIndex = 0
-  const concurrency = Math.min(limit, values.length)
-  await Promise.all(
-    Array.from({ length: concurrency }, async () => {
-      while (nextIndex < values.length) {
-        const index = nextIndex++
-        results[index] = await map(values[index]!)
-      }
-    })
-  )
-  return results
 }
 
 export function objectiveGitCommandForTarget(
@@ -359,7 +341,7 @@ export async function observeGitRepositoryState(
     throw treeResult.reason
   }
 
-  const fingerprints = await mapConcurrent(parsed.entries, HASH_CONCURRENCY, (entry) =>
+  const fingerprints = await mapWithConcurrency(parsed.entries, HASH_CONCURRENCY, (entry) =>
     fingerprintDirtyPath(target, runGit, repositoryPrefix, entry, caseInsensitivePaths)
   )
   return {

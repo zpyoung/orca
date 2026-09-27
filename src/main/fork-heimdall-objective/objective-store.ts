@@ -42,7 +42,6 @@ import { ObjectiveStoreDispatchMutations } from './objective-store-dispatch-muta
 import {
   completeGateAttempt,
   getGateAttempt,
-  listGateAttempts,
   startGateAttempt,
   type CompleteGateAttemptArgs,
   type ObjectiveGateAttempt,
@@ -58,18 +57,14 @@ import {
   getPlanPatch,
   ingestPlanPatch,
   listPlanPatches,
-  rejectDraftRevision,
-  rejectPlanPatch,
   type ApplyPlanPatchArgs,
   type ApplyPlanPatchResult,
   type IngestPlanPatchArgs,
-  type ObjectivePlanPatchRecord,
-  type RejectPlanPatchArgs
+  type ObjectivePlanPatchRecord
 } from './objective-store-plan-patches'
 import {
   getPlanReviewReport,
   listPlanReviews,
-  recordPlanReview,
   recordPlanReviewAndRejectRoundOneTarget,
   type ObjectivePlanReviewRecord,
   type RecordPlanReviewArgs
@@ -222,16 +217,8 @@ export class ObjectiveStore {
     return this.queries.getTask(revisionId, taskKey)
   }
 
-  rejectDraftRevision(args: { watcherId: string; revisionId: string }): void {
-    return rejectDraftRevision(this.database, args)
-  }
-
   ingestPlanPatch(args: IngestPlanPatchArgs): ObjectivePlanPatchRecord {
     return ingestPlanPatch(this.database, args)
-  }
-
-  rejectPlanPatch(args: RejectPlanPatchArgs): ObjectivePlanPatchRecord {
-    return rejectPlanPatch(this.database, args)
   }
 
   applyPlanPatch(args: ApplyPlanPatchArgs): ApplyPlanPatchResult {
@@ -244,10 +231,6 @@ export class ObjectiveStore {
 
   listPlanPatches(watcherId: string): ObjectivePlanPatchRecord[] {
     return listPlanPatches(this.database, watcherId)
-  }
-
-  recordPlanReview(args: RecordPlanReviewArgs): ObjectivePlanReviewRecord {
-    return recordPlanReview(this.database, args)
   }
 
   /** Records a plan review and, when it is a round-one `revise`, rejects its target atomically. */
@@ -279,10 +262,6 @@ export class ObjectiveStore {
     return getGateAttempt(this.database, watcherId, gateName, contentIdentity)
   }
 
-  listGateAttempts(watcherId: string): ObjectiveGateAttempt[] {
-    return listGateAttempts(this.database, watcherId)
-  }
-
   abandonGateAttempt(args: AbandonGateAttemptArgs): void {
     this.mutations.abandonGateAttempt(args)
   }
@@ -311,10 +290,6 @@ export class ObjectiveStore {
     this.mutations.abandonCheckAttempt(args)
   }
 
-  hasCheckAttempt(criterionId: string, contentIdentity: string, completed = false): boolean {
-    return this.queries.hasCheckAttempt(criterionId, contentIdentity, completed)
-  }
-
   recordVerdict(args: RecordVerdictArgs): { dispatchId: string; reportDigest: string } {
     return this.mutations.recordVerdict(args)
   }
@@ -323,9 +298,6 @@ export class ObjectiveStore {
     return this.mutations.recordLanding(args)
   }
 
-  hasPlanRevision(watcherId: string, revisionId: string, digest?: string): boolean {
-    return this.queries.hasPlanRevision(watcherId, revisionId, digest)
-  }
   hasUsablePlan(watcherId: string): boolean {
     return this.queries.hasUsablePlan(watcherId)
   }

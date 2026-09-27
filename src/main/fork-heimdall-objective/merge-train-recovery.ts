@@ -1,6 +1,6 @@
+import { isObjectiveGitObjectId } from '../../shared/fork-heimdall-objective/git-object-id'
 import type { ObjectiveGitCommand } from './content-identity'
 
-const OBJECT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu
 const RECOVERY_LOG_PAGE_SIZE = 32
 const RECOVERY_LOG_MAX_CANDIDATES = 256
 
@@ -8,7 +8,7 @@ async function readRequiredCommit(runGit: ObjectiveGitCommand, revision: string)
   const sha = (
     await runGit(['rev-parse', '--verify', '--quiet', `${revision}^{commit}`])
   ).stdout.trim()
-  if (!OBJECT_ID_PATTERN.test(sha)) {
+  if (!isObjectiveGitObjectId(sha)) {
     throw new Error(`Git returned an invalid object id for ${revision}`)
   }
   return sha
@@ -83,7 +83,7 @@ async function readCandidatePage(args: {
     `${args.mergeBase}..${args.headSha}`
   ])
   const candidates = stdout.split(/\r?\n/u).filter(Boolean)
-  if (candidates.length > args.limit || candidates.some((sha) => !OBJECT_ID_PATTERN.test(sha))) {
+  if (candidates.length > args.limit || candidates.some((sha) => !isObjectiveGitObjectId(sha))) {
     throw new Error('Git returned malformed objective recovery history')
   }
   return candidates

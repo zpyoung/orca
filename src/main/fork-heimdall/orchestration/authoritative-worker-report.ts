@@ -1,6 +1,7 @@
 import type { EvidenceEntry } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import type { AttemptObservationFact, OrchestrationDb } from '../../runtime/orchestration/db'
+import { parseLifecycleRejectionPayload } from './lifecycle-rejection-payload'
 import { mailboxEvidenceForMessage } from './mailbox-drain'
 
 type AcceptedWorkerReportResult = {
@@ -177,21 +178,8 @@ function parsePreflightRejection(value: unknown): { code: string; reason: string
 function parseReportRejection(
   payload: Record<string, unknown>
 ): { code: string; reason: string; originalBody: string } | null {
-  const value = payload._orcaLifecycleRejection
-  if (!value || typeof value !== 'object') {
-    return null
-  }
-  const rejection = value as Record<string, unknown>
-  const reason =
-    typeof rejection.originalReason === 'string'
-      ? rejection.originalReason
-      : typeof rejection.reason === 'string'
-        ? rejection.reason
-        : null
-  return typeof rejection.code === 'string' &&
-    rejection.code.trim() &&
-    reason !== null &&
-    typeof rejection.originalBody === 'string'
-    ? { code: rejection.code, reason, originalBody: rejection.originalBody }
+  const parsed = parseLifecycleRejectionPayload(payload)
+  return parsed && typeof parsed.originalBody === 'string'
+    ? { code: parsed.code, reason: parsed.reason, originalBody: parsed.originalBody }
     : null
 }

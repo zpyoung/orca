@@ -33,6 +33,7 @@ import {
 } from './orchestration/orchestration-contract'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { WatcherRunner } from './runner-state'
+import { getErrorCode } from '../git/worktree-operation-options'
 
 type ControlPlaneDependencies = {
   enrollments: EnrollmentStore
@@ -508,12 +509,7 @@ function refused(
 }
 
 function errorCode(error: unknown): string | null {
-  return typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof error.code === 'string'
-    ? error.code
-    : null
+  return getErrorCode(error) ?? null
 }
 
 function errorText(error: unknown): string {

@@ -1,8 +1,7 @@
 import { OBJECTIVE_ABSENT_REMOTE_REF_STATE } from '../../shared/fork-heimdall-objective/contract-types'
+import { isObjectiveGitObjectId } from '../../shared/fork-heimdall-objective/git-object-id'
 import { resolveConfiguredGitPushTarget } from '../../shared/git-push-target-resolution'
 import type { ObjectiveGitCommand } from './content-identity'
-
-const OBJECT_ID_PATTERN = /^[0-9a-f]{40,64}$/iu
 
 export type ObjectivePushTarget = {
   remote: string
@@ -41,7 +40,7 @@ export async function readObjectiveAttachedBranch(
 export async function readObjectiveHeadSha(runGit: ObjectiveGitCommand): Promise<string | null> {
   try {
     const sha = (await runGit(['rev-parse', '--verify', 'HEAD'])).stdout.trim()
-    return OBJECT_ID_PATTERN.test(sha) ? sha : null
+    return isObjectiveGitObjectId(sha) ? sha : null
   } catch {
     return null
   }
@@ -70,7 +69,7 @@ export async function readObjectiveRemoteBranchHead(
   if (!sha) {
     return ''
   }
-  if (!OBJECT_ID_PATTERN.test(sha)) {
+  if (!isObjectiveGitObjectId(sha)) {
     throw new Error('Git returned an invalid remote branch object id')
   }
   return sha

@@ -82,8 +82,7 @@ function preparedWorkspace(
       workspacePath: '/workspaces/node-a',
       fileProvider: null
     },
-    reuseTerminal: null,
-    isolated: true
+    reuseTerminal: null
   }
 }
 
