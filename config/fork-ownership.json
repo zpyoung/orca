@@ -1550,7 +1550,7 @@
       "lines": [
         "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
         "  const widthClassName = useNativeChatWidthClassName()",
-        "      <div className={cn('mx-auto w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
+        "      <div className={cn('mx-auto flex h-full min-h-0 max-h-full w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
       ]
     },
     {
@@ -3648,6 +3648,18 @@
       "lines": ["const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'"]
     },
     {
+      "path": "tests/e2e/cross-version-wire/cross-version-session-tabs-retirement-proof.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-worktree-identity-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
+    },
+    {
       "path": "tests/e2e/cross-version-wire/release-checkout.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -3972,6 +3984,11 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/mobile-web-bundle-packaging-workflow-contract.test.mjs",
+      "status": "permanent",
+      "reason": "Packaging-job census for the fork-owned workflow set, which omits pr.yml's Windows packaging job; upstream's inventory names a job this fork does not run."
+    },
+    {
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
       "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
       "status": "permanent"
@@ -4087,12 +4104,6 @@
       "path": "docs/fork-upstreaming.md",
       "reason": "The upstreaming ledger declares itself so a sync never removes it.",
       "status": "permanent"
-    },
-    {
-      "path": "mobile/src/browser/mobile-browser-frame-state.ts",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
-      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line."
     },
     {
       "path": "mobile/src/browser/mobile-browser-frameless-stream.test.tsx",
@@ -5448,8 +5459,8 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
-      "added": 74,
-      "removed": 11
+      "added": 66,
+      "removed": 9
     },
     "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.test.tsx": {
       "added": 1,
@@ -5677,7 +5688,7 @@
     },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
       "added": 13,
-      "removed": 5
+      "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
       "added": 36,
@@ -6306,6 +6317,14 @@
     "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": {
       "added": 4,
       "removed": 2
+    },
+    "tests/e2e/cross-version-wire/cross-version-session-tabs-retirement-proof.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/cross-version-worktree-identity-downgrade.unit.test.ts": {
+      "added": 1,
+      "removed": 1
     },
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,

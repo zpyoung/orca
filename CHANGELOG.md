@@ -1,6 +1,6 @@
 ---
-last_released_commit: 8ee9f04c4dcf4cd017dd969bcdc1d0667938d5f5
-upstream_synced: v1.4.206
+last_released_commit: a45f3e27a5c8055dc283ac22002a843c094664c8
+upstream_synced: v1.4.207
 ---
 
 # Changelog
@@ -11,6 +11,42 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.208-rc.0.zy01] - 2026-09-22
+
+Synced to upstream [v1.4.207](https://github.com/stablyai/orca/releases/tag/v1.4.207).
+
+### Fixed
+- Typing in the quick-open file search or the right sidebar's file-explorer filter no longer leaves
+  the previous query's results on screen for a moment; both lists now clear and re-filter as the
+  query changes. This comes from upstream.
+
+### Changed
+- The fork's own record of which upstream files it copies wholesale was advanced to this release.
+  Nothing upstream changed in any copied file, so no fork behaviour moved with it.
+
+## [1.4.207-rc.0.zy02] - 2026-09-21
+
+Re-synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4.206). Upstream
+retracted the v1.4.206 tag that 1.4.207-rc.0.zy01 was built on and re-cut it from trunk at a
+different commit, adding 325 commits the retracted tag never carried.
+
+### Added
+- Upstream's mobile web app bundle, terminal performance work, editor diff improvements and
+  OpenCode 2 beta support arrive with the re-cut release.
+
+### Fixed
+- The docked terminal composer no longer crashes pane close in setups that report no settings
+  snapshot, which previously surfaced as a failure when closing a split or a pending pane.
+- Mobile browser frames decode image data again in the browser-served mobile app; the frame reader
+  had been importing Node's Buffer in a form the web bundle cannot resolve.
+
+### Changed
+- The fork's packaging and sandbox test inventories now describe this repository's own job set
+  rather than upstream's, so they stop reporting a Windows packaging job the fork does not run and
+  they skip the same relay region suites CI does.
+- Native chat keeps reading the agent's own session log for its model and effort while also using
+  upstream's new live agent-status model discovery, rather than one replacing the other.
 
 ## [1.4.207-rc.0.zy01] - 2026-09-18
 
