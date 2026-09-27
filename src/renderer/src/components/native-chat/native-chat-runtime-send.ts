@@ -3,7 +3,14 @@
 // byte builders in native-chat-send.ts so those stay IO-free and unit-testable.
 
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
-import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
+import {
+  isTerminalInputQuarantined,
+  subscribeTerminalInputQuarantine
+} from '../terminal-pane/terminal-input-quarantine'
+import type {
+  NativeChatResolvedTarget,
+  NativeChatRuntimeSettings
+} from './native-chat-composer-target'
 import { runBodyAcceptedThen } from './fork-agent-composer/native-chat-runtime-send-acceptance'
 import { enqueueNativeChatBodySend } from './fork-agent-composer/native-chat-body-send'
 import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
@@ -23,13 +30,14 @@ import {
 } from './native-chat-send'
 import {
   cancelNativeChatPtySends,
+  invalidateNativeChatPtySends,
   resetNativeChatPtySendQueuesForTests,
   waitForNativeChatPtyIdle
 } from './native-chat-pty-send-queue'
 import { clearConfirmDurationMs } from './fork-agent-composer/native-chat-runtime-clear'
 
 export { NATIVE_CHAT_ADVANCE_BUFFER_MS, NATIVE_CHAT_QUESTION_STEP_MS, NATIVE_CHAT_SUBMIT_DELAY_MS }
-export { resetNativeChatPtySendQueuesForTests }
+export { invalidateNativeChatPtySends, resetNativeChatPtySendQueuesForTests }
 export {
   sendNativeChatTypedCommand,
   typeNativeChatCommand
@@ -66,7 +74,17 @@ export type NativeChatSendHandle = {
   settled?: Promise<void>
 }
 
-export type RuntimeSettings = ReturnType<typeof getSettingsForAgentTabRuntimeOwner>
+export type RuntimeSettings = NativeChatRuntimeSettings
+
+const NOOP_NATIVE_CHAT_SEND_HANDLE: NativeChatSendHandle = {
+  cancel: () => {},
+  settleAfterMs: 0
+}
+
+function rejectQuarantinedNativeChatSend(options?: NativeChatSendOptions): NativeChatSendHandle {
+  options?.onOutcome?.('may-not-have-sent')
+  return NOOP_NATIVE_CHAT_SEND_HANDLE
+}
 
 /**
  * Chat message path:
@@ -77,14 +95,15 @@ export type RuntimeSettings = ReturnType<typeof getSettingsForAgentTabRuntimeOwn
  * Serialized per PTY so rapid sends cannot glue before Enter.
  */
 export function sendNativeChatMessage(
-  settings: RuntimeSettings,
-  ptyId: string,
+  target: NativeChatResolvedTarget,
   text: string,
   options?: NativeChatSendOptions
 ): NativeChatSendHandle {
+  if (isTerminalInputQuarantined(target.terminalTabId)) {
+    return rejectQuarantinedNativeChatSend(options)
+  }
   return enqueueNativeChatBodySend({
-    settings,
-    ptyId,
+    target,
     options,
     durationMs: NATIVE_CHAT_SUBMIT_DELAY_MS + clearConfirmDurationMs(options),
     chunks: [buildNativeChatPasteBytes(text)]
@@ -101,36 +120,49 @@ export function sendNativeChatMessage(
  * write cannot land mid-body or mid-Enter of this command.
  */
 export async function sendNativeChatMessageVerified(
-  settings: RuntimeSettings,
-  ptyId: string,
+  target: NativeChatResolvedTarget,
   text: string,
   signal?: AbortSignal
 ): Promise<boolean> {
-  // Why: chat sends hold a delayed Enter for 500ms. Opening the model picker in
-  // that window used to let that Enter hit Claude's confirmation UI, so
-  // verification timed out with "Could not verify the model change".
-  cancelNativeChatPtySends(ptyId)
-  await waitForNativeChatPtyIdle(ptyId)
-  if (signal?.aborted) {
-    return false
+  let invalidated = false
+  const unsubscribe = subscribeTerminalInputQuarantine(target.terminalTabId, (armed) => {
+    if (armed) {
+      invalidated = true
+    }
+  })
+  try {
+    if (signal?.aborted || invalidated) {
+      return false
+    }
+    // Why: chat sends hold a delayed Enter for 500ms. Opening the model picker in
+    // that window used to let that Enter hit Claude's confirmation UI, so
+    // verification timed out with "Could not verify the model change".
+    cancelNativeChatPtySends(target.ptyId)
+    await waitForNativeChatPtyIdle(target.ptyId)
+    if (signal?.aborted || invalidated) {
+      return false
+    }
+    return await sendNativeChatMessageVerifiedQueued(target, text, signal)
+  } finally {
+    unsubscribe()
   }
-  return sendNativeChatMessageVerifiedQueued(settings, ptyId, text, signal)
 }
 
 export function sendNativeChatMessageWithImageAttachments(
-  settings: RuntimeSettings,
-  ptyId: string,
+  target: NativeChatResolvedTarget,
   text: string,
   imagePaths: readonly string[],
   options?: NativeChatSendOptions
 ): NativeChatSendHandle {
+  if (isTerminalInputQuarantined(target.terminalTabId)) {
+    return rejectQuarantinedNativeChatSend(options)
+  }
   if (imagePaths.length === 0) {
-    return sendNativeChatMessage(settings, ptyId, text, options)
+    return sendNativeChatMessage(target, text, options)
   }
   const trimmedText = text.trim()
   return enqueueNativeChatBodySend({
-    settings,
-    ptyId,
+    target,
     options,
     durationMs:
       (trimmedText.length > 0
@@ -144,8 +176,8 @@ export function sendNativeChatMessageWithImageAttachments(
       }
       delayGuarded(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
         runBodyAcceptedThen(
-          settings,
-          ptyId,
+          target.settings,
+          target.ptyId,
           [buildNativeChatPasteBytes(text)],
           isCancelled,
           markSubmitted,
@@ -159,8 +191,10 @@ export function sendNativeChatMessageWithImageAttachments(
 
 /** Submit a TUI prompt with no body (Enter only) — e.g. a plain submit when the
  *  composer is empty. */
-export function submitNativeChatPrompt(settings: RuntimeSettings, ptyId: string): void {
-  sendRuntimePtyInput(settings, ptyId, NATIVE_CHAT_SUBMIT)
+export function submitNativeChatPrompt(target: NativeChatResolvedTarget): void {
+  if (!isTerminalInputQuarantined(target.terminalTabId)) {
+    sendRuntimePtyInput(target.settings, target.ptyId, NATIVE_CHAT_SUBMIT)
+  }
 }
 
 export { sendNativeChatAskAnswerQueued as sendNativeChatAskAnswer }

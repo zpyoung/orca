@@ -1,3 +1,4 @@
+import './mock-descendant-sweep'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -41,14 +42,18 @@ vi.mock('../main/shell-prompt-readiness-probe', () => ({
   createShellPromptReadinessProbe: mockCreateShellPromptReadinessProbe
 }))
 
-import { PtyHandler } from './pty-handler'
-import type { RelayDispatcher } from './dispatcher'
+import type { PtyHandler } from './pty-handler'
 import {
   beginPtyHandlerTest,
   createMockDispatcher,
+  createTestPtyHandler,
+  testPtyId,
   endPtyHandlerTest
 } from './pty-handler-test-harness'
 import type { MockDispatcher } from './pty-handler-test-harness'
+
+const PTY_1 = testPtyId(1)
+const PTY_2 = testPtyId(2)
 
 describe('PtyHandler', () => {
   let dispatcher: MockDispatcher
@@ -184,12 +189,12 @@ describe('PtyHandler', () => {
       expect(spawnedEnv.env.ORCA_ATTRIBUTION_SHIM_DIR).toBeUndefined()
 
       const state = (await dispatcher.callRequest('pty.serialize', {
-        ids: ['pty-1']
+        ids: [PTY_1]
       })) as string
       await handler.dispose({ waitForPhysicalExit: false })
       mockPtySpawn.mockClear()
       dispatcher = createMockDispatcher()
-      handler = new PtyHandler(dispatcher as unknown as RelayDispatcher)
+      handler = createTestPtyHandler(dispatcher)
       const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
       try {
         await dispatcher.callRequest('pty.revive', { state })
@@ -498,7 +503,7 @@ describe('PtyHandler', () => {
       expect(userEnv.GIT_CONFIG_COUNT).toBe('1')
       expect(userEnv.GIT_CONFIG_KEY_0).toBe('core.quotePath')
       expect(userEnv.GIT_CONFIG_KEY_1).toBeUndefined()
-      const state = (await dispatcher.callRequest('pty.serialize', { ids: ['pty-1'] })) as string
+      const state = (await dispatcher.callRequest('pty.serialize', { ids: [PTY_1] })) as string
       expect(JSON.parse(state)[0]?.gitCredentialPromptGuarded).toBe(false)
     } finally {
       Object.defineProperty(process, 'platform', {
@@ -508,6 +513,73 @@ describe('PtyHandler', () => {
     }
   })
 
+  it('keeps the image protocol hint consistent after renderer and augmenter overrides', async () => {
+    handler.addEnvAugmenter(() => ({ ORCA_IMAGE_PROTOCOL: 'sixel' }))
+    await dispatcher.callRequest('pty.spawn', {
+      cols: 80,
+      rows: 24,
+      env: { ORCA_IMAGE_PROTOCOL: 'none' }
+    })
+    expect(mockPtySpawn.mock.calls[0][2].env.ORCA_IMAGE_PROTOCOL).toBe('kitty')
+  })
+
+  it('waits for execution-host environment resolution before spawning', async () => {
+    const entered = Promise.withResolvers<void>()
+    const resolved = Promise.withResolvers<Record<string, string>>()
+    handler.addEnvAugmenter(() => {
+      entered.resolve()
+      return resolved.promise
+    })
+    const spawning = dispatcher.callRequest('pty.spawn', { cols: 80, rows: 24 })
+    await entered.promise
+    expect(mockPtySpawn).not.toHaveBeenCalled()
+    resolved.resolve({ PI_CONFIG_DIR: '.evaluated-profile' })
+    await spawning
+    expect(mockPtySpawn.mock.calls[0]?.[2]?.env.PI_CONFIG_DIR).toBe('.evaluated-profile')
+  })
+
+  it('does not spawn when canceled during environment resolution', async () => {
+    const entered = Promise.withResolvers<void>()
+    const resolved = Promise.withResolvers<Record<string, string>>()
+    handler.addEnvAugmenter(() => {
+      entered.resolve()
+      return resolved.promise
+    })
+    const abort = new AbortController()
+    const spawning = dispatcher.callRequest(
+      'pty.spawn',
+      { cols: 80, rows: 24 },
+      {
+        signal: abort.signal,
+        isStale: () => abort.signal.aborted
+      }
+    )
+    const rejected = expect(spawning).rejects.toThrow('client_disconnected')
+    await entered.promise
+    abort.abort()
+    resolved.resolve({ PI_CONFIG_DIR: '.evaluated-profile' })
+    await rejected
+    expect(mockPtySpawn).not.toHaveBeenCalled()
+    expect(handler.activePtyCount).toBe(0)
+  })
+
+  it('disposes a creation already awaiting its execution environment', async () => {
+    const entered = Promise.withResolvers<void>()
+    const resolved = Promise.withResolvers<Record<string, string>>()
+    handler.addEnvAugmenter(() => {
+      entered.resolve()
+      return resolved.promise
+    })
+    const spawning = dispatcher.callRequest('pty.spawn', { cols: 80, rows: 24 })
+    await entered.promise
+    const disposal = handler.dispose({ waitForPhysicalExit: false })
+    expect(mockPtySpawn).not.toHaveBeenCalled()
+    resolved.resolve({ PI_CONFIG_DIR: '.evaluated-profile' })
+    await spawning
+    await disposal
+    expect(mockPtyInstance.kill).toHaveBeenCalled()
+    expect(handler.activePtyCount).toBe(0)
+  })
   it('applies env augmenters after process.env and renderer-supplied env (augmenter wins on key conflict)', async () => {
     handler.addEnvAugmenter(() => ({
       ORCA_AGENT_HOOK_PORT: '12345',
@@ -557,14 +629,14 @@ describe('PtyHandler', () => {
     const firstEnv = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
     const secondEnv = mockPtySpawn.mock.calls[1][2] as { env: Record<string, string> }
     expect(seenContexts[0]).toMatchObject({
-      id: 'pty-1',
+      id: PTY_1,
       paneKey: 'tab-context:0',
       launchAgent: 'pi',
       env: { ORCA_PANE_KEY: 'tab-context:0' }
     })
-    expect(seenContexts[1]).toMatchObject({ id: 'pty-2', paneKey: undefined })
+    expect(seenContexts[1]).toMatchObject({ id: PTY_2, paneKey: undefined })
     expect(firstEnv.env.OVERLAY_ID).toBe('tab-context:0')
-    expect(secondEnv.env.OVERLAY_ID).toBe('pty-2')
+    expect(secondEnv.env.OVERLAY_ID).toBe(PTY_2)
   })
 
   it('passes process and renderer env to env augmenters before augmenter overrides are applied', async () => {
@@ -647,6 +719,7 @@ describe('PtyHandler', () => {
     expect(spawnEnv.name).toBe('xterm-256color')
     expect(spawnEnv.env.TERM).toBe('xterm-256color')
     expect(spawnEnv.env.TERM_PROGRAM).toBe('Orca')
+    expect(spawnEnv.env.ORCA_IMAGE_PROTOCOL).toBe('kitty')
   })
 
   it('expands variables in PATH before spawning a Windows relay shell', async () => {

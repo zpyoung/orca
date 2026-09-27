@@ -44,7 +44,10 @@ function oversizedResult(): GitDiffResult {
   }
 }
 
-function commands(connectionId?: string): RuntimeGitCommands {
+function commands(
+  connectionId?: string,
+  localGitOptions?: { wslDistro: string }
+): RuntimeGitCommands {
   const worktree = {
     id: 'wt-1',
     repoId: 'repo-1',
@@ -54,7 +57,8 @@ function commands(connectionId?: string): RuntimeGitCommands {
   return new RuntimeGitCommands({
     resolveRuntimeGitTarget: async () => ({
       worktree,
-      ...(connectionId ? { connectionId } : {})
+      executionHostId: connectionId ? (`ssh:${connectionId}` as const) : ('local' as const),
+      ...(localGitOptions ? { localGitOptions } : {})
     }),
     getRuntimeSettings: () => ({}) as GlobalSettings
   })
@@ -97,17 +101,34 @@ describe('runtime git diff transport budget', () => {
       '/remote/repo',
       'assets/logo.png',
       false,
+      undefined,
       undefined
     )
     expect(mocks.getDiff).not.toHaveBeenCalled()
   })
 
   it('leaves an SSH-forwarded diff uncapped when no budget is supplied', async () => {
-    mocks.getSshGitProvider.mockReturnValue(sshProvider())
+    const provider = sshProvider()
+    mocks.getSshGitProvider.mockReturnValue(provider)
+    const controller = new AbortController()
 
     await expect(
-      commands('conn-1').getRuntimeGitDiff('id:wt-1', 'assets/logo.png', false)
+      commands('conn-1').getRuntimeGitDiff(
+        'id:wt-1',
+        'assets/logo.png',
+        false,
+        undefined,
+        undefined,
+        controller.signal
+      )
     ).resolves.toMatchObject({ modifiedContent: OVERSIZED_BASE64 })
+    expect(provider.getDiff).toHaveBeenCalledWith(
+      '/remote/repo',
+      'assets/logo.png',
+      false,
+      undefined,
+      { signal: controller.signal }
+    )
   })
 
   it('caps a local-repo diff that exceeds the budget', async () => {
@@ -193,6 +214,25 @@ describe('runtime git diff transport budget', () => {
       {
         modifiedContent: OVERSIZED_BASE64
       }
+    )
+  })
+
+  it('prioritizes local file diff reads without losing WSL routing', async () => {
+    const runtime = commands(undefined, { wslDistro: 'Ubuntu' })
+
+    await runtime.getRuntimeGitBranchDiff('id:wt-1', BRANCH_COMPARE, 'assets/logo.png')
+    await runtime.getRuntimeGitCommitDiff('id:wt-1', COMMIT_ARGS)
+
+    const options = { admissionTier: 'interactive', wslDistro: 'Ubuntu' }
+    expect(mocks.getBranchDiff).toHaveBeenLastCalledWith(
+      '/remote/repo',
+      expect.objectContaining({ filePath: 'assets/logo.png' }),
+      options
+    )
+    expect(mocks.getCommitDiff).toHaveBeenLastCalledWith(
+      '/remote/repo',
+      expect.objectContaining({ filePath: 'assets/logo.png' }),
+      options
     )
   })
 })

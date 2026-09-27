@@ -1,11 +1,14 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { LedgerRemovalPreview } from '../../../../../../shared/ledger'
+import { requestLedger } from '@/runtime/runtime-ledger-client'
+import { isLedgerRemovalConflict } from '@/store/repos/ledger-removal-conflict'
 
 export type ProjectGroupNameDialogState =
   | { type: 'create-from-repo'; repo: Repo }
@@ -17,6 +20,9 @@ export type ProjectGroupDeleteDialogState = {
   groupName: string
   removeContainedProjects: boolean
   hostId?: ExecutionHostId
+  ledgerPreview: LedgerRemovalPreview[]
+  ledgerPreviewLoading: boolean
+  ledgerPreviewError: string | null
 }
 
 export type ProjectGroupDialogs = ReturnType<typeof useProjectGroupDialogs>
@@ -76,6 +82,7 @@ export function useProjectGroupDialogs(args: {
   )
   const [nameDialog, setNameDialog] = useState<ProjectGroupNameDialogState | null>(null)
   const [deleteDialog, setDeleteDialog] = useState<ProjectGroupDeleteDialogState | null>(null)
+  const [ledgerPreviewGeneration, setLedgerPreviewGeneration] = useState(0)
 
   const handleCreateGroupFromRepo = useCallback((repo: Repo) => {
     setNameDialog({ type: 'create-from-repo', repo })
@@ -165,10 +172,80 @@ export function useProjectGroupDialogs(args: {
 
   const handleDeleteProjectGroup = useCallback(
     (groupId: string, groupName: string, hostId?: ExecutionHostId) => {
-      setDeleteDialog({ groupId, groupName, removeContainedProjects: false, hostId })
+      setDeleteDialog({
+        groupId,
+        groupName,
+        removeContainedProjects: false,
+        hostId,
+        ledgerPreview: [],
+        ledgerPreviewLoading: true,
+        ledgerPreviewError: null
+      })
     },
     []
   )
+
+  const ledgerPreviewGroupId = deleteDialog?.groupId
+  const ledgerPreviewHostId = deleteDialog?.hostId
+  const ledgerPreviewRemoveProjects = deleteDialog?.removeContainedProjects
+  useEffect(() => {
+    if (!ledgerPreviewGroupId) {
+      return
+    }
+    let cancelled = false
+    const parsedHost = ledgerPreviewHostId ? parseExecutionHostId(ledgerPreviewHostId) : null
+    setDeleteDialog((current) =>
+      current ? { ...current, ledgerPreviewLoading: true, ledgerPreviewError: null } : current
+    )
+    void requestLedger(
+      {
+        operation: 'removal-preview',
+        removal: {
+          projectGroupId: ledgerPreviewGroupId,
+          removeContainedProjects: ledgerPreviewRemoveProjects
+        }
+      },
+      parsedHost?.kind === 'runtime' ? parsedHost.environmentId : undefined
+    )
+      .then((response) => {
+        if (cancelled) {
+          return
+        }
+        setDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                ledgerPreview: response.removalPreview ?? [],
+                ledgerPreviewLoading: false,
+                ledgerPreviewError: null
+              }
+            : current
+        )
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return
+        }
+        setDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                ledgerPreviewLoading: false,
+                ledgerPreviewError:
+                  error instanceof Error ? error.message : 'Ledger preview unavailable'
+              }
+            : current
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    ledgerPreviewGeneration,
+    ledgerPreviewGroupId,
+    ledgerPreviewHostId,
+    ledgerPreviewRemoveProjects
+  ])
 
   const handleConfirmDeleteProjectGroup = useCallback(async () => {
     if (!deleteDialog) {
@@ -178,13 +255,41 @@ export function useProjectGroupDialogs(args: {
       reportProjectGroupDeleteFailures(
         await deleteProjectGroupWithContainedProjects(deleteDialog.groupId, {
           removeContainedProjects,
-          hostId: deleteDialog.hostId
+          hostId: deleteDialog.hostId,
+          // Why: the guard asserts the preview the user saw, so a preview that never loaded has
+          // nothing to assert and must not be sent as an empty expectation.
+          ...(deleteDialog.ledgerPreviewLoading || deleteDialog.ledgerPreviewError
+            ? {}
+            : {
+                expectedLedgers: deleteDialog.ledgerPreview.map(({ ledgerId, revision }) => ({
+                  ledgerId,
+                  revision
+                }))
+              })
         })
       )
-    } finally {
-      // Why: deleting contained projects can unmount this dialog before its close handler runs, so the parent owns cleanup.
-      setDeleteDialog(null)
+    } catch (error) {
+      if (isLedgerRemovalConflict(error)) {
+        setDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                ledgerPreview: [],
+                ledgerPreviewLoading: true,
+                ledgerPreviewError: null
+              }
+            : current
+        )
+        setLedgerPreviewGeneration((generation) => generation + 1)
+      } else {
+        setDeleteDialog(null)
+      }
+      // Why: the dialog closes itself when onConfirm resolves, so a conflict must reach it as a
+      // rejection or the retry preview it just refreshed is thrown away unseen.
+      throw error
     }
+    // Why: deleting contained projects can unmount this dialog before its close handler runs, so the parent owns cleanup.
+    setDeleteDialog(null)
   }, [deleteProjectGroupWithContainedProjects, removeContainedProjects, deleteDialog])
 
   return {

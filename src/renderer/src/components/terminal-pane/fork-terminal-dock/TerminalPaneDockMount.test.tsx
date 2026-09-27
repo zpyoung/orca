@@ -519,8 +519,8 @@ describe('TerminalPaneDockMount', () => {
     }
 
     const pane = makeFakePane()
-    // A fixed 300px pane: low/high thresholds for the default 5-row gutter are 256/296
-    // (mounted), but for the 15-row (max) gutter dragged to below, low is 456 — well past
+    // A fixed 300px pane: low/high thresholds for the default 5-row gutter are 240/280
+    // (mounted), but for the 15-row (max) gutter dragged to below, low is 440 — well past
     // 300px, so growing the drag genuinely should undock once it settles.
     pane.container.getBoundingClientRect = () => ({ height: 300 }) as DOMRect
 

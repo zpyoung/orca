@@ -146,6 +146,44 @@ function setTargetSurface(worktreeId: string, tabId: string): string {
   return paneKey
 }
 
+type LegacyIdentitySource = 'live' | 'retained' | 'sleeping'
+
+function installLegacyChildIdentity(source: LegacyIdentitySource, legacyPane: string): void {
+  const entry = statusEntry(legacyPane, 'codex', 'child-provider', 'child-worktree')
+  harness.records = [makeRecord({ child: { ...makeRecord().child, paneKey: null } })]
+  harness.state.agentStatusByPaneKey = {
+    [PARENT_PANE]: statusEntry(PARENT_PANE, 'claude', 'parent-provider', 'parent-worktree'),
+    ...(source === 'live' ? { [legacyPane]: entry } : {})
+  }
+  if (source === 'retained') {
+    harness.state.retainedAgentsByPaneKey = {
+      [legacyPane]: {
+        entry,
+        worktreeId: 'child-worktree',
+        tab: { id: 'child-tab' },
+        agentType: 'codex',
+        startedAt: 1
+      }
+    }
+  }
+  if (source === 'sleeping') {
+    harness.state.sleepingAgentSessionsByPaneKey = {
+      [legacyPane]: {
+        paneKey: legacyPane,
+        tabId: 'child-tab',
+        worktreeId: 'child-worktree',
+        agent: 'codex',
+        providerSession: { key: 'session_id', id: 'child-provider' },
+        prompt: '',
+        state: 'done',
+        capturedAt: 1,
+        updatedAt: 1,
+        origin: 'live'
+      }
+    }
+  }
+}
+
 function renderBadge(paneKey = PARENT_PANE, parentClick = vi.fn()) {
   return {
     parentClick,
@@ -267,6 +305,62 @@ describe('SessionHandoffLineageBadge', () => {
       scrollToBottomIfOutputSinceLastView: true
     })
   })
+
+  it.each(['live', 'retained', 'sleeping'] as const)(
+    'does not guess a split-pane jump target from a legacy %s identity',
+    async (source) => {
+      const siblingLeaf = '33333333-3333-4333-8333-333333333333'
+      installLegacyChildIdentity(source, 'child-tab:2')
+      harness.state.terminalLayoutsByTabId = {
+        'child-tab': {
+          root: {
+            type: 'split',
+            direction: 'horizontal',
+            ratio: 0.5,
+            first: { type: 'leaf', leafId: CHILD_LEAF },
+            second: { type: 'leaf', leafId: siblingLeaf }
+          },
+          ptyIdsByLeafId: { [CHILD_LEAF]: 'child-pty', [siblingLeaf]: 'sibling-pty' }
+        }
+      }
+
+      renderBadge()
+      const button = screen.getByRole('button', { name: 'Jump to handed-off session' })
+      expect(button).toHaveAttribute('aria-disabled', 'true')
+      await userEvent.setup().click(button)
+      expect(harness.activatePane).not.toHaveBeenCalled()
+
+      harness.state.agentStatusByPaneKey = {
+        [CHILD_PANE]: statusEntry(CHILD_PANE, 'codex', 'child-provider', 'child-worktree')
+      }
+      cleanup()
+      renderBadge()
+      await userEvent
+        .setup()
+        .click(screen.getByRole('button', { name: 'Jump to handed-off session' }))
+      expect(harness.activatePane).toHaveBeenCalledWith('child-tab', CHILD_LEAF, {
+        flashFocusedPane: true,
+        scrollToBottomIfOutputSinceLastView: true
+      })
+    }
+  )
+
+  it.each(['live', 'retained', 'sleeping'] as const)(
+    'jumps to the only pane of the tab a legacy %s identity names',
+    async (source) => {
+      installLegacyChildIdentity(source, 'child-tab:1')
+
+      renderBadge()
+      const button = screen.getByRole('button', { name: 'Jump to handed-off session' })
+      expect(button).toHaveAttribute('aria-disabled', 'false')
+      await userEvent.setup().click(button)
+
+      expect(harness.activatePane).toHaveBeenCalledWith('child-tab', CHILD_LEAF, {
+        flashFocusedPane: true,
+        scrollToBottomIfOutputSinceLastView: true
+      })
+    }
+  )
 
   it('keeps a valid folder workspace live and activates it through the folder path', async () => {
     harness.records = [

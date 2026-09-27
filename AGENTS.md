@@ -1,15 +1,27 @@
 # Design System
 
-All UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don't invent new color values, font sizes, or shadow tiers when a documented one already covers the role. When STYLEGUIDE.md is silent, follow the resolution order in its final section.
+All UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Most of it is linted: `pnpm run check:code-quality:changed` fails on new restyles of a `components/ui/` primitive, raw palette colors, and computed `className` strings; `pnpm lint` fails on any class Tailwind cannot generate. See the Enforcement section of the style guide before suppressing either. Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don't invent new color values, font sizes, or shadow tiers when a documented one already covers the role. When STYLEGUIDE.md is silent, follow the resolution order in its final section.
 
 ## Electron UI Validation
+
+Always run tests and agent-launched apps in the background with `ORCA_BACKGROUND_LAUNCH=1`.
+Never steal monitor focus or reveal test windows: no `show()`, `showInactive()`, `bringToFront()`,
+`app.focus()`, or OS activation. Use CDP screenshots of hidden renderers. Keep native-focus and
+visible-window tests paused on the user's desktop; run them on an isolated display or CI.
+Rebuild modified launch-policy code before running an app; stale build wrappers are not safe.
 
 Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
 
 # Style
-## Concise/Brief Non-obviosu comments ONLY
-  * DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
-  * BE CONCISE. 1 LINE if possible
+
+## Reuse Before Reimplementing
+
+Before writing new logic at any scale — a function, component, IPC channel, state store, or whole subsystem/flow — check whether an existing implementation already does the job (or nearly does). Extend or generalize it instead of building a parallel version; only write from scratch when nothing fits. Keep the check proportionate: a quick search for trivial code, a real one before building anything substantial.
+
+## Concise/Brief Non-obvious Comments ONLY
+
+- DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
+- BE CONCISE. 1 LINE if possible
 
 ## Lint Rules: Do Not Disable Max Lines
 
@@ -20,6 +32,53 @@ NEVER add a `max-lines` disable (`eslint-disable max-lines`, `oxlint-disable max
 Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuff` for files, folders, or modules. They carry zero info and tend to become dumping grounds. Name files after what they _actually_ contain — prefer the concrete domain concept (e.g. `tab-group-state.ts`, `terminal-orphan-cleanup.ts`) over the generic role (`tabs-helpers.ts`, `terminal-utils.ts`). If you find yourself reaching for `helpers`, the file probably has more than one responsibility and should be split, or there's a better name hiding in the code that describes what the functions operate on.
 
 ## Type Declarations: Prefer `.ts` Over `.d.ts`
+
+## Type Assertions: Prefer Checked Types
+
+Avoid type assertions except `as const`. Unavoidable casts need a line-specific `SAFETY:` explanation:
+
+```ts
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Explain the verified invariant here.
+```
+
+# Verifying Changes
+
+- **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)
+- **Test**: see [Running Tests: Remote Sandbox Only](#running-tests-remote-sandbox-only) — `pnpm test` is blocked on this machine
+- **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
+- **Design system**: `pnpm run lint:design-system` for the full renderer report (not a gate); the changed-lines gate above is what CI enforces
+
+# Typed Observations: the Orca Ledger
+
+When you notice something you cannot act on in this session, do NOT bury it in prose with phrases
+like "pre-existing", "out of scope", "future work", or "skipped for brevity". File it in the Orca
+ledger, which is keyed to the project, so entries survive worktree deletion and stay visible from
+sibling worktrees of this repo.
+
+```sh
+orca ledger file --type bug      --title <t> --file <path:line> \
+                                 --description <d> --severity critical|high|medium|low
+orca ledger file --type deferred --title <t> --why-deferred <w> \
+                                 --priority high|medium|low
+orca ledger file --type test-gap --title <t> --file-under-test <path:line> \
+                                 --reason-skipped <r>
+orca ledger file --type proposal --title <t> --context <c> --recommendation <r>
+orca ledger file --type decision --title <t> --context <c> --decision <d> \
+                                 --consequences <q> --status proposed|accepted|superseded
+orca ledger list   --type bug --state open --json
+orca ledger show   --id bug-12 --json
+orca ledger state  --id bug-12 --state resolved --if-revision <n> --json
+orca ledger review --json
+```
+
+`--if-revision` takes the revision from `show`; a stale value returns `conflict` with the current
+revision in `error.data.currentRevision`.
+
+The ledger is the only surface, and it wins on any disagreement. BUGS.md, DEFERRED.md,
+TEST_BACKLOG.md, proposals.md and docs/adr/ are legacy — read them for history, never append to
+them. BUGS.md and DEFERRED.md were migrated; TEST_BACKLOG.md was not, so its entries live only in
+markdown until someone files them. The `quirk:typed-artifacts` skill and the `/quirk:artifacts:*`
+commands still write markdown; do not use them.
 
 # Fork Feature Structure
 
@@ -85,6 +144,17 @@ seam file whose measured diff no longer matches its recorded budget (residual bu
 Fork edits to an upstream-owned file are not blocked by the guard — but an undeclared edit is
 reverted at the next sync, so declare it.
 
+# Writing Pull Requests
+
+Fill in [`.github/pull_request_template.md`](./.github/pull_request_template.md), written for a reviewer who has never seen this code:
+
+- No jargon — plain language, no internal shorthand.
+- The before and after as the user experiences it.
+- The mechanism you changed, not just the symptom.
+- Why this approach over the alternatives you considered.
+
+Cover all four concisely. Don't pad or walk the diff.
+
 # Considerations
 ## Running Tests: Remote Sandbox Only
 
@@ -111,6 +181,30 @@ inline `VAR=1 pnpm test` prefix does not, because it never reaches the hook proc
 
 The `shell` and `e2e` lanes have not been run anywhere yet — treat a green run there as unproven.
 
+## Typechecking: Scope It to What You Changed
+
+Never run `pnpm typecheck` on this machine. It spawns three concurrent `tsc --noEmit` runs over the
+whole repo, and with several worktrees open at once that is enough to saturate every core. The full
+sweep belongs to the `typecheck` job in [`.github/workflows/pr.yml`](./.github/workflows/pr.yml),
+which runs it against a cached `.tsbuildinfo` graph.
+
+Locally, run only the project that owns the files you touched:
+
+| Changed path | Command |
+| --- | --- |
+| `src/main/**`, `src/preload/**`, `src/relay/**`, `src/types/**` | `pnpm typecheck:node` |
+| `src/renderer/**` | `pnpm typecheck:web` |
+| `src/cli/**` | `pnpm typecheck:cli` |
+| `tests/**` | `pnpm typecheck:e2e` |
+
+`src/shared/**` is included by the node, web, and cli projects alike, and the cli project also pulls
+in a fixed list of `src/main` modules named in `config/tsconfig.cli.json`. When a change spans more
+than one project, run them one after another — never concurrently.
+
+For a single file, prefer the editor's TypeScript language server over spawning `tsc` at all; it
+answers from a graph that is already resident. `tsc --noEmit <file>` is not a substitute, because it
+drops the project's `paths` aliases and JSX settings and reports errors that do not exist.
+
 ## Worktree Safety
 
 Always use the primary working directory (the worktree) for all file reads and edits. Never follow absolute paths from subagent results that point to the main repo.
@@ -122,11 +216,19 @@ Orca targets macOS, Linux, and Windows. Keep all platform-dependent behavior beh
 - **Keyboard shortcuts**: Never hardcode `e.metaKey`. Use a platform check (`navigator.userAgent.includes('Mac')`) to pick `metaKey` on Mac and `ctrlKey` on Linux/Windows. Electron menu accelerators should use `CmdOrCtrl`.
 - **Shortcut labels in UI**: Display `⌘` / `⇧` on Mac and `Ctrl+` / `Shift+` on other platforms.
 - **File paths**: Use `path.join` or Electron/Node path utilities — never assume `/` or `\`.
+- **Windows terminal shells**: `--shell` picks the shell a terminal *is*; `--command` is typed into whatever shell the host spawned, so a shell choice routed through `command` silently becomes a child process. See [`docs/reference/windows-terminal-shell-selection.md`](./docs/reference/windows-terminal-shell-selection.md).
 - **Windows setup scripts**: the setup/issue-command runner is a `.cmd` batch file unless the script starts with a `#!` line — never derive that from the user's terminal-shell preference, and never launch a `.cmd` runner with a bare `cmd.exe /c` from a Git Bash pane (MSYS rewrites the `/c`). See [`docs/reference/windows-setup-shell.md`](./docs/reference/windows-setup-shell.md).
-- **Windows child processes**: start them through `runProcess`/`spawnProcess` in `src/shared/child-process/` — never `child_process` directly. It pins `windowsHide`, refuses `shell: true`, and encodes `.cmd`/`.bat` arguments so neither `CommandLineToArgvW` nor `cmd.exe` mangles them. A ratchet test fails on any new direct import.
+- **Windows child processes**: start them through `runProcess`/`spawnProcess` in `src/shared/child-process/` — never `child_process` directly. It pins `windowsHide`, refuses `shell: true`, and encodes `.cmd`/`.bat` arguments so neither `CommandLineToArgvW` nor `cmd.exe` mangles them. A ratchet test fails on any new direct import. Recognised npm/pnpm `.cmd` shims are resolved to their real target so the spawn skips `cmd.exe` entirely; see [`docs/reference/windows-cmd-shim-resolution.md`](./docs/reference/windows-cmd-shim-resolution.md) before adding a shim shape or debugging one.
 - **Windows process enumeration**: read the table through `src/main/windows/windows-process-table.ts`, never by forking `powershell.exe`. See [`docs/reference/windows-process-enumeration.md`](./docs/reference/windows-process-enumeration.md).
+- **Windows MSYS/Git Bash panes**: their children break away from the per-PTY job unless it is created without `JOB_OBJECT_LIMIT_BREAKAWAY_OK`, and a `conpty.node` built before that fix passes every existing gate. Before changing the per-PTY job or debugging `windows-msys-job.win32.test.ts`, read [`docs/reference/windows-msys-job-breakaway.md`](./docs/reference/windows-msys-job-breakaway.md).
+- **Windows daemon-host relocation**: the terminal daemon runs from a copy of the app runtime under `%LOCALAPPDATA%`, which is what survives an auto-update. Before touching that copy, its exe name, or the NSIS uninstall macro, read [`docs/reference/windows-daemon-host-relocation.md`](./docs/reference/windows-daemon-host-relocation.md).
+- **Windows EDR signal**: don't add `-ExecutionPolicy Bypass`, `-EncodedCommand`, `cmd.exe /c` with escaped free text, per-operation interpreter spawning, or runtime `Add-Type` compilation without reading [`docs/reference/windows-edr-posture.md`](./docs/reference/windows-edr-posture.md) first — behavioural EDR scores each of those, and being signed does not clear them.
 - **WSL commands**: build argv with `buildWslExecArgs` (always `--exec` — under `--`, `wsl.exe` expands `$name` in every argument and silently rewrites the script), and fence anything whose stdout you parse with `buildWslCapturedLoginShellCommand`, because the interactive login shell prints the distro banner to stdout. See [`docs/reference/wsl-command-execution.md`](./docs/reference/wsl-command-execution.md).
 - **Linux native modules**: keep the glibc floor at Ubuntu 20.04 / glibc 2.31. A module compiled from source on a newer runner can reference symbol versions absent on the floor and crash the app on startup. See [`docs/reference/linux-glibc-compatibility.md`](./docs/reference/linux-glibc-compatibility.md); packaging fails if a bundled native binary needs newer glibc.
+
+## Native Dependency Installs
+
+Ordinary `pnpm install` covers the host OS and CPU only. Before packaging for another architecture — including `pnpm build:mac`, which builds x64 and arm64 by default — run `pnpm install:release`. electron-builder only warns on a missing `extraResources` source, so the `beforePack` guard is what turns a thin install into a build failure instead of a silently broken artifact; see [`docs/reference/pnpm-install-policy.md`](./docs/reference/pnpm-install-policy.md).
 
 ## SSH Use Case
 
@@ -135,6 +237,14 @@ All changes must consider the SSH use case. Don't assume local-only execution. B
 ## Folder Workspace Use Case
 
 All changes must consider folder workspaces as well as git worktrees. Don't assume every workspace is a git worktree.
+
+## Agent Status
+
+The execution host owns agent status in one store, the hook server's, and every reader (sidebar, `worktree ps`, mobile, dashboard) subscribes to it. Before adding a producer, a cache, or a reader-side precedence rule, read [`docs/reference/agent-status-store.md`](./docs/reference/agent-status-store.md): new producers write into that store, and readers keep only presentation policy.
+
+## Agent Terminal Screens
+
+A rule that reads what an agent CLI paints on a terminal — readiness, blocked prompts, idle — must be written against a captured transcript, not a remembered screen. Record one with [`docs/reference/agent-pty-transcript-capture.md`](./docs/reference/agent-pty-transcript-capture.md), which keeps escapes and wrapping intact and scrubs account identifiers before they reach git. Antigravity readiness has no transcript yet and five failed attempts without one; before touching it, read [`docs/reference/antigravity-readiness-evidence.md`](./docs/reference/antigravity-readiness-evidence.md).
 
 ## Remote Wire Compatibility
 
@@ -151,6 +261,12 @@ When adding or changing a Git command:
 - Scope capability state to the host that executes Git: native, WSL distro, SSH provider, or relay connection. Cover the first fallback, later cached calls, concurrent probes, and relevant host isolation in tests.
 - Keep the real-binary compatibility contract in PR CI current. When adopting a newer Git feature, add its version boundary so the preferred command and fallback both run against representative Git releases.
 - Preserve commands that begin with global Git options such as `-c` before the subcommand, including auto-maintenance suppression used by worktree-create fetches.
+
+## Git Scan Safety
+
+- Never enumerate every ref and then run `git ls-tree -r` or `git show` once per ref. That ref × tree fan-out can retain gigabytes of output before a downstream `sort -u` or search can make progress.
+- Prefer `rg` over the checked-out files for source searches. For history or refs, use a named ref, an explicit namespace/path, `--max-count`, and a bounded output; do not use an unqualified `--all` scan as a first diagnostic.
+- Keep repository-wide commands targeted to the current repository and worktree. If an unbounded scan is genuinely required, measure the ref count first, explain the cost, and get confirmation before running it.
 
 ## Git Provider Compatibility
 

@@ -1,6 +1,7 @@
-import { isSkillsCliAgentKeyShaped } from './skills-cli-agent-keys'
+import { isUsableSkillsCliAgentKey } from './skills-cli-agent-keys'
+import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'
 
-export const ORCA_SKILLS_REPOSITORY_URL = 'https://github.com/stablyai/orca'
+export { ORCA_SKILLS_REPOSITORY_URL }
 
 export const ORCA_CLI_SKILL_NAME = 'orca-cli'
 export const COMPUTER_USE_SKILL_NAME = 'computer-use'
@@ -35,7 +36,7 @@ export function buildAgentFeatureSkillInstallArgs(
   }
   // Why: a value the skills CLI would drop leaves it with no target at all, which
   // is the same all-agents install as passing no --agent.
-  const unusable = agents.find((agent) => !isSkillsCliAgentKeyShaped(agent))
+  const unusable = agents.find((agent) => !isUsableSkillsCliAgentKey(agent))
   if (unusable !== undefined) {
     throw new Error(`"${unusable}" is not a usable install target.`)
   }

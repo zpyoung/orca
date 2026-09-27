@@ -4,6 +4,7 @@ import { parseAppSshPtyId } from '../../../providers/ssh-pty-id'
 import { ptyOwnership, ptyIncarnationById } from '../provider/ownership-state'
 import { getProvider, getProviderForPty } from '../provider/registry'
 import { isPtyAlreadyGoneError, delay, verifyPtyStopped } from '../provider/liveness'
+import { recordUndeliveredSshPtyKill } from './undelivered-ssh-kill'
 import type { PtyRuntimeControllerDeps } from './controller-deps'
 
 export function killPtyFromRuntimeController(
@@ -18,12 +19,22 @@ export function killPtyFromRuntimeController(
     rememberSyntheticKillExit,
     sendPtyExitToRenderer,
     finishPtyShutdown,
-    retiredRejectedPtyIds
+    retiredRejectedPtyIds,
+    reversibleStopOwnersByPtyId
   } = deps
   runtime?.markPtyStopRequested?.(ptyId)
   let connectionId: string | null | undefined = ptyOwnership.get(ptyId)
   const parsedSshId = connectionId === undefined ? parseAppSshPtyId(ptyId) : null
   connectionId ??= parsedSshId?.connectionId
+  const recordUndelivered = (incarnationId?: string): void => {
+    recordUndeliveredSshPtyKill({
+      store,
+      ptyId,
+      connectionId,
+      reversible: reversibleStopOwnersByPtyId.has(ptyId),
+      incarnationId
+    })
+  }
   const killWithCurrentProvider = (): boolean => {
     let provider: IPtyProvider
     try {
@@ -34,8 +45,10 @@ export function killPtyFromRuntimeController(
         // provider was unregistered. Tombstone the lease so reconnect does
         // not revive a terminal the user explicitly closed.
         const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
+        // The relay was never asked, so the remote shell is still running. Keep the order.
+        recordUndelivered(incarnationId)
         runtime?.onPtyExit(ptyId, -1, incarnationId)
-        rememberSyntheticKillExit(ptyId)
+        rememberSyntheticKillExit(ptyId, incarnationId)
         sendPtyExitToRenderer({
           id: ptyId,
           code: -1,
@@ -53,7 +66,7 @@ export function killPtyFromRuntimeController(
         const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
         if (!providerExitObserved && !retired) {
           runtime?.onPtyExit(ptyId, -1, incarnationId)
-          rememberSyntheticKillExit(ptyId)
+          rememberSyntheticKillExit(ptyId, incarnationId)
           sendPtyExitToRenderer({
             id: ptyId,
             code: -1,
@@ -67,7 +80,7 @@ export function killPtyFromRuntimeController(
           const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
           if (!retired) {
             runtime?.onPtyExit(ptyId, -1, incarnationId)
-            rememberSyntheticKillExit(ptyId)
+            rememberSyntheticKillExit(ptyId, incarnationId)
             sendPtyExitToRenderer({
               id: ptyId,
               code: -1,
@@ -90,6 +103,9 @@ export function killPtyFromRuntimeController(
           }
           runtime?.onPtyExit(ptyId, -1, ptyIncarnationById.get(ptyId))
         }
+        // Outside the `retired` guard: the remote process outlives this client's bookkeeping
+        // either way, and the intent is what the next handshake replays.
+        recordUndelivered()
       })
     return true
   }
@@ -109,6 +125,7 @@ export function killPtyFromRuntimeController(
         }
         runtime?.onPtyExit(ptyId, -1, ptyIncarnationById.get(ptyId))
       }
+      recordUndelivered()
     })
     return true
   }
@@ -137,8 +154,9 @@ export function retireRejectedPtyFromRuntimeController(
     if (!ptyOwnership.has(ptyId)) {
       return
     }
-    runtime?.onPtyExit(ptyId, -1, ptyIncarnationById.get(ptyId))
-    rememberSyntheticKillExit(ptyId)
+    const incarnationId = ptyIncarnationById.get(ptyId)
+    runtime?.onPtyExit(ptyId, -1, incarnationId)
+    rememberSyntheticKillExit(ptyId, incarnationId)
     sendPtyExitToRenderer({
       id: ptyId,
       code: -1,
@@ -158,7 +176,7 @@ export function retireRejectedPtyFromRuntimeController(
   connectionId ??= parsedSshId?.connectionId
   const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
   runtime?.onPtyExit(ptyId, 0, incarnationId)
-  rememberSyntheticKillExit(ptyId)
+  rememberSyntheticKillExit(ptyId, incarnationId)
   sendPtyExitToRenderer({
     id: ptyId,
     code: 0,
@@ -191,6 +209,14 @@ export function markReversibleStopsFromRuntimeController(
   }
 }
 
+/**
+ * Deliberately records no undelivered-stop intent, unlike `killPtyFromRuntimeController`.
+ *
+ * Only a caller that gives the PTY up for good may leave a replayable kill order behind. This one
+ * hands its failures back instead: worktree sleep marks these stops reversible and leaves the pane
+ * live and usable when one does not land, so a durable order recorded here would come back on a
+ * later handshake and destroy a terminal the user had gone back to using.
+ */
 export async function stopAndWaitPtyFromRuntimeController(
   deps: PtyRuntimeControllerDeps,
   ptyId: string,
@@ -245,7 +271,7 @@ export async function stopAndWaitPtyFromRuntimeController(
       // await, but the relay lease must still be tombstoned.
       const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
       runtime?.onPtyExit(ptyId, -1, incarnationId)
-      rememberSyntheticKillExit(ptyId)
+      rememberSyntheticKillExit(ptyId, incarnationId)
       sendPtyExitToRenderer({
         id: ptyId,
         code: -1,
@@ -300,7 +326,7 @@ export async function stopAndWaitPtyFromRuntimeController(
     // The owning provider's fresh inventory observed absence, so this is a
     // death certificate even when its exit event was missed.
     runtime?.onPtyExit(ptyId, 0, incarnationId)
-    rememberSyntheticKillExit(ptyId)
+    rememberSyntheticKillExit(ptyId, incarnationId)
     sendPtyExitToRenderer({
       id: ptyId,
       code: 0,

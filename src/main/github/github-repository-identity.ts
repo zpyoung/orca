@@ -1,5 +1,6 @@
 import { runCoalescedProbe, type CoalescedProbes } from '../git/coalesced-probe'
 import { readRemoteUrl } from '../git/remote-url-probe'
+import type { GhAccountBinding } from '../../shared/github/account-binding'
 import type { GitHubOwnerRepo } from '../../shared/github/pull-request-types'
 import {
   getSshGitProvider,
@@ -14,6 +15,7 @@ import {
 } from './github-remote-identity-parsing'
 import { classifyGitHubOwnerRepoFromRemoteUrl } from './github-ssh-host-alias-resolution'
 import { isStableMissingGitRemoteError } from '../git/stable-missing-git-remote-error'
+import type { GitAdmissionTier } from '../git/command-runner/git-exec-options'
 
 export type OwnerRepo = GitHubOwnerRepo
 
@@ -24,10 +26,15 @@ export type GitHubRepoContext = {
   repoPath: string
   connectionId?: string | null
   wslDistro?: string
+  admissionTier?: GitAdmissionTier
+  /** SSH keeps the binding even when cwd is omitted from gh options. */
+  ghAccount?: GhAccountBinding
 }
 
 export type LocalGitExecOptions = {
   wslDistro?: string
+  admissionTier?: GitAdmissionTier
+  ghAccount?: GhAccountBinding
 }
 
 export type GitHubRemoteIdentityProbeOptions = {
@@ -42,7 +49,9 @@ export function githubRepoContext(
   return {
     repoPath,
     connectionId: connectionId ?? null,
-    ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {})
+    ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {}),
+    ...(localGitOptions.admissionTier ? { admissionTier: localGitOptions.admissionTier } : {}),
+    ...(localGitOptions.ghAccount ? { ghAccount: localGitOptions.ghAccount } : {})
   }
 }
 
@@ -50,24 +59,23 @@ export function ghRepoExecOptions(context: GitHubRepoContext): {
   cwd?: string
   encoding?: BufferEncoding
   wslDistro?: string
+  admissionTier?: GitAdmissionTier
+  ghAccount?: GhAccountBinding
 } {
+  const account = context.ghAccount ? { ghAccount: context.ghAccount } : {}
   return context.connectionId
-    ? {}
+    ? { ...account }
     : {
         cwd: context.repoPath,
-        ...(context.wslDistro ? { wslDistro: context.wslDistro } : {})
+        ...(context.wslDistro ? { wslDistro: context.wslDistro } : {}),
+        ...(context.admissionTier ? { admissionTier: context.admissionTier } : {}),
+        ...account
       }
 }
 
 const OWNER_REPO_POSITIVE_CACHE_TTL_MS = 30_000
 const OWNER_REPO_NEGATIVE_CACHE_TTL_MS = 5 * 60_000
-/**
- * A signature-backed answer is held as long as a negative one. `git remote
- * get-url` reads `.git/config`, and the signature covers that file plus every
- * path it includes — so while the signature holds, a re-probe can only return
- * what is already cached. The short TTL above is the no-signature fallback
- * (remote runtimes, an unreadable gitdir), where nothing invalidates on change.
- */
+// Signed entries revalidate against Git config before reuse.
 const OWNER_REPO_SIGNED_CACHE_TTL_MS = 5 * 60_000
 const OWNER_REPO_CACHE_MAX_ENTRIES = 512
 
@@ -143,10 +151,7 @@ export async function getOwnerRepoForRemote(
   pruneOwnerRepoCache(now)
   const cached = ownerRepoCache.get(cacheKey)
   if (cached && cached.expiresAt > now) {
-    // Why every signed entry, not only the negatives: a positive identity is
-    // held for the same five minutes now, so the same revalidation is what
-    // keeps a `git remote set-url` visible within one lookup rather than five
-    // minutes. The signature read is fs stat/readFile, not a Git subprocess.
+    // Revalidate signed hits so remote changes are immediately visible.
     if (cached.configSignature !== undefined) {
       const currentSignature = await readLocalGitConfigSignature(context)
       if (currentSignature !== cached.configSignature) {
@@ -215,10 +220,7 @@ async function resolveOwnerRepoForRemote(
     // Why: PR mutations need the effective host behind an SSH alias.
     const classification = await classifyGitHubOwnerRepoFromRemoteUrl(remoteUrl, context)
     if (classification.kind === 'github') {
-      // Why store the signature: without it this entry can only expire on the
-      // clock, which put a `git remote get-url` (plus its ssh-alias probe) on
-      // every PR refresh cycle — the second most frequent Git subprocess in a
-      // Windows field trace, on a host spawning Git at ~250-800ms a call.
+      // Signed identities stay valid until Git config changes.
       ownerRepoCache.set(cacheKey, {
         value: classification.ownerRepo,
         expiresAt: now + getOwnerRepoCacheTtl(classification.ownerRepo, configSignature),

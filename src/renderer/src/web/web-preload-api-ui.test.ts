@@ -5,6 +5,8 @@ import {
   type PairingLocalUiField
 } from '../../../shared/pairing-local-ui-fields'
 import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
+import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'
+import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { ManualRepoOrderEntry } from '../../../shared/ui-chrome-types'
 import {
@@ -461,14 +463,40 @@ describe('web UI preload API', () => {
   // without wiring the web read seam fails here rather than shipping. The host sample differs from
   // the browser's for every field, so only the pin makes this pass.
   const browserLocalUiSamples: Record<PairingLocalUiField, unknown> = {
+    automationHostFilter: { kind: 'host', hostKey: 'browser-local-host-key' },
     hideWorkspacesFromOtherDevices: true,
     manualRepoOrder: [{ hostId: 'runtime:web-env-1', repoId: 'repo-b' }],
-    workspaceHostOrder: ['runtime:web-env-1', 'local']
+    workspaceHostOrder: ['runtime:web-env-1', 'local'],
+    agentsVisibleHostIds: ['runtime:web-env-1'],
+    agentsFilterRepoIds: ['repo-b'],
+    agentsShowChildAgents: true,
+    agentsCompactMode: false,
+    agentsShowSearch: false,
+    agentsReadFilter: 'unread',
+    agentsGroupBy: 'project',
+    activityClearedAtByPaneKey: { 'tab-1:leaf-1': 123 },
+    manuallyUnreadTurnsByPaneKey: { 'tab-1:leaf-1': 321 },
+    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,
+    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES
   }
   const hostUiSamples: Record<PairingLocalUiField, unknown> = {
+    automationHostFilter: { kind: 'all' },
     hideWorkspacesFromOtherDevices: false,
     manualRepoOrder: [{ hostId: 'local', repoId: 'repo-a' }],
-    workspaceHostOrder: ['local', 'ssh:box']
+    workspaceHostOrder: ['local', 'ssh:box'],
+    agentsVisibleHostIds: ['local'],
+    agentsFilterRepoIds: ['repo-a'],
+    agentsShowChildAgents: false,
+    agentsCompactMode: true,
+    agentsShowSearch: true,
+    agentsReadFilter: 'all',
+    agentsGroupBy: 'status',
+    activityClearedAtByPaneKey: { 'tab-2:leaf-2': 456 },
+    manuallyUnreadTurnsByPaneKey: { 'tab-2:leaf-2': 654 },
+    workspaceActivityWindow: 'all',
+    workspaceActivityCustomDays: 30,
+    hideCompletedReviewWorkspaces: false,
+    hidePassingCheckWorkspaces: false
   }
 
   it.each(PAIRING_LOCAL_UI_FIELDS.map((field) => [field] as const))(
@@ -796,6 +824,41 @@ describe('web UI preload API', () => {
         { method: 'computer.permissions', params: { id: 'accessibility' } }
       ])
     )
+  })
+
+  it('setWithAck rejects on transport failure while set stays best-effort (STA-5781)', async () => {
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string): Promise<RuntimeRpcResponse<unknown>> {
+          if (method === 'ui.set') {
+            return Promise.reject(new Error('runtime disconnected'))
+          }
+          return Promise.resolve({
+            id: method,
+            ok: true,
+            result: {},
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+
+    const globals = installBrowserGlobals('Linux')
+    writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    // Plain set swallows the failure so fire-and-forget callers stay quiet...
+    await expect(
+      globals.window.api.ui.set({ hideDefaultBranchWorkspace: true })
+    ).resolves.toBeUndefined()
+    // ...but the diff writer's ack path must see it, or it folds a patch the
+    // host never received into its baseline and silently stops retrying it.
+    await expect(
+      globals.window.api.ui.setWithAck!({ hideSleepingWorkspaces: true })
+    ).rejects.toThrow('runtime disconnected')
   })
 
   it('rejects paired web skill discovery failures instead of returning an empty scan', async () => {

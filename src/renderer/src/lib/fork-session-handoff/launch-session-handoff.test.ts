@@ -71,7 +71,7 @@ function launchResult(
   promptDeliveryResult?: Promise<{ delivered: boolean; failureNotified: boolean }>
 ): LaunchAgentInNewTabResult {
   return {
-    tabId: TAB_ID,
+    surface: { kind: 'local-terminal' as const, tabId: TAB_ID },
     startupPlan: {},
     pasteDraftAfterLaunch: true,
     ...(promptDeliveryResult ? { promptDeliveryResult } : {})
@@ -213,7 +213,7 @@ describe('launchForkSessionHandoff', () => {
     const submitPrompt = vi.fn(async () => true)
     const recordLineage = vi.fn(async (_record: ForkSessionHandoffLineageRecord) => undefined)
     const pairedResult = {
-      tabId: null,
+      surface: { kind: 'host-published' as const },
       startupPlan: {},
       pasteDraftAfterLaunch: true,
       promptDeliveryResult: Promise.resolve({ delivered: false, failureNotified: false })
@@ -246,7 +246,7 @@ describe('launchForkSessionHandoff', () => {
     const recordLineage = vi.fn(async (_record: ForkSessionHandoffLineageRecord) => undefined)
     const resolveDeliveryEvidence = vi.fn(() => 'unobservable' as const)
     const pairedResult = {
-      tabId: null,
+      surface: { kind: 'host-published' as const },
       startupPlan: {},
       pasteDraftAfterLaunch: true,
       promptDeliveryResult: creation.promise

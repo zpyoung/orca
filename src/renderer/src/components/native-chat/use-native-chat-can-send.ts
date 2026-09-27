@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getDriverForPty, onDriverChange } from '@/lib/pane-manager/mobile-driver-state'
 import { deriveNativeChatCanSend } from './native-chat-send-eligibility'
+import {
+  isTerminalInputQuarantined,
+  subscribeTerminalInputQuarantine
+} from '../terminal-pane/terminal-input-quarantine'
 
 /**
- * Track the mobile presence-lock for this chat pane's live pty and derive the
- * composer's `canSend` (R8). The driver Map lives outside React for perf, so we
- * subscribe to its change events and re-read on each flip. A pty held by a
- * mobile client guards desktop sends exactly as it guards xterm input.
+ * Track both native-chat input guards for the live tab/pty pair: the tab-keyed
+ * fresh-shell quarantine and the pty-keyed mobile presence lock.
  */
-export function useNativeChatCanSend(ptyId: string | null): boolean {
+export function useNativeChatCanSend(terminalTabId: string, ptyId: string | null): boolean {
+  const [quarantineTick, setQuarantineTick] = useState(0)
   const [driverTick, setDriverTick] = useState(0)
+  useEffect(
+    () =>
+      subscribeTerminalInputQuarantine(terminalTabId, () => {
+        setQuarantineTick((n) => n + 1)
+      }),
+    [terminalTabId]
+  )
+
   // Why: the driver event fires for every pty; only re-derive when it targets
   // this pane's pty. ptyId is a dep so the listener re-binds on a pty swap.
   useEffect(
@@ -24,6 +35,10 @@ export function useNativeChatCanSend(ptyId: string | null): boolean {
   )
   return useMemo(() => {
     void driverTick
-    return deriveNativeChatCanSend(ptyId ? getDriverForPty(ptyId) : null)
-  }, [ptyId, driverTick])
+    void quarantineTick
+    return deriveNativeChatCanSend(
+      ptyId ? getDriverForPty(ptyId) : null,
+      isTerminalInputQuarantined(terminalTabId)
+    )
+  }, [terminalTabId, ptyId, driverTick, quarantineTick])
 }

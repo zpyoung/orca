@@ -3,9 +3,19 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CatalogModel } from '../../../../../shared/agent-session-option-catalog'
+import type { NativeChatSessionOptionObservation } from '../../../../../shared/native-chat-types'
 import { clearNativeChatModelEnrichmentForTests } from '../native-chat-session-option-enrichment'
 
 const discoverModels = vi.fn<() => Promise<readonly CatalogModel[] | null>>()
+const unsubscribePtyData = vi.fn()
+let ptyDataObserver: (data: string) => void = () => {}
+
+vi.mock('../../terminal-pane/pty-data-sidecar-subscriptions', () => ({
+  subscribeToPtyData: (_ptyId: string, observer: (data: string) => void) => {
+    ptyDataObserver = observer
+    return unsubscribePtyData
+  }
+}))
 
 vi.mock('../native-chat-session-option-discovery', () => ({
   resolveNativeChatModelDiscoveryContext: () => ({ hostKey: 'host', runtime: null }),
@@ -20,10 +30,16 @@ vi.mock('../../../store', () => ({
 
 import { useNativeChatSessionOptions } from '../use-native-chat-session-options'
 
+beforeEach(() => {
+  unsubscribePtyData.mockReset()
+  ptyDataObserver = () => {}
+})
+
 // A 1M-context Opus session: the frame names the resolved model while the
 // host's discovered catalog names the alias.
 const CLAUDE_SCREEN =
   'Claude Code v2.1.220\r\nOpus 5 (1M context) with high effort · API Usage Billing\r\n~/repo'
+const CLAUDE_HAIKU_SCREEN = 'Claude Code v2.1.220\r\nHaiku · API Usage Billing\r\n~/repo'
 
 const DISCOVERED: CatalogModel[] = [
   { id: 'opus[1m]', label: 'Opus (1M context)', options: [] },
@@ -169,5 +185,180 @@ describe('useNativeChatSessionOptions session-log pre-fill', () => {
 
     await waitFor(() => expect(modelDescriptor(result.current.snapshot).currentValue).toBe('opus'))
     expect(effortValue(result.current.snapshot)).toBe('high')
+  })
+})
+
+describe('useNativeChatSessionOptions startup-frame repaint', () => {
+  beforeEach(() => {
+    clearNativeChatModelEnrichmentForTests()
+    discoverModels.mockReset().mockReturnValue(new Promise(() => {}))
+    Object.defineProperty(window, 'api', { configurable: true, value: undefined })
+  })
+
+  it('re-scrapes after PTY output paints the startup frame', async () => {
+    let screen = 'shell output before Claude starts'
+    const dispatchCommand = vi.fn()
+    const readTerminalScreen = (): string => screen
+    const { result } = renderHook(() =>
+      useNativeChatSessionOptions({
+        agent: 'claude',
+        terminalTabId: 'tab-startup',
+        targetPtyId: 'pty-startup',
+        dispatchCommand,
+        readTerminalScreen
+      })
+    )
+
+    expect(modelDescriptor(result.current.snapshot).currentValue).toBeUndefined()
+    screen = CLAUDE_SCREEN
+    act(() => ptyDataObserver('startup frame repaint'))
+
+    await waitFor(() => expect(modelDescriptor(result.current.snapshot).currentValue).toBe('opus'))
+    expect(unsubscribePtyData).toHaveBeenCalledOnce()
+  })
+
+  it('retries when the renderer applies the frame after the first scrape', async () => {
+    vi.useFakeTimers()
+    let unmount = () => {}
+    try {
+      let screen = 'shell output before Claude starts'
+      const dispatchCommand = vi.fn()
+      const readTerminalScreen = (): string => screen
+      const hook = renderHook(() =>
+        useNativeChatSessionOptions({
+          agent: 'claude',
+          terminalTabId: 'tab-delayed-frame',
+          targetPtyId: 'pty-delayed-frame',
+          dispatchCommand,
+          readTerminalScreen
+        })
+      )
+      unmount = hook.unmount
+
+      act(() => ptyDataObserver('startup frame repaint'))
+      await act(async () => vi.advanceTimersByTimeAsync(100))
+      expect(modelDescriptor(hook.result.current.snapshot).currentValue).toBeUndefined()
+
+      screen = CLAUDE_SCREEN
+      await act(async () => vi.advanceTimersByTimeAsync(500))
+      expect(modelDescriptor(hook.result.current.snapshot).currentValue).toBe('opus')
+      expect(unsubscribePtyData).toHaveBeenCalledOnce()
+    } finally {
+      unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('ignores later PTY data after resolving instead of reverting a dispatched pick', async () => {
+    let screen = 'shell output before Claude starts'
+    const readTerminalScreen = vi.fn(() => screen)
+    const dispatchCommand = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() =>
+      useNativeChatSessionOptions({
+        agent: 'claude',
+        terminalTabId: 'tab-stable',
+        targetPtyId: 'pty-stable',
+        dispatchCommand,
+        readTerminalScreen
+      })
+    )
+
+    screen = CLAUDE_SCREEN
+    act(() => ptyDataObserver('startup frame repaint'))
+    await waitFor(() => expect(modelDescriptor(result.current.snapshot).currentValue).toBe('opus'))
+
+    await act(async () => {
+      await result.current.surface?.setOption('effort', 'max')
+    })
+    expect(effortValue(result.current.snapshot)).toBe('max')
+    const readsAfterResolution = readTerminalScreen.mock.calls.length
+
+    act(() => ptyDataObserver('later conversation output'))
+    await act(async () => {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 150))
+    })
+
+    expect(readTerminalScreen).toHaveBeenCalledTimes(readsAfterResolution)
+    expect(effortValue(result.current.snapshot)).toBe('max')
+  })
+
+  it('does not let a late snapshot overwrite a dispatched model', async () => {
+    let resolveSnapshot: (value: { data: string; alternateScreen: false }) => void = () => {}
+    const snapshot = new Promise<{ data: string; alternateScreen: false }>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { pty: { getMainBufferSnapshot: vi.fn().mockReturnValue(snapshot) } }
+    })
+    const dispatchCommand = vi.fn().mockResolvedValue(undefined)
+    const readTerminalScreen = (): null => null
+    const { result } = renderHook(() =>
+      useNativeChatSessionOptions({
+        agent: 'claude',
+        terminalTabId: 'tab-dispatch-race',
+        targetPtyId: 'pty-dispatch-race',
+        dispatchCommand,
+        readTerminalScreen
+      })
+    )
+
+    await act(async () => {
+      await result.current.surface?.setOption('model', 'haiku')
+    })
+    expect(modelDescriptor(result.current.snapshot).currentValue).toBe('haiku')
+
+    await act(async () => {
+      resolveSnapshot({ data: CLAUDE_SCREEN, alternateScreen: false })
+      await snapshot
+    })
+    expect(modelDescriptor(result.current.snapshot).currentValue).toBe('haiku')
+  })
+
+  it('does not let a late snapshot overwrite an authoritative log report', async () => {
+    let resolveSnapshot: (value: { data: string; alternateScreen: false }) => void = () => {}
+    const snapshot = new Promise<{ data: string; alternateScreen: false }>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { pty: { getMainBufferSnapshot: vi.fn().mockReturnValue(snapshot) } }
+    })
+    const dispatchCommand = vi.fn()
+    const readTerminalScreen = (): null => null
+    const hook = renderHook(
+      ({
+        reportedSessionOptions
+      }: {
+        reportedSessionOptions: NativeChatSessionOptionObservation | null
+      }) =>
+        useNativeChatSessionOptions({
+          agent: 'claude',
+          terminalTabId: 'tab-log-race',
+          targetPtyId: 'pty-log-race',
+          dispatchCommand,
+          readTerminalScreen,
+          reportedSessionOptions
+        }),
+      {
+        initialProps: {
+          reportedSessionOptions: null as NativeChatSessionOptionObservation | null
+        }
+      }
+    )
+
+    hook.rerender({
+      reportedSessionOptions: { model: 'claude-opus-5', effort: 'max', observedAt: 500 }
+    })
+    await waitFor(() =>
+      expect(modelDescriptor(hook.result.current.snapshot).currentValue).toBe('opus')
+    )
+
+    await act(async () => {
+      resolveSnapshot({ data: CLAUDE_HAIKU_SCREEN, alternateScreen: false })
+      await snapshot
+    })
+    expect(modelDescriptor(hook.result.current.snapshot).currentValue).toBe('opus')
+    expect(effortValue(hook.result.current.snapshot)).toBe('max')
   })
 })

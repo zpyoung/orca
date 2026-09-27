@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx
-// FORK-COPY-SHA: 6e4f817101daa18d82824b69243d9079baa9c416
+// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
 
 /** The composer grows with the draft up to 8 lines, then scrolls internally.
  *  Sizing is layout-driven (field-sizing + an lh-relative cap) rather than a JS
@@ -25,11 +25,13 @@ vi.mock('../NativeChatAutocompleteMenus', () => ({
 }))
 
 import { AgentComposerField } from './AgentComposerField'
+import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 
 afterEach(() => cleanup())
 
-function renderField(draft: string): HTMLTextAreaElement {
-  render(
+function TestField({ draft }: { draft: string }): React.JSX.Element {
+  const imeEnterGesture = useImeEnterGestureOwnership()
+  return (
     <AgentComposerField
       terminalTabId="tab-1"
       paneKey="pane-1"
@@ -48,11 +50,11 @@ function renderField(draft: string): HTMLTextAreaElement {
       dictationDisabled={false}
       isDictating={false}
       isDictationHoldMode={false}
+      imeEnterGesture={imeEnterGesture}
       onDraftChange={vi.fn()}
       onTextareaSelect={vi.fn()}
       onKeyDown={vi.fn()}
-      onCompositionStart={vi.fn()}
-      onCompositionEnd={vi.fn()}
+      onImeSettled={vi.fn()}
       onPaste={vi.fn()}
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}
@@ -68,6 +70,10 @@ function renderField(draft: string): HTMLTextAreaElement {
       sessionOptionsSnapshot={[]}
     />
   )
+}
+
+function renderField(draft: string): HTMLTextAreaElement {
+  render(<TestField draft={draft} />)
   return screen.getByRole('textbox') as HTMLTextAreaElement
 }
 
@@ -98,5 +104,15 @@ describe('agent composer autogrow', () => {
     // A JS measure pass writes style.height and only re-measures on the next
     // value change, so a re-wrap from a window/pane resize would strand it.
     expect(renderField('a\n'.repeat(6)).style.height).toBe('')
+  })
+
+  it('layers the native caret and selection over the Markdown mirror', () => {
+    const textarea = renderField('**bold**')
+    const overlay = textarea.parentElement?.querySelector('[data-composer-markdown-overlay]')
+
+    expect(overlay).not.toBeNull()
+    expect(textarea.className).toContain('text-transparent')
+    expect(textarea.className).toContain('caret-foreground')
+    expect(textarea.className).toContain('selection:bg-ring/35')
   })
 })

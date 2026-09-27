@@ -1,3 +1,4 @@
+import { inheritOmpLaunchEnvironment } from '../host-env/omp-launch-environment'
 import { getAppEnvironment } from '../../../../shared/app-environment'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -35,10 +36,11 @@ export function configureLocalPtyProvider(args: {
   localProvider.configure({
     isHistoryEnabled: () => getSettings?.()?.terminalScopeHistoryByWorktree ?? true,
     getWindowsShell: () => getSettings?.()?.terminalWindowsShell,
+    getDefaultShell: () => getSettings?.()?.terminalDefaultShell,
     getWindowsPowerShellImplementation: () =>
       getSettings ? (getSettings()?.terminalWindowsPowerShellImplementation ?? 'auto') : undefined,
     pwshAvailable: () => isPwshAvailableAsync(),
-    buildSpawnEnv: (id, baseEnv, ctx) => {
+    buildSpawnEnv: async (id, baseEnv, ctx) => {
       const codexSelectionTarget: CodexAccountSelectionTarget =
         ctx?.isWsl === true
           ? { runtime: 'wsl', wslDistro: ctx.wslDistro ?? null }
@@ -47,13 +49,20 @@ export function configureLocalPtyProvider(args: {
         codexSelectionTarget,
         ctx?.codexHomePathOverride
           ? ctx.codexHomePathOverride.value
-          : (getSelectedCodexHomePath?.(codexSelectionTarget, baseEnv, {
+          : ((await getSelectedCodexHomePath?.(codexSelectionTarget, baseEnv, {
               workspacePath: ctx?.cwd,
               launchAgent: ctx?.launchAgent
-            }) ?? null)
+            })) ?? null)
       )
       const skipCodexHomeEnv = ctx?.isWsl === true && !selectedCodexHomePath
       const ptySettings = getSettings?.()
+      await inheritOmpLaunchEnvironment(baseEnv, {
+        shellPath: ctx?.shellPath,
+        explicitEnv: ctx?.explicitEnv,
+        isWsl: ctx?.isWsl,
+        launchAgent: ctx?.launchAgent,
+        launchCommand: ctx?.command
+      })
       const env = buildPtyHostEnv(id, baseEnv, {
         isPackaged: getAppEnvironment().isPackaged(),
         resourcesPath: process.resourcesPath,
@@ -71,8 +80,10 @@ export function configureLocalPtyProvider(args: {
         isWsl: ctx?.isWsl,
         wslDistro: ctx?.wslDistro ?? null,
         agentStatusHooksEnabled: isAgentStatusHooksEnabled(ptySettings),
+        disabledTuiAgents: ptySettings?.disabledTuiAgents,
         codexStatusHooksEnabled: isCodexStatusHooksEnabled(ptySettings),
-        networkProxySettings: ptySettings
+        networkProxySettings: ptySettings,
+        routeBrowserOpensToClient: runtime?.shouldRelayTerminalBrowserOpens?.()
       })
       // Why: agents need their terminal handle at process start to self-identify in orchestration messages without an extra RPC.
       const requestedHandle = baseEnv.ORCA_TERMINAL_HANDLE

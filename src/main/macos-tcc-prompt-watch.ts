@@ -19,6 +19,8 @@ export type LogStreamChild = ChildProcessByStdio<null, Readable, Readable>
 
 /** Why: terminals run from the detached helper, which TCC can hold responsible independently. */
 const ORCA_RESPONSIBLE_IDENTIFIERS = new Set([
+  'com.stablyai.orca.dev',
+  'com.stablyai.orca.dev.helper',
   'com.zpyoung.orca',
   'com.zpyoung.orca.helper',
   'com.zpyoung.orca.dev',

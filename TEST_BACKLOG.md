@@ -44,3 +44,32 @@ Reviewed every 2 weeks. Use `/quirk:artifacts:test-skip` to append.
 - **Reason skipped**: no test file renders `useHandoffDialogState` — `AgentSessionContinuationDialog.test.tsx` mocks the hook wholesale, so the hook has zero coverage today. It reads the app store through three `useAppStore` selectors plus `getState`, and drives capture, target resolution, secret scanning, and draft preservation, so a `renderHook` harness means standing up a full store fixture and mocking eight modules. The values a freshly opened dialog starts from are now covered by `handoff-dialog-open-seed.test.ts`, and the BUG-6 fix is anchored by `HandoffNotesControls.test.tsx` on the component side. What stays unproven is the wiring: that the render-time seeding runs on the open transition and not on unrelated re-renders, and that the newly saved template is adopted only when nothing was selected.
 - **Edge cases to cover**: save with a template already selected (prior selection and steering note both survive); save with no template selected (new template is adopted and the note clears); a save that resolves after the generation ref advanced changes nothing
 - **Priority**: P3
+
+## TEST-5: The composer's IME deferral and remount behaviour is replayed but untested in fork shape
+- **File under test**: src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts; src/renderer/src/components/native-chat/fork-agent-composer/AgentComposerField.tsx; src/renderer/src/components/native-chat/NativeChatComposer.tsx
+- **Test type**: unit / component
+- **Reason skipped**: the v1.4.194 sync replayed upstream's IME rework (`useImeEnterGestureOwnership`, uncontrolled textarea with a layout-effect draft sync, attachment deferral while composing, `key={paneKey}` remount) into the fork's tier-2 composer copies. Upstream's own new assertions for it live in `NativeChatComposer.test.tsx` and `use-native-chat-composer-attachments.test.tsx` against upstream's module layout — those tests mock `./NativeChatComposerField` and `./use-native-chat-composer-keydown`, which the fork deletes, so they cannot be taken verbatim. The fork's equivalents were updated only far enough to compile against the new prop shape. `native-chat-composer-composition.test.tsx`, upstream's new field-level composition suite, was dropped with the component it exercises.
+- **Edge cases to cover**: a draft clear dropped mid-composition leaves only the composed segment (`imeComposedSegment`); paths attached while composing are deferred and flushed on IME settle; a deferred batch over `NATIVE_FILE_DROP_MAX_PATHS` is rejected whole and keeps its notice; blur while composing settles like `compositionend`; a `paneKey` change remounts the field instead of carrying the previous pane's provisional value
+- **Priority**: P2
+
+## TEST-6: The sidebar section-separator predicate ships with no test
+- **File under test**: src/renderer/src/components/sidebar/fork-sidebar-section-separator/section-separator-class.ts
+- **Test type**: unit
+- **Reason skipped**: environment — vitest cannot run on this machine (sandbox-only lane) and this worktree has no `ORCA_SANDBOX_DOCKER_HOST` configured, so a new test file could not be executed before landing. `sidebarSectionSeparatorClass` is a pure predicate over `(settings, row, index, context)` and is cheap to cover once a runner is reachable; the fork convention already puts fork tests beside fork code, so the file has an obvious home. Nothing in CI currently fails if a suppression rule regresses.
+- **Edge cases to cover**: setting disabled returns no class; the first header in the list gets no separator; a header immediately beneath a host header gets none; the pinned sticky-header branch returns none; nested headers (`projectGroupDepth > 0`) get none; a top-level header after a normal row does get the hairline; the collapsed-Pinned case (`followsCollapsedPinnedHeader`) pins whichever behavior is decided to be intended
+- **Priority**: P3
+
+## TEST-7: no-top-level-translate times out deterministically in the remote sandbox
+- **File under test**: src/renderer/src/i18n/no-top-level-translate.test.ts
+- **Test type**: unit
+- **Reason skipped**: environment — the test walks every renderer .ts/.tsx and builds a TypeScript AST per file under an explicit 15_000ms budget. In the remote Docker sandbox it takes 39s with the ask-card changes applied and 62s on clean HEAD with them reverted, so it times out on every run even at --shards=4 --only=2 with no competing shards. Distinct from TEST-1: that class is intermittent under worker-pool contention, while this fails at minimum concurrency and is slower without the diff than with it — a budget-vs-host mismatch, not the diff.
+- **Edge cases to cover**: Raise the per-test budget to something the sandbox container can meet, or cache/parallelize the AST scan; then confirm it passes in a --shards=16 --jobs=8 full run, not only in isolation.
+- **Priority**: P3
+
+
+## TEST-8: tabs-terminal-dock's host-mirror assertions flake in isolation, not just under load
+- **File under test**: src/renderer/src/store/slices/fork-terminal-dock/tabs-terminal-dock.test.ts
+- **Test type**: unit
+- **Reason skipped**: flaky — the `terminal dock state` cases that `vi.waitFor` on `setWebRuntimeTabPropsMock` fail intermittently at `--shards=1 --jobs=1` with no competing work. Measured on the remote sandbox: 2 of 3 runs failed at e57ecedc8f, and 3 of 3 failed on a throwaway worktree at 0dfa466215, which predates the right-sidebar ask work entirely. Failing more often on the older tree rules out the ask changes as the cause. Distinct from TEST-1 (contention-only) and TEST-7 (deterministic budget miss): this one fails at minimum concurrency and is not reproducible on demand.
+- **Edge cases to cover**: Find what the waitFor is racing — most likely the mirror dispatch is scheduled off a timer or microtask the test does not drive — and await that seam instead of polling the mock. Then run the file 10x at --shards=1 to confirm the flake is gone.
+- **Priority**: P2

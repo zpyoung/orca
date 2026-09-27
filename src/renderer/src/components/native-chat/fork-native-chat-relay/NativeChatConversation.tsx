@@ -7,16 +7,22 @@ import type { NativeChatLiveSession } from './use-native-chat-live-session'
  *  notice above it. Split out so the view file dispatches surfaces only. */
 export function NativeChatConversation({
   session,
+  isVisible,
   isWorking,
   fontScale,
+  workingStartedAt,
+  showTurnStatus,
   onLinkClick,
   allowFileUriLinks,
   failedDeliveryMessageIds,
   readError
 }: {
   session: NativeChatLiveSession
+  isVisible?: boolean
   isWorking: boolean
   fontScale: number
+  workingStartedAt?: number | null
+  showTurnStatus?: boolean
   onLinkClick?: CommentMarkdownLinkClickHandler
   allowFileUriLinks: boolean
   failedDeliveryMessageIds?: ReadonlySet<string>
@@ -27,9 +33,12 @@ export function NativeChatConversation({
       {readError ? <NativeChatReadErrorNotice message={readError} /> : null}
       <NativeChatMessageList
         session={session}
+        isVisible={isVisible}
         isWorking={isWorking}
         expandSignal={false}
         fontScale={fontScale}
+        workingStartedAt={workingStartedAt}
+        showTurnStatus={showTurnStatus}
         onLinkClick={onLinkClick}
         allowFileUriLinks={allowFileUriLinks}
         failedDeliveryMessageIds={failedDeliveryMessageIds}

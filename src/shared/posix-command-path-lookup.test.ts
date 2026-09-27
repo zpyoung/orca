@@ -19,6 +19,7 @@ import { buildWslCapturedLoginShellCommand, buildWslExecArgs } from './wsl-login
 type ShellCase = {
   name: string
   path: string | null
+  args?: string[]
 }
 
 const isWindows = process.platform === 'win32'
@@ -27,7 +28,7 @@ let wslShAvailable: boolean | null = null
 const shellCases: ShellCase[] = [
   { name: 'sh', path: executablePath(['/bin/sh']) },
   { name: 'bash', path: executablePath(['/bin/bash', '/usr/bin/bash']) },
-  { name: 'zsh', path: executablePath(['/bin/zsh', '/usr/bin/zsh']) },
+  { name: 'zsh', path: executablePath(['/bin/zsh', '/usr/bin/zsh']), args: ['-f'] },
   { name: 'dash', path: executablePath(['/bin/dash', '/usr/bin/dash']) }
 ]
 
@@ -37,29 +38,33 @@ describe('buildPosixCommandPathLookupScript', () => {
       `resolves without mutating alias and function masks in ${shell.name}`,
       () => {
         const commandName = basename(process.execPath)
-        const script = [
-          `${commandName}() { printf '%s\\n' masked-function; }`,
-          `alias ${commandName}='printf "%s\\n" masked-alias'`,
-          buildPosixCommandPathLookupScript({ kind: 'literal', value: commandName }),
-          `printf '%s\\n' "$resolved"`,
-          `alias ${commandName} >/dev/null`,
-          `unalias ${commandName}`,
-          `${commandName}`
-        ].join('\n')
+        withExecutableFixture(commandName, (directory, executable, root) => {
+          writeFileSync(join(root, '.zshenv'), 'export PATH=/missing\n')
+          const script = [
+            `${commandName}() { printf '%s\\n' masked-function; }`,
+            `alias ${commandName}='printf "%s\\n" masked-alias'`,
+            buildPosixCommandPathLookupScript({ kind: 'literal', value: commandName }),
+            `printf '%s\\n' "$resolved"`,
+            `alias ${commandName} >/dev/null`,
+            `unalias ${commandName}`,
+            `${commandName}`
+          ].join('\n')
 
-        const resolved = execFileSync(shell.path!, ['-c', script], {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ''}`
-          }
+          const resolved = execFileSync(shell.path!, [...(shell.args ?? []), '-c', script], {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: `${directory}${delimiter}${process.env.PATH ?? ''}`,
+              ZDOTDIR: root
+            }
+          })
+            .trim()
+            .split('\n')
+
+          expect(isAbsolute(resolved[0])).toBe(true)
+          expect(realpathSync(resolved[0])).toBe(realpathSync(executable))
+          expect(resolved[1]).toBe('masked-function')
         })
-          .trim()
-          .split('\n')
-
-        expect(isAbsolute(resolved[0])).toBe(true)
-        expect(realpathSync(resolved[0])).toBe(realpathSync(process.execPath))
-        expect(resolved[1]).toBe('masked-function')
       }
     )
   }

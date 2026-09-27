@@ -93,12 +93,14 @@ export function syncSystemConfigIntoManagedCodexHome(
   }
   // Why: the baseline advances only after a successful mirror; recording an
   // unpromoted runtime change as Orca-written would strand it forever.
-  snapshotCodexRuntimeSettingsBaseline(
-    homes.runtimeHomePath,
-    new Map(
+  snapshotCodexRuntimeSettingsBaseline(homes.runtimeHomePath, {
+    conflicts: new Map(
       [...promotionPlan.conflicts].filter(([key]) => mirrorResult.preservedConflictKeys.has(key))
-    )
-  )
+    ),
+    // Why: this pass made the runtime's marketplace and plugin tables canonical,
+    // so a later source config that lacks one is a removal, not an addition.
+    mirroredRegistrations: true
+  })
 }
 
 /**
@@ -155,15 +157,15 @@ type CodexConfigMirrorResult =
   | { status: 'mirrored'; preservedConflictKeys: ReadonlySet<string> }
 
 function syncSystemConfigIntoManagedCodexHomeUnsafe(
-  { runtimeHomePath, systemHomePath }: CodexSettingsPromotionHomes,
+  { runtimeHomePath, systemHomePath, systemConfigDir }: CodexSettingsPromotionHomes,
   promotionPlan: CodexSettingsPromotionPlan
 ): CodexConfigMirrorResult {
   const systemConfigPath = join(systemHomePath, 'config.toml')
   const runtimeConfigPath = join(runtimeHomePath, 'config.toml')
-  // Why: `existsSync` answered `false` for a locked file exactly as for an absent
-  // one, so a held handle on the RUNTIME config read as "no runtime config yet"
-  // and the fresh-mirror branch below overwrote it wholesale. Neither side may
-  // be acted on unless it was actually observed.
+  // Why: `existsSync` collapses an indeterminate probe into the same `false` as
+  // absence, so a transiently unavailable RUNTIME config could reach the fresh
+  // mirror after the path recovered. Neither side may be acted on unless it was
+  // actually observed.
   const systemConfigObservation = observeAgentStateFile(systemConfigPath)
   if (systemConfigObservation.kind === 'indeterminate') {
     return { status: 'refused-indeterminate', error: systemConfigObservation.error }
@@ -184,7 +186,7 @@ function syncSystemConfigIntoManagedCodexHomeUnsafe(
       : { status: 'mirrored', preservedConflictKeys: new Set() }
   }
 
-  const sourceConfigDir = resolveCodexConfigMirrorSourceDirectory(systemHomePath)
+  const sourceConfigDir = resolveCodexConfigMirrorSourceDirectory(systemHomePath, systemConfigDir)
   if (!runtimeConfigExists) {
     writeFileAtomically(
       runtimeConfigPath,
@@ -207,8 +209,15 @@ function syncSystemConfigIntoManagedCodexHomeUnsafe(
   return { status: 'mirrored', preservedConflictKeys: preserved.keys }
 }
 
-export function resolveCodexConfigMirrorSourceDirectory(systemHomePath: string): string {
-  return parseWslUncPath(systemHomePath)?.linuxPath ?? dirname(join(systemHomePath, 'config.toml'))
+export function resolveCodexConfigMirrorSourceDirectory(
+  systemHomePath: string,
+  systemConfigDir?: string
+): string {
+  return (
+    systemConfigDir ??
+    parseWslUncPath(systemHomePath)?.linuxPath ??
+    dirname(join(systemHomePath, 'config.toml'))
+  )
 }
 
 function prepareSystemConfigForRuntimeMirror(config: string, systemConfigDir: string): string {

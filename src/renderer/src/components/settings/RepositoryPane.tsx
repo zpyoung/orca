@@ -1,3 +1,4 @@
+import type { GhAccountBinding } from '../../../../shared/github/account-binding'
 import { useCallback, useRef, useState } from 'react'
 import type { OrcaHooks, RepoHookSettings } from '../../../../shared/orca-yaml-hook-types'
 import type { Project, ProjectUpdateArgs } from '../../../../shared/project-types'
@@ -24,10 +25,12 @@ import { getRepositoryPaneSearchEntries } from './repository-search'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
 import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
 import { RepositoryForkSyncSection } from './RepositoryForkSyncSection'
+import { RepositoryGitHubAccountSection } from './RepositoryGitHubAccountSection'
 import { translate } from '@/i18n/i18n'
 import { RepositoryWindowsRuntimeSection } from './RepositoryWindowsRuntimeSection'
 import { matchesRepositoryIdentitySearch } from './repository-identity-search'
 import { RepositoryWorktreeDefaultsSection } from './RepositoryWorktreeDefaultsSection'
+import { RepositoryLedgerSection } from './RepositoryLedgerSection'
 import { getProjectRuntimeSessionSummary } from './repository-runtime-session-summary'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../store/worktree-visibility-defaults-by-host'
 export { getRepositoryPaneSearchEntries }
@@ -35,10 +38,11 @@ export { matchesRepositoryIdentitySearch } from './repository-identity-search'
 
 type RepositoryPaneRepoUpdate = Omit<
   Partial<Repo>,
-  'sourceControlAi' | 'externalWorktreeVisibility'
+  'sourceControlAi' | 'externalWorktreeVisibility' | 'ghAccount'
 > & {
   sourceControlAi?: Repo['sourceControlAi'] | null
   externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
+  ghAccount?: GhAccountBinding | null
 }
 
 const EMPTY_WSL_DISTROS: string[] = []
@@ -179,6 +183,7 @@ export function RepositoryPane({
   const identityEntryTitles = new Set([
     translate('auto.components.settings.repository.search.7e1e456a95', 'Display Name'),
     translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),
+    translate('auto.components.settings.repository.search.githubAccount', 'GitHub Account'),
     translate(
       'auto.components.settings.repository.search.keepForkUpToDate',
       'Keep Fork Up to Date'
@@ -207,6 +212,7 @@ export function RepositoryPane({
   const sourceControlAiEntries = allEntries.filter((entry) => entry.title === 'Git AI Author')
   const hostSetupEntries = allEntries.filter((entry) => entry.title === 'Available Hosts')
   const projectRuntimeEntries = allEntries.filter((entry) => entry.title === 'Project Runtime')
+  const ledgerStalenessEntries = allEntries.filter((entry) => entry.title === 'Ledger Staleness')
   const removeProjectLabel =
     confirmingRemove === repo.id ? 'Confirm Remove Project' : 'Remove Project'
 
@@ -365,6 +371,12 @@ export function RepositoryPane({
               forceVisible={forceFullPaneForRepoMatch}
             />
 
+            <RepositoryGitHubAccountSection
+              repo={repo}
+              updateRepo={updateSelectedRepo}
+              forceVisible={forceFullPaneForRepoMatch}
+            />
+
             <RepositoryWorktreeDefaultsSection
               repo={repo}
               settings={repoOwnerSettings}
@@ -377,6 +389,11 @@ export function RepositoryPane({
               }
               forceVisible={forceFullPaneForRepoMatch}
             />
+
+            {forceFullPaneForRepoMatch ||
+            matchesSettingsSearch(searchQuery, ledgerStalenessEntries) ? (
+              <RepositoryLedgerSection repo={repo} forceVisible={forceFullPaneForRepoMatch} />
+            ) : null}
           </>
         ) : null}
       </section>

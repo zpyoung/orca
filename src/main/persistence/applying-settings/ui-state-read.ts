@@ -31,15 +31,21 @@ import {
   normalizeSortBy
 } from './ui-selection-normalization'
 import { stripMainOwnedTelemetryMarkerFromUI } from './ui-interaction-merge'
+import { normalizeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'
+import { normalizeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'
 
 export function getPersistedUI(
   state: PersistedState,
   activeView: PersistedState['ui']['activeView']
 ): PersistedState['ui'] {
   const uiState = stripMainOwnedTelemetryMarkerFromUI(state.ui)
+  const workspaceActivityUI = normalizeWorkspaceActivityUI(uiState)
+  const workspaceReviewUI = normalizeWorkspaceReviewUI(uiState)
   return {
     ...getDefaultUIState(),
     ...uiState,
+    ...workspaceActivityUI,
+    ...workspaceReviewUI,
     groupBy: normalizeGroupBy(state.ui?.groupBy),
     sortBy: normalizeSortBy(state.ui?.sortBy),
     projectOrderBy: normalizeProjectOrderBy(state.ui?.projectOrderBy),
@@ -62,6 +68,7 @@ export function getPersistedUI(
     markdownTocPanelWidth: clampMarkdownTocPanelWidth(state.ui?.markdownTocPanelWidth),
     combinedDiffFileTreeWidth: clampCombinedDiffFileTreeWidth(state.ui?.combinedDiffFileTreeWidth),
     visibleWorkspaceHostIds: normalizeVisibleExecutionHostIds(state.ui?.visibleWorkspaceHostIds),
+    agentsVisibleHostIds: normalizeVisibleExecutionHostIds(state.ui?.agentsVisibleHostIds),
     workspaceHostOrder: normalizeExecutionHostOrder(state.ui?.workspaceHostOrder),
     manualRepoOrder: normalizeManualRepoOrder(state.ui?.manualRepoOrder),
     browserDefaultZoomLevel: normalizeBrowserPageZoomLevel(state.ui?.browserDefaultZoomLevel),

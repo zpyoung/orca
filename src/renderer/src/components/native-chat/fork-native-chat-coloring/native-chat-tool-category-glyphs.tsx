@@ -34,7 +34,13 @@ const DOT_CLASS_BY_CATEGORY: Record<NativeChatToolCategory, string> = {
   net: 'bg-tool-net'
 }
 
-export function NativeChatToolName({ name }: { name: string }): React.JSX.Element {
+export function NativeChatToolName({
+  name,
+  children
+}: {
+  name: string
+  children?: React.ReactNode
+}): React.JSX.Element {
   const category = categorizeNativeChatTool(name)
   const Glyph = category ? GLYPH_BY_CATEGORY[category] : null
 
@@ -49,13 +55,13 @@ export function NativeChatToolName({ name }: { name: string }): React.JSX.Elemen
       ) : null}
       <code
         className={cn(
-          'shrink-0 font-mono text-xs font-semibold transition-colors',
+          'min-w-0 truncate font-mono text-xs font-semibold transition-colors',
           category
             ? TEXT_CLASS_BY_CATEGORY[category]
             : 'text-foreground/90 group-hover:text-foreground'
         )}
       >
-        {name}
+        {children ?? name}
       </code>
     </>
   )

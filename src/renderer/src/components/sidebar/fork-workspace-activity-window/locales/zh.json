@@ -1,0 +1,20 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceActivityWindowControl": {
+          "activityWindow": "活动时间范围",
+          "all": "全部",
+          "live-only": "仅活跃",
+          "today": "过去24小时",
+          "week": "过去7天",
+          "month": "过去30天",
+          "custom": "自定义",
+          "customDays": "自定义天数",
+          "customDaysError": "请输入正整数。"
+        },
+        "WorkspaceActivityHiddenCountRow": { "hidden": "活动时间范围隐藏了{{count}}个工作区" }
+      }
+    }
+  }
+}

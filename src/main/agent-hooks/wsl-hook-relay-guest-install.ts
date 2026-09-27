@@ -6,13 +6,14 @@ import type { ManagedHookDetectionSettings } from './managed-hook-detection-comm
 import type { installRemoteManagedAgentHooks } from './remote-managed-hook-installers'
 import { requestGuestOpenCodeOverlayDir } from './wsl-guest-plugin-install'
 import { installWslGuestHooks } from './wsl-hook-fs-adapter'
-import { REINSTALL_MIN_INTERVAL_MS } from './wsl-hook-relay-deps'
+import { REINSTALL_MIN_INTERVAL_MS, type WslHookRelayManagerDeps } from './wsl-hook-relay-deps'
 import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
 import type { PluginSources } from '../../relay/plugin-overlay'
 
 /** Structural slice of WslHookRelayManagerDeps — only what an install pass uses. */
 type GuestInstallDeps = {
   installHooks: typeof installRemoteManagedAgentHooks
+  installCodex: WslHookRelayManagerDeps['installCodex']
   managedHookSettings: () => ManagedHookDetectionSettings
   pluginSources: () => PluginSources
   warn: (message: string) => void
@@ -23,7 +24,9 @@ type GuestInstallState = {
   distro: string
   mux?: SshChannelMultiplexer
   guestHome?: string
+  codexHomePath?: string
   opencodeOverlayDir?: string
+  opencode2OverlayDir?: string
   lastInstallAt?: number
 }
 
@@ -37,8 +40,10 @@ export async function runWslRelayGuestInstall(
   await installWslGuestHooks({
     mux,
     guestHome,
+    codexHomePath: state.codexHomePath ?? null,
     distro: state.distro,
     installHooks: deps.installHooks,
+    installCodex: deps.installCodex,
     settings: deps.managedHookSettings(),
     warn: deps.warn
   })
@@ -49,6 +54,7 @@ export async function runWslRelayGuestInstall(
     // Clearing on 'none' matters: a rebuild that failed after wiping leaves the dir
     // present but plugin-less, and advertising it would hide the user's own config.
     state.opencodeOverlayDir = overlay.kind === 'dir' ? overlay.dir : undefined
+    state.opencode2OverlayDir = overlay.kind === 'dir' ? overlay.dir2 : undefined
   }
 }
 

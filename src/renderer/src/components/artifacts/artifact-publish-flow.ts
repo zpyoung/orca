@@ -5,12 +5,15 @@ import type {
   ArtifactWriteRequest
 } from '../../../../shared/artifacts'
 import {
-  ARTIFACT_CLI_MAX_RPC_BYTES,
+  ARTIFACT_MAX_CONTENT_BYTES,
+  ARTIFACT_MAX_REQUEST_BYTES,
+  artifactContentByteLength,
   artifactWriteRequestByteLength
 } from '../../../../shared/artifacts'
 import { translate } from '@/i18n/i18n'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { useAppStore } from '@/store'
+import { showCompletedArtifactPublish } from './fork-artifact-passwords/artifact-password-publish-feedback'
 
 const LOCAL_RUNTIME = { kind: 'local' } as const
 
@@ -33,14 +36,18 @@ export function validateArtifactPublishRequest(
   if (!request.content) {
     throw new ArtifactPublishPreparationError('empty')
   }
-  if (artifactWriteRequestByteLength(request) > ARTIFACT_CLI_MAX_RPC_BYTES) {
+  if (
+    artifactContentByteLength(request.content) > ARTIFACT_MAX_CONTENT_BYTES ||
+    artifactWriteRequestByteLength(request) > ARTIFACT_MAX_REQUEST_BYTES
+  ) {
     throw new ArtifactPublishPreparationError('too-large')
   }
   return request
 }
 
 export async function publishArtifactFromSurface(
-  createRequest: () => Promise<ArtifactWriteRequest>
+  createRequest: () => Promise<ArtifactWriteRequest>,
+  rpcMethod = 'artifacts.publish'
 ): Promise<ArtifactPublishResult | null> {
   try {
     if (!(await ensureArtifactAccountConnected())) {
@@ -50,11 +57,11 @@ export async function publishArtifactFromSurface(
       const request = validateArtifactPublishRequest(await createRequest())
       const result = await callRuntimeRpc<ArtifactCloudOperation<ArtifactPublishResult>>(
         LOCAL_RUNTIME,
-        'artifacts.publish',
+        rpcMethod,
         request
       )
       if (result.status === 'ok') {
-        showArtifactPublishedToast(result.value)
+        showCompletedArtifactPublish(result.value, showArtifactPublishedToast)
         return result.value
       }
       if (result.status === 'unconfigured') {
@@ -123,7 +130,7 @@ function artifactPreparationErrorDescription(code: ArtifactPublishPreparationErr
     case 'too-large':
       return translate(
         'auto.components.artifacts.artifact-publish-flow.6112db5a1c',
-        'Artifacts shared from Orca must be smaller than 800 KB.'
+        'This artifact is too large to share.'
       )
     case 'unreadable':
       return translate(

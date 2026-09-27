@@ -170,7 +170,7 @@ describe('AgentHookServer listener replay', () => {
           baselineStateStartedAt: baseline.stateStartedAt,
           baselinePrompt: 'run in background',
           baselineAgentType: 'claude',
-          intent: 'plain-escape'
+          intent: 'ctrl-c'
         })
       ).toBe(false)
       expect(server.getStatusSnapshot()[0]).toMatchObject({ state: 'working' })
@@ -196,7 +196,7 @@ describe('AgentHookServer listener replay', () => {
           baselineStateStartedAt: baseline.stateStartedAt,
           baselinePrompt: 'run in background',
           baselineAgentType: 'claude',
-          intent: 'plain-escape'
+          intent: 'ctrl-c'
         })
       ).toBe(true)
     } finally {
@@ -228,6 +228,7 @@ describe('AgentHookServer listener replay', () => {
       const baseline = server.getStatusSnapshot()[0]
 
       expect(baseline).not.toHaveProperty('claudeRunningNonAgentTask')
+      expect(baseline).toMatchObject({ state: 'working', workingMode: 'monitoring' })
       expect(
         server.inferInterrupt({
           paneKey: PANE,

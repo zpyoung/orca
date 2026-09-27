@@ -1,0 +1,12 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceReviewFilterRows": {
+          "hideCompleted": "隐藏已合并/已关闭的评审",
+          "hidePassing": "隐藏通过的检查"
+        }
+      }
+    }
+  }
+}

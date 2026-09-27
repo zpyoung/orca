@@ -25,6 +25,7 @@ import {
   getTypographyEntries,
   getZoomEntries
 } from './appearance-search'
+import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'
 import { getTerminalAppearanceSearchEntries } from './terminal-search'
 import { TerminalAppearanceSection } from './TerminalAppearanceSection'
 import type { UseGhosttyImportReturn } from './useGhosttyImport'
@@ -147,7 +148,9 @@ export function AppearancePane({
   ]
   const terminalSearchEntries = [
     { title: terminalTitle },
-    ...getTerminalAppearanceSearchEntries({ showWarpImport: !isWebClient })
+    ...getTerminalAppearanceSearchEntries({
+      showDesktopThemeImports: !isWebClient
+    })
   ]
   const windowSearchEntries = [
     {
@@ -156,6 +159,7 @@ export function AppearancePane({
     },
     ...getStatusBarEntries(),
     ...getSidebarEntries(),
+    getSidebarSectionSeparatorEntry(),
     ...getLayoutEntries(),
     getLeftSidebarAppearanceEntry(),
     getWorkspaceCardLayoutEntry()

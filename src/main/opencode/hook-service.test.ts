@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync
 } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setAppEnvironment } from '../../shared/app-environment'
@@ -18,7 +19,13 @@ const { getPathMock } = vi.hoisted(() => ({
   getPathMock: vi.fn<(name: string) => string>()
 }))
 
-import { OpenCodeHookService, _internals } from './hook-service'
+import {
+  OpenCodeHookService,
+  _internals,
+  getOpenCodeFamilyPluginSource,
+  getOpenCodePluginSource,
+  getOpenCode2PluginSource
+} from './hook-service'
 
 beforeEach(() => {
   setAppEnvironment({
@@ -35,6 +42,61 @@ beforeEach(() => {
 const { isUsableId, toSafeDirName } = _internals
 
 describe('OpenCode hook plugin source', () => {
+  it('preserves the public module surface', async () => {
+    const module = await import('./hook-service')
+
+    expect(Object.keys(module).sort()).toEqual([
+      'OpenCodeHookService',
+      '_internals',
+      'getOpenCode2PluginSource',
+      'getOpenCodeFamilyPluginSource',
+      'getOpenCodePluginSource',
+      'openCode2HookService',
+      'openCodeHookService'
+    ])
+    expect(Object.keys(module._internals).sort()).toEqual([
+      'getOpenCode2PluginSource',
+      'getOpenCodePluginSource',
+      'isUsableId',
+      'toSafeDirName'
+    ])
+  })
+
+  it('keeps family routing and session-start policy separate', () => {
+    const primarySource = getOpenCodePluginSource()
+    const familySource = getOpenCodeFamilyPluginSource('/hook/mimo-code', {
+      emitSessionStart: false
+    })
+
+    expect(primarySource).toContain('http://127.0.0.1:${coords.port}/hook/opencode')
+    expect(primarySource).toContain('post("SessionStart", { sessionID: info.id })')
+    expect(familySource).toContain('http://127.0.0.1:${coords.port}/hook/mimo-code')
+    expect(familySource).not.toContain('post("SessionStart", { sessionID: info.id })')
+    expect(familySource).toContain('export const OrcaOpenCodeStatusPlugin')
+  })
+
+  it('generates the OpenCode 2 plugin with its dedicated hook and event family', () => {
+    const source = getOpenCode2PluginSource()
+    expect(source).toContain('/hook/opencode2')
+    expect(source).toContain('session.next.text.delta')
+    expect(source).toContain('permission.v2.asked')
+    expect(source).toContain('event.type === "session.next.prompt.admitted"')
+    expect(source).not.toContain(
+      'event.type === "session.next.prompted" || event.type === "session.next.prompt.admitted"'
+    )
+  })
+
+  it('keeps generated plugin bytes stable across the module split', () => {
+    const digest = (source: string): string => createHash('sha256').update(source).digest('hex')
+
+    expect(digest(getOpenCodePluginSource())).toBe(
+      'd14859a36c88aefe3a45cd232789503296e0a23438b151c773414bad64ab8eaa'
+    )
+    expect(
+      digest(getOpenCodeFamilyPluginSource('/hook/mimo-code', { emitSessionStart: false }))
+    ).toBe('4de14bee0c27ce55f29f70b19aa6ce9967e09b098bba139fb88f0511af7d4fca')
+  })
+
   it('filters child sessions via parentID lookup before forwarding events', () => {
     const source = _internals.getOpenCodePluginSource()
 

@@ -33,7 +33,7 @@ baked="$(cat /home/runner/lockfile.sha256)"
 current="$(sha256sum pnpm-lock.yaml | cut -d ' ' -f 1)"
 if [ "$baked" != "$current" ]; then
   echo "orca-test-sandbox: lockfile differs from the image; reinstalling" >&2
-  pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --ignore-scripts
+  pnpm install --no-frozen-lockfile --no-prefer-frozen-lockfile --ignore-scripts
   node config/scripts/ensure-native-runtime.mjs --runtime=node
 fi
 

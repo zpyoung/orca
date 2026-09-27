@@ -20,7 +20,9 @@ export type GitInspectionApi = {
   status: (args: {
     worktreePath: string
     connectionId?: string
+    admissionTier?: 'interactive' | 'status' | 'background'
     includeIgnored?: boolean
+    includeLineStats?: boolean
     bypassEffectiveUpstreamNegativeCache?: boolean
     reuseLineStats?: boolean
     /** Merge-base OID to measure the branch line total against; omit to skip the work. */
@@ -61,11 +63,14 @@ export type GitInspectionApi = {
     staged: boolean
     compareAgainstHead?: boolean
     connectionId?: string
+    requestToken?: string
   }) => Promise<GitDiffResult>
+  cancelDiff: (args: { requestToken: string }) => Promise<void>
   branchCompare: (args: {
     worktreePath: string
     baseRef: string
     connectionId?: string
+    admissionTier?: 'interactive' | 'status' | 'background'
   }) => Promise<GitBranchCompareResult>
   commitCompare: (args: {
     worktreePath: string

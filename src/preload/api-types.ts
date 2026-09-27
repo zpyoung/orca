@@ -1,4 +1,5 @@
-import type { ElectronAPI } from '@electron-toolkit/preload'
+import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
+import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -6,7 +7,7 @@ import type {
   GrokAccountsApi,
   MinimaxCredentialsApi
 } from './api/agent-account-api'
-import type { AgentHooksApi, HooksApi } from './api/agent-hook-api'
+import type { HooksApi } from './api/agent-hook-api'
 import type { SkillsApi } from './api/agent-skill-api'
 import type { AgentAwakeApi, AgentStatusApi, AgentTrustApi } from './api/agent-status-api'
 import type {
@@ -22,11 +23,13 @@ import type { BrowserApi } from './api/browser-api'
 import type { CliApi } from './api/cli-install-api'
 import type { CrashReportsApi, FeedbackApi } from './api/crash-report-api'
 import type { DashboardApi, TerminalPreviewApi } from './api/dashboard-api'
+import type { DocPreviewApi } from './api/doc-preview-api'
 import type { EmulatorApi } from './api/emulator-api'
 import type { EphemeralVmApi } from './api/ephemeral-vm-api'
 import type { ExportApi, FilesystemApi } from './api/filesystem-api'
 import type { GitInspectionApi } from './api/git-inspection-api'
 import type { GitOperationApi } from './api/git-operation-api'
+import type { GithubAccountApi } from './api/github-account-api'
 import type { GithubPullRequestApi } from './api/github-pull-request-api'
 import type { GithubWorkItemApi } from './api/github-work-item-api'
 import type { GitLabApi } from './api/gitlab-api'
@@ -57,6 +60,7 @@ import type { DiagnosticsApi, MemoryApi, StatsApi, TelemetryApi } from './api/te
 import type { UiCommandEventApi } from './api/ui-command-event-api'
 import type { UiWindowApi } from './api/ui-window-api'
 import type { UpdaterApi } from './api/updater-api'
+import type { LedgerApi } from './api/ledger-api'
 import type { WorkspaceCleanupApi, WorkspaceSpaceApi } from './api/workspace-cleanup-api'
 import type { LocalhostWorktreeLabelsApi, WorkspacePortsApi } from './api/workspace-port-api'
 import type { WorkspaceSessionApi } from './api/workspace-session-api'
@@ -65,7 +69,17 @@ import type { FolderWorkspacesApi, SparsePresetsApi, WorktreeApi } from './api/w
 // Flattens contracts that share one PreloadApi key: an intersection is not type-identical to the flat shape.
 type Merged<T> = { [K in keyof T]: T[K] }
 
+/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */
+export type AskApi = {
+  onSet: (callback: (event: AskRegistryEvent) => void) => () => void
+  getSuppressionVerdict: () => Promise<ClaudeSuppressionVerdict>
+  onSuppressionVerdict: (callback: (verdict: ClaudeSuppressionVerdict) => void) => () => void
+}
+
 export type PreloadApi = {
+  forkSessionHandoff: ForkSessionHandoffPreloadApi
+  forkSessionInfo: ForkSessionInfoApi
+  ledger: LedgerApi
   app: AppApi
   orcaProfiles: OrcaProfileApi
   platform: PlatformApi
@@ -83,7 +97,7 @@ export type PreloadApi = {
   feedback: FeedbackApi
   crashReports: CrashReportsApi
   export: ExportApi
-  gh: Merged<GithubPullRequestApi & GithubWorkItemApi>
+  gh: Merged<GithubPullRequestApi & GithubWorkItemApi & GithubAccountApi>
   hostedReview: HostedReviewApi
   gl: GitLabApi
   bitbucket: BitbucketApi
@@ -103,7 +117,6 @@ export type PreloadApi = {
   claudeAccounts: ClaudeAccountsApi
   cli: CliApi
   codexConfigSync: CodexConfigSyncApi
-  agentHooks: AgentHooksApi
   agentTrust: AgentTrustApi
   preflight: PreflightApi
   notifications: NotificationsApi
@@ -125,6 +138,7 @@ export type PreloadApi = {
   remoteWorkspace: WorkspaceSessionApi['remoteWorkspace']
   updater: UpdaterApi
   notebook: FilesystemApi['notebook']
+  docPreview: DocPreviewApi['docPreview']
   stats: StatsApi
   memory: MemoryApi
   claudeUsage: ClaudeUsageApi
@@ -147,12 +161,14 @@ export type PreloadApi = {
   gitBash: RuntimeApi['gitBash']
   plugins: PluginsApi
   agentStatus: AgentStatusApi
+  asks: AskApi
   mobile: MobileApi
   speech: SpeechApi
 }
 
 export type { ClaudeUsageApi, CodexUsageApi, OpenCodeUsageApi } from './api/agent-usage-api'
 export type { AiVaultApi } from './api/ai-vault-api'
+export type { AutomationsApi, ExternalAutomationManagerResult } from './api/automation-api'
 export type { AppApi } from './api/app-api'
 export type { BrowserApi, DetectedBrowserInfo, DetectedBrowserProfileInfo } from './api/browser-api'
 export type { EmulatorApi } from './api/emulator-api'
@@ -200,11 +216,12 @@ export type {
   MemoryApi,
   StatsApi
 } from './api/telemetry-api'
+import type { ForkSessionHandoffPreloadApi } from './fork-session-handoff/session-handoff-preload-api'
+import type { ForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
 
 declare global {
   // oxlint-disable-next-line typescript-eslint/consistent-type-definitions -- declaration merging requires interface
   interface Window {
-    electron: ElectronAPI
     api: PreloadApi
   }
 }

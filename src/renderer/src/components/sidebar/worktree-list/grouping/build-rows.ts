@@ -109,8 +109,11 @@ export function buildRows(
     pinnedDisplayPolicy === 'duplicate-in-groups'
       ? worktrees
       : worktrees.filter((worktree) => !pinnedSectionIds.has(getWorktreeHostIdentity(worktree)))
+  // Why the full set: under the default pinned policy a pinned worktree exists
+  // only in the Pinned section, and its host is part of whether the sidebar is
+  // mixed at all. Scoping to naturalWorktrees left pinned remotes unlabelled.
   const mixedWorktreeHostContextLabels = getMixedWorktreeHostContextLabels(
-    naturalWorktrees,
+    worktrees,
     repoMap,
     hostLabelById,
     defaultHostId
@@ -149,7 +152,8 @@ export function buildRows(
     worktreeMap,
     nestLineage,
     cyclicLineageIds,
-    noticeHostContextLabelByRepoId
+    noticeHostContextLabelByRepoId,
+    mixedWorktreeHostContextLabels
   )
   if (groupBy === 'none') {
     // Why folder workspaces gate this too: an account with only folder

@@ -2,7 +2,7 @@ import type {
   ActiveRightSidebarTab,
   RightSidebarExplorerView
 } from '../../../shared/ui-chrome-types'
-import { isPluginPanelTabKey } from '../../../shared/plugins/plugin-manifest'
+import { isPluginPanelTabKey } from '../../../shared/plugins/plugin-tab-key'
 
 export type RightSidebarRoute = {
   rightSidebarTab: ActiveRightSidebarTab
@@ -42,11 +42,14 @@ export function normalizeRightSidebarRoute(
   if (
     tab === 'explorer' ||
     tab === 'vault' ||
+    tab === 'session-info' ||
+    tab === 'ask' ||
     tab === 'workspaces' ||
     tab === 'pr-checks' ||
     tab === 'source-control' ||
     tab === 'checks' ||
-    tab === 'ports'
+    tab === 'ports' ||
+    tab === 'ledger'
   ) {
     return {
       rightSidebarTab: tab,

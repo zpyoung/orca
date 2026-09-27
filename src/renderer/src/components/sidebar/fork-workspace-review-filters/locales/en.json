@@ -1,0 +1,12 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceReviewFilterRows": {
+          "hideCompleted": "Hide merged/closed reviews",
+          "hidePassing": "Hide passing checks"
+        }
+      }
+    }
+  }
+}

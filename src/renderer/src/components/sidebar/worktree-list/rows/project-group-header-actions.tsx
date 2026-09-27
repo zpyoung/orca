@@ -1,5 +1,5 @@
 import React from 'react'
-import { Ellipsis, Plus } from 'lucide-react'
+import { BookOpen, Ellipsis, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -26,7 +26,8 @@ export function ProjectGroupHeaderMenu({
   hostId,
   label,
   onRename,
-  onDelete
+  onDelete,
+  onOpenLedger
 }: {
   groupId: string
   /** Owner host of the group row, so rename/delete route to the host that holds it. */
@@ -34,6 +35,7 @@ export function ProjectGroupHeaderMenu({
   label: string
   onRename: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
   onDelete: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
+  onOpenLedger?: () => void
 }): React.JSX.Element {
   return (
     <DropdownMenu modal={false}>
@@ -68,6 +70,12 @@ export function ProjectGroupHeaderMenu({
         onClick={stopRepoHeaderMenuEvent}
         onKeyDown={stopRepoHeaderMenuEvent}
       >
+        {onOpenLedger ? (
+          <DropdownMenuItem onSelect={onOpenLedger}>
+            <BookOpen className="size-3.5" />
+            {translate('auto.components.sidebar.WorktreeList.openLedger', 'Open ledger')}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onSelect={() => onRename(groupId, label, hostId)}>
           {translate('auto.components.sidebar.WorktreeList.4d7b73658c', 'Rename group')}
         </DropdownMenuItem>

@@ -24,7 +24,6 @@ import { normalizeContextualTourIds } from '../../../shared/contextual-tours'
 import { normalizeFeatureInteractions } from '../../../shared/feature-interactions'
 import { mergeWorkspaceCleanupUIState } from '../../../shared/workspace-cleanup-ui-state'
 import { persistedUIValuesEqual } from '../../../shared/persisted-ui-equality'
-import type { StoreOwnedPersistedState } from '../loading-store/store-owned-state'
 import {
   PROTECTED_SECRET_SLOT,
   type ProtectedSecretPersistence
@@ -43,8 +42,11 @@ import {
   stripMainOwnedTelemetryMarkerFromUI
 } from './ui-interaction-merge'
 
+import { mergeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'
+import { mergeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'
+
 export type UIUpdateOperations = {
-  state: StoreOwnedPersistedState
+  state: PersistedState
   removeRetainedBlob: (
     slot: Parameters<ProtectedSecretPersistence['removeRetainedBlob']>[0]
   ) => void
@@ -80,6 +82,8 @@ export function updatePersistedUI(
     // fallback; the profile sidecar is authoritative in current builds.
     activeView: currentUI.activeView
   }
+  const nextActivityUI = mergeWorkspaceActivityUI(operations.state.ui, sanitizedUpdates)
+  const nextReviewUI = mergeWorkspaceReviewUI(operations.state.ui, sanitizedUpdates)
   const nextRightSidebarTab =
     sanitizedUpdates.rightSidebarTab !== undefined
       ? normalizeRightSidebarTab(sanitizedUpdates.rightSidebarTab)
@@ -123,6 +127,8 @@ export function updatePersistedUI(
       sanitizedUpdates.agentActivityDisplayMode !== undefined
         ? normalizeAgentActivityDisplayMode(sanitizedUpdates.agentActivityDisplayMode)
         : normalizeAgentActivityDisplayMode(operations.state.ui?.agentActivityDisplayMode),
+    ...nextActivityUI,
+    ...nextReviewUI,
     workspaceStatuses:
       sanitizedUpdates.workspaceStatuses !== undefined
         ? normalizeWorkspaceStatuses(sanitizedUpdates.workspaceStatuses)
@@ -153,6 +159,10 @@ export function updatePersistedUI(
       sanitizedUpdates.visibleWorkspaceHostIds !== undefined
         ? normalizeVisibleExecutionHostIds(sanitizedUpdates.visibleWorkspaceHostIds)
         : normalizeVisibleExecutionHostIds(operations.state.ui?.visibleWorkspaceHostIds),
+    agentsVisibleHostIds:
+      sanitizedUpdates.agentsVisibleHostIds !== undefined
+        ? normalizeVisibleExecutionHostIds(sanitizedUpdates.agentsVisibleHostIds)
+        : normalizeVisibleExecutionHostIds(operations.state.ui?.agentsVisibleHostIds),
     workspaceHostOrder:
       sanitizedUpdates.workspaceHostOrder !== undefined
         ? normalizeExecutionHostOrder(sanitizedUpdates.workspaceHostOrder)
