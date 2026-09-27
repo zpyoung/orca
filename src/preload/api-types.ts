@@ -1,4 +1,5 @@
-import type { ElectronAPI } from '@electron-toolkit/preload'
+import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
+import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -28,6 +29,7 @@ import type { EphemeralVmApi } from './api/ephemeral-vm-api'
 import type { ExportApi, FilesystemApi } from './api/filesystem-api'
 import type { GitInspectionApi } from './api/git-inspection-api'
 import type { GitOperationApi } from './api/git-operation-api'
+import type { GithubAccountApi } from './api/github-account-api'
 import type { GithubPullRequestApi } from './api/github-pull-request-api'
 import type { GithubWorkItemApi } from './api/github-work-item-api'
 import type { GitLabApi } from './api/gitlab-api'
@@ -58,6 +60,7 @@ import type { DiagnosticsApi, MemoryApi, StatsApi, TelemetryApi } from './api/te
 import type { UiCommandEventApi } from './api/ui-command-event-api'
 import type { UiWindowApi } from './api/ui-window-api'
 import type { UpdaterApi } from './api/updater-api'
+import type { LedgerApi } from './api/ledger-api'
 import type { WorkspaceCleanupApi, WorkspaceSpaceApi } from './api/workspace-cleanup-api'
 import type { LocalhostWorktreeLabelsApi, WorkspacePortsApi } from './api/workspace-port-api'
 import type { WorkspaceSessionApi } from './api/workspace-session-api'
@@ -66,7 +69,17 @@ import type { FolderWorkspacesApi, SparsePresetsApi, WorktreeApi } from './api/w
 // Flattens contracts that share one PreloadApi key: an intersection is not type-identical to the flat shape.
 type Merged<T> = { [K in keyof T]: T[K] }
 
+/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */
+export type AskApi = {
+  onSet: (callback: (event: AskRegistryEvent) => void) => () => void
+  getSuppressionVerdict: () => Promise<ClaudeSuppressionVerdict>
+  onSuppressionVerdict: (callback: (verdict: ClaudeSuppressionVerdict) => void) => () => void
+}
+
 export type PreloadApi = {
+  forkSessionHandoff: ForkSessionHandoffPreloadApi
+  forkSessionInfo: ForkSessionInfoApi
+  ledger: LedgerApi
   app: AppApi
   orcaProfiles: OrcaProfileApi
   platform: PlatformApi
@@ -84,7 +97,7 @@ export type PreloadApi = {
   feedback: FeedbackApi
   crashReports: CrashReportsApi
   export: ExportApi
-  gh: Merged<GithubPullRequestApi & GithubWorkItemApi>
+  gh: Merged<GithubPullRequestApi & GithubWorkItemApi & GithubAccountApi>
   hostedReview: HostedReviewApi
   gl: GitLabApi
   bitbucket: BitbucketApi
@@ -148,6 +161,7 @@ export type PreloadApi = {
   gitBash: RuntimeApi['gitBash']
   plugins: PluginsApi
   agentStatus: AgentStatusApi
+  asks: AskApi
   mobile: MobileApi
   speech: SpeechApi
 }
@@ -202,11 +216,12 @@ export type {
   MemoryApi,
   StatsApi
 } from './api/telemetry-api'
+import type { ForkSessionHandoffPreloadApi } from './fork-session-handoff/session-handoff-preload-api'
+import type { ForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
 
 declare global {
   // oxlint-disable-next-line typescript-eslint/consistent-type-definitions -- declaration merging requires interface
   interface Window {
-    electron: ElectronAPI
     api: PreloadApi
   }
 }

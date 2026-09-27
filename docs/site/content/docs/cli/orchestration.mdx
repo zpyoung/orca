@@ -3,18 +3,21 @@ title: Orchestration
 description: Coordinate agents with Runs, tasks, supervised workers, messages, and decision gates.
 ---
 
-import { Callout } from '@/components/docs/prose';
+import { Callout } from '@/components/docs/prose'
 
 Orchestration is Orca's structured multi-agent layer: a **Run** (namespace + coordinator inbox), **Tasks**, **Dispatches**, supervised **workers**, messages, and decision gates.
 
 Use it when you need ownership, completion tracking, or a DAG. For one-off prompts, use `orca terminal send`. For full ownership handoffs without supervision, use worktree/terminal commands from the `orca-cli` skill.
 
 <Callout title="Experimental">
-Enable orchestration under Settings → Experimental before using these commands. The CLI talks to the running Orca runtime, so `orca status --json` should succeed first.
+  Enable orchestration under Settings → Experimental before using these commands. The CLI talks to
+  the running Orca runtime, so `orca status --json` should succeed first.
 </Callout>
 
 <Callout title="Legacy commands retired">
-`orca orchestration run` and `run-stop` (and `coordinator-start` / `coordinator-stop`) perform **no effects**. They return recovery text pointing at `orca skills get orchestration --full`. Use the Run + worker-start flow below.
+  `orca orchestration run` and `run-stop` (and `coordinator-start` / `coordinator-stop`) perform
+  **no effects**. They return recovery text pointing at `orca skills get orchestration --full`. Use
+  the Run + worker-start flow below.
 </Callout>
 
 ## Core model
@@ -113,12 +116,14 @@ orca orchestration dispatch --task <taskId> --to <workerHandle> --inject --json
 - Default `check` is the bound Run's oldest unacked Delivery (FIFO). Replay until `--ack`.
 - `--peek` / `--all` do not consume mail.
 - Group addresses: `@all`, `@idle`, `@claude`, `@codex`, `@opencode`, `@gemini`, `@droid`, `@grok`, `@cursor`, `@worktree:<id>` — never for `worker_done` / heartbeat.
+- Every group except `@worktree:<id>` means the live Dispatches of the sender's own Run, delivered to their Dispatch mailboxes (or child Run mailboxes for nested coordinators). A sender in no Run is refused; `--run` must match the audience and never grants membership.
+- Run groups exclude their owning coordinator. A worker raising a blocker sends to `run:<id>`. `@worktree:<id>` includes coordinators in that workspace.
 - Quote PowerShell group addresses: `--to "@all"`.
 
 ```bash
 orca orchestration send --to @all --subject "Heads up" --body "Pausing dispatches for a review." --json
 orca orchestration send --to @idle --subject "Anyone free?" --json
-orca orchestration send --to @codex --subject "Codex agents only" --json
+orca orchestration send --to @codex --subject "Codex workers in this Run only" --json
 ```
 
 While a wait is active, the CLI emits small JSON heartbeat lines to stderr every 15 seconds. Stdout remains the final command result.
@@ -142,7 +147,7 @@ orca orchestration ask \
   --json
 ```
 
-With `--json`, `ask` prints a single JSON object so workers can pipe it to `jq -r .answer`.
+With `--json`, `ask` prints the standard `{id, ok, result, _meta}` envelope, so workers read the answer with `jq -r .result.answer`.
 
 ## Decision gates
 

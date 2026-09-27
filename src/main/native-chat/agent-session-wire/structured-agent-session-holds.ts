@@ -36,6 +36,7 @@ export type StructuredAgentSessionHoldOptions = {
 export class StructuredAgentSessionHolds {
   private readonly holders = new StructuredAgentSessionHolders()
   private readonly clock: StructuredAgentSessionReleaseClock
+  private disposed = false
 
   constructor(private readonly deps: StructuredAgentSessionHoldsDeps) {
     const clockDeps: StructuredAgentSessionReleaseClockDeps = {
@@ -54,7 +55,8 @@ export class StructuredAgentSessionHolds {
     options: StructuredAgentSessionHoldOptions = {}
   ): Promise<void> {
     const alreadyHeld = this.holders.has(sessionId, holderId)
-    this.holders.add(sessionId, holderId)
+    this.holders.add(sessionId, holderId, options.resume !== false)
+    const incarnation = this.holders.incarnation(sessionId, holderId)
     // Unconditional, not only on the first-holder edge: a second surface arriving during the grace
     // window must cancel the pending release too.
     this.clock.cancel(sessionId)
@@ -66,19 +68,23 @@ export class StructuredAgentSessionHolds {
       if (!this.deps.hasProviderChild(sessionId)) {
         throw new Error('agent_session_ownership_unknown')
       }
+      // The last surface can disconnect before acquisition makes a child available to release.
+      if (!this.disposed && !this.holders.isHeld(sessionId)) {
+        this.clock.arm(sessionId)
+      }
     } catch (error) {
-      if (!alreadyHeld) {
-        this.holders.remove(sessionId, holderId)
+      if (!alreadyHeld && incarnation !== undefined) {
+        this.release(sessionId, holderId, incarnation)
       }
       throw error
     }
   }
 
-  release(sessionId: string, holderId: string): void {
-    if (!this.holders.remove(sessionId, holderId)) {
+  release(sessionId: string, holderId: string, expectedIncarnation?: symbol): void {
+    if (!this.holders.remove(sessionId, holderId, expectedIncarnation)) {
       return
     }
-    if (this.deps.hasProviderChild(sessionId)) {
+    if (!this.disposed && this.deps.hasProviderChild(sessionId)) {
       this.clock.arm(sessionId)
     }
   }
@@ -93,11 +99,16 @@ export class StructuredAgentSessionHolds {
     return this.holders.isHeld(sessionId)
   }
 
+  hasResumeCapableHolder(sessionId: string): boolean {
+    return this.holders.hasResumeCapableHolder(sessionId)
+  }
+
   isReleasePending(sessionId: string): boolean {
     return this.clock.isArmed(sessionId)
   }
 
   dispose(): void {
+    this.disposed = true
     this.clock.dispose()
   }
 }

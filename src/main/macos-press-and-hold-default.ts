@@ -11,7 +11,7 @@ import { writeFileAtomically } from './codex-accounts/fs-utils'
  * The key is unset by default, which is why every terminal-hosting Mac app ships this opt-out.
  *
  * Written once and never again: a user who wants the accent picker back sets
- * `defaults write com.stablyai.orca ApplePressAndHoldEnabled -bool true` (or deletes the key), and
+ * `defaults write <bundle-id> ApplePressAndHoldEnabled -bool true` (or deletes the key), and
  * the recorded decision below keeps a later launch from overwriting that choice.
  *
  * A fresh write is assumed to land for the *next* launch, not the current one: it goes out through
@@ -43,6 +43,7 @@ const DEFAULTS_TIMEOUT_MS = 5_000
 const DEFAULTS_MISSING_STATUS = 1
 
 const ORCA_BUNDLE_ID = 'com.stablyai.orca'
+const FORK_BUNDLE_ID = 'com.zpyoung.orca'
 
 export type PressAndHoldDecision =
   /** Not macOS — nothing is read or written. */
@@ -83,7 +84,12 @@ export type PressAndHoldHost = {
 /** Only Orca's own bundle: an unpackaged run is `com.github.Electron`, shared with every other
  *  unpackaged Electron app on the machine. */
 export function isOrcaPreferencesDomain(domain: string): boolean {
-  return domain === ORCA_BUNDLE_ID || domain.startsWith(`${ORCA_BUNDLE_ID}.`)
+  return (
+    domain === ORCA_BUNDLE_ID ||
+    domain.startsWith(`${ORCA_BUNDLE_ID}.`) ||
+    domain === FORK_BUNDLE_ID ||
+    domain.startsWith(`${FORK_BUNDLE_ID}.`)
+  )
 }
 
 /** `<bundle>/Contents/MacOS/<exe>` → `<bundle>/Contents/Info.plist`. */

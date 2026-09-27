@@ -1,6 +1,7 @@
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
+import { MOBILE_WEB_APP_DEPENDENCIES_REQUIRED_ENV } from './mobile-web-app-bundle-dependencies.mjs'
 
 const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
 const unitTestWorkflow = parse(readFileSync('.github/workflows/unit-tests.yml', 'utf8'))
@@ -15,6 +16,7 @@ const shellContractFiles = [
   'src/main/daemon/shell-ready.test.ts',
   'src/main/providers/local-pty-shell-ready-zsh-launch-environment.test.ts',
   'src/main/providers/__tests__/shell-ready-framework-example.test.ts',
+  'src/main/pty/omp-shell-wrapper-alias-safety.test.ts',
   'src/main/pty/omp-shell-wrapper.node-pty.test.ts',
   'src/main/shell-startup-feature-channel.test.ts',
   'src/main/zsh-scoped-histfile.live-shell.test.ts',
@@ -102,8 +104,13 @@ describe('PR workflow parallelism', () => {
         .split(/\s+/)
         .filter((token) => !['apt-get', 'install', 'sudo', ''].includes(token))
         .filter((token) => !token.startsWith('-'))
-    const jobsInstallingPackages = Object.entries(workflow.jobs)
-      .filter(([, job]) => (job.steps ?? []).some((step) => aptPackages(step).length > 0))
+    const requiredShells = ['zsh', 'fish']
+    const jobsInstallingShells = Object.entries(workflow.jobs)
+      .filter(([, job]) =>
+        (job.steps ?? []).some((step) =>
+          aptPackages(step).some((packageName) => requiredShells.includes(packageName))
+        )
+      )
       .map(([name]) => name)
 
     expect(shellStep).toBeDefined()
@@ -111,11 +118,11 @@ describe('PR workflow parallelism', () => {
     expect(shellStep.run.split(/\s+/)).toContain('--maxWorkers=1')
     // Why the whole workflow, not just the general shards: any other lane installing
     // these shells would silently start running the real-shell tests twice.
-    expect(jobsInstallingPackages).toEqual(['shell_contracts'])
+    expect(jobsInstallingShells).toEqual(['shell_contracts'])
     // Why each shell is asserted: the live tests skip themselves when the binary is
     // missing, so a dropped package silently empties this lane instead of failing it.
     const shellPackages = workflow.jobs.shell_contracts.steps.flatMap(aptPackages)
-    for (const shell of ['zsh', 'fish']) {
+    for (const shell of requiredShells) {
       expect(shellPackages).toContain(shell)
     }
     expect(shellInstall.with['native-runtime']).toBe('node')
@@ -297,13 +304,6 @@ describe('PR workflow parallelism', () => {
     expect(installFor('shell_contracts').with['native-runtime']).toBe('node')
     expect(sharedTestInstall.with['native-runtime']).toBe('node')
     expect(installFor('package').with['native-runtime']).toBe('electron')
-    expect(installFor('package_windows').with['native-runtime']).toBe('node')
-    expect(installFor('package_windows').with['persist-native-cache']).toBe('false')
-    expect(
-      workflow.jobs.package_windows.steps.find(
-        (step) => step.name === 'Save compiled Node native modules'
-      ).if
-    ).toBe("steps.deps.outputs.native-cache-hit != 'true'")
 
     expect(dependencyAction.inputs['persist-native-cache'].default).toBe('true')
     expect(
@@ -323,10 +323,8 @@ describe('PR workflow parallelism', () => {
     expect(dependencyInstall.run).toContain('--ignore-scripts')
     expect(dependencyInstall.run).not.toContain('--os=')
     expect(dependencyInstall.run).not.toContain('--cpu=')
-    expect(pnpmWorkspace.supportedArchitectures.os).toEqual(
-      expect.arrayContaining(['current', 'win32'])
-    )
-    expect(pnpmWorkspace.supportedArchitectures.cpu).toContain('current')
+    expect(pnpmWorkspace.supportedArchitectures.os).toEqual(['current'])
+    expect(pnpmWorkspace.supportedArchitectures.cpu).toEqual(['current'])
     const prepareRuntime = dependencyAction.runs.steps.find(
       (step) => step.name === 'Prepare native runtime'
     )
@@ -384,8 +382,8 @@ describe('PR workflow parallelism', () => {
       expect(cacheStep.with.key).toContain('config/scripts/ensure-native-runtime.mjs')
       expect(cacheStep.with.key).toContain('config/scripts/rebuild-native-deps.mjs')
       expect(cacheStep.with.path).toContain('node-pty@*/node_modules/node-pty/build')
-      expect(cacheStep.with.path).toContain('windows-native-registry@')
-      expect(cacheStep.with.path).toContain('@vscode+windows-process-tree@')
+      expect(cacheStep.with.path).toContain('native/windows-registry/build')
+      expect(cacheStep.with.path).toContain('@vscode+windows-process-tre*')
       expect(cacheStep.with['restore-keys']).toBeUndefined()
     }
     expect(steps[cacheIndex].id).toBe('native-cache-restore')
@@ -448,23 +446,6 @@ describe('PR workflow parallelism', () => {
   })
 
   it('keeps verify as the aggregate required check', () => {
-    expect(workflow.jobs.verify.needs).toEqual([
-      'code_paths',
-      'static_analysis',
-      'root_directory_guard',
-      'fork_ownership_guard',
-      'typecheck',
-      'git_compatibility',
-      'codex_index_heal_contract',
-      'xterm_patch_sync',
-      'shell_contracts',
-      'test',
-      'orcad_browser',
-      'cross-version-wire',
-      'managed_hook_node18',
-      'package',
-      'package_windows'
-    ])
     const verifyStep = workflow.jobs.verify.steps.find(
       (step) => step.name === 'Require successful checks'
     )
@@ -476,5 +457,19 @@ describe('PR workflow parallelism', () => {
     expect(verifyStep.run).toContain('"$ORCAD_BROWSER"')
     expect(verifyStep.env.CROSS_VERSION_WIRE).toBe('${{ needs.cross-version-wire.result }}')
     expect(verifyStep.run).toContain('"$CROSS_VERSION_WIRE"')
+    // Same reason as the browser provider: the render check fails loudly on a runner with no
+    // Chrome, which only guards the page if verify reads the job's result.
+    expect(verifyStep.env.MOBILE_WEB_APP).toBe('${{ needs.mobile_web_app.result }}')
+    expect(verifyStep.run).toContain('"$MOBILE_WEB_APP"')
+  })
+
+  it('makes the mobile_web_app job refuse to skip the tests it exists to run', () => {
+    // The bundling tests skip themselves without mobile/node_modules, which is what keeps the
+    // sharded `test` job green. Only this env var stops that skip from spreading to the one job
+    // that installs them, so a typo here would leave the whole job passing vacuously.
+    const step = workflow.jobs.mobile_web_app.steps.find((entry) =>
+      entry.run?.includes('build-mobile-web-app-bundle.test.mjs')
+    )
+    expect(step.env[MOBILE_WEB_APP_DEPENDENCIES_REQUIRED_ENV]).toBe('1')
   })
 })

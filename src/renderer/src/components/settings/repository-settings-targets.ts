@@ -18,3 +18,7 @@ export function getRepositorySourceControlAiActionRecipeSectionId(
 ): string {
   return `repo-${repoId}-source-control-ai-${actionId}`
 }
+
+export function getRepositoryLedgerSectionId(repoId: string): string {
+  return `repo-${repoId}-ledger`
+}

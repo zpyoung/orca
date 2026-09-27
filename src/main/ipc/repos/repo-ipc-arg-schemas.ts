@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ExpectedLedgersArg } from './ledger-removal-guard'
 import { isTuiAgent } from '../../../shared/tui-agent-config'
 import { TaskSourceContextSchema } from '../../../shared/task-source-context-schema'
 import { WorkspaceLinkedItemSchema } from '../../../shared/workspace-linked-item-schema'
@@ -26,6 +27,11 @@ export const ProjectGroupUpdateArgs = z.object({
 
 export const ProjectGroupSelectorArgs = z.object({
   groupId: z.string().min(1)
+})
+
+export const ProjectGroupDeleteArgs = ProjectGroupSelectorArgs.extend({
+  expectedLedgers: ExpectedLedgersArg,
+  removeContainedProjects: z.boolean().optional()
 })
 
 export const ProjectGroupMoveProjectArgs = z.object({

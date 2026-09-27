@@ -43,7 +43,9 @@ const page: ArtifactCloudOperation<ArtifactListPage> = {
 describe('artifact password client projection', () => {
   it.each(['mobile', 'runtime'] as const)('removes local fields for %s clients', (clientKind) => {
     const item = page.status === 'ok' ? page.value.artifacts[0] : undefined
-    expect(projectArtifactListForClient(page, { clientKind, clientId: 'paired-device-token' })).toEqual({
+    expect(
+      projectArtifactListForClient(page, { clientKind, clientId: 'paired-device-token' })
+    ).toEqual({
       status: 'ok',
       value: {
         artifacts: [
@@ -143,7 +145,13 @@ describe('artifact protection projection on single results', () => {
 describe('withArtifactProtectionProjection', () => {
   it('projects every artifact method that can carry protection state', async () => {
     const methods = [
-      { name: 'artifacts.share', handler: () => ({ status: 'ok', value: { artifact: {}, shareUrl: 'u', local: { sourceKey: '/s' } } }) },
+      {
+        name: 'artifacts.share',
+        handler: () => ({
+          status: 'ok',
+          value: { artifact: {}, shareUrl: 'u', local: { sourceKey: '/s' } }
+        })
+      },
       { name: 'artifacts.delete', handler: () => ({ status: 'ok', value: { deleted: true } }) }
     ] as never[]
     type Wrapped = { handler: (params: never, context: never) => Promise<unknown> }

@@ -83,7 +83,15 @@ function sshState(connectionId: string | null): NativeChatSshOwnerState {
   return {
     ...state(),
     repos: [{ id: 'repo', connectionId } as never],
-    worktreesByRepo: { repo: [{ id: 'wt-1', repoId: 'repo', hostId: 'local' } as never] }
+    worktreesByRepo: {
+      repo: [
+        {
+          id: 'wt-1',
+          repoId: 'repo',
+          hostId: connectionId ? `ssh:${connectionId}` : 'local'
+        } as never
+      ]
+    }
   } as unknown as NativeChatSshOwnerState
 }
 

@@ -14,6 +14,8 @@ export type RuntimeMobileSessionTerminalTab = {
   parentTabId: string
   leafId: string
   ptyId?: string | null
+  /** Host-owned PTY incarnation used to fence remote identity observations. */
+  incarnationId?: string | null
   terminalTheme?: RuntimeMobileTerminalTheme
   agentStatus?: AgentStatusEntry | null
   /** Event-only lead-turn end time for paired clients; never persisted in AgentStatusEntry. */
@@ -35,6 +37,9 @@ export type RuntimeMobileSessionTerminalTab = {
 export type RuntimeMobileTerminalTheme = {
   mode: 'dark' | 'light'
   theme: TerminalColorOverrides
+  /** Optional desktop terminalMinimumContrastRatio override (#10754). Absent means the client picks
+   *  its own background-luminance floor, which is what pre-#10754 clients always do. */
+  minimumContrastRatio?: number
 }
 
 export type RuntimeMobileSessionMarkdownTab = {
@@ -95,7 +100,8 @@ export type RuntimeMobileSessionAgentTab = {
   id: string
   title: string
   sessionId: string
-  agent: 'codex'
+  replacesSessionId?: string
+  agent: 'claude' | 'codex'
   color?: string | null
   isPinned?: boolean
   isActive: boolean

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SkillLocationRow } from './skill-freshness-grouping'
 import { skippedReason } from './skill-freshness-skipped-reason'
+import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 function row(
   chip: SkillLocationRow['chip'],
@@ -40,7 +41,7 @@ describe('skippedReason', () => {
     const reason = skippedReason([row(null)], 'orchestration')
     expect(reason).toContain('reports the skill as already up to date')
     expect(reason).toContain(
-      'npx skills add https://github.com/stablyai/orca --skill orchestration --global'
+      `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
     )
   })
 

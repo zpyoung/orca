@@ -6,6 +6,8 @@ import {
   persistedUIWriteFieldsToWireUpdate,
   type PersistedUIWriteBaseline
 } from './persisted-ui-write-baseline'
+import { WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'
+import { WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'
 
 function makeBaseline(overrides: Partial<PersistedUIWriteBaseline> = {}): PersistedUIWriteBaseline {
   return {
@@ -20,6 +22,8 @@ function makeBaseline(overrides: Partial<PersistedUIWriteBaseline> = {}): Persis
     sortBy: 'recent',
     projectOrderBy: 'manual',
     showSleepingWorkspaces: true,
+    ...WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE,
+    ...WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE,
     hideDefaultBranchWorkspace: false,
     hideAutomationGeneratedWorkspaces: false,
     hideCliCreatedWorkspaces: false,
@@ -29,6 +33,8 @@ function makeBaseline(overrides: Partial<PersistedUIWriteBaseline> = {}): Persis
     showDotfilesByWorktree: {},
     filterRepoIds: [],
     acknowledgedAgentsByPaneKey: {},
+    activityClearedAtByPaneKey: {},
+    manuallyUnreadTurnsByPaneKey: {},
     ...overrides
   }
 }
@@ -92,6 +98,28 @@ describe('diffPersistedUIWriteFields', () => {
     const baseline = makeBaseline({ filterRepoIds: ['r1', 'r2'] })
     const current = makeBaseline({ filterRepoIds: ['r2', 'r1'] })
     expect(diffPersistedUIWriteFields(current, baseline)).toEqual({ filterRepoIds: ['r2', 'r1'] })
+  })
+})
+
+describe('manuallyUnreadTurnsByPaneKey write round-trip', () => {
+  it('is writer-owned and diffs by record content like the other pane-key records', () => {
+    expect(PERSISTED_UI_WRITE_BASELINE_FIELDS).toContain('manuallyUnreadTurnsByPaneKey')
+    const baseline = makeBaseline({ manuallyUnreadTurnsByPaneKey: { p1: 5 } })
+    expect(
+      diffPersistedUIWriteFields(
+        makeBaseline({ manuallyUnreadTurnsByPaneKey: { p1: 5 } }),
+        baseline
+      )
+    ).toEqual({})
+    expect(
+      diffPersistedUIWriteFields(
+        makeBaseline({ manuallyUnreadTurnsByPaneKey: { p1: 7 } }),
+        baseline
+      )
+    ).toEqual({ manuallyUnreadTurnsByPaneKey: { p1: 7 } })
+    expect(persistedUIWriteFieldsToWireUpdate({ manuallyUnreadTurnsByPaneKey: { p1: 7 } })).toEqual(
+      { manuallyUnreadTurnsByPaneKey: { p1: 7 } }
+    )
   })
 })
 

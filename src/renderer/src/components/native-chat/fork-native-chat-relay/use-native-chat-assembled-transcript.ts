@@ -20,7 +20,8 @@ export function useNativeChatAssembledTranscript(
   sessionId: string | null,
   agent: AgentType
 ): NativeChatMessage[] {
-  const cacheRef = useRef(createNativeChatTranscriptCache())
+  const cacheRef = useRef<ReturnType<typeof createNativeChatTranscriptCache>>(undefined!)
+  cacheRef.current ??= createNativeChatTranscriptCache()
 
   const assembledMessages = useMemo(
     () =>

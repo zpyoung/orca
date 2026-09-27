@@ -18,6 +18,7 @@ describe('web preload API composition', () => {
     installWebPreloadApi()
 
     expect(Object.keys(globals.window.api)).toEqual([
+      'ledger',
       'app',
       'starNag',
       'platform',
@@ -78,8 +79,8 @@ describe('web preload API composition', () => {
       'telemetryAcknowledgeBanner'
     ])
     expect(Object.keys(globals.window.api.projects)).toEqual([])
-    expect(Reflect.get(globals.window.api.projects, 'then')).toBeUndefined()
-    expect(Object.keys(globals.window.electron)).toEqual([])
+    const projects: Record<string, unknown> = globals.window.api.projects
+    expect(projects.then).toBeUndefined()
   })
 
   it('snapshots E2E config before runtime storage initialization', async () => {

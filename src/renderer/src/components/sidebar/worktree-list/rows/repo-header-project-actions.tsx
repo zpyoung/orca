@@ -1,11 +1,13 @@
 import React from 'react'
 import {
+  BookOpen,
   CircleX,
   Ellipsis,
   Eye,
   FolderInput,
-  FolderPlus,
+  FolderTree,
   Plus,
+  // `Shapes` is lucide-react's own export name; exempted in config/oxlint-anti-slop.json.
   Shapes,
   SlidersHorizontal,
   Trash2
@@ -59,6 +61,7 @@ function getWorktreeVisibilityMenuLabel(
 export type RepoHeaderProjectActions = {
   getWorktreeVisibilityDefaults: (repo: Repo) => WorktreeVisibilityDefaults | undefined
   onOpenRepoSettings: (projectId: string, sectionId?: string) => void
+  onOpenProjectLedger: (repo: Repo) => void
   onOpenWorktreeVisibility: (repo: Repo) => void
   onCreateGroupFromRepo: (repo: Repo) => void
   onMoveProjectToGroup: (repo: Repo, groupId: string) => void
@@ -118,6 +121,10 @@ export function RepoHeaderProjectActionsMenu({
         onClick={stopRepoHeaderMenuEvent}
         onKeyDown={stopRepoHeaderMenuEvent}
       >
+        <DropdownMenuItem onSelect={() => actions.onOpenProjectLedger(repo)}>
+          <BookOpen className="size-3.5" />
+          {translate('auto.components.sidebar.WorktreeList.openLedger', 'Open ledger')}
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => actions.onOpenRepoSettings(repo.id)}>
           <SlidersHorizontal className="size-3.5" />
           {translate('auto.components.sidebar.WorktreeList.2cdffbc728', 'Project Settings')}
@@ -135,7 +142,8 @@ export function RepoHeaderProjectActionsMenu({
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem onSelect={() => actions.onCreateGroupFromRepo(repo)}>
-          <FolderPlus className="size-3.5" />
+          {/* Not FolderPlus: that now means "Add project" in the sidebar header above. */}
+          <FolderTree className="size-3.5" />
           {translate('auto.components.sidebar.WorktreeList.cbfd565f83', 'New group from project')}
         </DropdownMenuItem>
         {projectGroups.length > 0 ? (

@@ -14,7 +14,8 @@ import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../native-chat-se
 import { enqueueNativeChatPtySend } from '../native-chat-pty-send-queue'
 import { sendNativeChatAskAnswer as sendNativeChatAskAnswerRaw } from './native-chat-ask-answer-send'
 import type { AskAnswerKeyGroup } from '../native-chat-interactive-prompt'
-import type { NativeChatSendHandle, RuntimeSettings } from '../native-chat-runtime-send'
+import type { NativeChatSendHandle } from '../native-chat-runtime-send'
+import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 
 /**
  * Body + delayed Enter for the session-option/slash-command path, queued like
@@ -22,22 +23,26 @@ import type { NativeChatSendHandle, RuntimeSettings } from '../native-chat-runti
  * chat Enter cannot land on a confirmation dialog this write opens.
  */
 export function sendNativeChatMessageVerifiedQueued(
-  settings: RuntimeSettings,
-  ptyId: string,
+  target: NativeChatResolvedTarget,
   text: string,
   signal?: AbortSignal
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     let accepted = false
     const handle = enqueueNativeChatPtySend(
-      ptyId,
+      target.ptyId,
       NATIVE_CHAT_SUBMIT_DELAY_MS,
       ({ isCancelled, delay, markSubmitted }) => {
         if (isCancelled() || signal?.aborted) {
           markSubmitted()
           return
         }
-        sendRuntimePtyInputVerified(settings, ptyId, buildNativeChatPasteBytes(text))
+        sendRuntimePtyInputVerified(
+          target.settings,
+          target.ptyId,
+          buildNativeChatPasteBytes(text),
+          () => isCancelled() || signal?.aborted === true
+        )
           .then((bodyAccepted) => {
             if (!bodyAccepted || isCancelled() || signal?.aborted) {
               markSubmitted()
@@ -48,7 +53,12 @@ export function sendNativeChatMessageVerifiedQueued(
                 markSubmitted()
                 return
               }
-              sendRuntimePtyInputVerified(settings, ptyId, NATIVE_CHAT_SUBMIT)
+              sendRuntimePtyInputVerified(
+                target.settings,
+                target.ptyId,
+                NATIVE_CHAT_SUBMIT,
+                () => isCancelled() || signal?.aborted === true
+              )
                 .then((sent) => {
                   accepted = sent
                   markSubmitted()
@@ -57,7 +67,8 @@ export function sendNativeChatMessageVerifiedQueued(
             })
           })
           .catch(markSubmitted)
-      }
+      },
+      { terminalTabId: target.terminalTabId }
     )
     // Why: resolve through the queue's own settlement, not our promise chain
     // above — a cancel mid-write must still resolve `false` exactly once.
@@ -77,8 +88,7 @@ export function sendNativeChatMessageVerifiedQueued(
  * answer silently (mirrors the chat-send queued-cancel outcome).
  */
 export function sendNativeChatAskAnswerQueued(
-  settings: RuntimeSettings,
-  ptyId: string,
+  target: NativeChatResolvedTarget,
   groups: AskAnswerKeyGroup[],
   onSettled?: (delivered: boolean) => void
 ): NativeChatSendHandle {
@@ -88,8 +98,16 @@ export function sendNativeChatAskAnswerQueued(
   const durationMs =
     (groups.length - 1) * NATIVE_CHAT_QUESTION_STEP_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
   let inner: NativeChatSendHandle | null = null
+  let settleReported = false
+  const reportSettled = (delivered: boolean): void => {
+    if (settleReported) {
+      return
+    }
+    settleReported = true
+    onSettled?.(delivered)
+  }
   const handle = enqueueNativeChatPtySend(
-    ptyId,
+    target.ptyId,
     durationMs,
     ({ isCancelled, delay, markSubmitted }) => {
       if (isCancelled()) {
@@ -98,14 +116,21 @@ export function sendNativeChatAskAnswerQueued(
       }
       const finish = (delivered: boolean): void => {
         markSubmitted()
-        onSettled?.(delivered)
+        reportSettled(delivered)
       }
-      inner = sendNativeChatAskAnswerRaw(settings, ptyId, groups, onSettled ? finish : undefined)
+      inner = sendNativeChatAskAnswerRaw(target, groups, onSettled ? finish : undefined)
       if (!onSettled) {
         delay(durationMs, markSubmitted)
       }
     },
-    { onCancelUnsubmitted: () => inner?.cancel() }
+    {
+      terminalTabId: target.terminalTabId,
+      onCancelUnsubmitted: () => inner?.cancel(),
+      onInvalidate: () => {
+        inner?.cancel()
+        reportSettled(false)
+      }
+    }
   )
   return {
     cancel: () => {
@@ -113,7 +138,7 @@ export function sendNativeChatAskAnswerQueued(
       inner?.cancel()
       handle.cancel()
       if (!startedBeforeCancel) {
-        onSettled?.(false)
+        reportSettled(false)
       }
     },
     settleAfterMs: handle.settleAfterMs,

@@ -29,6 +29,7 @@ import {
   type WorktreeItemRowContext
 } from './item-row'
 import { renderWorktreeSectionHeaderRow, type SectionHeaderRowContext } from './SectionHeader'
+import { sidebarSectionSeparatorClass } from '../../fork-sidebar-section-separator/section-separator-class'
 import type { WorktreeRowDragState } from '../drag/row-state'
 
 export type WorktreeVirtualRowContext = {
@@ -124,6 +125,7 @@ function renderLineageGroupVirtualRow(
       ref={ctx.measureVirtualRowElement}
       className={cn(
         'absolute left-0 right-0 top-0',
+        parent?.worktree.id === ctx.worktreeDragState.draggingWorktreeId && 'pointer-events-none',
         ctx.worktreeDragState.draggingWorktreeId !== null &&
           'transition-transform duration-150 ease-out will-change-transform'
       )}
@@ -166,6 +168,14 @@ export function renderWorktreeVirtualRow(
         rows: ctx.renderRows,
         index: vItem.index,
         firstHeaderIndex: ctx.firstHeaderIndex
+      }),
+      sectionSeparatorClass: sidebarSectionSeparatorClass({
+        settings: ctx.item.settings,
+        rows: ctx.renderRows,
+        index: vItem.index,
+        firstHeaderIndex: ctx.firstHeaderIndex,
+        isActiveStickyHeader: ctx.activeStickyHeaderIndexRef.current === vItem.index,
+        projectGroupDepth: row.projectGroupDepth
       }),
       measureVirtualRowElement: ctx.measureVirtualRowElement
     })
@@ -234,6 +244,7 @@ export function renderWorktreeVirtualRow(
       data-workspace-status={itemWorkspaceStatus ?? undefined}
       className={cn(
         'absolute left-0 right-0 top-0',
+        row.worktree.id === ctx.worktreeDragState.draggingWorktreeId && 'pointer-events-none',
         ctx.worktreeDragState.draggingWorktreeId !== null &&
           'transition-transform duration-150 ease-out will-change-transform'
       )}

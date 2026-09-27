@@ -1,4 +1,4 @@
-import { defineStreamingMethod, type RpcAnyMethod } from '../../core'
+import { defineStreamingMethod } from '../../core'
 import { TerminalSubscribe } from './stream-schemas'
 import { isTerminalReadPayloadIncomplete } from './terminal-stream-replay'
 import { runTerminalBinarySubscription } from './terminal-legacy-subscribe-binary'
@@ -7,8 +7,9 @@ import {
   runTerminalLeaseSubscription
 } from './terminal-legacy-simple-subscriptions'
 import type { TerminalSubscriptionArgs } from './terminal-legacy-subscription-types'
+import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
-export const TERMINAL_SUBSCRIBE_METHODS: RpcAnyMethod[] = [
+export const TERMINAL_SUBSCRIBE_METHODS = [
   // Streams live terminal output over WebSocket; mobile clients pass client+viewport for server-side auto-fit.
   defineStreamingMethod({
     name: 'terminal.subscribe',
@@ -56,6 +57,7 @@ export const TERMINAL_SUBSCRIBE_METHODS: RpcAnyMethod[] = [
       }
 
       const ptyId = leaf.ptyId
+      trackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
       const clientId = params.client?.id
       const missingHeadlessStateBeforeMobileFit =
         isMobile &&

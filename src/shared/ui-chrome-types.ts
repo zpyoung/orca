@@ -49,6 +49,10 @@ export type WorktreeCardMode = 'Default' | 'Compact'
 
 export type AgentActivityDisplayMode = 'compact' | 'full'
 
+// Re-exported so existing importers keep one home for UI chrome types; the
+// value domain lives with the normalizers that police it.
+export type { ActivityGroupBy, ThreadReadFilter } from './agents-view-thread-filters'
+
 export type StatusBarItem =
   | 'claude'
   | 'codex'
@@ -86,11 +90,13 @@ export type RightSidebarTab =
   | 'search'
   | 'vault'
   | 'session-info'
+  | 'ask'
   | 'workspaces'
   | 'pr-checks'
   | 'source-control'
   | 'checks'
   | 'ports'
+  | 'ledger'
   // Plugin-contributed panels are keyed `plugin:<pluginId>/<panelId>` so the
   // static union stays closed while plugin tabs remain type-representable.
   | `plugin:${string}`
@@ -117,3 +123,4 @@ export type TopLevelView =
   | 'skills'
   | 'artifacts'
   | 'mobile'
+  | 'ledger'

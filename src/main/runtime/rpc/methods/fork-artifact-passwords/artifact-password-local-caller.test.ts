@@ -23,9 +23,9 @@ describe('artifact password local caller', () => {
   })
 
   it('rejects paired runtime clients, which share the renderer clientKind', () => {
-    expect(
-      isLocalArtifactPasswordCaller({ clientKind: 'runtime', clientId: 'a'.repeat(48) })
-    ).toBe(false)
+    expect(isLocalArtifactPasswordCaller({ clientKind: 'runtime', clientId: 'a'.repeat(48) })).toBe(
+      false
+    )
     expect(isLocalArtifactPasswordCaller({ clientKind: 'runtime' })).toBe(false)
   })
 

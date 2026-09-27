@@ -5,13 +5,13 @@ import type { RelayContext } from './context'
 import { expandTilde } from './context'
 import { InFlightPromiseDedupe } from '../shared/in-flight-promise-dedupe'
 import { GitCapabilityCache } from '../shared/git-capability-cache'
+import { GitStatusReadLeaseOwner } from '../shared/git-status-read-lease-owner'
 import {
   clearSubmodulePathsCache,
   createSubmodulePathsCache,
   type SubmodulePathsCache
 } from './git-handler-submodule-ops'
-import { GitResponseStreamRegistry } from './git-response-stream'
-import { GIT_RESPONSE_STREAM_THRESHOLD } from './protocol'
+import { GitResponseStreamRegistry, maybeStreamRpcResponse } from './git-response-stream'
 import { clearGitStatusLineStatsCache } from '../shared/git-status-line-stats-cache'
 import { invalidateGitBranchLineTotalInFlight } from '../shared/git-branch-line-total'
 import { buildRelayGitEnv, buildRelayUnattendedGitEnv } from './relay-command-env'
@@ -67,10 +67,8 @@ function execFileWithStdin(
 export class GitHandler {
   private dispatcher: RelayDispatcher
   private readonly gitDiffReadDedupe = new InFlightPromiseDedupe<unknown>()
+  private readonly gitFileDiffReadLeaseOwner = new GitStatusReadLeaseOwner<unknown>()
   private readonly gitCapabilities = new GitCapabilityCache()
-  // Why: use the bulk lane so large responses do not block interactive PTY echo.
-  private readonly responseStreams = new GitResponseStreamRegistry()
-
   // Why: cache .gitmodules per instance to avoid SSH reads and test leakage.
   private submodulePathsCache: SubmodulePathsCache = createSubmodulePathsCache()
 
@@ -78,17 +76,23 @@ export class GitHandler {
   constructor(
     dispatcher: RelayDispatcher,
     _context: RelayContext,
-    private readonly watcherRegistry?: GitHandlerWatcherRegistry
+    private readonly watcherRegistry?: GitHandlerWatcherRegistry,
+    // Why: use the bulk lane so large responses do not block interactive PTY echo. This handler
+    // registers the `git.responseAck` route below, so in production it takes the relay's single
+    // registry and FsHandler is handed the same one — see the header of git-response-stream.ts for
+    // why a second registry both collides on stream ids and stalls on credit.
+    private readonly responseStreams: GitResponseStreamRegistry = new GitResponseStreamRegistry()
   ) {
     this.dispatcher = dispatcher
     const handlers = createGitHandlerOperationSet({
       gitDiffReadDedupe: this.gitDiffReadDedupe,
+      gitFileDiffReadLeaseOwner: this.gitFileDiffReadLeaseOwner,
       gitCapabilities: this.gitCapabilities,
       submodulePathsCache: this.submodulePathsCache,
       watcherRegistry: this.watcherRegistry,
       git: (args, cwd, opts) =>
         opts === undefined ? this.git(args, cwd) : this.git(args, cwd, opts),
-      gitBuffer: (args, cwd) => this.gitBuffer(args, cwd),
+      gitBuffer: (args, cwd, opts) => this.gitBuffer(args, cwd, opts),
       spawnClone: (args, cwd, progressId, context) =>
         this.spawnClone(args, cwd, progressId, context),
       clearGitMutationReadCaches: () => this.clearGitMutationReadCaches(),
@@ -132,18 +136,12 @@ export class GitHandler {
     params: Record<string, unknown>,
     context: RequestContext | undefined
   ): unknown {
-    if (params.__streamResponse !== true || !context) {
-      return result
-    }
-    const payload = Buffer.from(JSON.stringify(result ?? null), 'utf-8')
-    if (payload.length <= GIT_RESPONSE_STREAM_THRESHOLD) {
-      return result
-    }
-    return this.responseStreams.startStream(payload, this.dispatcher, context)
+    return maybeStreamRpcResponse(result, params, context, this.responseStreams, this.dispatcher)
   }
 
   private clearGitMutationReadCaches(): void {
     this.gitDiffReadDedupe.clear()
+    this.gitFileDiffReadLeaseOwner.invalidate()
     invalidateGitBranchLineTotalInFlight()
     clearGitStatusLineStatsCache()
     clearSubmodulePathsCache(this.submodulePathsCache)
@@ -193,14 +191,22 @@ export class GitHandler {
       : run()
   }
 
-  private async gitBuffer(args: string[], cwd: string): Promise<Buffer> {
-    const { stdout } = (await execFileAsync('git', args, {
+  private async gitBuffer(
+    args: string[],
+    cwd: string,
+    opts?: { signal?: AbortSignal }
+  ): Promise<Buffer> {
+    const result = await execFileAsync('git', args, {
       cwd,
       env: buildRelayGitEnv(),
       encoding: 'buffer',
-      maxBuffer: MAX_GIT_BUFFER
-    })) as { stdout: Buffer }
-    return stdout
+      maxBuffer: MAX_GIT_BUFFER,
+      signal: opts?.signal
+    })
+    if (!Buffer.isBuffer(result.stdout)) {
+      throw new TypeError('Expected buffered git output')
+    }
+    return result.stdout
   }
 
   private async spawnClone(

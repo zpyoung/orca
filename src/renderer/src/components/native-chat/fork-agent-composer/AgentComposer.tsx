@@ -17,6 +17,7 @@ import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
 import { useNativeChatTypedInsertion } from '../use-native-chat-typed-insertion'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
+import { isTerminalInputQuarantined } from '../../terminal-pane/terminal-input-quarantine'
 import type {
   ComposerAutocomplete,
   NativeChatPickerItem,
@@ -94,7 +95,13 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   const [activeSuggestion, setActiveSuggestion] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const imeEnterGesture = useImeEnterGestureOwnership()
-  const { textareaRef } = useNativeChatComposerAppMenuSelection(imeEnterGesture.isComposing)
+  // Why: v1.4.200 widened the app-menu ref to NativeChatComposerInput for upstream's
+  // contenteditable editor. This composer's field is a real <textarea>, so the ref
+  // only ever holds one, and the overlay and scroll sync need the element itself.
+  const { textareaRef: composerInputRef } = useNativeChatComposerAppMenuSelection(
+    imeEnterGesture.isComposing
+  )
+  const textareaRef = composerInputRef as RefObject<HTMLTextAreaElement | null>
   const { cancelPendingSends, trackPendingSend } = useNativeChatSendLifecycle(
     terminalTabId,
     targetPtyId,
@@ -112,10 +119,14 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   }
 
   const resolveTarget = useCallback((): NativeChatResolvedTarget | null => {
-    if (!targetPtyId) {
+    if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
       return null
     }
-    return { ptyId: targetPtyId, settings: getSettingsForAgentTabRuntimeOwner(terminalTabId) }
+    return {
+      terminalTabId,
+      ptyId: targetPtyId,
+      settings: getSettingsForAgentTabRuntimeOwner(terminalTabId)
+    }
   }, [targetPtyId, terminalTabId])
 
   const hasPty = allowWithoutTarget || targetPtyId !== null
@@ -242,8 +253,17 @@ export function useAgentComposerCompose(
   const imageAttachments = bridges?.imageAttachments ?? EMPTY_ATTACHMENTS
   const autocomplete = bridges?.autocomplete ?? DEFAULT_AUTOCOMPLETE
 
+  // A pasted image has no agent-readable path until its save lands; sending
+  // mid-save would ship the message without the image the chip promises.
+  const hasPendingAttachment = imageAttachments.some((attachment) => attachment.pending)
   const ptySend = useAgentComposerSend(core, props, bridges, imageAttachments)
-  const send = bridges?.sendOverride ?? ptySend
+  const hostSend = bridges?.sendOverride ?? ptySend
+  const send = useCallback(() => {
+    if (hasPendingAttachment) {
+      return
+    }
+    hostSend()
+  }, [hasPendingAttachment, hostSend])
 
   const handleDraftChange = useCallback(
     (value: string, element: HTMLTextAreaElement) => {
@@ -313,6 +333,7 @@ export function useAgentComposerCompose(
   const sendButtonDisabled =
     core.disabled ||
     props.sendDisabled ||
+    hasPendingAttachment ||
     (core.draft.trim() === '' && imageAttachments.length === 0)
 
   const fieldProps: AgentComposerFieldProps = {

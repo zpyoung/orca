@@ -1,3 +1,4 @@
+import type { AgentAttentionUnreadReason } from '@/attention/agent-attention-contract'
 import type { PtyTransport } from './pty-transport'
 import type { SessionRestoredBannerReason } from './session-restored-banner-pane-state'
 import type { ReplayingPanesRef } from './replay-guard'
@@ -16,6 +17,7 @@ import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/termin
 import type { PtyTransportRecoveryState } from './pty-transport-types'
 import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
 import type { DirectSshPaneRetryAttemptId } from '@/store/slices/direct-ssh-terminal-recovery'
+import type { PtyPreconnectInputEntry } from './pty-preconnect-input-buffer'
 
 export type PtyPaneStartup = {
   command: string
@@ -55,6 +57,14 @@ export type PtyConnectionDeps = {
   tabId: string
   worktreeId: string
   cwd?: string
+  /** Delays a fresh split's spawn without delaying its renderer pane. */
+  cwdPromise?: Promise<string>
+  /** Input handed off from a predecessor mount of the same deferred split. */
+  preconnectInput?: readonly PtyPreconnectInputEntry[]
+  /** Captures newly retained input for a remount-safe deferred split handoff. */
+  onPreconnectInput?: (input: PtyPreconnectInputEntry) => void
+  /** Releases a deferred split's detach fence when its initial spawn yields no PTY. */
+  onDeferredCwdSpawnFailed?: () => void
   startup?: PtyPaneStartup
   restoredLeafId?: string | null
   restoredPtyIdByLeafId?: Record<string, string>
@@ -98,8 +108,8 @@ export type PtyConnectionDeps = {
     directSshRetryAttemptId?: DirectSshPaneRetryAttemptId
   ) => void
   markWorktreeUnread: (worktreeId: string) => void
-  markTerminalTabUnread: (tabId: string) => void
-  markTerminalPaneUnread: (paneKey: string) => void
+  markTerminalTabUnread: (tabId: string, reason: AgentAttentionUnreadReason) => void
+  markTerminalPaneUnread: (paneKey: string, reason: AgentAttentionUnreadReason) => void
   clearWorktreeUnread: (worktreeId: string) => void
   clearTerminalTabUnread: (tabId: string) => void
   clearTerminalPaneUnread: (paneKey: string) => void
@@ -113,7 +123,6 @@ export type PtyConnectionDeps = {
     terminalTitle?: string
     paneKey?: string
     agentStatusSnapshot?: AgentCompletionStatusSnapshot
-    suppressOsNotification?: boolean
   }) => void
   setCacheTimerStartedAt: (key: string, ts: number | null) => void
   syncPanePtyLayoutBinding: (paneId: number, ptyId: string | null) => void

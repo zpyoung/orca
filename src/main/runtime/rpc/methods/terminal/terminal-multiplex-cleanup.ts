@@ -3,17 +3,19 @@ import type {
   TerminalMultiplexConnection,
   TerminalMultiplexFlowControlStage
 } from './terminal-multiplex-connection'
+import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export function installMultiplexCleanup(
   build: TerminalMultiplexFlowControlStage
 ): asserts build is TerminalMultiplexCleanupStage {
   const state = build as TerminalMultiplexConnection
-  const { runtime, streams, pendingPtyWaitControllers, emit, signal } = state
+  const { runtime, connectionId, streams, pendingPtyWaitControllers, emit, signal } = state
   state.detachStream = (streamId: number, endVerdict, releaseRemoteDesktopDriver = true): void => {
     const stream = streams.get(streamId)
     if (!stream) {
       return
     }
+    untrackAskSurfacePaneSubscription(runtime, connectionId, stream.terminal)
     const replacement = stream.sourceRangeReplacement
     stream.sourceRangeReplacement = null
     if (replacement) {

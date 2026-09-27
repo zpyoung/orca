@@ -23,20 +23,84 @@ describe('SshGitProvider', () => {
     provider = new SshGitProvider('conn-1', mux as never)
   })
 
-  it('getDiff sends git.diff request', async () => {
-    const diffResult = { kind: 'text', originalContent: '', modifiedContent: 'hello' }
-    mux.request.mockResolvedValue(diffResult)
+  it('keeps a coalesced diff running for an uncancelled reader', async () => {
+    const diffResult = { kind: 'text', originalContent: 'old', modifiedContent: 'new' }
+    const pendingDiff = deferredValue(diffResult)
+    mux.request.mockReturnValue(pendingDiff.promise)
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const firstError = new Error('first cancelled')
 
-    const result = await provider.getDiff('/home/user/repo', 'src/index.ts', true)
-    expect(mux.request).toHaveBeenCalledWith('git.diff', {
-      worktreePath: '/home/user/repo',
-      filePath: 'src/index.ts',
-      staged: true,
-      // Why: opts into response streaming; a small result still comes back as a
-      // single frame (relay decides), and old relays ignore the flag.
-      __streamResponse: true
+    const first = provider.getDiff('/home/user/repo', 'src/index.ts', false, false, {
+      signal: firstController.signal
     })
-    expect(result).toEqual(diffResult)
+    const second = provider.getDiff('/home/user/repo', 'src/index.ts', false, false, {
+      signal: secondController.signal
+    })
+    await waitForRequestCount(mux.request, 1)
+    const sharedSignal = mux.request.mock.calls[0]?.[2]?.signal
+    if (!(sharedSignal instanceof AbortSignal)) {
+      throw new TypeError('Expected git.diff to receive a shared abort signal')
+    }
+    expect(mux.request).toHaveBeenCalledWith(
+      'git.diff',
+      {
+        worktreePath: '/home/user/repo',
+        filePath: 'src/index.ts',
+        staged: false,
+        compareAgainstHead: false,
+        // Why: opts into response streaming; a small result still comes back as a
+        // single frame (relay decides), and old relays ignore the flag.
+        __streamResponse: true
+      },
+      { signal: sharedSignal, timeoutMs: undefined }
+    )
+
+    firstController.abort(firstError)
+
+    await expect(first).rejects.toBe(firstError)
+    expect(sharedSignal.aborted).toBe(false)
+    pendingDiff.resolve()
+    await expect(second).resolves.toEqual(diffResult)
+    expect(mux.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts the relay diff request after every coalesced reader cancels', async () => {
+    const relayRequest = Promise.withResolvers<unknown>()
+    let sharedSignal: AbortSignal | undefined
+    mux.request.mockImplementation(
+      (_method: string, _params: Record<string, unknown>, options?: { signal?: AbortSignal }) => {
+        sharedSignal = options?.signal
+        options?.signal?.addEventListener(
+          'abort',
+          () => relayRequest.reject(options.signal?.reason),
+          {
+            once: true
+          }
+        )
+        return relayRequest.promise
+      }
+    )
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const firstError = new Error('first cancelled')
+    const secondError = new Error('second cancelled')
+
+    const first = provider.getDiff('/home/user/repo', 'src/index.ts', false, false, {
+      signal: firstController.signal
+    })
+    const second = provider.getDiff('/home/user/repo', 'src/index.ts', false, false, {
+      signal: secondController.signal
+    })
+    await waitForRequestCount(mux.request, 1)
+
+    firstController.abort(firstError)
+    await expect(first).rejects.toBe(firstError)
+    expect(sharedSignal?.aborted).toBe(false)
+
+    secondController.abort(secondError)
+    await expect(second).rejects.toBe(secondError)
+    expect(sharedSignal?.aborted).toBe(true)
   })
 
   it('getBranchDiff sends git.branchDiff request', async () => {

@@ -1,0 +1,12 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceReviewFilterRows": {
+          "hideCompleted": "Ocultar revisiones fusionadas/cerradas",
+          "hidePassing": "Ocultar comprobaciones aprobadas"
+        }
+      }
+    }
+  }
+}

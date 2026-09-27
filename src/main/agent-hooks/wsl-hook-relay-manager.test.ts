@@ -150,6 +150,7 @@ describe('WslHookRelayManager', () => {
   const codexHome =
     '\\\\wsl.localhost\\Ubuntu\\home\\wsl-test-user\\.local\\share\\orca\\codex-runtime-home\\home'
   const opencodeOverlayDir = `${home}/.orca-relay/opencode-overlays/deadbeefcafe`
+  const opencode2OverlayDir = `${home}/.orca-relay/opencode2-overlays/deadbeefcafe`
   let harnesses: GuestHarness[]
 
   beforeEach(() => {
@@ -180,9 +181,13 @@ describe('WslHookRelayManager', () => {
   }
 
   function guestTransport(
-    options: { registerInstallPlugins?: boolean; detectedAgents?: string[] } = {}
+    options: {
+      registerInstallPlugins?: boolean
+      detectedAgents?: string[]
+      claudeVersion?: string
+    } = {}
   ): MultiplexerTransport {
-    const { registerInstallPlugins = true, detectedAgents = ['codex'] } = options
+    const { registerInstallPlugins = true, detectedAgents = ['codex'], claudeVersion } = options
     const harness = createGuestHarness()
     harnesses.push(harness)
     registerWslHookFsHandlers(harness.guestDispatcher, home)
@@ -190,13 +195,14 @@ describe('WslHookRelayManager', () => {
       replayed: 0
     }))
     harness.guestDispatcher.onRequest('preflight.detectAgents', async () => ({
-      agents: detectedAgents
+      agents: detectedAgents,
+      ...(claudeVersion ? { versions: { claude: claudeVersion } } : {})
     }))
     // A guest bundle predating the plugin overlay omits this handler (-32601).
     if (registerInstallPlugins) {
       harness.guestDispatcher.onRequest(AGENT_HOOK_INSTALL_PLUGINS_METHOD, async () => ({
-        installed: { opencode: true, pi: false, omp: false },
-        overlayDirs: { opencode: opencodeOverlayDir }
+      installed: { opencode: true, opencode2: true, pi: false, omp: false },
+      overlayDirs: { opencode: opencodeOverlayDir, opencode2: opencode2OverlayDir }
       }))
     }
     return harness.transport
@@ -281,6 +287,22 @@ describe('WslHookRelayManager', () => {
     manager.disposeAll()
   })
 
+  it('forwards the WSL guest Claude version to the shared remote installer', async () => {
+    const waitForSentinel = vi.fn(async () =>
+      guestTransport({ detectedAgents: ['claude'], claudeVersion: '2.1.261 (Claude Code)' })
+    )
+    const { manager, deps } = createManager({ waitForSentinel })
+
+    manager.ensureForDistro('Ubuntu')
+    await vi.waitFor(() => expect(deps.installHooks).toHaveBeenCalledTimes(1))
+
+    expect(deps.installHooks).toHaveBeenCalledWith(expect.anything(), home, {
+      agents: ['claude'],
+      claudeVersion: '2.1.261'
+    })
+    manager.disposeAll()
+  })
+
   it('reinstalls into a newly resolved runtime home without restarting the relay', async () => {
     const { manager, deps } = createManager({})
     manager.ensureForDistro('Ubuntu', codexHome)
@@ -299,6 +321,16 @@ describe('WslHookRelayManager', () => {
     const { manager } = createManager({})
     manager.ensureForDistro('Ubuntu', codexHome)
     await vi.waitFor(() => expect(manager.getOpenCodeOverlayDir('Ubuntu')).toBe(opencodeOverlayDir))
+    manager.disposeAll()
+  })
+
+  it('keeps the OpenCode 2 guest overlay separate', async () => {
+    const { manager } = createManager({})
+    manager.ensureForDistro('Ubuntu', codexHome)
+    await vi.waitFor(() =>
+      expect(manager.getOpenCodeOverlayDir('Ubuntu', 'opencode2')).toBe(opencode2OverlayDir)
+    )
+    expect(manager.getOpenCodeOverlayDir('Ubuntu', 'opencode')).toBe(opencodeOverlayDir)
     manager.disposeAll()
   })
 

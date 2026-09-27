@@ -141,6 +141,13 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcRequestAdmission {
         // Why: gates the mobile-only payload diet so full-screen web/desktop clients aren't truncated.
         clientKind: device.scope,
         clientCapabilities: authenticatedSocket?.clientCapabilities,
+        authenticatedCredential: token,
+        updateClientCapabilities:
+          authenticatedSocket && device.scope === 'mobile'
+            ? (clientCapabilities) => {
+                authenticatedSocket.clientCapabilities = clientCapabilities
+              }
+            : undefined,
         pairing: pairingContext,
         signal: abortRegistration?.signal,
         sendBinary,

@@ -13,6 +13,7 @@ import {
 } from './native-chat-send-outcome'
 import { clearThenWrite, clearUnsubmittedAgentInput } from './native-chat-runtime-clear'
 import type { NativeChatSendOptions, RuntimeSettings } from '../native-chat-runtime-send'
+import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 
 // The queue only reports `onCancelUnsubmitted` once `start` has run — a send
 // cancelled while still queued behind another PTY send never reaches `start`,
@@ -73,14 +74,19 @@ export type NativeChatBodySendContext = {
  * attachments settling before the text body) drives that from the context.
  */
 export function enqueueNativeChatBodySend(args: {
-  settings: RuntimeSettings
-  ptyId: string
+  target: NativeChatResolvedTarget
   options: NativeChatSendOptions | undefined
   durationMs: number
   chunks: readonly string[]
   afterAccepted?: (context: NativeChatBodySendContext) => void
 }): NativeChatPtySendQueueHandle {
-  const { settings, ptyId, options, durationMs, chunks, afterAccepted } = args
+  const {
+    target: { terminalTabId, settings, ptyId },
+    options,
+    durationMs,
+    chunks,
+    afterAccepted
+  } = args
   const reportOutcome = createOutcomeReporter(options?.onOutcome)
   const handle = enqueueNativeChatPtySend(
     ptyId,
@@ -137,7 +143,11 @@ export function enqueueNativeChatBodySend(args: {
       })
     },
     {
-      onCancelUnsubmitted: () => bestEffortCancelClear(settings, ptyId, options, reportOutcome)
+      terminalTabId,
+      onCancelUnsubmitted: () => bestEffortCancelClear(settings, ptyId, options, reportOutcome),
+      // Quarantine owns the replacement shell: report for draft restoration,
+      // but never send the ordinary Ctrl+U cleanup into that new endpoint.
+      onInvalidate: () => reportOutcome('may-not-have-sent')
     }
   )
   return withQueuedCancelOutcome(handle, reportOutcome)

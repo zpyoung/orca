@@ -5,7 +5,11 @@
 // recording it would make the durable handle chain lie about what this session
 // actually proved.
 
-import type { CodexAppServerConnection } from './codex-app-server-connection'
+import {
+  isCodexAppServerRequestError,
+  type CodexAppServerConnection
+} from './codex-app-server-connection'
+import type { CodexStructuredPermissionPolicy } from './codex-structured-permission-policy'
 import { readCodexThreadId, readCodexThreadPath } from './codex-structured-thread-facts'
 
 export type CodexOpenedThread = {
@@ -13,30 +17,77 @@ export type CodexOpenedThread = {
   thread?: Record<string, unknown>
   /** Rollout file Codex named, when it named one. */
   historyPath: string | null
+  historyMode?: 'legacy' | 'paginated'
   model?: string
   effort?: string
+  /** Present, including null, only when this app-server reports the effective tier. */
+  serviceTier?: string | null
 }
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null
 }
 
+const resumeMetadataUnsupported = new WeakSet<object>()
+
+function isExcludeTurnsUnsupported(error: unknown): boolean {
+  return (
+    isCodexAppServerRequestError(error) &&
+    error.code === -32602 &&
+    /(?:unknown|unexpected|unsupported|unrecognized).{0,80}excludeTurns|excludeTurns.{0,80}(?:unknown|unexpected|unsupported|unrecognized)/i.test(
+      error.message
+    )
+  )
+}
+
+async function resumeCodexThread(
+  connection: Pick<CodexAppServerConnection, 'request'>,
+  params: Record<string, unknown>,
+  timeoutMs: number | undefined
+): Promise<unknown> {
+  if (resumeMetadataUnsupported.has(connection)) {
+    return connection.request('thread/resume', params, { timeoutMs })
+  }
+  try {
+    return await connection.request(
+      'thread/resume',
+      { ...params, excludeTurns: true },
+      { timeoutMs }
+    )
+  } catch (error) {
+    if (!isExcludeTurnsUnsupported(error)) {
+      throw error
+    }
+    resumeMetadataUnsupported.add(connection)
+    return connection.request('thread/resume', params, { timeoutMs })
+  }
+}
+
 export async function openCodexThread(
-  connection: CodexAppServerConnection,
-  launch: { cwd: string; resumeThreadId: string | null; resumePath?: string | null },
+  connection: Pick<CodexAppServerConnection, 'request'>,
+  launch: {
+    cwd: string
+    resumeThreadId: string | null
+    resumePath?: string | null
+    permissionPolicy?: CodexStructuredPermissionPolicy
+  },
   timeoutMs: number | undefined
 ): Promise<CodexOpenedThread> {
-  const opened = await connection.request(
-    launch.resumeThreadId ? 'thread/resume' : 'thread/start',
-    launch.resumeThreadId
-      ? {
-          threadId: launch.resumeThreadId,
-          cwd: launch.cwd,
-          ...(launch.resumePath ? { path: launch.resumePath } : {})
-        }
-      : { cwd: launch.cwd },
-    { timeoutMs }
-  )
+  const resumeParams = launch.resumeThreadId
+    ? {
+        threadId: launch.resumeThreadId,
+        cwd: launch.cwd,
+        ...launch.permissionPolicy,
+        ...(launch.resumePath ? { path: launch.resumePath } : {})
+      }
+    : null
+  const opened = resumeParams
+    ? await resumeCodexThread(connection, resumeParams, timeoutMs)
+    : await connection.request(
+        'thread/start',
+        { cwd: launch.cwd, ...launch.permissionPolicy },
+        { timeoutMs }
+      )
   const threadId = readCodexThreadId(opened)
   if (!threadId) {
     throw new Error('codex app-server did not name the thread it opened')
@@ -51,11 +102,17 @@ export async function openCodexThread(
       : {}
   const model = nonEmptyString(result.model)
   const effort = nonEmptyString(result.reasoningEffort)
+  const serviceTierKnown = Object.hasOwn(result, 'serviceTier')
+  const serviceTier = nonEmptyString(result.serviceTier)
   return {
     threadId,
     thread,
     historyPath: readCodexThreadPath(opened),
+    ...(thread.historyMode === 'legacy' || thread.historyMode === 'paginated'
+      ? { historyMode: thread.historyMode }
+      : {}),
     ...(model ? { model } : {}),
-    ...(effort ? { effort } : {})
+    ...(effort ? { effort } : {}),
+    ...(serviceTierKnown ? { serviceTier } : {})
   }
 }

@@ -35,6 +35,7 @@ const UNRESOLVED_MODEL: SessionOptionDescriptor = {
   category: 'model',
   kind: { type: 'select', choices: [] },
   valueSource: 'unknown',
+  transport: 'catalog',
   settable: true
 }
 

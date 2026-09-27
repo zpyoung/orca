@@ -67,6 +67,27 @@ own keys live in per-feature bundles under the feature directories, which a feat
 that split: a fork entry duplicating a key upstream defines shadows upstream's real translation with
 the English fallback `sync:localization-catalog` wrote, and that locale silently renders English.
 
+**A release that adds a language breaks every fork bundle written before it.** The check requires one
+file per locale in each fork bundle, so a fork feature that merged while the locale set was smaller
+now fails `verify:localization-catalog` with
+`Fork catalog <dir>/locales is missing <lang>.json` — v1.4.198 added French, and a feature merged the
+day before had only en/es/ja/ko/zh. Sweep after resolution:
+
+```sh
+comm -23 <(ls src/renderer/src/locales/*.json | xargs -n1 basename | sort) \
+         <(ls <fork bundle dir> | sort)
+```
+
+`pnpm sync:localization-catalog` will **not** fix this — `--fix` only repairs catalog registration
+and leaves the missing file missing, reporting the same error it was run to clear. Write it by hand:
+the file is exactly `{}` and a newline, matching every existing fork bundle, and
+`fork-localization-catalogs.ts` imports no French at all, so the keys fall through to English until
+someone translates them.
+
+Worth knowing where this surfaces: the failing step is inside `static analysis`, whose three ratchets
+all report *0 new findings* first. Read past them to the `verify:localization-catalog` step. `verify`
+then fails two seconds later purely as its downstream aggregate — it is not a second problem.
+
 ## Tier-2 forked-copy replay
 
 Complete this checklist for **every** copy headed by `FORK-COPY-OF` and `FORK-COPY-SHA` after
@@ -290,8 +311,21 @@ about *how the tree is fixed*, not about tolerating a failure: lint must still p
 
 Traps that fake results:
 
-- `rm -f config/*.tsbuildinfo` before every typecheck. Composite projects cache errors across
-  `git checkout` swaps.
+- Clear the composite build cache before every typecheck — composite projects cache errors across
+  `git checkout` swaps. Use `find`, never the glob:
+
+  ```sh
+  find config -maxdepth 1 -name '*.tsbuildinfo' -delete
+  ```
+
+  `rm -f config/*.tsbuildinfo` is the obvious form and it is unsafe here. This machine's shell is
+  zsh, where an unmatched glob is a hard error (`nomatch`) rather than a literal word, and the error
+  aborts the **whole** command list — so `rm -f config/*.tsbuildinfo && pnpm run typecheck:node`
+  prints `no matches found` and never runs `tsc`. `-f` does not help: zsh fails before `rm` is
+  reached. A fresh worktree has no `.tsbuildinfo` at all, and every later clear leaves none behind,
+  so the unmatched case is the normal one. The tell is a typecheck step that emits
+  `no matches found: config/*.tsbuildinfo` and then nothing — no `$ tsc --noEmit -p …` line, no
+  errors — which reads exactly like a pass.
 - Running the suite locally to diagnose something is a deliberate detour, not part of the gate — and
   it goes through `pnpm test:sandbox` (`AGENTS.md`), which a `PreToolUse` hook enforces. Two traps
   bite whichever way it is invoked: the run never builds the CLI, and ambient Git configuration can

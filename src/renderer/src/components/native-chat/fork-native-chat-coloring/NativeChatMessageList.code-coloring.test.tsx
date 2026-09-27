@@ -3,12 +3,20 @@
 import '@testing-library/jest-dom/vitest'
 
 import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
 import { NativeChatMessageList } from '../NativeChatMessageList'
 import type { NativeChatLiveSession } from '../use-native-chat-live-session'
+import { installNativeChatMessageListTestViewport } from '../native-chat-message-list-test-viewport'
 
 afterEach(cleanup)
+
+// The list windows its rows, so happy-dom's zero-height viewport mounts none of them.
+let restoreViewport = (): void => {}
+beforeAll(() => {
+  restoreViewport = installNativeChatMessageListTestViewport()
+})
+afterAll(() => restoreViewport())
 
 const FENCED_CODE = ['```js', 'const answer = 42;', '```'].join('\n')
 

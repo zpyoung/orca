@@ -5,6 +5,7 @@ import type { Repo } from '../../../../shared/repo-types'
 import { selectProjectGroupRemovalTargets } from '../slices/project-group-removal-targets'
 import {
   catalogOwnsHost,
+  getProjectGroupHostId,
   projectGroupMatchesOwnerHost,
   resolveProjectGroupOwnerHostId,
   settingsForProjectGroupOwner
@@ -17,6 +18,7 @@ import { mergeProjectCompatibilityForHostRepoChange } from '../repos/repo-catalo
 import { applyProjectGroupDeleteCascade } from './project-group-removal-state'
 import { repoWithFetchedOwner, settingsForRepoOwner } from '../repos/owner-routing'
 import { projectGroupWithFetchedOwner } from './project-group-owner-stamping'
+import { isLedgerRemovalConflict } from '../repos/ledger-removal-conflict'
 
 export function createProjectGroupMutationActions(
   set: Parameters<StateCreator<AppState>>[0],
@@ -48,10 +50,22 @@ export function createProjectGroupMutationActions(
                 )
               ).group
         const ownedGroup = projectGroupWithFetchedOwner(group, target)
-        set((s) => ({
-          projectGroups: [...s.projectGroups, ownedGroup],
-          folderWorkspacePathStatuses: {}
-        }))
+        const ownerHostId = getProjectGroupHostId(ownedGroup)
+        set((s) => {
+          // An overlapping catalog refresh may have already inserted a newer copy.
+          if (
+            s.projectGroups.some(
+              (existing) =>
+                existing.id === ownedGroup.id && getProjectGroupHostId(existing) === ownerHostId
+            )
+          ) {
+            return s
+          }
+          return {
+            projectGroups: [...s.projectGroups, ownedGroup],
+            folderWorkspacePathStatuses: {}
+          }
+        })
         return ownedGroup
       } catch (err) {
         console.error('Failed to create project group:', err)
@@ -101,14 +115,21 @@ export function createProjectGroupMutationActions(
         const target = getActiveRuntimeTarget(
           settingsForProjectGroupOwner(get(), groupId, options?.hostId)
         )
+        const deleteArgs = {
+          groupId,
+          ...(options?.expectedLedgers ? { expectedLedgers: options.expectedLedgers } : {}),
+          ...(options?.removeContainedProjects !== undefined
+            ? { removeContainedProjects: options.removeContainedProjects }
+            : {})
+        }
         const deleted =
           target.kind === 'local'
-            ? await window.api.projectGroups.delete({ groupId })
+            ? await window.api.projectGroups.delete(deleteArgs)
             : (
                 await callRuntimeRpc<{ deleted: boolean }>(
                   target,
                   'projectGroup.delete',
-                  { groupId },
+                  deleteArgs,
                   { timeoutMs: 15_000 }
                 )
               ).deleted
@@ -118,6 +139,9 @@ export function createProjectGroupMutationActions(
         set((s) => applyProjectGroupDeleteCascade(s, groupId, ownerHostId))
         return true
       } catch (err) {
+        if (options?.expectedLedgers && isLedgerRemovalConflict(err)) {
+          throw err
+        }
         console.error('Failed to delete project group:', err)
         return false
       }
@@ -142,8 +166,13 @@ export function createProjectGroupMutationActions(
         }
       }
 
+      // Why: the runtime removes contained projects inside the ledger retention transaction, so
+      // the preview the dialog showed and the rows that get detached stay in agreement; the loop
+      // below is the renderer's own cleanup pass over rows the host already dropped.
       const deleted = await get().deleteProjectGroup(groupId, {
-        hostId: ownerHostId ?? undefined
+        hostId: ownerHostId ?? undefined,
+        expectedLedgers: options.expectedLedgers,
+        removeContainedProjects: options.removeContainedProjects
       })
       if (!deleted) {
         return {

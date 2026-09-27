@@ -155,6 +155,10 @@ export function usePersistedUIWriter(): void {
       sortBy: s.sortBy,
       projectOrderBy: s.projectOrderBy,
       showSleepingWorkspaces: s.showSleepingWorkspaces,
+      workspaceActivityWindow: s.workspaceActivityWindow,
+      workspaceActivityCustomDays: s.workspaceActivityCustomDays,
+      hideCompletedReviewWorkspaces: s.hideCompletedReviewWorkspaces,
+      hidePassingCheckWorkspaces: s.hidePassingCheckWorkspaces,
       hideDefaultBranchWorkspace: s.hideDefaultBranchWorkspace,
       hideAutomationGeneratedWorkspaces: s.hideAutomationGeneratedWorkspaces,
       hideCliCreatedWorkspaces: s.hideCliCreatedWorkspaces,
@@ -167,7 +171,11 @@ export function usePersistedUIWriter(): void {
       // paths in agent-status.ts (close/dismiss) flow to disk through map identity changes.
       // Without persisting, agent rows that survive restart come back bold even when the
       // user had already visited them.
-      acknowledgedAgentsByPaneKey: s.acknowledgedAgentsByPaneKey
+      acknowledgedAgentsByPaneKey: s.acknowledgedAgentsByPaneKey,
+      // Why: "Clear completed" must survive restart, or cleared done/interrupted rows return.
+      activityClearedAtByPaneKey: s.activityClearedAtByPaneKey,
+      // Why: an explicit "mark unread" must survive restart, or the row comes back read.
+      manuallyUnreadTurnsByPaneKey: s.manuallyUnreadTurnsByPaneKey
     }))
   )
   useEffect(() => {

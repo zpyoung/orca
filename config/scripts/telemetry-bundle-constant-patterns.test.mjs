@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BUILD_IDENTITY_RE,
-  MINIFIED_TELEMETRY_CONSTANTS_RE,
+  MINIFIED_TELEMETRY_RE,
   WRITE_KEY_RE
 } from './telemetry-bundle-constant-patterns.mjs'
 
@@ -18,8 +18,8 @@ describe('telemetry bundle constant patterns', () => {
     expect('const WRITE_KEY = "example-key"').not.toMatch(WRITE_KEY_RE)
   })
 
-  it('accepts rolldown-minified declarations', () => {
-    const minified = 'var qae=`stable`,Jae=`phc_abc123`'
-    expect(minified).toMatch(MINIFIED_TELEMETRY_CONSTANTS_RE)
+  it('accepts minified adjacent declarations', () => {
+    const bundle = 'var dde=`stable`,fde=`phc_example-key_123`,pde=(dde===`stable`)'
+    expect(bundle).toMatch(MINIFIED_TELEMETRY_RE)
   })
 })

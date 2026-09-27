@@ -13,8 +13,13 @@ import { registerRepoFolderPickerHandlers } from './repos/repo-folder-picker-han
 import { registerRepoCloneHandlers } from './repos/repo-clone-lifecycle'
 import { registerRepoGitUsernameHandler } from './repos/repo-git-username-handler'
 import { registerBaseRefQueryHandlers } from './repos/base-ref-query-handlers'
+import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 
-export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): void {
+export function registerRepoHandlers(
+  mainWindow: BrowserWindow,
+  store: Store,
+  runtime: OrcaRuntimeService
+): void {
   // Remove previously registered handlers so we can re-register on macOS app re-activation (new window).
   ipcMain.removeHandler('repos:list')
   ipcMain.removeHandler('repos:listForExecutionHost')
@@ -63,11 +68,11 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   ipcMain.removeHandler('sparsePresets:save')
   ipcMain.removeHandler('sparsePresets:remove')
 
-  registerRepoCatalogHandlers(mainWindow, store)
+  registerRepoCatalogHandlers(mainWindow, store, runtime)
   registerProjectHostSetupHandlers(mainWindow, store)
   registerRepoCreationHandlers(mainWindow, store)
-  registerProjectGroupHandlers(mainWindow, store)
-  registerFolderWorkspaceHandlers(mainWindow, store)
+  registerProjectGroupHandlers(mainWindow, store, runtime)
+  registerFolderWorkspaceHandlers(mainWindow, store, runtime)
   registerNestedRepoImportHandler(mainWindow, store)
   registerRepoUpdateHandler(mainWindow, store)
   registerSparsePresetHandlers(mainWindow, store)

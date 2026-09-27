@@ -142,6 +142,74 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
   no direct push to `main` anywhere in this flow.
 - Otherwise continue.
 
+### An earlier run's PR may already resolve this tag
+
+This automation opens one run a day, and a run that stops with CI red leaves its PR open. The next
+run resolves the same `$STABLE_TAG` from the same unchanged `main` and would merge it a second time,
+racing a duplicate PR against the first. Check before Step 3:
+
+```sh
+env -u GITHUB_TOKEN gh pr list --repo zpyoung/orca --state open \
+  --json number,title,url,headRefName,headRefOid
+```
+
+A PR titled `sync: absorb upstream $STABLE_TAG` is this run's work, already done. **Adopt it — do not
+re-merge.** Verify it before you build on it, because its body is its own account and not evidence:
+
+```sh
+git fetch origin "$PR_BRANCH"
+git merge-base --is-ancestor "$UPSTREAM_TARGET" "$PR_HEAD"      # the tag really is merged
+git merge-base --is-ancestor "$ORIGIN_MAIN_OLD" "$PR_HEAD"      # it is built on today's main
+git rev-list "$PR_HEAD" | sort > /tmp/reachable                  # every FORK_COMMITS SHA present
+git ls-remote origin "refs/heads/${ITS_BACKUP_REF}"              # its backup still resolves to main
+git diff --stat origin/main.."$PR_HEAD" -- .claude/skills/sync-upstream/   # must be empty
+```
+
+Use set operations for the reachability check, never a shell loop — `git` inside a `for`/`while`
+body is "command not found" under the sandbox, which silently inverts every conditional.
+
+If all five hold, that PR's backup ref is this run's backup (do not mint a second one at the same
+SHA), and its head is this run's tree: do the Step 4 workspace checks, `git reset --hard` to its
+head, `pnpm install --frozen-lockfile`, and continue at **Step 10**. Steps 5–8 are already done and
+their evidence is in the PR body — re-run the Step 8 gate only after your own fixes. Push fixes to
+**its** branch (`git push origin HEAD:refs/heads/<its-branch>`), never to `$SYNC_BRANCH`, and compute
+the 4-hour budget from now rather than from the PR's creation. Append your account to its body rather
+than replacing it. At Step 11 the branch to delete is that one.
+
+If any of the five fails, the PR is not a safe base — leave it open, say so in the report, and run
+the normal procedure from Step 3. **One exception: the "built on today's main" check.** An open sync
+PR goes stale the moment anything else merges, and something else will — that check failed on
+2026-09-10 because a fork feature had landed overnight, and GitHub had already flipped the PR to
+`mergeable: false`, `mergeable_state: "dirty"`. Re-running from Step 3 there would throw away a
+resolution that was otherwise complete and green. Merge `main` **into** the PR branch instead and
+resolve, then continue at Step 10:
+
+```sh
+git reset --hard "$PR_HEAD"
+git merge --no-edit origin/main
+```
+
+This merge is fork-against-fork, so `-X ours` is wrong here — it would discard whatever landed on
+`main`, which is exactly the work you are trying to keep. Expect two shapes of conflict:
+
+- **`config/fork-ownership.json` conflicts on nearly every entry.** The two sides reflowed the
+  `residuals` block to different widths, so a textual merge reports formatting as content — 9 hunks
+  on 2026-09-10. Merge it as parsed JSON instead: key `features` by `name`, `seams` by
+  `(path, feature, kind)` (one path legitimately carries several seams, and a sync branch can hold
+  exact duplicate entries that must be collapsed rather than treated as conflicts), and
+  `exceptions`/`residuals` by `path`. Per key: `ours == theirs` take it; `theirs == base` take ours,
+  which honors a deletion the sync made; `ours == base` take theirs; anything else is hand review.
+  That produced **zero** value-level conflicts on the same merge. Format only that one file
+  afterwards (`npx oxfmt --write config/fork-ownership.json`), never `pnpm format`.
+- **Never merge residual numbers.** The two sides measured against different tags, so the merged
+  value is meaningless either way. Re-measure with `--verify-residuals "$UPSTREAM_TARGET"` and
+  re-baseline what it flags. A budget that *shrank* is the normal case here and means the new
+  release absorbed a line the fork was carrying — on 2026-09-10 upstream's own fixture fix
+  superseded a workaround `main` had landed for the same bug, and taking upstream's side dropped
+  three budgets from `+5/-2`, `+5/-2`, `+13/-4` to `+1/-1`, `+1/-1`, `+9/-3`.
+
+Then re-run the Step 8 gate whole before pushing: the merge can break a file neither side broke.
+
 ## Step 3 — Backup
 
 Build a UTC stamp for the run (`date -u +%Y%m%d-%H%M%SZ`, or the PowerShell equivalent on Windows)
@@ -172,8 +240,11 @@ handed and stop rather than adapting to a workspace that fails any of these:
 - `git symbolic-ref --short HEAD` resolves (HEAD is not detached) and is **not** `main`. Merging on
   `main` would put the resolution on the branch the PR targets.
 - `git status --porcelain` is empty.
-- No rebase/merge/cherry-pick is in progress (no `.git/rebase-merge`, `.git/rebase-apply`,
-  `.git/MERGE_HEAD`).
+- No rebase/merge/cherry-pick is in progress. Resolve each path with `git rev-parse --git-path`
+  (`MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`) and test what it prints. A
+  literal `.git/MERGE_HEAD` test can never fire here: the run always happens in a worktree, where
+  `.git` is a *file* pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
+  reads as absent no matter what is in progress.
 - `git merge-base --is-ancestor HEAD origin/main` succeeds. The branch carries no commits of its
   own, so the reset below destroys nothing. If it fails, the workspace holds someone's work.
 
@@ -191,7 +262,7 @@ before merging, so an install failure is never mistaken for a resolution failure
 pnpm install --frozen-lockfile
 ```
 
-If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
+If any check or the install fails, STOP and go to Step 16 with "needs attention: unusable run
 workspace (<which check failed>) — nothing merged, nothing pushed".
 
 ## Step 5 — Merge with fork priority
@@ -237,7 +308,7 @@ runs on the repaired tree.
 
 Anything else — rename/rename, rename/delete, submodule conflicts, binary files you cannot attribute
 to a side, or more than 25 conflicted paths in total — is out of scope. Do not guess. Run
-`git merge --abort` and go to Step 13 with "needs attention: merge conflicts require manual
+`git merge --abort` and go to Step 16 with "needs attention: merge conflicts require manual
 resolution (<conflict type> at <paths>)".
 
 After any completed merge, verify no conflict markers survived:
@@ -263,7 +334,7 @@ manifest's declared lines.
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
 feature-collision review**. Each can surface a decision the reference routes to a human. Under
-`--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
+`--unattended`, that is a stopping condition: go to Step 16 with "needs attention: <the decision>"
 rather than choosing a side.
 
 **`ours.txt` is the list that loses work silently, so audit it.** An exception wins the whole file,
@@ -359,6 +430,22 @@ import repointed at a forked copy, and a relay test mocking the fork's transport
 and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
 fail in Step 8 with a lockfile error that names nothing about ownership.
 
+**A `deleted: true` exception can be invalidated by the release you are merging.** The fork's
+deletions were decided against the *previous* tag's import graph; a new release can add files that
+import a module the fork deletes. Nothing reports it — `remove.txt` honours the deletion, both
+manifest checks pass, and the ownership guard passes — so it surfaces as `TS2307` against upstream's
+own new files. Sweep right after `remove.txt` is applied:
+
+```sh
+git grep -n "from '\./" "$UPSTREAM_TARGET" -- <dir of each deleted path> \
+  | grep -Ff <(sed 's|.*/||;s|\.[^.]*$||' <out-dir>/remove.txt)
+```
+
+Withdraw the deletion rather than extending it: restore the module and its test from the tag and
+drop the exception. Never delete the new upstream files to match, and never repoint an upstream
+import at the fork's replacement unless that module really provides the same surface. See
+[`references/sync-lessons.md`](./references/sync-lessons.md) for the v1.4.200 case.
+
 **A reset upstream test may pin an upstream release tag this remote does not have.** The
 cross-version-wire harness resolves refs against git, so a constant naming a bare `vX.Y.Z` aborts
 the whole suite in PR CI — three releases have now added one. Sweep after the reset:
@@ -377,7 +464,7 @@ Commit the ownership resolution as a single follow-up commit on top of the merge
 `--no-verify` for the reason in Step 5; Step 7 expects exactly one such extra commit.
 
 If the classifier fails, or `checkout.txt` is empty when the merge was not a no-op, STOP and go to
-Step 13 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
+Step 16 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
 that is the known-broken state.
 
 ## Step 7 — Commit accounting
@@ -387,7 +474,7 @@ makes this check strict and cheap: every SHA in FORK_COMMITS must still be prese
 
 For each SHA recorded in Step 2, `git merge-base --is-ancestor <sha> HEAD` must succeed. If any does
 not, something rewrote history — reset back (`git reset --hard $ORIGIN_MAIN_OLD`) and go to
-Step 13 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
+Step 16 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
 
 Also re-run the Step 2 range against the merged head —
 `git log --oneline --no-merges HEAD --not upstream/main "$UPSTREAM_TARGET"` — and confirm the count
@@ -466,7 +553,7 @@ gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks
 re-run is how a broken tree reaches the PR.
 
 If the policy says escalate, or the same failure survives your fixes, restore and bail:
-`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
+`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 16 with "needs attention: merge resolved but
 <install|manifest|typecheck|lint> failed — manual resolution required; backup at
 origin/<BACKUP_REF>". Include the first ~20 lines of the failure output.
 
@@ -544,6 +631,60 @@ still worth naming in the report. A shard matrix gives you a cheaper first read 
 the same shard number failing on **both** Node versions is deterministic, and one version alone is
 the flake shape. `gh run rerun` refuses with `cannot be rerun; This workflow is already running`
 until every job has settled, so wait for the run rather than retrying the command.
+
+**A CI failure can come from a poisoned Actions cache, not from the tree.** A `native-modules-*`
+entry can hold the published prebuild rather than the patched build. Every later run on the same key
+restores it, `rebuild-native-deps.mjs` sees the addon load and skips the rebuild, and a
+patched-source guard then rejects it. v1.4.198 added exactly such a guard
+(`ensure-native-runtime.mjs`: "the loaded addon still calls ReadProcessMemory"), and it failed
+`real WSL terminal` on two consecutive runs of the same PR — reproducing, but not from the diff.
+
+**The poison is self-perpetuating, and a green job is what writes it.** Do not look for a cancelled
+run: on 2026-09-10 the entry that failed the job had been written the previous afternoon by the
+*successful* WSL job that the previous run's cache deletion had just produced. `rebuild-native-deps.mjs`
+decides to skip from `probeElectronNativeModules`, which tests only whether the addon loads, while
+the patched-source check runs later in `ensure-native-runtime.mjs` — so a restored prebuild loads,
+the rebuild is skipped, and the guard rejects it. That file is byte-identical to upstream, so this is
+an upstream defect: deleting the entry unblocks the run but does not stop the next one inheriting a
+fresh bad entry. Expect to do this every sync until upstream's skip decision consults the guard.
+
+The tell is a failure whose whole path is byte-identical to the tag. Prove that before anything else,
+and diff the *real* paths — the patches live in `config/patches/`, not `patches/`, and a diff of a
+directory that does not exist reports no changes and looks like proof:
+
+```sh
+git diff --stat "$UPSTREAM_TARGET" HEAD -- config/patches/ config/scripts/ensure-native-runtime.mjs \
+  config/scripts/rebuild-native-deps.mjs .github/actions/install-node-dependencies/
+```
+
+Then confirm the cache actually supplied the artifact, and find out who wrote it:
+
+```sh
+# in the job log: "Cache restored from key: native-modules-..."
+env -u GITHUB_TOKEN gh api "repos/zpyoung/orca/actions/caches?per_page=100" \
+  --jq '.actions_caches[] | select(.key|test("native-modules")) | "\(.id) | \(.key) | \(.ref) | \(.created_at)"'
+```
+
+The poison is the entry whose key the failing log names as restored — not whichever entry looks
+suspect from its `created_at`. Delete just that entry and re-run the job:
+
+```sh
+env -u GITHUB_TOKEN gh api -X DELETE "repos/zpyoung/orca/actions/caches/<id>"
+```
+
+Delete only the one entry the failing log names, only after the run has settled so no in-flight
+Windows job can re-save it, and only once the byte-identical check above has ruled out the diff.
+Then re-run the job. If it passes, the cache was the cause; if it fails again on a clean cache, the
+defect is real and that is the evidence to escalate with.
+
+`gh run rerun --job <id>` answers `job <id> cannot be rerun` while any job in the run is still
+going, and on a sync PR the e2e lane holds the run open for its full 45 minutes — so queue the
+re-run behind a wait on run status rather than retrying the command. If you are pushing a fix
+anyway, do that instead: the new run re-runs the job for free. Re-running a job also re-runs its
+dependents, which is why `verify` cannot be re-run on its own and does not need to be.
+
+Whether clearing a cache belongs on the fix policy's list of what a fix *may* do is a question for
+the skill's owner, not for a run to settle — raise it, do not assume it.
 
 **A reproduced CI failure is the fork's to fix, even if the merge did not cause it.** There is no
 tolerance mechanism here and there is no need for one: these are clean hosted runners, so the

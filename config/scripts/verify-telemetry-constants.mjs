@@ -40,7 +40,7 @@ import { join, resolve } from 'node:path'
 import { extractFile, listPackage } from '@electron/asar'
 import {
   BUILD_IDENTITY_RE,
-  MINIFIED_TELEMETRY_CONSTANTS_RE,
+  MINIFIED_TELEMETRY_RE,
   WRITE_KEY_RE
 } from './telemetry-bundle-constant-patterns.mjs'
 
@@ -160,11 +160,14 @@ function verifyAsar(asarPath) {
 
   const buildIdentityMatch = BUILD_IDENTITY_RE.exec(indexJs)
   const writeKeyMatch = WRITE_KEY_RE.exec(indexJs)
-  const minifiedTelemetryMatch = MINIFIED_TELEMETRY_CONSTANTS_RE.exec(indexJs)
-  const resolvedBuildIdentity = buildIdentityMatch?.[1] ?? minifiedTelemetryMatch?.[1]
-  const resolvedWriteKey = writeKeyMatch?.[1] ?? minifiedTelemetryMatch?.[2]
+  const minifiedTelemetryMatch = MINIFIED_TELEMETRY_RE.exec(indexJs)
 
-  if (!resolvedBuildIdentity) {
+  // Rolldown renames module-local constants in production output. In that
+  // form, verify the adjacent injected identity/key declaration instead.
+  const verifiedIdentity = buildIdentityMatch?.[1] ?? minifiedTelemetryMatch?.[1]
+  const verifiedWriteKey = writeKeyMatch?.[1] ?? minifiedTelemetryMatch?.[2]
+
+  if (!verifiedIdentity) {
     console.error(`::error::BUILD_IDENTITY constant missing or unexpected value in ${asarPath}`)
     const sample = indexJs.match(/.{0,80}BUILD_IDENTITY.{0,80}/g)?.slice(0, 5) ?? []
     for (const line of sample) {
@@ -172,7 +175,7 @@ function verifyAsar(asarPath) {
     }
     return null
   }
-  if (!resolvedWriteKey) {
+  if (!verifiedWriteKey) {
     console.error(`::error::PostHog WRITE_KEY missing from ${asarPath}`)
     const sample = indexJs.match(/.{0,80}WRITE_KEY.{0,80}/g)?.slice(0, 5) ?? []
     for (const line of sample) {
@@ -181,7 +184,7 @@ function verifyAsar(asarPath) {
     return null
   }
 
-  return { asarPath, buildIdentity: resolvedBuildIdentity, writeKey: resolvedWriteKey }
+  return { asarPath, buildIdentity: verifiedIdentity, writeKey: verifiedWriteKey }
 }
 
 // Why verify every match (not just the first): macOS dual-arch produces one

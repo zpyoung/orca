@@ -1,0 +1,49 @@
+{
+  "components": {
+    "fork-ask-question-tool": {
+      "askCard": {
+        "cancel": "取消",
+        "submitting": "正在提交…",
+        "submit": "提交",
+        "header_one": "{{count}} 个问题",
+        "header_other": "{{count}} 个问题",
+        "statusAnswered": "已回答",
+        "statusPartial": "部分回答",
+        "statusDeclined": "已拒绝",
+        "statusTimedOut": "已超时",
+        "statusUnavailable": "不可用",
+        "yes": "是",
+        "no": "否",
+        "otherPlaceholder": "输入你自己的答案",
+        "optionalHint": "(可选)",
+        "requiredError": "此问题为必答题。",
+        "textEmailError": "请输入有效的电子邮件地址。",
+        "textUrlError": "请输入有效的URL。",
+        "textPatternError": "与预期格式不匹配。",
+        "numberInvalidError": "请输入数字。",
+        "numberIntegerError": "请输入整数。",
+        "numberMinError": "请输入至少为 {{value0}} 的数字。",
+        "numberMaxError": "请输入最多为 {{value0}} 的数字。",
+        "dateInvalidError": "请输入有效的日期。"
+      },
+      "askPreview": {
+        "hide": "隐藏预览",
+        "show": "显示预览",
+        "frameTitle": "问题预览"
+      },
+      "badge": {
+        "pendingCountLabel_one": "{{count}} 个待处理的问题",
+        "pendingCountLabel_other": "{{count}} 个待处理的问题"
+      },
+      "notification": {
+        "title": "{{worktreeLabel}} 中有待处理的问题",
+        "body": "正在等待你的回答。"
+      },
+      "askPanel": {
+        "title": "问题",
+        "empty": "没有问题",
+        "emptyDescription": "等待你回答的问题会显示在这里。"
+      }
+    }
+  }
+}

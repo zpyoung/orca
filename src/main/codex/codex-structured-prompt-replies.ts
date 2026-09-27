@@ -1,32 +1,35 @@
 import type { CodexAppServerConnection } from './codex-app-server-connection'
-
-// Codex asks for approvals and tool input by sending JSON-RPC REQUESTS back to
-// Orca, and the turn blocks until each one is answered. The journal answers them
-// much later, through a durable item id, so this module holds the live request
-// ids and turns a chosen option back into the reply payload Codex expects.
-
-export const CODEX_COMMAND_APPROVAL_METHOD = 'item/commandExecution/requestApproval'
-export const CODEX_FILE_CHANGE_APPROVAL_METHOD = 'item/fileChange/requestApproval'
-export const CODEX_USER_INPUT_METHOD = 'item/tool/requestUserInput'
+import { CODEX_PROMPT_MAX_ANSWER_BYTES } from './codex-prompt-registry-bounds'
+import {
+  CODEX_USER_INPUT_METHOD,
+  type CodexPendingPrompt,
+  type CodexPromptClaim,
+  type CodexPromptRegistry
+} from './codex-prompt-registry'
+export {
+  codexJournalPromptIdPart,
+  MAX_CODEX_PROMPT_REGISTRY_ENTRIES,
+  MAX_CODEX_PROMPT_JOURNAL_BINDINGS,
+  MAX_CODEX_PROMPT_REGISTRY_BYTES,
+  encodeCodexJournalQuestionOptionId
+} from './codex-prompt-registry-bounds'
+export {
+  CODEX_COMMAND_APPROVAL_METHOD,
+  CODEX_FILE_CHANGE_APPROVAL_METHOD,
+  CODEX_USER_INPUT_METHOD,
+  CodexPromptRegistry,
+  isCodexPromptMethod,
+  type CodexPendingPrompt,
+  type CodexPromptClaim
+} from './codex-prompt-registry'
 
 /** The decisions Codex accepts for both approval requests. Anything else is a
  *  client-supplied option id that never came from a Codex prompt. */
 export const CODEX_APPROVAL_DECISIONS = ['accept', 'acceptForSession', 'decline', 'cancel'] as const
 export type CodexApprovalDecision = (typeof CODEX_APPROVAL_DECISIONS)[number]
 
-export type CodexPendingPrompt = {
-  requestId: number | string
-  method: string
-  threadId: string
-  turnId: string | null
-  codexItemId: string
-  /** What addresses this prompt. One tool item can ask more than once — a shell
-   *  bridge re-asks per command under the same `itemId` — so the request's own
-   *  `approvalId` is the identity whenever Codex sends one. */
-  promptKey: string
-  /** One entry per question for a user-input request; empty for an approval. */
-  questionIds: readonly string[]
-  answers: Map<string, string>
+function isCodexApprovalDecision(optionId: string): optionId is CodexApprovalDecision {
+  return CODEX_APPROVAL_DECISIONS.some((decision) => decision === optionId)
 }
 
 /** A user-input request can carry several questions but takes ONE reply, so an
@@ -52,108 +55,6 @@ export function decodeCodexQuestionOptionId(
   }
 }
 
-function readString(params: unknown, key: string): string | null {
-  if (typeof params !== 'object' || params === null) {
-    return null
-  }
-  const value = (params as Record<string, unknown>)[key]
-  return typeof value === 'string' && value.length > 0 ? value : null
-}
-
-function readQuestionIds(params: unknown): string[] {
-  const questions = (params as { questions?: unknown } | null)?.questions
-  if (!Array.isArray(questions)) {
-    return []
-  }
-  return questions
-    .map((question) => (question as { id?: unknown })?.id)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0)
-}
-
-export function isCodexPromptMethod(method: string): boolean {
-  return (
-    method === CODEX_COMMAND_APPROVAL_METHOD ||
-    method === CODEX_FILE_CHANGE_APPROVAL_METHOD ||
-    method === CODEX_USER_INPUT_METHOD
-  )
-}
-
-/**
- * Live Codex prompt requests for one session, addressable by the journal item
- * id the client will eventually answer with. The binding is registered by the
- * translation module, because only it knows which journal item a Codex item
- * became.
- */
-export class CodexPromptRegistry {
-  private readonly byAddress = new Map<string, CodexPendingPrompt>()
-  /** Journal item id to thread-scoped prompt address. */
-  private readonly journalItemIds = new Map<string, string>()
-
-  private address(threadId: string, promptKey: string): string {
-    return `${encodeURIComponent(threadId)}:${encodeURIComponent(promptKey)}`
-  }
-
-  /** Returns null for a request this build does not model, so the caller can
-   *  refuse it instead of leaving Codex blocked on an answer forever. */
-  register(request: {
-    id: number | string
-    method: string
-    params: unknown
-  }): CodexPendingPrompt | null {
-    const codexItemId = readString(request.params, 'itemId')
-    const threadId = readString(request.params, 'threadId')
-    if (!isCodexPromptMethod(request.method) || !codexItemId || !threadId) {
-      return null
-    }
-    const prompt: CodexPendingPrompt = {
-      requestId: request.id,
-      method: request.method,
-      threadId,
-      turnId: readString(request.params, 'turnId'),
-      codexItemId,
-      promptKey: readString(request.params, 'approvalId') ?? codexItemId,
-      questionIds:
-        request.method === CODEX_USER_INPUT_METHOD ? readQuestionIds(request.params) : [],
-      answers: new Map()
-    }
-    this.byAddress.set(this.address(prompt.threadId, prompt.promptKey), prompt)
-    return prompt
-  }
-
-  /** Called by the translation module once the prompt has a journal id. */
-  bindJournalItemId(journalItemId: string, threadId: string, promptKey: string): void {
-    this.journalItemIds.set(journalItemId, this.address(threadId, promptKey))
-  }
-
-  /** Falls back to treating the id as a prompt key, which is what it is before
-   *  any binding exists. */
-  find(journalItemId: string): CodexPendingPrompt | null {
-    const address = this.journalItemIds.get(journalItemId)
-    if (address) {
-      return this.byAddress.get(address) ?? null
-    }
-    const matches = [...this.byAddress.values()].filter(
-      (prompt) => prompt.promptKey === journalItemId
-    )
-    return matches.length === 1 ? matches[0]! : null
-  }
-
-  forget(prompt: CodexPendingPrompt): void {
-    const address = this.address(prompt.threadId, prompt.promptKey)
-    this.byAddress.delete(address)
-    for (const [journalItemId, boundAddress] of this.journalItemIds) {
-      if (boundAddress === address) {
-        this.journalItemIds.delete(journalItemId)
-      }
-    }
-  }
-
-  clear(): void {
-    this.byAddress.clear()
-    this.journalItemIds.clear()
-  }
-}
-
 /**
  * Records one answer and returns the reply payload once the request is fully
  * answered. A multi-question user-input request stays pending until every
@@ -164,17 +65,23 @@ export function applyCodexPromptAnswer(
   optionId: string
 ): Record<string, unknown> | null {
   if (prompt.method !== CODEX_USER_INPUT_METHOD) {
-    if (!(CODEX_APPROVAL_DECISIONS as readonly string[]).includes(optionId)) {
+    if (!isCodexApprovalDecision(optionId)) {
       throw new Error(`${optionId} is not a Codex approval decision`)
     }
     return { decision: optionId }
   }
-  const decoded = decodeCodexQuestionOptionId(optionId)
+  const mapped = prompt.optionAnswers.get(optionId)
+  const decoded = mapped ?? decodeCodexQuestionOptionId(optionId)
   const questionId =
-    decoded?.questionId ?? (prompt.questionIds.length === 1 ? prompt.questionIds[0] : null)
+    (decoded?.questionId
+      ? (prompt.questionIdAliases.get(decoded.questionId) ?? decoded.questionId)
+      : null) ?? (prompt.questionIds.length === 1 ? prompt.questionIds[0] : null)
   const answer = decoded?.answer ?? optionId
   if (!questionId || !prompt.questionIds.includes(questionId)) {
     throw new Error(`${optionId} does not name a question on Codex item ${prompt.codexItemId}`)
+  }
+  if (Buffer.byteLength(answer, 'utf8') > CODEX_PROMPT_MAX_ANSWER_BYTES) {
+    throw new Error('codex prompt answer exceeds bounded registry state')
   }
   prompt.answers.set(questionId, answer)
   if (prompt.questionIds.some((id) => !prompt.answers.has(id))) {
@@ -182,7 +89,11 @@ export function applyCodexPromptAnswer(
   }
   const answers: Record<string, { answers: string[] }> = {}
   for (const id of prompt.questionIds) {
-    answers[id] = { answers: [prompt.answers.get(id) as string] }
+    const answer = prompt.answers.get(id)
+    if (answer === undefined) {
+      return null
+    }
+    answers[id] = { answers: [answer] }
   }
   return { answers }
 }
@@ -192,15 +103,16 @@ export function applyCodexPromptAnswer(
 export function answerCodexPrompt(
   registry: CodexPromptRegistry,
   connection: Pick<CodexAppServerConnection, 'respond'>,
-  itemId: string,
+  claim: CodexPromptClaim,
   optionId: string
 ): void {
-  const prompt = registry.find(itemId)
-  if (!prompt) {
-    throw new Error(`codex app-server is no longer waiting on ${itemId}`)
+  if (!registry.ownsClaim(claim)) {
+    throw new Error(`codex app-server is no longer waiting on ${claim.itemId}`)
   }
+  const prompt = claim.prompt
   const reply = applyCodexPromptAnswer(prompt, optionId)
   if (reply === null) {
+    registry.releaseClaim(claim)
     return
   }
   // Forget first: a second answer must find nothing rather than reply twice.

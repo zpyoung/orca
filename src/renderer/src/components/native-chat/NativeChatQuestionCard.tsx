@@ -11,7 +11,7 @@ export type NativeChatQuestionCardProps = {
   isSubmitting?: boolean
   /** Deliver the chosen answer (per-question option indices + free text). */
   onAnswer: (selections: AskAnswerSelection[]) => void
-  allowOther?: boolean
+  allowOther?: boolean | readonly boolean[]
   /** Dismiss the prompt (sends Escape to the agent). */
   onCancel: () => void
   /** Exposes the free-text row so pane-level Paste can target it while the
@@ -44,6 +44,7 @@ export function NativeChatQuestionCard({
   const total = prompt.questions.length
   const isLast = index === total - 1
   const q = prompt.questions[index]!
+  const questionAllowsOther = Array.isArray(allowOther) ? (allowOther[index] ?? false) : allowOther
 
   const setOther = (qi: number, value: string): void => {
     setOtherText((prev) => {
@@ -160,7 +161,10 @@ export function NativeChatQuestionCard({
 
         <div className="overflow-hidden rounded-lg border border-input bg-card shadow-xs">
           <div className="flex items-start justify-between gap-2 px-3.5 py-2.5">
-            <p className="min-w-0 break-words text-sm font-semibold text-foreground">
+            <p
+              data-testid="native-chat-question-card-title"
+              className="min-w-0 break-words text-sm font-semibold text-foreground"
+            >
               {q.question}
             </p>
             <button
@@ -188,11 +192,16 @@ export function NativeChatQuestionCard({
               />
             ))}
             <div className="flex items-center gap-3 px-3.5 py-2.5">
-              {allowOther ? (
+              {questionAllowsOther ? (
                 <>
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                     <Pencil className="size-3.5" />
                   </span>
+                  {/* No `/` or `@` picker here — that autocomplete belongs to the composer,
+                      which this card replaces. What you type is delivered verbatim as the
+                      AskUserQuestion tool result: it reaches the model but never the command
+                      parser, so `/compact` and friends are inert, while a skill name can
+                      still be acted on. */}
                   <input
                     ref={answerInputRef}
                     disabled={isSubmitting}

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: bc2f593ebba70a0ee6ff900129e4918f57b143aa
+// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
@@ -24,9 +24,9 @@ import type {
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 
 export type AgentComposerFieldProps = {
-  /** Identifies which composer a native OS file drop landed on, so a drop
-   *  reaches only this one when several composers are mounted at once. */
   terminalTabId: string
+  /** Published as `data-composer-scope-key` so a native OS file drop reaches
+   *  only the composer it landed on. */
   paneKey: string
   textareaRef: RefObject<HTMLTextAreaElement | null>
   draft: string
@@ -68,8 +68,14 @@ export type AgentComposerFieldProps = {
 
 export type AgentComposerImageAttachment = {
   id: string
+  /** Empty while `pending`: the clipboard image has no agent-readable path yet. */
   path: string
   connectionId?: string
+  /** Clipboard thumbnail (blob/data URL) rendered before — and after — the file
+   *  lands, so the chip never waits on a disk round-trip to show something. */
+  previewUrl?: string
+  /** True while the pasted image is still being written to disk or uploaded. */
+  pending?: boolean
 }
 
 /**
@@ -176,7 +182,7 @@ export function AgentComposerField({
             layout === 'dock' ? 'flex h-full min-h-0 flex-col' : cn('mx-auto', widthClassName)
           )}
         >
-          {autocomplete.mode === 'slash' || autocomplete.mode === 'skill' ? (
+          {autocomplete.mode === 'slash' ? (
             <NativeChatPickerMenu
               autocomplete={autocomplete}
               activeIndex={activeSuggestion}
@@ -196,14 +202,21 @@ export function AgentComposerField({
           ) : null}
           <div
             data-native-file-drop-target={NATIVE_FILE_DROP_TARGET.composer}
-            data-terminal-tab-id={terminalTabId}
-            data-terminal-pane-leaf-id={paneKey}
+            data-composer-scope-key={paneKey}
             className={cn(
               // Why: always-on hairline (token-level border, not focus ring) —
               // no focus/click border flash. The box is a container, not a
               // focus target.
               'border border-border p-1.5 shadow-xs',
               'bg-muted/50 dark:bg-input/40',
+              // Why (#10481): the native caret blink invalidates paint up to the
+              // nearest containment boundary; without this the whole transcript
+              // re-rasterizes twice a second. Pickers are siblings and every menu
+              // and tooltip in here is a Radix portal, so nothing floating clips.
+              // Tightest descendant is the attachment remove button, which
+              // overhangs its thumbnail by 6px and clears this box's padding by
+              // 4px — keep that slack if the padding below ever shrinks.
+              '[contain:paint]',
               layout === 'dock'
                 ? 'flex min-h-0 flex-1 flex-col overflow-hidden rounded-none'
                 : 'rounded-lg'
@@ -287,15 +300,10 @@ export function AgentComposerField({
                 }}
                 onPaste={onPaste}
                 onSelect={(e) => onTextareaSelect(e.currentTarget)}
-                aria-expanded={autocomplete.mode === 'slash' || autocomplete.mode === 'skill'}
-                aria-controls={
-                  autocomplete.mode === 'slash' || autocomplete.mode === 'skill'
-                    ? pickerListboxId
-                    : undefined
-                }
+                aria-expanded={autocomplete.mode === 'slash'}
+                aria-controls={autocomplete.mode === 'slash' ? pickerListboxId : undefined}
                 aria-activedescendant={
-                  (autocomplete.mode === 'slash' || autocomplete.mode === 'skill') &&
-                  autocomplete.items.length > 0
+                  autocomplete.mode === 'slash' && autocomplete.items.length > 0
                     ? `${pickerListboxId}-option-${Math.min(activeSuggestion, autocomplete.items.length - 1)}`
                     : undefined
                 }

@@ -11,8 +11,11 @@ import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { Repo } from '../../../../shared/repo-types'
 import {
   getRepoExecutionHostId,
-  getSettingsFocusedExecutionHostId
+  getSettingsFocusedExecutionHostId,
+  parseExecutionHostId
 } from '../../../../shared/execution-host'
+import { getProjectIdentityKey } from '../../../../shared/project-host-setup-projection'
+import { pageOwnerLedgerTitle } from '../ledger/ledger-page-copy'
 import { getActiveSidebarWorkspaceId } from '../../../../shared/workspace-scope'
 import { getPinnedWorktreeDisplayPolicy } from './worktree-list/grouping/row-types'
 import { selectWorktreeListReviewCacheInputs } from './worktree-list/listing/review-cache-inputs'
@@ -36,12 +39,14 @@ import { useSidebarWorktreeSortOrder } from './worktree-list/listing/use-sort-or
 import { useVisibleSidebarWorktrees } from './worktree-list/listing/use-visible-worktrees'
 import { useWorktreeStatusMutations } from './worktree-list/drag/use-status-mutations'
 import { shouldFiltersHideAllRows } from './sidebar-empty-state-gate'
+import { WorkspaceActivityHiddenCountRow } from './fork-workspace-activity-window/WorkspaceActivityHiddenCountRow'
 import { buildWorktreeManualOrderCatalog } from './worktree-manual-order-catalog'
 
 type WorktreeListProps = {
   scrollOffsetRef: React.MutableRefObject<number>
   scrollAnchorRef: React.MutableRefObject<VirtualizedScrollAnchor>
   workspaceBoardOpen?: boolean
+  onWorktreeCardClick?: () => void
   onWorkspaceBoardDragPreviewStart?: () => void
   onWorkspaceBoardDragPreviewCommit?: () => void
   onWorkspaceBoardDragPreviewCancel?: () => void
@@ -51,6 +56,7 @@ const WorktreeList = React.memo(function WorktreeList({
   scrollOffsetRef,
   scrollAnchorRef,
   workspaceBoardOpen = false,
+  onWorktreeCardClick,
   onWorkspaceBoardDragPreviewStart = NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK,
   onWorkspaceBoardDragPreviewCommit = NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK,
   onWorkspaceBoardDragPreviewCancel = NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK
@@ -76,6 +82,7 @@ const WorktreeList = React.memo(function WorktreeList({
   const projectOrderBy = useAppStore((s) => s.projectOrderBy)
   const openModal = useAppStore((s) => s.openModal)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
+  const openLedgerPage = useAppStore((s) => s.openLedgerPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const activeView = useAppStore((s) => s.activeView)
   const activeModal = useAppStore((s) => s.activeModal)
@@ -104,19 +111,24 @@ const WorktreeList = React.memo(function WorktreeList({
   )
 
   const agentSendTargetWorktreeId = useAgentSendTargetWorktreeId()
-  const { filterState, hasFilters, clearFilters } = useSidebarWorktreeFilters()
+  const { filterState, hasFilters, clearFilters, revealWorkspaceFilters } =
+    useSidebarWorktreeFilters()
   const sortedIds = useSidebarWorktreeSortOrder({ allWorktrees, repoMap, sortBy })
   const manualOrderCatalog = useMemo(
     () => buildWorktreeManualOrderCatalog({ worktrees: allWorktrees, folderWorkspaces }),
     [allWorktrees, folderWorkspaces]
   )
-  const { visibleWorktrees, pairedDeviceIdsByEnvironment } = useVisibleSidebarWorktrees({
+  const {
+    visibleWorktrees,
+    activityHiddenCount: activityHiddenWorktreeCount,
+    pairedDeviceIdsByEnvironment
+  } = useVisibleSidebarWorktrees({
     filterState,
     sortBy,
     sortedIds,
     repoMap,
     worktreeLineageById,
-    settings,
+    defaultHostId,
     agentSendTargetWorktreeId
   })
   const visibleScope = useSidebarHostVisibleScope({
@@ -204,6 +216,28 @@ const WorktreeList = React.memo(function WorktreeList({
     },
     [openSettingsPage, openSettingsTarget]
   )
+  const handleOpenProjectLedger = useCallback(
+    (repo: Repo) => {
+      const host = parseExecutionHostId(getRepoExecutionHostId(repo))
+      openLedgerPage({
+        target: { owner: { tier: 'project', id: getProjectIdentityKey(repo) } },
+        ...(host?.kind === 'runtime' ? { environmentId: host.environmentId } : {}),
+        title: pageOwnerLedgerTitle(repo.displayName)
+      })
+    },
+    [openLedgerPage]
+  )
+  const handleOpenGroupLedger = useCallback(
+    (group: ProjectGroup) => {
+      const host = 'executionHostId' in group ? parseExecutionHostId(group.executionHostId) : null
+      openLedgerPage({
+        target: { owner: { tier: 'group', id: group.id } },
+        ...(host?.kind === 'runtime' ? { environmentId: host.environmentId } : {}),
+        title: pageOwnerLedgerTitle(group.name)
+      })
+    },
+    [openLedgerPage]
+  )
   const handleOpenWorktreeVisibility = useCallback(
     (repo: Repo) => {
       openModal('worktree-visibility', { repoId: repo.id, hostId: getRepoExecutionHostId(repo) })
@@ -236,16 +270,17 @@ const WorktreeList = React.memo(function WorktreeList({
   useSidebarRevealRequests({
     groupBy,
     renderedSidebarRowKeys: rowModel.renderedSidebarRowKeys,
-    renderedWorktreeIdentities: selection.renderedWorktreeIdentities,
+    visibleWorktrees,
+    visibleFolderWorkspaces: visibleScope.visibleFolderWorkspacesForRows,
     currentSidebarWorktreeId,
     currentSidebarExecutionHostId: activeWorkspaceExecutionHostId,
     worktreeMap,
     worktrees: allWorktrees,
     folderWorkspaces,
     hasFilters,
-    clearFilters
+    revealWorkspaceFilters
   })
-
+  const activityHiddenCount = activityHiddenWorktreeCount + visibleScope.activityHiddenFolderCount
   const filtersHideAllRows = shouldFiltersHideAllRows({
     hasFilters,
     visibleWorktreeCount: visibleWorktrees.length,
@@ -255,7 +290,12 @@ const WorktreeList = React.memo(function WorktreeList({
   })
   // Why: when active filters hide every row, the Clear Filters empty state must win over Project Group headers.
   if (rowModel.rows.length === 0 || filtersHideAllRows) {
-    return <SidebarWorktreeListEmptyState hasFilters={hasFilters} onClearFilters={clearFilters} />
+    return (
+      <>
+        <SidebarWorktreeListEmptyState hasFilters={hasFilters} onClearFilters={clearFilters} />
+        <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />
+      </>
+    )
   }
 
   return (
@@ -284,7 +324,9 @@ const WorktreeList = React.memo(function WorktreeList({
         rows={rowModel.sectionRows}
         // Why: full-page nav views aren't scoped to a worktree, so no sidebar card should look selected.
         activeWorktreeId={
-          activeView === 'tasks' || activeView === 'activity' ? null : currentSidebarWorktreeId
+          activeView === 'tasks' || activeView === 'activity' || activeView === 'ledger'
+            ? null
+            : currentSidebarWorktreeId
         }
         activeWorkspaceExecutionHostId={activeWorkspaceExecutionHostId}
         currentWorktreeId={currentSidebarWorktreeId}
@@ -295,6 +337,8 @@ const WorktreeList = React.memo(function WorktreeList({
         collapsedGroups={effectiveCollapsedGroups}
         handleCreateForRepo={handleCreateForRepo}
         handleOpenRepoSettings={handleOpenRepoSettings}
+        handleOpenProjectLedger={handleOpenProjectLedger}
+        handleOpenGroupLedger={handleOpenGroupLedger}
         handleOpenWorktreeVisibility={handleOpenWorktreeVisibility}
         handleShowImportedWorktrees={externalWorktreeCards.handleShowImportedWorktrees}
         handleKeepImportedWorktreesHidden={externalWorktreeCards.handleKeepImportedWorktreesHidden}
@@ -346,6 +390,7 @@ const WorktreeList = React.memo(function WorktreeList({
         onPinWorktrees={statusMutations.pinWorktrees}
         onDropWorktreesOnWorkspaceBoard={statusMutations.dropWorktreesOnWorkspaceBoard}
         workspaceBoardOpen={workspaceBoardOpen}
+        onWorktreeCardClick={onWorktreeCardClick}
         onWorkspaceBoardDragPreviewStart={onWorkspaceBoardDragPreviewStart}
         onWorkspaceBoardDragPreviewCommit={onWorkspaceBoardDragPreviewCommit}
         onWorkspaceBoardDragPreviewCancel={onWorkspaceBoardDragPreviewCancel}
@@ -356,6 +401,7 @@ const WorktreeList = React.memo(function WorktreeList({
         scrollOffsetRef={scrollOffsetRef}
         scrollAnchorRef={scrollAnchorRef}
       />
+      <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />
     </>
   )
 })

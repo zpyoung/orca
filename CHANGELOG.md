@@ -1,6 +1,6 @@
 ---
-last_released_commit: d5be7dc01d01aed26d671f5818c2b1a351b58c37
-upstream_synced: v1.4.195
+last_released_commit: a45f3e27a5c8055dc283ac22002a843c094664c8
+upstream_synced: v1.4.207
 ---
 
 # Changelog
@@ -11,6 +11,219 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.208-rc.0.zy01] - 2026-09-22
+
+Synced to upstream [v1.4.207](https://github.com/stablyai/orca/releases/tag/v1.4.207).
+
+### Fixed
+- Typing in the quick-open file search or the right sidebar's file-explorer filter no longer leaves
+  the previous query's results on screen for a moment; both lists now clear and re-filter as the
+  query changes. This comes from upstream.
+
+### Changed
+- The fork's own record of which upstream files it copies wholesale was advanced to this release.
+  Nothing upstream changed in any copied file, so no fork behaviour moved with it.
+
+## [1.4.207-rc.0.zy02] - 2026-09-21
+
+Re-synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4.206). Upstream
+retracted the v1.4.206 tag that 1.4.207-rc.0.zy01 was built on and re-cut it from trunk at a
+different commit, adding 325 commits the retracted tag never carried.
+
+### Added
+- Upstream's mobile web app bundle, terminal performance work, editor diff improvements and
+  OpenCode 2 beta support arrive with the re-cut release.
+
+### Fixed
+- The docked terminal composer no longer crashes pane close in setups that report no settings
+  snapshot, which previously surfaced as a failure when closing a split or a pending pane.
+- Mobile browser frames decode image data again in the browser-served mobile app; the frame reader
+  had been importing Node's Buffer in a form the web bundle cannot resolve.
+
+### Changed
+- The fork's packaging and sandbox test inventories now describe this repository's own job set
+  rather than upstream's, so they stop reporting a Windows packaging job the fork does not run and
+  they skip the same relay region suites CI does.
+- Native chat keeps reading the agent's own session log for its model and effort while also using
+  upstream's new live agent-status model discovery, rather than one replacing the other.
+
+## [1.4.207-rc.0.zy01] - 2026-09-18
+
+Synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4.206), absorbing
+v1.4.204, v1.4.205 and v1.4.206 in one step.
+
+### Fixed
+- A parked `orca ask` no longer starves worker-to-coordinator messaging. Waiting on a human used to
+  hold one of eight shared long-poll slots for the full chunk, so eight agents waiting at once shed
+  every later `orchestration.ask` — which has no shed tolerance — and browser attach with it. Waits
+  are now metered on their own per-runtime gate of four, and overflow is reported as a resumable
+  pending ask rather than a failure.
+- Stale terminal input can no longer reach a replacement PTY after a reattach, and the same
+  quarantine now covers native-chat sends.
+- Cancelling a session handoff cancels its repository diff probes all the way through, instead of
+  leaving them running against a worktree nobody is waiting on.
+- Git errors that span several lines keep their full diagnostic text instead of being truncated to
+  the first line.
+- Interrupted release cuts can be recovered: a draft RC whose tag already exists is completed rather
+  than abandoned.
+- The packaged fork's macOS computer-use helper authorizes its own peers, so computer use works in a
+  packaged build without widening bundle-prefix trust.
+- The POSIX garbage-collection listing test no longer creates and removes 15,197 directories on the
+  test host; it feeds the real shell filter a synthetic listing instead.
+
+### Changed
+- Fork code adopts the eight `anti-slop` lint rules upstream enabled in v1.4.206, following
+  upstream's own renames for each rule. Symbol names and parameter types only — no behaviour
+  changed.
+- The sandboxed test runner tracks CI's shell-contract lane again after upstream moved the OMP
+  alias-safety suite out of the unit lane.
+
+## [1.4.204-rc.0.zy01] - 2026-09-15
+
+Synced to upstream [v1.4.203](https://github.com/stablyai/orca/releases/tag/v1.4.203).
+
+### Fixed
+- Release-notes links opened a 404 for everyone on a fork build, and the dev build picker listed
+  upstream's releases instead of this fork's. Stable and RC lookups now both resolve against the
+  fork's own repository.
+- The macOS press-and-hold default — the one that turns accented-character popups back into key
+  repeat — was gated on upstream's bundle identifier, so it silently never applied to a fork build.
+- macOS permission prompts were counted against upstream's dev bundle identifier while the
+  TCC watch had already moved to the fork's, so prompts from a stable dev build went unrecorded.
+- A long `orca ask` wait dropped its runtime connection after roughly twenty seconds and reported
+  "Orca is not running", abandoning a question that was still live and durable. Long waits now stay
+  alive and resume after a drop.
+- The pending-ask count never appeared in the titlebar — the badge was written but never mounted,
+  so there was no way to see that a question was waiting.
+- Ledger import misread `**Key**:` labels, the common bold form, and a storage failure partway
+  through aborted the run without resuming, leaving entries half-imported.
+- In a split tab, the lineage badge could resolve an ambiguous legacy pane key to the wrong pane and
+  jump to a sibling.
+- Starting a session handoff against a target that could not be resolved did nothing at all, with no
+  error. It now reports what is missing.
+- A template save the server rejected failed silently in the handoff settings editor, leaving the
+  editor looking as though the change had been kept.
+
+### Changed
+- Orca ask worktrees now carry their own sidebar icon.
+- Two suites that read the POSIX shell lookup are isolated from the developer's zsh startup files,
+  and the sandbox shard runner's exclude list matches CI's shell contracts again, so live-shell
+  suites no longer run inside parallel shards locally.
+- Internal documentation: the Orca ledger workflow for bugs and deferred work is written up, and the
+  sync skill records how to size a module split by line count and diagnose a type-only gate.
+
+## [1.4.203-rc.0.zy01] - 2026-09-14
+
+Synced to upstream [v1.4.202](https://github.com/stablyai/orca/releases/tag/v1.4.202), absorbing
+v1.4.201 in the same step.
+
+### Fixed
+- `npx skills add` cloned upstream, so every skill this fork ships that upstream does not have was
+  missing from the tree the installer read. It now installs from this fork's own repository.
+- The docked agent composer kept focus when a pane had one, but upstream's new chat-cover rule
+  could focus the terminal underneath it instead. A pane with a dock composer now hands focus
+  straight to it, and every other pane follows upstream's rule.
+
+### Changed
+- The mid-prompt `/` picker is now upstream's: it offers commands as well as skills mid-draft, and
+  opens for any agent with a known grammar. A pick made mid-sentence still completes the token
+  rather than sending it.
+- `$`-prefixed skill triggering is gone — upstream routes every agent's skills through `/`.
+
+## [1.4.201-rc.0.zy03] - 2026-09-13
+
+Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4.200) — no new
+upstream stable release since the previous fork build.
+
+### Added
+- `orca ask` lets an agent working in an Orca terminal put a real question to you and block until
+  you answer it — select, multi-select, text, number, date, or confirm — with the answer coming back
+  as a structured JSON envelope. A question that outlives a single invocation is resumed with
+  `orca ask wait` instead of holding a shell open, and `orca ask cancel` withdraws one the agent no
+  longer needs. The pane, terminal, and worktree an ask came from are recorded automatically, so it
+  reaches the right place with no flags to set.
+- Questions arrive as cards in a new Questions panel in the right sidebar, keeping your draft while
+  you think about it. One left unanswered escalates to a notification, and one raised while no UI is
+  attached is handed to the coordinator rather than stranding the agent. Registered questions are
+  stored durably rather than held in memory.
+- Claude sessions launched by Orca now suppress Claude's own `AskUserQuestion` prompt when the
+  installed `claude` binary is new enough to honour it, leaving one question surface rather than
+  two. The check fails open: a version that can't be read, or one below the floor, just leaves
+  Claude's prompt in place. The `orca-ask` skill guide ships with the bundled skill set.
+
+## [1.4.201-rc.0.zy02] - 2026-09-12
+
+Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4.200) — no new
+upstream stable release since the previous fork build.
+
+### Added
+- Project and group ledgers: a durable, validated record of decisions and findings that lives with a
+  project rather than in a scratch file. Entries carry provenance, revision history, and a triage
+  state, can be imported in bulk, and are browsable from a new sidebar view that filters by scope —
+  workspace, project, or group — and names the owner each entry resolves to. The `orca ledger`
+  command reaches the same data from the CLI, including on remote hosts, with list and review
+  filters and positional entry IDs.
+- Ledger staleness thresholds now live in repository settings and are reachable by deep link, so a
+  project can say for itself when an entry counts as going stale.
+
+### Changed
+- Removing a project or group checks its ledger first and refuses on a revision conflict rather than
+  silently discarding entries, and a rejected save keeps its error visible while leaving the form
+  usable instead of clearing what you typed.
+- The upstream-sync runbook now withdraws a fork file deletion when a new upstream release starts
+  importing the module the fork deleted. That case reached the previous sync as a type error against
+  upstream's own new files, with every ownership check still passing.
+
+## [1.4.201-rc.0.zy01] - 2026-09-11
+
+Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4.200), absorbing
+v1.4.199 and v1.4.200 in one span.
+
+### Added
+- The sidebar can now hide workspaces you are not working on: filter by how recently a workspace was
+  active — including a custom date range — and by whether its review is finished and its checks are
+  passing. The choices persist per pairing, and the header says how many workspaces are hidden so a
+  filtered list never looks like a missing one.
+
+### Changed
+- A file dropped on a chat composer now attaches only to the composer it landed on. Upstream shipped
+  its own version of the fix this fork had been carrying, so the fork's copy is retired in favour of
+  it; the behaviour is the same and it now covers every composer, not just this fork's.
+- Skill and slash-command suggestions come from what the running session reports it actually loaded,
+  and still name the plugin each skill belongs to. The two used to be alternatives; they now compose,
+  so a skill offered by more than one plugin stays disambiguated.
+- PR CI no longer scans a sync-sized diff line by line, and the Windows lanes this macOS-only fork
+  cannot use are gone. Sync pull requests stop burning their budget on checks that could not finish.
+
+### Fixed
+- The terminal no longer loses its composer draft or its focus after a window wake while a chat view
+  covers the pane — an effect had stopped re-running when the chat view was toggled.
+
+## [1.4.199-rc.0.zy01] - 2026-09-10
+
+Synced to upstream [v1.4.198](https://github.com/stablyai/orca/releases/tag/v1.4.198), absorbing
+v1.4.196, v1.4.197 and v1.4.198 in one span.
+
+### Added
+- Optional divider lines between the sidebar's top-level projects and groups, switchable from
+  Appearance and findable through settings search. They do not affect layout, and default to on, so
+  an existing sidebar looks the same until the setting is turned off.
+
+### Changed
+- The fork's seams survived upstream's largest module split yet. v1.4.198 broke `main/index.ts`, the
+  chat composer and the terminal pane into separate modules; nine seam barrels were re-homed onto the
+  new files, and the terminal dock now reaches the pane through a controller bridge inside
+  `TerminalPaneSurface` rather than riding its lifecycle hook. That also keeps the dock clear of
+  upstream's per-pane listener budget and leaves a dock-less tab on upstream's own single-argument
+  focus call. No behavior change.
+- The fork's preload API types are covered by the renderer typecheck projects, which had not been
+  seeing them.
+
+### Fixed
+- The sidebar-separator setting has the French catalog it was missing. v1.4.198 adds French to the
+  locale set and the setting was written before it, so its keys had no French bundle to resolve from
+  and the catalog gate rejected the merged tree.
 
 ## [1.4.196-rc.0.zy02] - 2026-09-03
 

@@ -1,43 +1,21 @@
 import { useCallback, useEffect } from 'react'
-import {
-  NATIVE_FILE_DROP_TARGET,
-  type NativeFileDropPayload
-} from '../../../../shared/native-file-drop'
-
-type ComposerDropIdentity = {
-  terminalTabId: string
-  paneKey: string
-}
-
-/** A drop is broadcast to every renderer subscriber, so each composer takes only
- *  the drops addressed to it. An unaddressed payload still lands here, so a
- *  producer that cannot resolve pane identity keeps working. */
-function dropAddressesComposer(
-  payload: Extract<NativeFileDropPayload, { target: typeof NATIVE_FILE_DROP_TARGET.composer }>,
-  { terminalTabId, paneKey }: ComposerDropIdentity
-): boolean {
-  if (payload.tabId !== undefined && payload.tabId !== terminalTabId) {
-    return false
-  }
-  return payload.paneLeafId === undefined || payload.paneLeafId === paneKey
-}
+import { NATIVE_FILE_DROP_TARGET } from '../../../../shared/native-file-drop'
 
 export function useNativeChatFileAttachmentActions(
-  attachExternalPaths: (paths: string[]) => void,
-  identity: ComposerDropIdentity
+  /** Pane identity published as `data-composer-scope-key` on the drop target. */
+  scopeKey: string,
+  attachExternalPaths: (paths: string[]) => void
 ): { pickAttachment: () => void } {
-  const { terminalTabId, paneKey } = identity
   useEffect(
     () =>
       window.api.ui.onFileDrop((payload) => {
-        if (
-          payload.target === NATIVE_FILE_DROP_TARGET.composer &&
-          dropAddressesComposer(payload, { terminalTabId, paneKey })
-        ) {
+        // Why: this event reaches every mounted composer, including hidden
+        // background chat tabs. Only the pane the drop landed on may attach.
+        if (payload.target === NATIVE_FILE_DROP_TARGET.composer && payload.scopeKey === scopeKey) {
           attachExternalPaths(payload.paths)
         }
       }),
-    [attachExternalPaths, terminalTabId, paneKey]
+    [attachExternalPaths, scopeKey]
   )
 
   const pickAttachment = useCallback(() => {

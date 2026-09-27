@@ -51,13 +51,11 @@ type UseHandoffDialogStartArgs = {
 
 export function useHandoffDialogStart(args: UseHandoffDialogStartArgs): () => Promise<boolean> {
   return useCallback(async (): Promise<boolean> => {
-    if (
-      !args.request ||
-      !args.selectedAgent ||
-      !args.target ||
-      !args.compositionInputs ||
-      args.startDisabled
-    ) {
+    if (args.startDisabled) {
+      return false
+    }
+    if (!args.request || !args.selectedAgent || !args.target || !args.compositionInputs) {
+      args.setOperationError(handoffLaunchError('launch-failed'))
       return false
     }
     args.setStarting(true)

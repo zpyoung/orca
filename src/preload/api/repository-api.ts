@@ -1,4 +1,5 @@
 import type { ExecutionHostId } from '../../shared/execution-host'
+import type { GhAccountBinding } from '../../shared/github/account-binding'
 import type {
   HostRepoCatalogSnapshot,
   ListReposForExecutionHostArgs
@@ -33,7 +34,10 @@ export type RepositoryApi = {
     kind?: 'git' | 'folder'
     displayName?: string
   }) => Promise<{ repo: Repo } | { error: string }>
-  remove: (args: { repoId: string }) => Promise<void>
+  remove: (args: {
+    repoId: string
+    expectedLedgers?: { ledgerId: string; revision: number }[]
+  }) => Promise<void>
   // Forget a project on one execution host only, leaving the same repo id on other hosts intact.
   removeForHost: (args: { repoId: string; hostId: string }) => Promise<void>
   reorder: (args: { orderedIds: string[] }) => Promise<{ status: 'applied' | 'rejected' }>
@@ -70,6 +74,7 @@ export type RepositoryApi = {
       agentWorktreeVisibility?: Repo['agentWorktreeVisibility'] | null
       sourceControlAi?: Repo['sourceControlAi'] | null
       externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
+      ghAccount?: GhAccountBinding | null
     }
   }) => Promise<Repo>
   pickFolder: () => Promise<string | null>
@@ -143,7 +148,11 @@ export type ProjectGroupsApi = {
     groupId: string
     updates: Partial<Pick<ProjectGroup, 'name' | 'isCollapsed' | 'tabOrder' | 'color'>>
   }) => Promise<ProjectGroup | null>
-  delete: (args: { groupId: string }) => Promise<boolean>
+  delete: (args: {
+    groupId: string
+    expectedLedgers?: { ledgerId: string; revision: number }[]
+    removeContainedProjects?: boolean
+  }) => Promise<boolean>
   moveProject: (args: {
     projectId: string
     groupId: string | null

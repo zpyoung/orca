@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { ArtifactWriteRequest } from '../../../../../shared/artifacts'
-import { defineMethod, type RpcAnyMethod } from '../../core'
-import { SourceRequest, WriteRequest } from '../artifacts'
+import { defineMethod } from '../../core'
+import { SourceRequest, WriteRequest } from '../../../../../shared/rpc-contract/artifacts-params'
 import {
   isLocalArtifactPasswordCaller,
   type ArtifactPasswordCaller
@@ -26,7 +26,7 @@ function assertLocalPasswordRequest(caller: ArtifactPasswordCaller): void {
   }
 }
 
-export const ARTIFACT_PASSWORD_METHODS: readonly RpcAnyMethod[] = [
+export const ARTIFACT_PASSWORD_METHODS = [
   defineMethod({
     name: 'artifacts.shareProtected',
     params: ProtectedWriteRequest,

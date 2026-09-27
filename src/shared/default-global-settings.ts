@@ -43,6 +43,7 @@ export function buildDefaultSettings(args: {
     branchPrefixCustom: '',
     theme: 'system',
     leftSidebarAppearanceMode: 'default',
+    sidebarSectionSeparators: true,
     leftSidebarTintColor: DEFAULT_LEFT_SIDEBAR_TINT_COLOR,
     leftSidebarTintOpacity: DEFAULT_LEFT_SIDEBAR_TINT_OPACITY,
     uiLanguage: UI_LANGUAGE_SYSTEM,
@@ -73,6 +74,9 @@ export function buildDefaultSettings(args: {
     terminalGpuAcceleration: 'auto',
     // Why 'auto': enable ligatures only for known ligature fonts, never forced. Resolver in shared/terminal-ligatures.ts.
     terminalLigatures: 'auto',
+    // Why on: the addon is lazy-loaded off the critical path and only creates
+    // canvas layers once a pane receives an image; parser/decoder setup still has overhead.
+    terminalInlineImages: true,
     terminalCursorStyle: 'block',
     terminalCursorStyleDefaultedToBlock: true,
     terminalCursorBlink: true,
@@ -90,6 +94,7 @@ export function buildDefaultSettings(args: {
     terminalRightClickToPaste: args.terminalRightClickToPaste,
     terminalRightClickToPasteDefaultedForPlatform: true,
     terminalWindowsShell: 'powershell.exe',
+    terminalDefaultShell: '',
     terminalWindowsWslDistro: null,
     localAccountRuntime: 'auto',
     localAccountRuntimeDefaultedToAutoForAllUsers: true,
@@ -106,6 +111,9 @@ export function buildDefaultSettings(args: {
     // Why: default-on everywhere so it round-trips across platforms; only darwin acts on it.
     showMenuBarIcon: true,
     terminalClipboardOnSelect: false,
+    // Why: only the run of spaces shared by every selected line is dropped, so
+    // relative indentation survives and the clipboard loses only the gutter.
+    terminalCopyTrimsGutter: true,
     // Why: default on so Zellij/tmux/nvim copy works out of the box. Query
     // replies stay disabled and payload size is capped in the OSC 52 handler.
     // This default only covers new profiles; existing ones persisted `false`
@@ -124,12 +132,15 @@ export function buildDefaultSettings(args: {
     openLinksInAppPreferencePrompted: false,
     openLinksInAppModifierInverts: false,
     terminalLinkActionPopoverEnabled: true,
+    terminalLinkClickBehavior: 'actions',
+    terminalUrlMiddleClickBehavior: 'open',
     openAgentTabsInChatByDefault: false,
     experimentalNativeChat: false,
     experimentalStructuredNativeChat: false,
     experimentalTerminalDock: false,
     dockTerminalComposerByDefault: true,
     nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,
+    nativeChatResumeWorkOnRestart: false,
     nativeChatSessionOptions: {},
     openInApplications: [...DEFAULT_OPEN_IN_APPLICATIONS],
     rightSidebarOpenByDefault: true,
@@ -161,6 +172,8 @@ export function buildDefaultSettings(args: {
     notifications: args.notifications,
     diffDefaultView: 'inline',
     diffWordWrap: false,
+    diffShowWhitespace: false,
+    diffCollapseUnchangedRegions: false,
     combinedDiffFileTreeVisibleByDefault: false,
     prBotAuthorOverrides: [],
     promptCacheTimerEnabled: false,
@@ -202,6 +215,7 @@ export function buildDefaultSettings(args: {
     opencodeWorkspaceId: '',
     minimaxGroupId: '',
     minimaxUsageModels: 'general',
+    minimaxEndpoint: 'overseas',
     geminiCliOAuthEnabled: false,
     agentCmdOverrides: {},
     agentDefaultArgs: { ...DEFAULT_TUI_AGENT_ARGS },

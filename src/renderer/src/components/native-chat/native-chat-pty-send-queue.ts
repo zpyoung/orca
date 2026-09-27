@@ -6,8 +6,12 @@
 // Option commands (model switch) cancel/await this queue first so a delayed chat
 // Enter cannot land on Claude's model confirmation dialog.
 
+import { subscribeTerminalInputQuarantine } from '../terminal-pane/terminal-input-quarantine'
+
 export type NativeChatPtySendQueueHandle = {
   cancel: () => void
+  /** Invalidates pending writes without sending a cleanup control to the PTY. */
+  invalidate: () => void
   settleAfterMs: number
   settled: Promise<void>
   bodyStarted: () => boolean
@@ -15,11 +19,14 @@ export type NativeChatPtySendQueueHandle = {
 }
 
 export type EnqueueNativeChatPtySendOptions = {
+  terminalTabId: string
   /**
    * Called when cancel aborts after `start` began but before Enter was marked
    * submitted. Used to clear leftover body text from the agent TUI.
    */
   onCancelUnsubmitted?: () => void
+  /** Called for quarantine invalidation; must not write to the PTY. */
+  onInvalidate?: () => void
 }
 
 type PtyQueueState = {
@@ -60,6 +67,21 @@ export function cancelNativeChatPtySends(ptyId: string): void {
   }
 }
 
+/** Abort every send bound to a replaced PTY without writing cleanup bytes. */
+export function invalidateNativeChatPtySends(ptyId: string): void {
+  const state = ptyQueues.get(ptyId)
+  if (!state) {
+    return
+  }
+  for (const handle of state.handles) {
+    try {
+      handle.invalidate()
+    } catch {
+      // Isolate invalidation so one callback cannot leave later queued sends live.
+    }
+  }
+}
+
 /** Wait until every chat sequence on this PTY has finished or been cancelled. */
 export async function waitForNativeChatPtyIdle(ptyId: string): Promise<void> {
   const state = ptyQueues.get(ptyId)
@@ -82,7 +104,7 @@ export function enqueueNativeChatPtySend(
     /** Call when Enter (or the terminal write that completes the send) fires. */
     markSubmitted: () => void
   }) => void,
-  options?: EnqueueNativeChatPtySendOptions
+  options: EnqueueNativeChatPtySendOptions
 ): NativeChatPtySendQueueHandle {
   const now = Date.now()
   const state = getOrCreateState(ptyId)
@@ -92,12 +114,24 @@ export function enqueueNativeChatPtySend(
   state.depth += 1
 
   let cancelled = false
+  let invalidatedBeforeHandle = false
   let bodyStarted = false
   let finished = false
   let submitted = false
   const timers: ReturnType<typeof setTimeout>[] = []
   let release: (() => void) | null = null
-
+  let handle: NativeChatPtySendQueueHandle | null = null
+  const unsubscribe = subscribeTerminalInputQuarantine(options.terminalTabId, (armed) => {
+    if (!armed) {
+      return
+    }
+    if (handle) {
+      handle.invalidate()
+      return
+    }
+    cancelled = true
+    invalidatedBeforeHandle = true
+  })
   const finishEntry = (): void => {
     if (finished) {
       return
@@ -142,7 +176,9 @@ export function enqueueNativeChatPtySend(
     state.depth === 1 && waitMs === 0 ? execute() : state.tail.then(() => execute())
 
   const dropHandle = (): void => {
-    state.handles.delete(handle)
+    if (handle) {
+      state.handles.delete(handle)
+    }
   }
 
   const settleQueueEntry = (): void => {
@@ -159,32 +195,42 @@ export function enqueueNativeChatPtySend(
   const settled = runPromise.then(settleQueueEntry, settleQueueEntry)
   state.tail = settled
 
-  const handle: NativeChatPtySendQueueHandle = {
-    cancel: () => {
-      if (cancelled) {
-        return
-      }
-      cancelled = true
-      for (const timer of timers) {
-        clearTimeout(timer)
-      }
-      const shouldClear = bodyStarted && !submitted
-      // Why: refund only THIS sequence's charged window rather than collapsing
-      // freeAt to now — later queued sends still hold the line, so a blanket
-      // reset would understate the next enqueue's settle time and let a send
-      // card drop while a queued Enter is still pending.
-      state.freeAt = Math.max(Date.now(), state.freeAt - Math.max(0, durationMs))
-      finishEntry()
-      dropHandle()
-      if (shouldClear) {
-        options?.onCancelUnsubmitted?.()
-      }
-    },
+  const cancel = (mode: 'cancel' | 'invalidate'): void => {
+    if (cancelled) {
+      return
+    }
+    cancelled = true
+    for (const timer of timers) {
+      clearTimeout(timer)
+    }
+    const shouldClear = mode === 'cancel' && bodyStarted && !submitted
+    // Why: refund only THIS sequence's charged window rather than collapsing
+    // freeAt to now — later queued sends still hold the line, so a blanket
+    // reset would understate the next enqueue's settle time and let a send
+    // card drop while a queued Enter is still pending.
+    state.freeAt = Math.max(Date.now(), state.freeAt - Math.max(0, durationMs))
+    finishEntry()
+    dropHandle()
+    if (mode === 'invalidate') {
+      options?.onInvalidate?.()
+    } else if (shouldClear) {
+      options?.onCancelUnsubmitted?.()
+    }
+  }
+  const createdHandle: NativeChatPtySendQueueHandle = {
+    cancel: () => cancel('cancel'),
+    invalidate: () => cancel('invalidate'),
     settleAfterMs,
     settled,
     bodyStarted: () => bodyStarted,
     finished: () => finished
   }
-  state.handles.add(handle)
-  return handle
+  handle = createdHandle
+  state.handles.add(createdHandle)
+  if (invalidatedBeforeHandle) {
+    state.freeAt = Math.max(Date.now(), state.freeAt - Math.max(0, durationMs))
+    options.onInvalidate?.()
+  }
+  void settled.then(unsubscribe, unsubscribe)
+  return createdHandle
 }

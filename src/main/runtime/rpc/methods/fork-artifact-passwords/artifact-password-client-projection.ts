@@ -106,10 +106,13 @@ const PROJECTIONS: Record<string, (result: never, caller: ArtifactPasswordCaller
  * Gating one method is not enough: the same protection state rides on the published-link lookup
  * and on every share/publish/update result, so a paired client could read from any of them.
  */
-export function withArtifactProtectionProjection<TMethod extends ProjectableMethod>(
-  methods: readonly TMethod[]
-): readonly TMethod[] {
-  return methods.map((method) => {
+// Why `readonly unknown[]` rather than a ProjectableMethod constraint: the params-parity
+// gate reads each method's literal name off the tuple, and a constraint declaring
+// `name: string` widens those names away at the inference site.
+export function withArtifactProtectionProjection<TMethods extends readonly unknown[]>(
+  methods: TMethods
+): TMethods {
+  return (methods as readonly ProjectableMethod[]).map((method) => {
     const project = PROJECTIONS[method.name]
     if (!project) {
       return method
@@ -122,5 +125,5 @@ export function withArtifactProtectionProjection<TMethod extends ProjectableMeth
         return project(result as never, { clientKind, clientId })
       }
     }
-  })
+  }) as unknown as TMethods
 }

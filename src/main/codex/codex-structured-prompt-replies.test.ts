@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { AGENT_SESSION_ID_MAX_LENGTH } from '../../shared/agent-session-wire'
 import {
   applyCodexPromptAnswer,
   CodexPromptRegistry,
+  MAX_CODEX_PROMPT_REGISTRY_BYTES,
+  MAX_CODEX_PROMPT_REGISTRY_ENTRIES,
+  codexJournalPromptIdPart,
   decodeCodexQuestionOptionId,
+  encodeCodexJournalQuestionOptionId,
   encodeCodexQuestionOptionId
 } from './codex-structured-prompt-replies'
 
@@ -35,6 +40,28 @@ describe('codex question option ids', () => {
 
   it('reads nothing from an id with no separator', () => {
     expect(decodeCodexQuestionOptionId('accept')).toBeNull()
+  })
+
+  it('bounds journal option ids while preserving the exact Codex answer', () => {
+    const longQuestionId = 'q'.repeat(5_000)
+    const longAnswer = 'answer '.repeat(5_000)
+    const optionId = encodeCodexJournalQuestionOptionId(longQuestionId, longAnswer)
+    const registry = new CodexPromptRegistry()
+    const prompt = registry.register({
+      id: 9,
+      method: 'item/tool/requestUserInput',
+      params: {
+        itemId: 'codex-item-1',
+        threadId: 'thread-1',
+        questions: [{ id: longQuestionId, options: [{ label: longAnswer }] }]
+      }
+    })
+
+    expect(Buffer.byteLength(optionId, 'utf8')).toBeLessThan(1024)
+    expect(codexJournalPromptIdPart(longQuestionId)).not.toBe(longQuestionId)
+    expect(applyCodexPromptAnswer(prompt as NonNullable<typeof prompt>, optionId)).toEqual({
+      answers: { [longQuestionId]: { answers: [longAnswer] } }
+    })
   })
 })
 
@@ -69,6 +96,79 @@ describe('CodexPromptRegistry', () => {
     expect(registry.find('codex-item-1')).toBeNull()
   })
 
+  it('clears only prompts belonging to a settled turn', () => {
+    const registry = new CodexPromptRegistry()
+    registry.register({
+      id: 1,
+      method: 'item/commandExecution/requestApproval',
+      params: { itemId: 'root-item', threadId: 'thread-1' }
+    })
+    registry.register({
+      id: 2,
+      method: 'item/commandExecution/requestApproval',
+      params: { itemId: 'other-item', threadId: 'thread-1', turnId: 'turn-2' }
+    })
+    registry.register({
+      id: 3,
+      method: 'item/commandExecution/requestApproval',
+      params: { itemId: 'other-thread-item', threadId: 'thread-2', turnId: 'turn-1' }
+    })
+    registry.bindJournalItemId('journal-root', 'thread-1', 'root-item', 'turn-1')
+
+    registry.clearTurn('thread-1', 'turn-1')
+
+    expect(registry.find('root-item')).toBeNull()
+    expect(registry.find('journal-root')).toBeNull()
+    expect(registry.find('other-item')?.requestId).toBe(2)
+    expect(registry.find('other-thread-item')?.requestId).toBe(3)
+  })
+
+  it('retains a bounded cleanup identity for an unaddressable backfilled turn id', () => {
+    const registry = new CodexPromptRegistry()
+    const turnId = 'turn-'.padEnd(MAX_CODEX_PROMPT_REGISTRY_BYTES + 1, 'x')
+    registry.register({
+      id: 1,
+      method: 'item/commandExecution/requestApproval',
+      params: { itemId: 'root-item', threadId: 'thread-1' }
+    })
+
+    registry.bindJournalItemId('journal-root', 'thread-1', 'root-item', turnId)
+
+    expect(registry.bytes).toBeLessThanOrEqual(MAX_CODEX_PROMPT_REGISTRY_BYTES)
+    registry.clearTurn('thread-1', turnId)
+    expect(registry.find('journal-root')).toBeNull()
+  })
+
+  it('reserves enough bytes for a wire-valid multibyte backfilled turn id', () => {
+    const registry = new CodexPromptRegistry()
+    registry.register({
+      id: 1,
+      method: 'item/commandExecution/requestApproval',
+      params: { itemId: 'root-item', threadId: 'thread-1' }
+    })
+    const reservedBytes = registry.bytes
+    const turnId = '界'.repeat(AGENT_SESSION_ID_MAX_LENGTH)
+
+    registry.bindJournalItemId('journal-root', 'thread-1', 'root-item', turnId)
+
+    expect(registry.find('journal-root')?.turnId).toBe(turnId)
+    expect(registry.bytes).toBe(reservedBytes)
+    expect(registry.bytes).toBeLessThanOrEqual(MAX_CODEX_PROMPT_REGISTRY_BYTES)
+  })
+
+  it('rejects a request turn id beyond the wire identity bound', () => {
+    const registry = new CodexPromptRegistry()
+    const turnId = 'x'.repeat(AGENT_SESSION_ID_MAX_LENGTH + 1)
+    const prompt = registry.register({
+      id: 1,
+      method: 'item/commandExecution/requestApproval',
+      params: { itemId: 'root-item', threadId: 'thread-1', turnId }
+    })
+
+    expect(prompt).toBeNull()
+    expect(registry.bytes).toBe(0)
+  })
+
   it('addresses a prompt by its journal item id once bound, and forgets both', () => {
     const registry = new CodexPromptRegistry()
     const prompt = registry.register(userInputRequest(['q1']))
@@ -99,6 +199,22 @@ describe('CodexPromptRegistry', () => {
     expect(registry.find('journal-root')?.requestId).toBe(1)
     expect(registry.find('journal-child')?.requestId).toBe(2)
     expect(registry.find('item-2')).toBeNull()
+  })
+
+  it('keeps a journal-bound pending prompt answerable after the lookup window evicts it', () => {
+    const registry = new CodexPromptRegistry()
+    const first = registry.register(userInputRequest(['q1']))
+    registry.bindJournalItemId('journal-first', 'thread-1', 'codex-item-1')
+
+    for (let index = 0; index <= MAX_CODEX_PROMPT_REGISTRY_ENTRIES; index += 1) {
+      registry.register({
+        id: index + 10,
+        method: 'item/commandExecution/requestApproval',
+        params: { itemId: `item-${index}`, threadId: 'thread-1' }
+      })
+    }
+
+    expect(registry.find('journal-first')).toBe(first)
   })
 })
 
@@ -137,5 +253,29 @@ describe('applyCodexPromptAnswer', () => {
     expect(applyCodexPromptAnswer(prompt, encodeCodexQuestionOptionId('q1', 'second'))).toEqual({
       answers: { q1: { answers: ['second'] } }
     })
+  })
+
+  it('refuses question and option collections that exceed bounded live state', () => {
+    const registry = new CodexPromptRegistry()
+    const tooManyQuestions = registry.register(
+      userInputRequest(Array.from({ length: 65 }, (_, index) => `q${index}`))
+    )
+    expect(tooManyQuestions).toBeNull()
+
+    const hugeOptionRequest = {
+      id: 10,
+      method: 'item/tool/requestUserInput',
+      params: {
+        itemId: 'item-huge-options',
+        threadId: 'thread-1',
+        questions: [
+          { id: 'q1', options: Array.from({ length: 257 }, (_, i) => ({ label: `option-${i}` })) }
+        ]
+      }
+    }
+    expect(registry.register(hugeOptionRequest)).toBeNull()
+
+    const hugeQuestionId = 'x'.repeat(32 * 1024 + 1)
+    expect(registry.register(userInputRequest([hugeQuestionId]))).toBeNull()
   })
 })

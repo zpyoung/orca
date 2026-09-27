@@ -1,0 +1,13 @@
+{
+  "fork": {
+    "sidebarSectionSeparator": {
+      "title": "사이드바 섹션 구분선",
+      "description": "최상위 프로젝트와 그룹 사이에 구분선을 표시합니다.",
+      "keywordSidebar": "사이드바",
+      "keywordSeparator": "구분선",
+      "keywordDivider": "디바이더",
+      "keywordProject": "프로젝트",
+      "keywordGroup": "그룹"
+    }
+  }
+}

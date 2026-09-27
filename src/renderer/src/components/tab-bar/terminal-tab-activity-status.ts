@@ -1,3 +1,7 @@
+import {
+  readAgentAttentionUnreadReason,
+  type ReadableAgentAttentionUnread
+} from '@/attention/agent-attention-contract'
 import { isExplicitAgentStatusFresh } from '@/lib/agent-status'
 import { resolveWorktreeStatus, type WorktreeStatus } from '@/lib/worktree-status'
 import {
@@ -23,6 +27,8 @@ type TerminalTabActivityFlags = {
   hasInterrupted: boolean
   hasLiveDone: boolean
   paneIds: Set<string>
+  /** Panes whose row went stale; suppress generated permission labels only. */
+  stalePaneIds: Set<string>
 }
 
 type FlagsCache = {
@@ -69,6 +75,10 @@ function getTerminalTabActivityFlags(
     // Why: stale hook entries (>30m) are not authority; a slept/abandoned pane
     // must not keep a tab spinning. Same freshness gate as the sidebar.
     if (!isExplicitAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)) {
+      // Stale identity suppresses Orca's one-shot permission label without suppressing native titles.
+      getOrCreateTerminalTabActivityFlags(flagsByTabId, identity.tabId).stalePaneIds.add(
+        identity.paneId
+      )
       continue
     }
 
@@ -106,7 +116,8 @@ function getOrCreateTerminalTabActivityFlags(
       hasLiveMonitoring: false,
       hasInterrupted: false,
       hasLiveDone: false,
-      paneIds: new Set()
+      paneIds: new Set(),
+      stalePaneIds: new Set()
     }
     flagsByTabId.set(tabId, flags)
   }
@@ -128,6 +139,7 @@ function parseAgentStatusPaneKey(paneKey: string): { tabId: string; paneId: stri
 const EMPTY_PANE_IDS: ReadonlySet<string> = new Set()
 
 type TerminalTabActivityInput = {
+  hasPendingAsk?: boolean
   // Why: launchAgent is read, not just carried — the status gate needs it to attribute a
   // bare spinner title to an agent (#9040). Narrowing it away here compiles (it is optional)
   // but silently drops the tab-bar dot back to the pre-#9040 behavior.
@@ -148,6 +160,7 @@ type TerminalTabActivityInput = {
  * Returns a `WorktreeStatus` primitive so the tab re-renders only when it flips.
  */
 export function resolveTerminalTabActivityStatus({
+  hasPendingAsk,
   tab,
   agentStatusByPaneKey,
   agentStatusEpoch,
@@ -162,8 +175,9 @@ export function resolveTerminalTabActivityStatus({
     ptyIdsByTabId: ptyIdsByTabId ?? {},
     runtimePaneTitlesByTabId: runtimePaneTitlesByTabId ?? {},
     agentStatusPaneIdsByTabId: { [tab.id]: flags?.paneIds ?? EMPTY_PANE_IDS },
+    stalePaneIdsByTabId: { [tab.id]: flags?.stalePaneIds ?? EMPTY_PANE_IDS },
     terminalLayoutsByTabId: terminalLayout ? { [tab.id]: terminalLayout } : undefined,
-    hasPermission: flags?.hasPermission ?? false,
+    hasPermission: hasPendingAsk || (flags?.hasPermission ?? false),
     hasLiveWorking: flags?.hasLiveWorking ?? false,
     hasLiveMonitoring: flags?.hasLiveMonitoring ?? false,
     hasInterrupted: flags?.hasInterrupted ?? false,
@@ -247,23 +261,23 @@ export function terminalTabHasUnreadActivity({
   unreadAgentCompletionPanes
 }: {
   terminalTabId: string
-  unreadTerminalTabs: Record<string, boolean | undefined>
-  unreadAgentCompletionPanes: Record<string, boolean | undefined>
+  unreadTerminalTabs: Record<string, ReadableAgentAttentionUnread>
+  unreadAgentCompletionPanes: Record<string, ReadableAgentAttentionUnread>
 }): boolean {
   return (
-    unreadTerminalTabs[terminalTabId] === true ||
+    readAgentAttentionUnreadReason(unreadTerminalTabs[terminalTabId]) !== null ||
     hasUnreadAgentCompletionForTerminalTab(unreadAgentCompletionPanes, terminalTabId)
   )
 }
 
 // Why: production writes replace this map; WeakMap supports retained snapshots without pinning them.
 let unreadAgentCompletionTabIdsBySnapshot = new WeakMap<
-  Record<string, boolean | undefined>,
+  Record<string, ReadableAgentAttentionUnread>,
   ReadonlySet<string>
 >()
 
 function getUnreadAgentCompletionTabIds(
-  unreadAgentCompletionPanes: Record<string, boolean | undefined>
+  unreadAgentCompletionPanes: Record<string, ReadableAgentAttentionUnread>
 ): ReadonlySet<string> {
   const cached = unreadAgentCompletionTabIdsBySnapshot.get(unreadAgentCompletionPanes)
   if (cached) {
@@ -285,7 +299,7 @@ function getUnreadAgentCompletionTabIds(
 
 /** Match pane-level unread completion markers to their owning terminal tab. */
 export function hasUnreadAgentCompletionForTerminalTab(
-  unreadAgentCompletionPanes: Record<string, boolean | undefined> | undefined,
+  unreadAgentCompletionPanes: Record<string, ReadableAgentAttentionUnread> | undefined,
   tabId: string
 ): boolean {
   return unreadAgentCompletionPanes

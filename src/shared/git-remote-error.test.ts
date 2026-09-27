@@ -14,6 +14,32 @@ afterEach(() => {
 })
 
 describe('normalizeGitErrorMessage', () => {
+  it.each(['\n', '\r\n', '\r'])(
+    'preserves repository discovery diagnostics with %j lines',
+    (eol) => {
+      const diagnostic = [
+        'fatal: not a git repository (or any parent up to mount point /)',
+        'Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).'
+      ].join(eol)
+      const error = new Error(`Command failed: git rev-parse HEAD${eol}${diagnostic}${eol}`)
+
+      expect(normalizeGitErrorMessage(error)).toBe(diagnostic)
+    }
+  )
+
+  it('preserves multiline error details while redacting credentials throughout', () => {
+    const error = new Error(
+      'Command failed: git fetch\nremote: progress\n' +
+        'error: cannot fetch https://user:secret@example.com/repo.git\n' +
+        'Retry https://token@example.com/repo.git after checking access.\n'
+    )
+
+    expect(normalizeGitErrorMessage(error, 'fetch')).toBe(
+      'error: cannot fetch https://example.com/repo.git\n' +
+        'Retry https://example.com/repo.git after checking access.'
+    )
+  })
+
   it('keeps the submodule name when a recursive push is rejected', () => {
     const error = new Error(
       "Command failed: git push\nPushing submodule 'find-cmux-followers'\n" +
@@ -79,7 +105,25 @@ describe('normalizeGitErrorMessage', () => {
     )
   })
 
-  it('uses the tail diagnostic from newline-heavy failures without line-array splitting', () => {
+  it('uses the last diagnostic when git interleaves per-ref output after an early failure', () => {
+    const refUpdateLines = Array.from(
+      { length: 500 },
+      (_, index) =>
+        ` ! [new branch]      br${index}     -> origin/br${index}  (unable to update local ref)`
+    ).join('\n')
+    const error = new Error(
+      'Command failed: git fetch --prune\n' +
+        "error: cannot lock ref 'refs/remotes/origin/a': 'refs/remotes/origin/a/b' exists\n" +
+        `${refUpdateLines}\n` +
+        'error: some local refs could not be updated\n'
+    )
+
+    expect(normalizeGitErrorMessage(error, 'fetch')).toBe(
+      'error: some local refs could not be updated'
+    )
+  })
+
+  it('uses the tail diagnostic when progress output has no diagnostic prefix, without line-array splitting', () => {
     const splitSpy = vi.spyOn(String.prototype, 'split')
     const error = new Error(
       `Command failed: git fetch\r\n${'remote: progress update\r\n'.repeat(10_000)}remote side closed connection\r\n`

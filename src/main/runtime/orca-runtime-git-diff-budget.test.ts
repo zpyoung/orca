@@ -57,7 +57,7 @@ function commands(
   return new RuntimeGitCommands({
     resolveRuntimeGitTarget: async () => ({
       worktree,
-      ...(connectionId ? { connectionId } : {}),
+      executionHostId: connectionId ? (`ssh:${connectionId}` as const) : ('local' as const),
       ...(localGitOptions ? { localGitOptions } : {})
     }),
     getRuntimeSettings: () => ({}) as GlobalSettings
@@ -101,17 +101,34 @@ describe('runtime git diff transport budget', () => {
       '/remote/repo',
       'assets/logo.png',
       false,
+      undefined,
       undefined
     )
     expect(mocks.getDiff).not.toHaveBeenCalled()
   })
 
   it('leaves an SSH-forwarded diff uncapped when no budget is supplied', async () => {
-    mocks.getSshGitProvider.mockReturnValue(sshProvider())
+    const provider = sshProvider()
+    mocks.getSshGitProvider.mockReturnValue(provider)
+    const controller = new AbortController()
 
     await expect(
-      commands('conn-1').getRuntimeGitDiff('id:wt-1', 'assets/logo.png', false)
+      commands('conn-1').getRuntimeGitDiff(
+        'id:wt-1',
+        'assets/logo.png',
+        false,
+        undefined,
+        undefined,
+        controller.signal
+      )
     ).resolves.toMatchObject({ modifiedContent: OVERSIZED_BASE64 })
+    expect(provider.getDiff).toHaveBeenCalledWith(
+      '/remote/repo',
+      'assets/logo.png',
+      false,
+      undefined,
+      { signal: controller.signal }
+    )
   })
 
   it('caps a local-repo diff that exceeds the budget', async () => {
