@@ -17,6 +17,7 @@ import {
   type PendingKindPurge
 } from './enrollment-deletion'
 import type { EnrollmentRow } from './enrollment-row'
+import { withImmediateTransaction } from './transaction-scope'
 
 const EnrollmentRearmConfigurationSchema = z
   .object({
@@ -208,8 +209,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     const owner = this.serializeOwner(parsed.owner)
     this.database.assertWritable()
     const connection = this.database.connection()
-    connection.exec('BEGIN IMMEDIATE')
-    try {
+    return withImmediateTransaction(connection, () => {
       const result = connection
         .prepare(
           `UPDATE heimdall_enrollment
@@ -230,15 +230,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         throw new Error(`Unknown or immutable Heimdall watcher: ${watcherId}`)
       }
       appendWithinTransaction?.()
-      const rearmed = this.requireValid(watcherId)
-      connection.exec('COMMIT')
-      return rearmed
-    } catch (error) {
-      if (connection.isTransaction) {
-        connection.exec('ROLLBACK')
-      }
-      throw error
-    }
+      return this.requireValid(watcherId)
+    })
   }
 
   commitControl(
@@ -373,11 +366,9 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     }
     this.database.assertWritable()
     const connection = this.database.connection()
-    connection.exec('BEGIN IMMEDIATE')
-    try {
+    return withImmediateTransaction(connection, () => {
       const current = this.require(watcherId)
       if (current.terminalAtMs !== null) {
-        connection.exec('COMMIT')
         return current
       }
       appendWithinTransaction?.()
@@ -392,15 +383,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         throw new Error(`Heimdall watcher ${watcherId} changed during its terminal transaction`)
       }
       afterTerminalWithinTransaction?.()
-      const updated = this.require(watcherId)
-      connection.exec('COMMIT')
-      return updated
-    } catch (error) {
-      if (connection.isTransaction) {
-        connection.exec('ROLLBACK')
-      }
-      throw error
-    }
+      return this.require(watcherId)
+    })
   }
 
   private require(watcherId: string): EnrollmentRecord {

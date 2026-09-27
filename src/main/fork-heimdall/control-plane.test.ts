@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type {
-  EscalationEntry,
-  LedgerEntry,
-  WatcherLedger
-} from '../../shared/fork-heimdall/ledger-types'
+import type { EscalationEntry, LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { WatcherControlPlane } from './control-plane'
 import type {
@@ -11,27 +7,8 @@ import type {
   EnrollmentControlCommit,
   EnrollmentStore
 } from './enrollment-store'
-import type { HeimdallLedgerStore } from './ledger-store'
+import { fakeLedger } from './ledger-test-fixture'
 import type { WatcherRunner } from './runner-state'
-
-function fakeLedger(initial: LedgerEntry[] = []): {
-  store: HeimdallLedgerStore
-  entries: LedgerEntry[]
-} {
-  const entries = [...initial]
-  const store = {
-    read: (watcherId: string): WatcherLedger => ({
-      watcherId,
-      entries: entries.filter((entry) => entry.watcherId === watcherId)
-    }),
-    append: (entry: LedgerEntry): number => {
-      entries.push(entry)
-      return entries.length
-    }
-  }
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: HeimdallLedgerStore is a class with private fields, so a structural test double can never satisfy it without this cast; only read/append are exercised by the code under test.
-  return { store: store as unknown as HeimdallLedgerStore, entries }
-}
 
 function enrollment(overrides: Partial<WatcherEnrollment> = {}): WatcherEnrollment {
   return {

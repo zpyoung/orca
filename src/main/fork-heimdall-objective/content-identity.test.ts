@@ -12,6 +12,11 @@ import type { IFilesystemProvider } from '../providers/types'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
 import { computeObjectiveWorktreeContentDigest } from './objective-workspace-manifest'
+import {
+  folderTarget,
+  gitTarget as sharedGitTarget
+} from './objective-workspace-target-test-fixtures'
+import { cleanupTemporaryDirectories } from './objective-temp-workspace-test-fixtures'
 
 const temporaryDirectories: string[] = []
 
@@ -41,41 +46,13 @@ async function commitAll(cwd: string, message: string): Promise<void> {
 }
 
 function gitTarget(workspacePath: string): ObjectiveWorkspaceTarget {
-  const runtimeTarget = {
-    executionHostId: 'local',
-    worktree: {
-      id: 'objective-test',
-      repoId: 'objective-test-repo',
-      path: workspacePath,
-      git: { path: workspacePath, branch: 'main', isBare: false, isMainWorktree: true }
-    } as unknown as RuntimeGitTarget['worktree']
-  } satisfies RuntimeGitTarget
-  return {
-    kind: 'git',
-    executionHostId: 'local',
-    workspacePath,
-    fileProvider: null,
-    gitTarget: runtimeTarget
-  }
-}
-
-function folderTarget(workspacePath: string): ObjectiveWorkspaceTarget {
-  return {
-    kind: 'folder',
-    executionHostId: 'local',
-    workspacePath,
-    fileProvider: null
-  }
+  return sharedGitTarget(workspacePath, { id: 'objective-test', repoId: 'objective-test-repo' })
 }
 
 afterEach(async () => {
   unregisterSshFilesystemProvider('objective-content-test')
   unregisterSshGitProvider('objective-content-test')
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  )
+  await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
 describe('computeWorkspaceContentIdentity', () => {

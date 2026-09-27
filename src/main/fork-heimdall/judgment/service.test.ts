@@ -8,6 +8,7 @@ import { HeimdallDatabase } from '../database'
 import { HeimdallLedgerStore } from '../ledger-store'
 import { JudgmentClientFailure, type JudgmentClientFailureDiagnostic } from './client'
 import { computeJudgmentIdentity } from './identity'
+import { world as buildWorld } from './judgment-test-world'
 import { JudgmentService, type JudgmentServiceDependencies } from './service'
 import {
   JUDGMENT_ANSWER_OBSERVATION,
@@ -30,29 +31,7 @@ const requests: JudgmentQuestionRequest[] = [
 ]
 
 function world(): ObjectiveWorld {
-  return {
-    contract: {
-      objectiveText: 'Implement the objective',
-      tier: 'standard',
-      landingBar: 'files-on-disk',
-      maxConcurrency: 1,
-      workspaceKind: 'folder',
-      writeTerritory: ['**'],
-      roleAgents: {},
-      sitterOverrides: {}
-    },
-    workspaceKind: 'folder',
-    plan: { revisions: [], nodes: [], verdicts: [], landing: [] },
-    reports: [],
-    budget: { wallClockActiveMs: null, turns: null },
-    landingContext: {
-      branch: null,
-      headSha: null,
-      worktreeContentDigest: null,
-      pushTarget: null,
-      hostedReview: null
-    }
-  }
+  return buildWorld()
 }
 
 let root: string

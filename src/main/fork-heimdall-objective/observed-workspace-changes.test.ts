@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readdir, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, posix } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,8 @@ import {
   captureObjectiveWorkspaceBaseline,
   validateObjectiveWorkspaceChanges
 } from './observed-workspace-changes'
+import { folderTarget, gitTarget } from './objective-workspace-target-test-fixtures'
+import { cleanupTemporaryDirectories } from './objective-temp-workspace-test-fixtures'
 
 const temporaryDirectories: string[] = []
 const SSH_TARGET = 'objective-observation-test'
@@ -25,29 +27,6 @@ async function temporaryDirectory(prefix: string): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), prefix))
   temporaryDirectories.push(directory)
   return directory
-}
-
-function folderTarget(workspacePath: string): ObjectiveWorkspaceTarget {
-  return { kind: 'folder', executionHostId: 'local', workspacePath, fileProvider: null }
-}
-
-function gitTarget(workspacePath: string): ObjectiveWorkspaceTarget {
-  const runtimeTarget = {
-    executionHostId: 'local',
-    worktree: {
-      id: `objective-repo::${workspacePath}`,
-      repoId: 'objective-repo',
-      path: workspacePath,
-      git: { path: workspacePath, branch: 'main', isBare: false, isMainWorktree: true }
-    } as unknown as RuntimeGitTarget['worktree']
-  } satisfies RuntimeGitTarget
-  return {
-    kind: 'git',
-    executionHostId: 'local',
-    workspacePath,
-    fileProvider: null,
-    gitTarget: runtimeTarget
-  }
 }
 
 async function git(cwd: string, args: string[]): Promise<void> {
@@ -201,11 +180,7 @@ class MemoryFilesystemProvider {
 afterEach(async () => {
   unregisterSshFilesystemProvider(SSH_TARGET)
   unregisterSshGitProvider(SSH_TARGET)
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  )
+  await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
 describe('objective observed workspace changes', () => {

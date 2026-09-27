@@ -1,53 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createReportValidationProvenance } from '../../shared/fork-heimdall/effect-certainty'
-import type {
-  ObjectiveEnrollmentPayload,
-  ObjectiveLandingBar
-} from '../../shared/fork-heimdall-objective/contract-types'
+import type { ObjectiveLandingBar } from '../../shared/fork-heimdall-objective/contract-types'
 import {
   ObjectiveDetailSchema,
   type ObjectiveWorld
 } from '../../shared/fork-heimdall-objective/detail-types'
 import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
-import type {
-  PlannerReport,
-  ReviewerReport
-} from '../../shared/fork-heimdall-objective/plan-schema'
-import type {
-  AttemptEntry,
-  KernelAction,
-  WatcherLedger
-} from '../../shared/fork-heimdall/ledger-types'
+import type { ReviewerReport } from '../../shared/fork-heimdall-objective/plan-schema'
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import { decideObjective } from '../../shared/fork-heimdall-objective/decision'
 import { ObjectiveDatabase } from './objective-database'
 import type { ObjectiveLandingPayload } from './objective-store-data'
 import { ObjectiveStore } from './objective-store'
+import {
+  action,
+  CONTENT_IDENTITY,
+  CONTRACT,
+  ingest as sharedIngest,
+  REPORT,
+  settledAttempt,
+  WATCHER_ID
+} from './objective-store-test-fixtures'
 
-const WATCHER_ID = 'watcher-objective-1'
-const CONTENT_IDENTITY = 'content-identity-1'
-const REPORT: PlannerReport = {
-  plan: [
-    {
-      taskKey: 'task-a',
-      title: 'Secret node title A',
-      spec: 'Secret implementer specification A',
-      deps: [],
-      criteria: [
-        { body: 'Secret acceptance body A', shellCheckable: true, checkCommand: 'pnpm check:a' }
-      ],
-      declaresDependencyChange: false
-    },
-    {
-      taskKey: 'task-b',
-      title: 'Secret node title B',
-      spec: 'Secret implementer specification B',
-      deps: ['task-a'],
-      criteria: [{ body: 'Secret acceptance body B', shellCheckable: false, checkCommand: null }],
-      declaresDependencyChange: false
-    }
-  ]
-}
 const REVIEW: ReviewerReport = {
   verdict: 'approve',
   criteriaResults: [
@@ -55,16 +30,6 @@ const REVIEW: ReviewerReport = {
     { taskKey: 'task-b', criterionIndex: 0, result: 'pass', note: 'Verified B' }
   ],
   summary: 'Everything meets the contract'
-}
-const CONTRACT: ObjectiveEnrollmentPayload = {
-  objectiveText: 'Implement the requested objective',
-  tier: 'standard',
-  landingBar: 'files-on-disk',
-  maxConcurrency: 1,
-  workspaceKind: 'git',
-  writeTerritory: ['src/**'],
-  roleAgents: {},
-  sitterOverrides: {}
 }
 
 let database: ObjectiveDatabase
@@ -85,47 +50,7 @@ afterEach(() => {
 })
 
 function ingest(revisionNumber = 1, dispatchId = `planner-${revisionNumber}`) {
-  return store.ingestPlan({
-    watcherId: WATCHER_ID,
-    revisionNumber,
-    dispatchId,
-    report: REPORT,
-    digest: `plan-digest-${revisionNumber}`,
-    createdAtMs: 100 + revisionNumber
-  })
-}
-
-function settledAttempt(
-  id: string,
-  action: KernelAction,
-  effect: NonNullable<AttemptEntry['effect']>,
-  result?: unknown
-): AttemptEntry {
-  return {
-    eventId: `event-${id}`,
-    watcherId: WATCHER_ID,
-    atMs: 1_000,
-    origin: 'owner',
-    class: 'fact',
-    kind: 'attempt',
-    attemptId: id,
-    fingerprint: `fingerprint-${id}`,
-    action,
-    state: 'settled',
-    effect,
-    ...(result === undefined ? {} : { result })
-  }
-}
-
-function action(kind: string, extras: Record<string, unknown> = {}): KernelAction {
-  return {
-    kind,
-    capability: kind === 'record-landing' ? 'land' : 'implement',
-    visibility: 'local',
-    contentIdentity: CONTENT_IDENTITY,
-    evidenceKey: `${kind}-evidence`,
-    ...extras
-  }
+  return sharedIngest(store, revisionNumber, dispatchId)
 }
 
 function rowCounts(): Record<string, number> {

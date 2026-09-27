@@ -5,19 +5,7 @@ import {
   unknownAmendmentDropTaskKeys,
   type RevisionAmendmentPatch
 } from './revision-amendment'
-import type { ObjectivePlanTask } from './plan-schema'
-
-function task(taskKey: string, overrides: Partial<ObjectivePlanTask> = {}): ObjectivePlanTask {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec: `Implement ${taskKey}`,
-    deps: [],
-    criteria: [{ body: `${taskKey} works`, shellCheckable: true, checkCommand: 'pnpm check' }],
-    declaresDependencyChange: false,
-    ...overrides
-  }
-}
+import { checkableTask as task } from './decision-test-harness'
 
 function patch(overrides: Partial<RevisionAmendmentPatch> = {}): RevisionAmendmentPatch {
   return {

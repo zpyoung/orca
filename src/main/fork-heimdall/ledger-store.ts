@@ -27,6 +27,7 @@ import {
   reclaimTickTraces,
   reclaimWatcherRetention
 } from './retention'
+import { withImmediateTransaction, withReentrantImmediateTransaction } from './transaction-scope'
 
 type LedgerRow = {
   watcher_id: string
@@ -112,64 +113,55 @@ export class HeimdallLedgerStore implements LedgerStore {
 
     this.database.assertWritable()
     const connection = this.database.connection()
-    const ownsTransaction = !connection.isTransaction
-    if (ownsTransaction) {
-      connection.exec('BEGIN IMMEDIATE')
-    }
-    try {
-      this.assertLedgerOpen(connection, parsed)
-      if (parsed.kind === 'attempt-resolved') {
-        assertAttemptResolution(this.readWithConnection(connection, parsed.watcherId), parsed)
-      } else if (parsed.kind === 'attempt') {
-        assertAttemptTransition(this.readWithConnection(connection, parsed.watcherId), parsed)
-      } else if (
-        parsed.kind === 'interval-open' ||
-        parsed.kind === 'interval-checkpoint' ||
-        parsed.kind === 'interval-close'
-      ) {
-        assertIntervalTransition(this.readWithConnection(connection, parsed.watcherId), parsed)
-      }
+    return withReentrantImmediateTransaction(
+      connection,
+      () => {
+        this.assertLedgerOpen(connection, parsed)
+        if (parsed.kind === 'attempt-resolved') {
+          assertAttemptResolution(this.readWithConnection(connection, parsed.watcherId), parsed)
+        } else if (parsed.kind === 'attempt') {
+          assertAttemptTransition(this.readWithConnection(connection, parsed.watcherId), parsed)
+        } else if (
+          parsed.kind === 'interval-open' ||
+          parsed.kind === 'interval-checkpoint' ||
+          parsed.kind === 'interval-close'
+        ) {
+          assertIntervalTransition(this.readWithConnection(connection, parsed.watcherId), parsed)
+        }
 
-      const seq = this.nextSequence(connection, 'heimdall_ledger', parsed.watcherId)
-      const resolved =
-        parsed.class === 'observation'
-          ? (options.resolved ?? true)
-          : !(
-              parsed.kind === 'attempt' &&
-              parsed.state === 'settled' &&
-              parsed.effect === 'indeterminate'
-            )
-      connection
-        .prepare(
-          `INSERT INTO heimdall_ledger (
-             watcher_id, seq, event_id, at_ms, class, kind, origin, resolved, entry_json
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        )
-        .run(
-          parsed.watcherId,
-          seq,
-          parsed.eventId,
-          parsed.atMs,
-          parsed.class,
-          parsed.kind,
-          parsed.origin,
-          resolved ? 1 : 0,
-          JSON.stringify(parsed)
-        )
-      if (parsed.class === 'observation') {
-        reclaimLedgerObservations(connection, parsed.watcherId)
-      }
-      if (ownsTransaction) {
-        connection.exec('COMMIT')
-        this.publish(parsed.watcherId)
-      }
-      return seq
-    } catch (error) {
-      if (ownsTransaction && connection.isTransaction) {
-        connection.exec('ROLLBACK')
-      }
-      throw error
-    }
+        const seq = this.nextSequence(connection, 'heimdall_ledger', parsed.watcherId)
+        const resolved =
+          parsed.class === 'observation'
+            ? (options.resolved ?? true)
+            : !(
+                parsed.kind === 'attempt' &&
+                parsed.state === 'settled' &&
+                parsed.effect === 'indeterminate'
+              )
+        connection
+          .prepare(
+            `INSERT INTO heimdall_ledger (
+               watcher_id, seq, event_id, at_ms, class, kind, origin, resolved, entry_json
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            parsed.watcherId,
+            seq,
+            parsed.eventId,
+            parsed.atMs,
+            parsed.class,
+            parsed.kind,
+            parsed.origin,
+            resolved ? 1 : 0,
+            JSON.stringify(parsed)
+          )
+        if (parsed.class === 'observation') {
+          reclaimLedgerObservations(connection, parsed.watcherId)
+        }
+        return seq
+      },
+      () => this.publish(parsed.watcherId)
+    )
   }
 
   reclaim(watcherId: string): LedgerReclaimResult {
@@ -184,11 +176,7 @@ export class HeimdallLedgerStore implements LedgerStore {
     }
     this.database.assertWritable()
     const connection = this.database.connection()
-    const ownsTransaction = !connection.isTransaction
-    if (ownsTransaction) {
-      connection.exec('BEGIN IMMEDIATE')
-    }
-    try {
+    withReentrantImmediateTransaction(connection, () => {
       const row = connection
         .prepare('SELECT watcher_id FROM heimdall_ledger WHERE event_id = ?')
         .get(eventId) as { watcher_id: string } | undefined
@@ -211,15 +199,7 @@ export class HeimdallLedgerStore implements LedgerStore {
       } else {
         reclaimLedgerObservations(connection, row.watcher_id)
       }
-      if (ownsTransaction) {
-        connection.exec('COMMIT')
-      }
-    } catch (error) {
-      if (ownsTransaction && connection.isTransaction) {
-        connection.exec('ROLLBACK')
-      }
-      throw error
-    }
+    })
   }
 
   appendTickTrace(watcherId: string, trace: WatcherTickTrace): void {
@@ -227,8 +207,7 @@ export class HeimdallLedgerStore implements LedgerStore {
     const parsed = WatcherTickTraceSchema.parse(trace)
     this.database.assertWritable()
     const connection = this.database.connection()
-    connection.exec('BEGIN IMMEDIATE')
-    try {
+    withImmediateTransaction(connection, () => {
       this.assertWatcherOpenForTrace(connection, watcherId)
       connection
         .prepare(
@@ -237,11 +216,7 @@ export class HeimdallLedgerStore implements LedgerStore {
         )
         .run(watcherId, parsed.seq, parsed.pinned ? 1 : 0, JSON.stringify(parsed))
       reclaimTickTraces(connection, watcherId)
-      connection.exec('COMMIT')
-    } catch (error) {
-      connection.exec('ROLLBACK')
-      throw error
-    }
+    })
     this.publish(watcherId)
   }
 
@@ -276,11 +251,7 @@ export class HeimdallLedgerStore implements LedgerStore {
     }
     this.database.assertWritable()
     const connection = this.database.connection()
-    const ownsTransaction = !connection.isTransaction
-    if (ownsTransaction) {
-      connection.exec('BEGIN IMMEDIATE')
-    }
-    try {
+    withReentrantImmediateTransaction(connection, () => {
       const result = connection
         .prepare(
           `UPDATE heimdall_tick_trace
@@ -298,15 +269,7 @@ export class HeimdallLedgerStore implements LedgerStore {
       } else {
         reclaimTickTraces(connection, watcherId)
       }
-      if (ownsTransaction) {
-        connection.exec('COMMIT')
-      }
-    } catch (error) {
-      if (ownsTransaction && connection.isTransaction) {
-        connection.exec('ROLLBACK')
-      }
-      throw error
-    }
+    })
   }
 
   compactTerminal(

@@ -16,7 +16,7 @@ import {
   findObjectiveWorkerEvidence,
   type ObjectiveSnapshotBinding
 } from './execution-context'
-import { invalidObjectiveReport, rejectedWorkerReport } from './local-report-validation'
+import { invalidObjectiveReport, verifyWorkerReportEvidence } from './local-report-validation'
 import type { ObjectiveStore } from './objective-store'
 import { resolvePlanReviewDelta } from './plan-review-delta'
 import { readObjectiveRoleReport } from './report-ingestion'
@@ -79,36 +79,18 @@ export async function ingestObjectivePlanReviewReport(args: {
       detail: 'Plan review ingest action does not match its review dispatch'
     })
   }
-  const evidence = findObjectiveWorkerEvidence(args.context.ledger, action.dispatchId)
-  const rejection = rejectedWorkerReport({
-    evidence,
+  const verification = verifyWorkerReportEvidence({
+    evidence: findObjectiveWorkerEvidence(args.context.ledger, action.dispatchId),
     role: 'reviewer',
+    reasonPrefix: 'plan-review',
+    detailPrefix: 'Plan review',
     dispatchId: action.dispatchId,
     reportPath: action.reportPath
   })
-  if (rejection) {
-    return rejection
+  if (!verification.ok) {
+    return verification.outcome
   }
-  if (evidence?.outcome !== 'succeeded' || evidence.reportPath !== action.reportPath) {
-    return invalidObjectiveReport({
-      reason: 'plan-review-report-evidence-mismatch',
-      code: 'evidence-mismatch',
-      role: 'reviewer',
-      dispatchId: action.dispatchId,
-      reportPath: action.reportPath,
-      detail: 'Plan review report does not match accepted worker completion evidence'
-    })
-  }
-  if (!evidence.filesModifiedValid) {
-    return invalidObjectiveReport({
-      reason: 'plan-review-report-evidence-malformed',
-      code: 'evidence-malformed',
-      role: 'reviewer',
-      dispatchId: action.dispatchId,
-      reportPath: action.reportPath,
-      detail: 'Worker completion filesModified must be an array of workspace-relative paths'
-    })
-  }
+  const evidence = verification.evidence
   const assumptions = targetAssumptions(args.objectiveStore, action.target)
   if (assumptions === undefined) {
     return invalidObjectiveReport({

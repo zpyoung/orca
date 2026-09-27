@@ -15,8 +15,8 @@ import {
 } from './execution-context'
 import {
   invalidObjectiveReport,
-  rejectedWorkerReport,
-  reportActionNaturalKey
+  reportActionNaturalKey,
+  verifyWorkerReportEvidence
 } from './local-report-validation'
 import { validateObjectiveWorkspaceChanges } from './observed-workspace-changes'
 import type { ObjectiveStore } from './objective-store'
@@ -46,36 +46,18 @@ export async function ingestObjectiveVerdictReport(args: {
       detail: 'Verdict ingest action does not match its review dispatch'
     })
   }
-  const evidence = findObjectiveWorkerEvidence(args.context.ledger, args.action.dispatchId)
-  const rejection = rejectedWorkerReport({
-    evidence,
+  const verification = verifyWorkerReportEvidence({
+    evidence: findObjectiveWorkerEvidence(args.context.ledger, args.action.dispatchId),
     role: args.action.role,
+    reasonPrefix: 'review',
+    detailPrefix: 'Review',
     dispatchId: args.action.dispatchId,
     reportPath: args.action.reportPath
   })
-  if (rejection) {
-    return rejection
+  if (!verification.ok) {
+    return verification.outcome
   }
-  if (evidence?.outcome !== 'succeeded' || evidence.reportPath !== args.action.reportPath) {
-    return invalidObjectiveReport({
-      reason: 'review-report-evidence-mismatch',
-      code: 'evidence-mismatch',
-      role: args.action.role,
-      dispatchId: args.action.dispatchId,
-      reportPath: args.action.reportPath,
-      detail: 'Review report does not match accepted worker completion evidence'
-    })
-  }
-  if (!evidence.filesModifiedValid) {
-    return invalidObjectiveReport({
-      reason: 'review-report-evidence-malformed',
-      code: 'evidence-malformed',
-      role: args.action.role,
-      dispatchId: args.action.dispatchId,
-      reportPath: args.action.reportPath,
-      detail: 'Worker completion filesModified must be an array of workspace-relative paths'
-    })
-  }
+  const evidence = verification.evidence
   const plan = args.objectiveStore.getPlan(args.action.revisionId)
   if (!plan) {
     return invalidObjectiveReport({

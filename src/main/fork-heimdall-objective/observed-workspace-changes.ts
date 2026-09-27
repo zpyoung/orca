@@ -11,6 +11,10 @@ import {
   requireRuntimeGitProvider
 } from '../runtime/runtime-git-command-target'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
+import {
+  filesystemErrorCode,
+  isMissingFilesystemError
+} from '../fork-heimdall/filesystem-error-code'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import { observeGitWorkspaceState, type ObjectiveWorkspaceTarget } from './content-identity'
 import { computeGitWorkspaceChangedPaths } from './git-workspace-changed-set'
@@ -36,19 +40,6 @@ type BaselineRead =
   | { state: 'ok'; baseline: WorkspaceBaseline }
   | { state: 'missing' | 'malformed' | 'unreadable' }
 type BaselineLocation = { directory: string; path: string }
-
-function errorCode(error: unknown): string | number | undefined {
-  if (!error || typeof error !== 'object' || !('code' in error)) {
-    return undefined
-  }
-  const code = error.code
-  return typeof code === 'string' || typeof code === 'number' ? code : undefined
-}
-
-function isMissing(error: unknown): boolean {
-  const code = errorCode(error)
-  return code === 'ENOENT' || code === 'ENOTDIR' || code === 2
-}
 
 async function baselinePath(
   target: ObjectiveWorkspaceTarget,
@@ -97,7 +88,7 @@ async function readStoredBaseline(
     const parsed = parseBaseline(JSON.parse(bytes.toString('utf8')))
     return parsed ? { state: 'ok', baseline: parsed } : { state: 'malformed' }
   } catch (error) {
-    if (isMissing(error)) {
+    if (isMissingFilesystemError(error)) {
       return { state: 'missing' }
     }
     if (error instanceof SyntaxError) {
@@ -122,7 +113,7 @@ async function writeBaseline(
       await writeFile(path, serialized, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
       return
     } catch (error) {
-      if (errorCode(error) !== 'EEXIST') {
+      if (filesystemErrorCode(error) !== 'EEXIST') {
         throw error
       }
     }
@@ -260,7 +251,7 @@ async function existingContainedPaths(
           : await realpath(candidate)
         return [path, isPathInsideOrEqual(canonicalRoot, canonicalCandidate)]
       } catch (error) {
-        if (isMissing(error) || isENOENT(error)) {
+        if (isMissingFilesystemError(error) || isENOENT(error)) {
           return [path, false]
         }
         throw error

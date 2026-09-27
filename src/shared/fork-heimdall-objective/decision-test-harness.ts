@@ -21,6 +21,7 @@ import type {
   ObjectiveRevisionProjection,
   ObjectiveWorld
 } from './detail-types'
+import type { ObjectivePlanTask } from './plan-schema'
 
 export { WORKER_EXITED_WITHOUT_COMPLETION }
 
@@ -62,6 +63,40 @@ export function node(
     dispatchId: null,
     state: 'pending',
     criteria: [],
+    ...overrides
+  }
+}
+
+function planTaskCriterion(
+  taskKey: string,
+  criterionDefaults: { shellCheckable: boolean; checkCommand: string | null }
+): ObjectivePlanTask {
+  return {
+    taskKey,
+    title: `Task ${taskKey}`,
+    spec: `Implement ${taskKey}`,
+    deps: [],
+    criteria: [{ body: `${taskKey} works`, ...criterionDefaults }],
+    declaresDependencyChange: false
+  }
+}
+
+export function task(
+  taskKey: string,
+  overrides: Partial<ObjectivePlanTask> = {}
+): ObjectivePlanTask {
+  return {
+    ...planTaskCriterion(taskKey, { shellCheckable: false, checkCommand: null }),
+    ...overrides
+  }
+}
+
+export function checkableTask(
+  taskKey: string,
+  overrides: Partial<ObjectivePlanTask> = {}
+): ObjectivePlanTask {
+  return {
+    ...planTaskCriterion(taskKey, { shellCheckable: true, checkCommand: 'pnpm check' }),
     ...overrides
   }
 }

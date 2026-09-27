@@ -5,84 +5,13 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HeimdallApi } from '../../../shared/fork-heimdall/api'
 import {
-  WatcherFleetEntrySchema,
-  type WatcherFleetEntry
-} from '../../../shared/fork-heimdall/fleet-types'
+  buildWatcherFleetEntry as row,
+  deferred
+} from '../../../shared/fork-heimdall/fleet-test-fixtures'
 import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/detail-types'
 import { useAppStore } from '@/store'
 import { ObjectiveDetailContent } from './ObjectiveDetailContent'
 import { ObjectiveDetailSection } from './ObjectiveDetailSection'
-
-type Deferred<T> = {
-  promise: Promise<T>
-  resolve: (value: T) => void
-}
-
-function deferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((settle) => {
-    resolve = settle
-  })
-  return { promise, resolve }
-}
-
-function row(revision: number, observedAtMs = revision): WatcherFleetEntry {
-  return WatcherFleetEntrySchema.parse({
-    target: { watcherId: 'watcher-1', connectionId: 'hermes', pairingRevision: 7 },
-    ownerFence: {
-      executionHostId: 'runtime:hermes',
-      schedulerOwner: 'remote_host_service',
-      workspaceKey: 'runtime:hermes::worktree-1',
-      revision
-    },
-    observedAtMs,
-    contact: 'live',
-    readOnlyReason: null,
-    capabilityNotes: [],
-    paused: false,
-    entry: {
-      name: 'Objective',
-      enrollment: {
-        watcherId: 'watcher-1',
-        kind: 'objective',
-        workspaceKey: 'runtime:hermes::worktree-1',
-        executionHostId: 'runtime:hermes',
-        repoId: 'repo-1',
-        worktreeId: 'worktree-1',
-        workspacePath: '/workspace/repo-1',
-        schedulerOwner: 'remote_host_service',
-        enabled: true,
-        paused: false,
-        commandRevision: revision,
-        capabilities: {
-          plan: 'gated',
-          implement: 'on',
-          review: 'on',
-          check: 'on',
-          land: 'on'
-        },
-        budget: { wallClockActiveMs: 14_400_000, turns: 40 },
-        kindPayload: {},
-        coordinatorIdentity: { handle: 'main', paneKey: 'pane-1' },
-        orchestrationRunId: null,
-        createdAtMs: 1,
-        terminalAtMs: null
-      },
-      status: {
-        watcherId: 'watcher-1',
-        enabled: true,
-        state: 'watching',
-        phase: 'observe',
-        reason: null,
-        parkReason: null,
-        budget: { activeMs: 0, turns: 0, exhausted: null },
-        startedAtMs: 1,
-        lastSuccessfulTickAtMs: null,
-        nextPulseAtMs: null
-      }
-    }
-  })
-}
 
 function detail(objectiveText: string, asOfMs: number): ObjectiveDetail {
   return {

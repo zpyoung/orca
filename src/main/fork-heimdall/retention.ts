@@ -8,6 +8,7 @@ import {
   type WatcherTerminalSummary
 } from '../../shared/fork-heimdall/watcher-types'
 import type Database from '../sqlite/sync-database'
+import { withReentrantImmediateTransaction } from './transaction-scope'
 
 export const RETENTION_RING_CAPACITY = TICK_TRACE_RING_CAPACITY
 
@@ -94,25 +95,10 @@ export function reclaimWatcherRetention(
   database: Database.Database,
   watcherId: string
 ): { observations: number; tickTraces: number } {
-  const ownsTransaction = !database.isTransaction
-  if (ownsTransaction) {
-    database.exec('BEGIN IMMEDIATE')
-  }
-  try {
-    const result = {
-      observations: reclaimLedgerObservations(database, watcherId),
-      tickTraces: reclaimTickTraces(database, watcherId)
-    }
-    if (ownsTransaction) {
-      database.exec('COMMIT')
-    }
-    return result
-  } catch (error) {
-    if (ownsTransaction && database.isTransaction) {
-      database.exec('ROLLBACK')
-    }
-    throw error
-  }
+  return withReentrantImmediateTransaction(database, () => ({
+    observations: reclaimLedgerObservations(database, watcherId),
+    tickTraces: reclaimTickTraces(database, watcherId)
+  }))
 }
 
 export function readTerminalRetentionSummary(
@@ -146,11 +132,7 @@ export function compactTerminalRetention(
   totals: BudgetState,
   readLedger: TerminalCompactionLedgerReader
 ): WatcherTerminalSummary {
-  const ownsTransaction = !database.isTransaction
-  if (ownsTransaction) {
-    database.exec('BEGIN IMMEDIATE')
-  }
-  try {
+  return withReentrantImmediateTransaction(database, () => {
     const existing = readTerminalRetentionSummary(database, watcherId)
     const ledger = readLedger(database, watcherId)
     let summary = existing
@@ -222,14 +204,6 @@ export function compactTerminalRetention(
     database
       .prepare('DELETE FROM heimdall_tick_trace WHERE watcher_id = ? AND pinned = 0')
       .run(watcherId)
-    if (ownsTransaction) {
-      database.exec('COMMIT')
-    }
     return summary
-  } catch (error) {
-    if (ownsTransaction && database.isTransaction) {
-      database.exec('ROLLBACK')
-    }
-    throw error
-  }
+  })
 }

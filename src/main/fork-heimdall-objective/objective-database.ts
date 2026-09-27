@@ -1,16 +1,14 @@
-import { mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import Database from '../sqlite/sync-database'
-import { hardenSqliteDatabaseFiles } from '../sqlite/harden-database-files'
+import type Database from '../sqlite/sync-database'
+import {
+  ScopedSqliteDatabase,
+  type ScopedDatabaseDirectoryProvider,
+  type ScopedDatabaseDirectorySource
+} from '../fork-heimdall/scoped-sqlite-database'
 
 export const OBJECTIVE_DATABASE_SCHEMA_VERSION = 5
 export const OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS = 5_000
 
-export type ObjectiveProfileDirectoryProvider = {
-  getProfileStorageDirectory(): string
-}
-
-type ProfileDirectorySource = string | (() => string) | ObjectiveProfileDirectoryProvider
+export type ObjectiveProfileDirectoryProvider = ScopedDatabaseDirectoryProvider
 
 const OBJECTIVE_SCHEMA_V1_SQL = `
 CREATE TABLE plan_revision (
@@ -240,161 +238,49 @@ CREATE INDEX objective_gate_attempt_watcher
   ON gate_attempt (watcher_id, started_at_ms, id);
 `
 
+const OBJECTIVE_MIGRATIONS = [
+  OBJECTIVE_SCHEMA_V1_SQL,
+  OBJECTIVE_SCHEMA_V2_SQL,
+  OBJECTIVE_SCHEMA_V3_SQL,
+  OBJECTIVE_SCHEMA_V4_SQL,
+  OBJECTIVE_SCHEMA_V5_SQL
+]
+
 /** Lazily owns the profile-scoped objective persistence database. */
 export class ObjectiveDatabase {
-  private opened: Database.Database | null = null
-  private openedReadOnly = false
-  private openedPath: string | null = null
+  private readonly scoped: ScopedSqliteDatabase
 
-  constructor(private readonly profileDirectory: ProfileDirectorySource) {}
+  constructor(profileDirectory: ScopedDatabaseDirectorySource) {
+    this.scoped = new ScopedSqliteDatabase({
+      profileDirectory,
+      supportsInMemory: true,
+      subdirectory: 'fork-heimdall-objective',
+      filename: 'objective.db',
+      schemaVersion: OBJECTIVE_DATABASE_SCHEMA_VERSION,
+      migrations: OBJECTIVE_MIGRATIONS,
+      busyTimeoutMs: OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS,
+      missingDirectoryMessage: 'Objective persistence requires a profile storage directory',
+      readOnlyMessage: 'Objective database schema is newer than this build; database is read-only'
+    })
+  }
 
   connection(): Database.Database {
-    if (this.opened) {
-      return this.opened
-    }
-
-    const databasePath = this.resolveDatabasePath()
-    if (databasePath !== ':memory:') {
-      mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 })
-    }
-    const probe = new Database(databasePath, { timeout: OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS })
-    let storedVersion: number
-    try {
-      storedVersion = Number(probe.pragma('user_version', { simple: true }) ?? 0)
-    } catch (error) {
-      probe.close()
-      throw error
-    }
-    if (storedVersion > OBJECTIVE_DATABASE_SCHEMA_VERSION) {
-      probe.close()
-      const readOnly = new Database(databasePath, {
-        readonly: true,
-        fileMustExist: true,
-        timeout: OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS
-      })
-      this.opened = readOnly
-      this.openedReadOnly = true
-      this.openedPath = databasePath
-      return readOnly
-    }
-
-    let probeOpen = true
-    let transferred = false
-    try {
-      this.configure(probe)
-      const initialization = this.createSchema(probe, storedVersion)
-      if (initialization === 'future-schema') {
-        probe.close()
-        probeOpen = false
-        const readOnly = new Database(databasePath, {
-          readonly: true,
-          fileMustExist: true,
-          timeout: OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS
-        })
-        this.opened = readOnly
-        this.openedReadOnly = true
-        this.openedPath = databasePath
-        transferred = true
-        return readOnly
-      }
-      hardenSqliteDatabaseFiles(databasePath)
-      this.opened = probe
-      this.openedReadOnly = false
-      this.openedPath = databasePath
-      transferred = true
-      return probe
-    } finally {
-      if (!transferred && probeOpen) {
-        probe.close()
-      }
-    }
+    return this.scoped.connection()
   }
 
   isReadOnly(): boolean {
-    this.connection()
-    return this.openedReadOnly
+    return this.scoped.isReadOnly()
   }
 
   databasePath(): string {
-    return this.openedPath ?? this.resolveDatabasePath()
+    return this.scoped.databasePath()
   }
 
   assertWritable(): void {
-    if (this.isReadOnly()) {
-      throw new Error('Objective database schema is newer than this build; database is read-only')
-    }
+    this.scoped.assertWritable()
   }
 
   close(): void {
-    this.opened?.close()
-    this.opened = null
-    this.openedReadOnly = false
-    this.openedPath = null
-  }
-
-  private resolveDatabasePath(): string {
-    if (this.profileDirectory === ':memory:') {
-      return ':memory:'
-    }
-    const profileDirectory =
-      typeof this.profileDirectory === 'string'
-        ? this.profileDirectory
-        : typeof this.profileDirectory === 'function'
-          ? this.profileDirectory()
-          : this.profileDirectory.getProfileStorageDirectory()
-    if (!profileDirectory) {
-      throw new Error('Objective persistence requires a profile storage directory')
-    }
-    return join(profileDirectory, 'fork-heimdall-objective', 'objective.db')
-  }
-
-  private configure(database: Database.Database): void {
-    database.pragma('journal_mode = WAL')
-    database.pragma(`busy_timeout = ${OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS}`)
-    database.pragma('foreign_keys = ON')
-    database.pragma('synchronous = FULL')
-  }
-
-  private createSchema(
-    database: Database.Database,
-    storedVersion: number
-  ): 'writable' | 'future-schema' {
-    if (storedVersion >= OBJECTIVE_DATABASE_SCHEMA_VERSION) {
-      return 'writable'
-    }
-
-    database.exec('BEGIN IMMEDIATE')
-    try {
-      const lockedVersion = Number(database.pragma('user_version', { simple: true }) ?? 0)
-      if (lockedVersion > OBJECTIVE_DATABASE_SCHEMA_VERSION) {
-        database.exec('ROLLBACK')
-        return 'future-schema'
-      }
-      if (lockedVersion < 1) {
-        database.exec(OBJECTIVE_SCHEMA_V1_SQL)
-      }
-      if (lockedVersion < 2) {
-        database.exec(OBJECTIVE_SCHEMA_V2_SQL)
-      }
-      if (lockedVersion < 3) {
-        database.exec(OBJECTIVE_SCHEMA_V3_SQL)
-      }
-      if (lockedVersion < 4) {
-        database.exec(OBJECTIVE_SCHEMA_V4_SQL)
-      }
-      if (lockedVersion < 5) {
-        database.exec(OBJECTIVE_SCHEMA_V5_SQL)
-      }
-      if (lockedVersion < OBJECTIVE_DATABASE_SCHEMA_VERSION) {
-        database.pragma(`user_version = ${OBJECTIVE_DATABASE_SCHEMA_VERSION}`)
-      }
-      database.exec('COMMIT')
-      return 'writable'
-    } catch (error) {
-      if (database.isTransaction) {
-        database.exec('ROLLBACK')
-      }
-      throw error
-    }
+    this.scoped.close()
   }
 }

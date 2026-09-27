@@ -4,21 +4,9 @@ import {
   OBJECTIVE_TASK_SPEC_MAX_LENGTH
 } from './contract-types'
 import { parseAndValidatePlannerRepairReport } from './plan-repair-schema'
-import type { ObjectivePlanTask } from './plan-schema'
+import { checkableTask as task } from './decision-test-harness'
 
 const CONTRACT = { writeTerritory: ['src/**'] }
-
-function task(taskKey: string, overrides: Partial<ObjectivePlanTask> = {}): ObjectivePlanTask {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec: `Implement ${taskKey}`,
-    deps: [],
-    criteria: [{ body: `${taskKey} works`, shellCheckable: true, checkCommand: 'pnpm check' }],
-    declaresDependencyChange: false,
-    ...overrides
-  }
-}
 
 describe('parseAndValidatePlannerRepairReport', () => {
   it('rejects a malformed report with the schema failure', () => {

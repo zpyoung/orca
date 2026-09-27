@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto'
-import { constants, type Stats } from 'node:fs'
-import { chmod, lstat, mkdir, open, realpath } from 'node:fs/promises'
+import { chmod, mkdir } from 'node:fs/promises'
 import type { ZodIssue } from 'zod'
 import {
   IntegratorReportSchema,
@@ -20,20 +19,13 @@ import {
   PlanReviewReportSchema,
   type PlanReviewReport
 } from '../../shared/fork-heimdall-objective/plan-review-schema'
-import {
-  isPathInsideOrEqual,
-  normalizeRuntimePathForComparison
-} from '../../shared/cross-platform-path'
-import { isBinaryBuffer } from '../../shared/binary-buffer'
 import { resolveGitMetadataPath } from '../../shared/git-metadata-path'
-import {
-  NodeFileReadTooLargeError,
-  readNodeFileHandleWithinLimit
-} from '../../shared/node-bounded-file-reader'
-import type { FileStat, IFilesystemProvider } from '../providers/types'
 import { localGitOptionsForTarget } from '../runtime/runtime-git-command-target'
-import { FileReadCapExceededError } from '../ssh/ssh-filesystem-stream-reader'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
+import {
+  readHardenedReportBytes,
+  type HardenedReportBytes
+} from '../fork-heimdall/hardened-report-file-reader'
 import { objectiveGitCommandForTarget, type ObjectiveWorkspaceTarget } from './content-identity'
 
 export const MAX_OBJECTIVE_REPORT_BYTES = 256 * 1024
@@ -195,19 +187,6 @@ export async function issueObjectiveReportPath(
   return reportPathForLocation(target, location, attemptFingerprint)
 }
 
-function errorCode(error: unknown): string | number | undefined {
-  if (!error || typeof error !== 'object' || !('code' in error)) {
-    return undefined
-  }
-  const code = error.code
-  return typeof code === 'string' || typeof code === 'number' ? code : undefined
-}
-
-function isMissingFileError(error: unknown): boolean {
-  const code = errorCode(error)
-  return code === 'ENOENT' || code === 'ENOTDIR' || code === 2
-}
-
 function formatIssuePath(path: readonly PropertyKey[]): string {
   let formatted = ''
   for (const segment of path) {
@@ -315,174 +294,23 @@ function matchesAnotherRole(input: unknown, expectedRole: ObjectiveReportRole): 
   )
 }
 
-const OPEN_NOFOLLOW = typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0
-const OPEN_NONBLOCK = typeof constants.O_NONBLOCK === 'number' ? constants.O_NONBLOCK : 0
-type ReportBytes = { buffer: Buffer; binary: boolean }
-
-function pathsEqual(left: string, right: string): boolean {
-  return normalizeRuntimePathForComparison(left) === normalizeRuntimePathForComparison(right)
-}
-
-async function canonicalReportPath(
-  target: ObjectiveWorkspaceTarget,
-  reportPath: string,
-  authorityRoot: string,
-  resolveRealPath: (path: string) => Promise<string>
-): Promise<string | null> {
-  const pathFlavor = resolveLeasePathFlavor(target.executionHostId, reportPath)
-  const [canonicalAuthority, canonicalParent, canonicalLeaf] = await Promise.all([
-    resolveRealPath(authorityRoot),
-    resolveRealPath(pathFlavor.dirname(reportPath)),
-    resolveRealPath(reportPath)
-  ])
-  const canonicalExpected = pathFlavor.join(canonicalParent, pathFlavor.basename(reportPath))
-  return isPathInsideOrEqual(canonicalAuthority, canonicalParent) &&
-    pathsEqual(canonicalLeaf, canonicalExpected)
-    ? canonicalExpected
-    : null
-}
-
-function sameLocalFile(left: Stats, right: Stats): boolean {
-  return left.dev === right.dev && left.ino === right.ino
-}
-
-function sameRemoteFile(left: FileStat, right: FileStat): boolean {
-  if (
-    typeof left.dev === 'number' &&
-    typeof left.ino === 'number' &&
-    typeof right.dev === 'number' &&
-    typeof right.ino === 'number'
-  ) {
-    return left.dev === right.dev && left.ino === right.ino
-  }
-  return (
-    left.type === right.type &&
-    left.size === right.size &&
-    (left.mtimeMs ?? left.mtime) === (right.mtimeMs ?? right.mtime)
-  )
-}
-
-async function readRemoteReportBytes(
-  target: ObjectiveWorkspaceTarget,
-  provider: IFilesystemProvider,
-  reportPath: string,
-  authorityRoot: string
-): Promise<ReportBytes | ObjectiveReportReadFailure> {
-  if (!provider.lstat || typeof provider.realpath !== 'function') {
-    return { ok: false, reason: 'malformed' }
-  }
-  try {
-    const canonicalPath = await canonicalReportPath(target, reportPath, authorityRoot, (path) =>
-      provider.realpath(path)
-    )
-    if (!canonicalPath) {
-      return { ok: false, reason: 'malformed' }
-    }
-    const before = await provider.lstat(canonicalPath)
-    if (before.type !== 'file') {
-      return { ok: false, reason: 'malformed' }
-    }
-    if (!Number.isSafeInteger(before.size) || before.size < 0) {
-      return { ok: false, reason: 'malformed' }
-    }
-    if (before.size > MAX_OBJECTIVE_REPORT_BYTES) {
-      return { ok: false, reason: 'oversize' }
-    }
-    const read = await provider.readFile(canonicalPath, {
-      maxTextBytes: MAX_OBJECTIVE_REPORT_BYTES,
-      maxBinaryBytes: MAX_OBJECTIVE_REPORT_BYTES
-    })
-    const [after, currentCanonicalPath] = await Promise.all([
-      provider.lstat(canonicalPath),
-      provider.realpath(canonicalPath)
-    ])
-    if (
-      after.type !== 'file' ||
-      !sameRemoteFile(before, after) ||
-      !pathsEqual(currentCanonicalPath, canonicalPath)
-    ) {
-      return { ok: false, reason: 'malformed' }
-    }
-    const buffer = read.isBinary
-      ? Buffer.from(read.content, 'base64')
-      : Buffer.from(read.content, 'utf8')
-    if (buffer.byteLength > MAX_OBJECTIVE_REPORT_BYTES) {
-      return { ok: false, reason: 'oversize' }
-    }
-    if (buffer.byteLength !== after.size) {
-      return { ok: false, reason: 'malformed' }
-    }
-    return { buffer, binary: read.isBinary || isBinaryBuffer(buffer) }
-  } catch (error) {
-    if (
-      error instanceof FileReadCapExceededError ||
-      (error instanceof Error && error.message === 'file_too_large')
-    ) {
-      return { ok: false, reason: 'oversize' }
-    }
-    if (isMissingFileError(error)) {
-      return { ok: false, reason: 'missing' }
-    }
-    throw error
-  }
-}
-
-async function readLocalReportBytes(
-  target: ObjectiveWorkspaceTarget,
-  reportPath: string,
-  authorityRoot: string
-): Promise<ReportBytes | ObjectiveReportReadFailure> {
-  try {
-    const canonicalPath = await canonicalReportPath(target, reportPath, authorityRoot, realpath)
-    if (!canonicalPath) {
-      return { ok: false, reason: 'malformed' }
-    }
-    const handle = await open(canonicalPath, constants.O_RDONLY | OPEN_NOFOLLOW | OPEN_NONBLOCK)
-    try {
-      const [opened, leaf, currentCanonicalPath] = await Promise.all([
-        handle.stat(),
-        lstat(canonicalPath),
-        realpath(canonicalPath)
-      ])
-      if (
-        !opened.isFile() ||
-        !leaf.isFile() ||
-        !sameLocalFile(opened, leaf) ||
-        !pathsEqual(currentCanonicalPath, canonicalPath)
-      ) {
-        return { ok: false, reason: 'malformed' }
-      }
-      const { buffer } = await readNodeFileHandleWithinLimit(handle, MAX_OBJECTIVE_REPORT_BYTES)
-      return { buffer, binary: isBinaryBuffer(buffer) }
-    } finally {
-      await handle.close()
-    }
-  } catch (error) {
-    if (error instanceof NodeFileReadTooLargeError) {
-      return { ok: false, reason: 'oversize' }
-    }
-    if (isMissingFileError(error)) {
-      return { ok: false, reason: 'missing' }
-    }
-    if (errorCode(error) === 'ELOOP' || errorCode(error) === 'ENXIO') {
-      return { ok: false, reason: 'malformed' }
-    }
-    throw error
-  }
-}
+type ReportBytes = HardenedReportBytes
 
 async function readReportBytes(
   target: ObjectiveWorkspaceTarget,
   reportPath: string,
   authorityRoot: string
 ): Promise<ReportBytes | ObjectiveReportReadFailure> {
-  if (target.fileProvider) {
-    return await readRemoteReportBytes(target, target.fileProvider, reportPath, authorityRoot)
-  }
-  if (target.executionHostId !== 'local') {
+  if (!target.fileProvider && target.executionHostId !== 'local') {
     throw new Error('Remote objective target has no filesystem provider')
   }
-  return await readLocalReportBytes(target, reportPath, authorityRoot)
+  return await readHardenedReportBytes({
+    executionHostId: target.executionHostId,
+    fileProvider: target.fileProvider,
+    reportPath,
+    authorityRoot,
+    maxBytes: MAX_OBJECTIVE_REPORT_BYTES
+  })
 }
 
 export async function readObjectiveRoleReport<R extends ObjectiveReportRole>(

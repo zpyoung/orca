@@ -1,6 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFile, stat } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ledger as watcherLedger,
@@ -23,6 +21,10 @@ import {
   writePlanReviewInputFile,
   type PlanReviewInput
 } from './plan-review-input'
+import {
+  cleanupTemporaryDirectories,
+  createLocalFolderTarget
+} from './objective-temp-workspace-test-fixtures'
 
 const LINT: ObjectivePlanLint = {
   findings: [],
@@ -60,17 +62,11 @@ function input(overrides: Partial<PlanReviewInput> = {}): PlanReviewInput {
 const temporaryDirectories: string[] = []
 
 async function localFolderTarget(): Promise<ObjectiveWorkspaceTarget> {
-  const workspacePath = await mkdtemp(join(tmpdir(), 'orca-plan-review-input-'))
-  temporaryDirectories.push(workspacePath)
-  return { kind: 'folder', executionHostId: 'local', workspacePath, fileProvider: null }
+  return createLocalFolderTarget(temporaryDirectories, 'orca-plan-review-input-')
 }
 
 afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  )
+  await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
 describe('buildPlanReviewInput', () => {

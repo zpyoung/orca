@@ -1,3 +1,4 @@
+import { withImmediateTransaction } from '../fork-heimdall/transaction-scope'
 import type Database from '../sqlite/sync-database'
 import type { ObjectiveDatabase } from './objective-database'
 
@@ -12,15 +13,5 @@ export function runObjectiveMutation<T>(
 ): T {
   database.assertWritable()
   const db: Database.Database = database.connection()
-  db.exec('BEGIN IMMEDIATE')
-  try {
-    const result = operation(db)
-    db.exec('COMMIT')
-    return result
-  } catch (error) {
-    if (db.isTransaction) {
-      db.exec('ROLLBACK')
-    }
-    throw error
-  }
+  return withImmediateTransaction(db, () => operation(db))
 }

@@ -1,18 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { task } from './decision-test-harness'
 import { lintObjectivePlan, type LintObjectivePlanInput, type PlanLintCode } from './plan-lint'
 import type { ObjectivePlanAssumption, ObjectivePlanTask } from './plan-schema'
-
-function task(taskKey: string, overrides: Partial<ObjectivePlanTask> = {}): ObjectivePlanTask {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec: `Implement ${taskKey}`,
-    deps: [],
-    criteria: [{ body: `${taskKey} works`, shellCheckable: false, checkCommand: null }],
-    declaresDependencyChange: false,
-    ...overrides
-  }
-}
 
 function lint(
   overrides: Partial<LintObjectivePlanInput> & { plan: ObjectivePlanTask[] }

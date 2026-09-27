@@ -1,37 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
-import type {
-  AttemptEntry,
-  KernelAction,
-  WatcherLedger
-} from '../../shared/fork-heimdall/ledger-types'
+import type { AttemptEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
-
-const WATCHER_ID = 'watcher-objective-1'
-const CONTENT_IDENTITY = 'content-identity-1'
-const REPORT: PlannerReport = {
-  plan: [
-    {
-      taskKey: 'task-a',
-      title: 'Secret node title A',
-      spec: 'Secret implementer specification A',
-      deps: [],
-      criteria: [
-        { body: 'Secret acceptance body A', shellCheckable: true, checkCommand: 'pnpm check:a' }
-      ],
-      declaresDependencyChange: false
-    },
-    {
-      taskKey: 'task-b',
-      title: 'Secret node title B',
-      spec: 'Secret implementer specification B',
-      deps: ['task-a'],
-      criteria: [{ body: 'Secret acceptance body B', shellCheckable: false, checkCommand: null }],
-      declaresDependencyChange: false
-    }
-  ]
-}
+import {
+  action,
+  CONTENT_IDENTITY,
+  ingest as sharedIngest,
+  settledAttempt,
+  WATCHER_ID
+} from './objective-store-test-fixtures'
 
 let database: ObjectiveDatabase
 let store: ObjectiveStore
@@ -51,47 +28,7 @@ afterEach(() => {
 })
 
 function ingest(revisionNumber = 1, dispatchId = `planner-${revisionNumber}`) {
-  return store.ingestPlan({
-    watcherId: WATCHER_ID,
-    revisionNumber,
-    dispatchId,
-    report: REPORT,
-    digest: `plan-digest-${revisionNumber}`,
-    createdAtMs: 100 + revisionNumber
-  })
-}
-
-function settledAttempt(
-  id: string,
-  action: KernelAction,
-  effect: NonNullable<AttemptEntry['effect']>,
-  result?: unknown
-): AttemptEntry {
-  return {
-    eventId: `event-${id}`,
-    watcherId: WATCHER_ID,
-    atMs: 1_000,
-    origin: 'owner',
-    class: 'fact',
-    kind: 'attempt',
-    attemptId: id,
-    fingerprint: `fingerprint-${id}`,
-    action,
-    state: 'settled',
-    effect,
-    ...(result === undefined ? {} : { result })
-  }
-}
-
-function action(kind: string, extras: Record<string, unknown> = {}): KernelAction {
-  return {
-    kind,
-    capability: kind === 'record-landing' ? 'land' : 'implement',
-    visibility: 'local',
-    contentIdentity: CONTENT_IDENTITY,
-    evidenceKey: `${kind}-evidence`,
-    ...extras
-  }
+  return sharedIngest(store, revisionNumber, dispatchId)
 }
 
 describe('Objective store recovery', () => {

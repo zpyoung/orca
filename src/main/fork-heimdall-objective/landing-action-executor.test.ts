@@ -1,5 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { chmod, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
@@ -18,9 +17,7 @@ import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { objectiveBarReachedPredicate } from '../../shared/fork-heimdall-objective/stop-policy'
 import type { HostedReviewInfo } from '../../shared/hosted-review'
-import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import type { ForgeProvider } from '../source-control/forge-provider'
-import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
 import { ObjectiveDatabase } from './objective-database'
 import type { ObjectiveSnapshotBinding } from './execution-context'
@@ -29,6 +26,8 @@ import {
   executeOpenHostedReview,
   executePushRef
 } from './landing-action-executor'
+import { createLandingRepositoryFixture, git, gitText } from './objective-git-test-fixtures'
+import { cleanupTemporaryDirectories } from './objective-temp-workspace-test-fixtures'
 import type { ObjectiveForgeAccess } from './objective-forge-access'
 import { objectiveRemoteRefState } from './landing-git-state'
 import { ObjectiveStore } from './objective-store'
@@ -51,14 +50,6 @@ const PLAN: PlannerReport = {
 const temporaryDirectories: string[] = []
 const databases: ObjectiveDatabase[] = []
 
-async function git(cwd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
-  return gitExecFileAsync(args, { cwd, admissionTier: 'background' })
-}
-
-async function gitText(cwd: string, args: string[]): Promise<string> {
-  return (await git(cwd, args)).stdout.trim()
-}
-
 type RepositoryFixture = {
   parent: string
   root: string
@@ -69,38 +60,15 @@ type RepositoryFixture = {
 }
 
 async function repositoryFixture(): Promise<RepositoryFixture> {
-  const parent = await mkdtemp(join(tmpdir(), 'orca-objective-landing-'))
-  temporaryDirectories.push(parent)
-  const root = join(parent, 'worktree')
-  const remote = join(parent, 'remote.git')
-  await mkdir(join(root, 'src'), { recursive: true })
-  await git(root, ['init', '-b', 'main'])
-  await git(root, ['config', 'user.name', 'Objective Landing Test'])
-  await git(root, ['config', 'user.email', 'objective@example.test'])
-  await git(root, ['config', 'commit.gpgsign', 'false'])
-  await writeFile(join(root, 'src', 'result.txt'), 'initial\n')
-  await writeFile(join(root, 'outside.txt'), 'outside initial\n')
-  await git(root, ['add', '--all'])
-  await git(root, ['commit', '-m', 'initial'])
-  await git(parent, ['init', '--bare', remote])
-  await git(root, ['remote', 'add', 'origin', remote])
-
-  const runtimeTarget = {
-    executionHostId: 'local',
-    worktree: {
-      id: `repo::${root}`,
-      repoId: 'repo',
-      path: root,
-      git: { path: root, branch: 'main', isBare: false, prunable: false, isMainWorktree: true }
-    } as unknown as RuntimeGitTarget['worktree']
-  } satisfies RuntimeGitTarget
-  const target: ObjectiveWorkspaceTarget = {
-    kind: 'git',
-    executionHostId: 'local',
-    workspacePath: root,
-    fileProvider: null,
-    gitTarget: runtimeTarget
-  }
+  const { parent, root, remote, target } = await createLandingRepositoryFixture(
+    temporaryDirectories,
+    {
+      tempPrefix: 'orca-objective-landing-',
+      userName: 'Objective Landing Test',
+      userEmail: 'objective@example.test',
+      extraFiles: { 'outside.txt': 'outside initial\n' }
+    }
+  )
   const database = new ObjectiveDatabase(':memory:')
   databases.push(database)
   const store = new ObjectiveStore(database)
@@ -348,11 +316,7 @@ afterEach(async () => {
   for (const database of databases.splice(0)) {
     database.close()
   }
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  )
+  await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
 describe('landing action executor Git effects', () => {

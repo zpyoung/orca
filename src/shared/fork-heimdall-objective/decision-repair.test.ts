@@ -8,22 +8,12 @@ import {
   planReview,
   projection,
   snapshot,
+  task as planTask,
   workerDone
 } from './decision-test-harness'
 import type { ObjectiveAction } from './objective-actions'
 import type { ObjectiveDispatchRecord } from './parallel-types'
 import type { ObjectivePlanPatchProjection } from './detail-types'
-
-function planTask(taskKey: string) {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec: `Implement ${taskKey}`,
-    deps: [],
-    criteria: [{ body: `${taskKey} works`, shellCheckable: false, checkCommand: null }],
-    declaresDependencyChange: false
-  }
-}
 
 function dispatchRecord(
   taskKey: string,

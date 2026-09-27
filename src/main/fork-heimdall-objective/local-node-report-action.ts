@@ -16,8 +16,8 @@ import {
 import { resolveObjectiveDispatchTarget } from './dispatch-worktree'
 import {
   invalidObjectiveReport,
-  rejectedWorkerReport,
-  reportActionNaturalKey
+  reportActionNaturalKey,
+  verifyWorkerReportEvidence
 } from './local-report-validation'
 import { ObjectiveNodeIngestRejectedError } from './merge-train-git'
 import {
@@ -128,43 +128,20 @@ export async function ingestObjectiveNodeReport(args: {
       detail: 'Accepted worker completion has no orchestration task id'
     })
   }
-  const evidence = findObjectiveWorkerEvidence(args.context.ledger, args.action.dispatchId)
-  const rejection = rejectedWorkerReport({
-    evidence,
+  const verification = verifyWorkerReportEvidence({
+    evidence: findObjectiveWorkerEvidence(args.context.ledger, args.action.dispatchId),
     role: 'implementer',
+    reasonPrefix: 'implementer',
+    detailPrefix: 'Implementer',
     dispatchId: args.action.dispatchId,
     taskKey: args.action.taskKey,
-    reportPath: args.action.reportPath
+    reportPath: args.action.reportPath,
+    orchestrationTaskId: args.action.orchestrationTaskId
   })
-  if (rejection) {
-    return rejection
+  if (!verification.ok) {
+    return verification.outcome
   }
-  if (
-    evidence?.outcome !== 'succeeded' ||
-    evidence.reportPath !== args.action.reportPath ||
-    evidence.orchestrationTaskId !== args.action.orchestrationTaskId
-  ) {
-    return invalidObjectiveReport({
-      reason: 'implementer-report-evidence-mismatch',
-      code: 'evidence-mismatch',
-      role: 'implementer',
-      dispatchId: args.action.dispatchId,
-      taskKey: args.action.taskKey,
-      reportPath: args.action.reportPath,
-      detail: 'Implementer report does not match accepted worker completion evidence'
-    })
-  }
-  if (!evidence.filesModifiedValid) {
-    return invalidObjectiveReport({
-      reason: 'implementer-report-evidence-malformed',
-      code: 'evidence-malformed',
-      role: 'implementer',
-      dispatchId: args.action.dispatchId,
-      taskKey: args.action.taskKey,
-      reportPath: args.action.reportPath,
-      detail: 'Worker completion filesModified must be an array of workspace-relative paths'
-    })
-  }
+  const evidence = verification.evidence
   const task =
     dispatchRecord?.task ?? args.objectiveStore.getTask(args.action.revisionId, args.action.taskKey)
   if (!task) {

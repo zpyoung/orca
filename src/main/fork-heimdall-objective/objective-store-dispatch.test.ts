@@ -1,43 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
 import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
-import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
-
-const WATCHER_ID = 'watcher-objective-1'
-const REPORT: PlannerReport = {
-  plan: [
-    {
-      taskKey: 'task-a',
-      title: 'Secret node title A',
-      spec: 'Secret implementer specification A',
-      deps: [],
-      criteria: [
-        { body: 'Secret acceptance body A', shellCheckable: true, checkCommand: 'pnpm check:a' }
-      ],
-      declaresDependencyChange: false
-    },
-    {
-      taskKey: 'task-b',
-      title: 'Secret node title B',
-      spec: 'Secret implementer specification B',
-      deps: ['task-a'],
-      criteria: [{ body: 'Secret acceptance body B', shellCheckable: false, checkCommand: null }],
-      declaresDependencyChange: false
-    }
-  ]
-}
-const CONTRACT: ObjectiveEnrollmentPayload = {
-  objectiveText: 'Implement the requested objective',
-  tier: 'standard',
-  landingBar: 'files-on-disk',
-  maxConcurrency: 1,
-  workspaceKind: 'git',
-  writeTerritory: ['src/**'],
-  roleAgents: {},
-  sitterOverrides: {}
-}
+import { CONTRACT, REPORT, WATCHER_ID } from './objective-store-test-fixtures'
 
 let database: ObjectiveDatabase
 let store: ObjectiveStore

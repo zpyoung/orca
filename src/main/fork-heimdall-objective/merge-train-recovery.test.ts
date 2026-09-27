@@ -1,12 +1,16 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
-import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
-import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 import { createObjectiveNodeCommit, recoverObjectiveNodeApply } from './merge-train-git'
+import { cleanupTemporaryDirectories } from './objective-temp-workspace-test-fixtures'
+import {
+  commitAll,
+  createMergeTrainRepositoryFixture,
+  git,
+  gitText
+} from './objective-git-test-fixtures'
 
 vi.mock('./check-runner', () => ({ runCriterionCheck: vi.fn() }))
 
@@ -18,45 +22,6 @@ const leaseGuard: LeaseGuard = {
   renewLoop: () => ({ dispose() {} })
 }
 
-async function git(cwd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
-  return gitExecFileAsync(args, { cwd, admissionTier: 'background' })
-}
-
-async function gitText(cwd: string, args: string[]): Promise<string> {
-  return (await git(cwd, args)).stdout.trim()
-}
-
-async function commitAll(cwd: string, message: string): Promise<string> {
-  await git(cwd, ['add', '--all'])
-  await git(cwd, ['commit', '-m', message])
-  return gitText(cwd, ['rev-parse', 'HEAD'])
-}
-
-function target(workspacePath: string, id: string): ObjectiveWorkspaceTarget {
-  const runtimeTarget = {
-    executionHostId: 'local',
-    worktree: {
-      id,
-      repoId: 'merge-train-recovery-test-repo',
-      path: workspacePath,
-      git: {
-        path: workspacePath,
-        branch: 'main',
-        isBare: false,
-        prunable: false,
-        isMainWorktree: id === 'source'
-      }
-    } as unknown as RuntimeGitTarget['worktree']
-  } satisfies RuntimeGitTarget
-  return {
-    kind: 'git',
-    executionHostId: 'local',
-    workspacePath,
-    fileProvider: null,
-    gitTarget: runtimeTarget
-  }
-}
-
 type RepositoryFixture = {
   source: string
   enrolled: string
@@ -66,33 +31,16 @@ type RepositoryFixture = {
 }
 
 async function repositoryFixture(): Promise<RepositoryFixture> {
-  const parent = await mkdtemp(join(tmpdir(), 'orca-objective-recovery-'))
-  temporaryDirectories.push(parent)
-  const source = join(parent, 'source')
-  const enrolled = join(parent, 'enrolled')
-  await mkdir(source)
-  await git(source, ['init'])
-  await git(source, ['config', 'user.name', 'Merge Train Recovery Test'])
-  await git(source, ['config', 'user.email', 'merge-train-recovery@example.test'])
-  await git(source, ['config', 'commit.gpgsign', 'false'])
-  await writeFile(join(source, 'shared.txt'), 'base\n')
-  const baseCommit = await commitAll(source, 'base')
-  await git(source, ['worktree', 'add', '--detach', enrolled, baseCommit])
-  return {
-    source,
-    enrolled,
-    sourceTarget: target(source, 'source'),
-    enrolledTarget: target(enrolled, 'enrolled'),
-    baseCommit
-  }
+  return createMergeTrainRepositoryFixture(temporaryDirectories, {
+    tempPrefix: 'orca-objective-recovery-',
+    repoId: 'merge-train-recovery-test-repo',
+    userName: 'Merge Train Recovery Test',
+    userEmail: 'merge-train-recovery@example.test'
+  })
 }
 
 afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  )
+  await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
 describe('objective merge train recovery', () => {

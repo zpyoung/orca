@@ -2,40 +2,18 @@ import { describe, expect, it } from 'vitest'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/detail-types'
 import { computeJudgmentIdentity } from './identity'
+import { ledger as buildLedger, world as buildWorld } from './judgment-test-world'
 import { expandJudgmentState } from './state-normalization'
 import { stableJson } from './state-projection'
 
 const watcherId = 'normalization-budget-watcher'
 
 function world(): ObjectiveWorld {
-  return {
-    contract: {
-      objectiveText: 'Implement the objective',
-      tier: 'standard',
-      landingBar: 'files-on-disk',
-      maxConcurrency: 1,
-      workspaceKind: 'folder',
-      writeTerritory: ['**'],
-      roleAgents: {},
-      sitterOverrides: {}
-    },
-    workspaceKind: 'folder',
-    plan: { revisions: [], nodes: [], verdicts: [], landing: [] },
-    reports: [],
-    budget: { wallClockActiveMs: null, turns: null },
-    capabilities: { plan: 'gated', implement: 'on', review: 'on', check: 'on', land: 'off' },
-    landingContext: {
-      branch: null,
-      headSha: null,
-      worktreeContentDigest: null,
-      pushTarget: null,
-      hostedReview: null
-    }
-  }
+  return buildWorld({ withCapabilities: true })
 }
 
 function ledger(entries: WatcherLedger['entries']): WatcherLedger {
-  return { watcherId, entries }
+  return buildLedger(watcherId, entries)
 }
 
 function repeatedHistory(text: string): WatcherLedger['entries'] {

@@ -1,6 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { writeFile } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
@@ -12,6 +10,10 @@ import { ingestObjectivePlanReviewReport } from './local-plan-review-report-acti
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
 import { issueObjectiveReportPath } from './report-ingestion'
+import {
+  cleanupTemporaryDirectories,
+  createLocalFolderTarget
+} from './objective-temp-workspace-test-fixtures'
 
 const WATCHER_ID = 'watcher-1'
 const PLAN: PlannerReport = {
@@ -35,11 +37,7 @@ afterEach(async () => {
   for (const item of opened.splice(0)) {
     item.close()
   }
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  )
+  await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
 async function fixture() {
@@ -49,14 +47,7 @@ async function fixture() {
 }
 
 async function folderTarget() {
-  const workspacePath = await mkdtemp(join(tmpdir(), 'objective-plan-review-ingest-'))
-  temporaryDirectories.push(workspacePath)
-  return {
-    kind: 'folder' as const,
-    executionHostId: 'local' as const,
-    workspacePath,
-    fileProvider: null
-  }
+  return createLocalFolderTarget(temporaryDirectories, 'objective-plan-review-ingest-')
 }
 
 function planReviewReport(

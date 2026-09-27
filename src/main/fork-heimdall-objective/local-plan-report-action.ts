@@ -22,8 +22,8 @@ import {
 import type { ObjectivePlanPatchRecord, ObjectiveStore } from './objective-store'
 import {
   invalidObjectiveReport,
-  rejectedWorkerReport,
-  reportActionNaturalKey
+  reportActionNaturalKey,
+  verifyWorkerReportEvidence
 } from './local-report-validation'
 import { readObjectiveRoleReport } from './report-ingestion'
 
@@ -80,36 +80,18 @@ export async function ingestObjectivePlanReport(args: {
       detail: 'Repair ingest action does not match its originating dispatch-planner shape'
     })
   }
-  const evidence = findObjectiveWorkerEvidence(args.context.ledger, args.action.dispatchId)
-  const rejection = rejectedWorkerReport({
-    evidence,
+  const verification = verifyWorkerReportEvidence({
+    evidence: findObjectiveWorkerEvidence(args.context.ledger, args.action.dispatchId),
     role: 'planner',
+    reasonPrefix: 'planner',
+    detailPrefix: 'Planner',
     dispatchId: args.action.dispatchId,
     reportPath: args.action.reportPath
   })
-  if (rejection) {
-    return rejection
+  if (!verification.ok) {
+    return verification.outcome
   }
-  if (evidence?.outcome !== 'succeeded' || evidence.reportPath !== args.action.reportPath) {
-    return invalidObjectiveReport({
-      reason: 'planner-report-evidence-mismatch',
-      code: 'evidence-mismatch',
-      role: 'planner',
-      dispatchId: args.action.dispatchId,
-      reportPath: args.action.reportPath,
-      detail: 'Planner report does not match accepted worker completion evidence'
-    })
-  }
-  if (!evidence.filesModifiedValid) {
-    return invalidObjectiveReport({
-      reason: 'planner-report-evidence-malformed',
-      code: 'evidence-malformed',
-      role: 'planner',
-      dispatchId: args.action.dispatchId,
-      reportPath: args.action.reportPath,
-      detail: 'Worker completion filesModified must be an array of workspace-relative paths'
-    })
-  }
+  const evidence = verification.evidence
   const read = await readObjectiveRoleReport({
     target: args.binding.target,
     attemptFingerprint: origin.attempt.fingerprint,

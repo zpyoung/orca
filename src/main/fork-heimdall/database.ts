@@ -1,16 +1,14 @@
-import { mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import Database from '../sqlite/sync-database'
-import { hardenSqliteDatabaseFiles } from '../sqlite/harden-database-files'
+import type Database from '../sqlite/sync-database'
+import {
+  ScopedSqliteDatabase,
+  type ScopedDatabaseDirectoryProvider,
+  type ScopedDatabaseDirectorySource
+} from './scoped-sqlite-database'
 
 export const HEIMDALL_DATABASE_SCHEMA_VERSION = 4
 export const HEIMDALL_DATABASE_BUSY_TIMEOUT_MS = 5_000
 
-export type HeimdallProfileDirectoryProvider = {
-  getProfileStorageDirectory(): string
-}
-
-type ProfileDirectorySource = string | (() => string) | HeimdallProfileDirectoryProvider
+export type HeimdallProfileDirectoryProvider = ScopedDatabaseDirectoryProvider
 
 const HEIMDALL_SCHEMA_V1_SQL = `
 CREATE TABLE heimdall_enrollment (
@@ -95,158 +93,48 @@ CREATE TABLE heimdall_pending_kind_purge (
 );
 `
 
+const HEIMDALL_MIGRATIONS = [
+  HEIMDALL_SCHEMA_V1_SQL,
+  HEIMDALL_SCHEMA_V2_SQL,
+  HEIMDALL_SCHEMA_V3_SQL,
+  HEIMDALL_SCHEMA_V4_SQL
+]
+
 /** Lazily owns the single profile-scoped Heimdall registry database. */
 export class HeimdallDatabase {
-  private opened: Database.Database | null = null
-  private openedReadOnly = false
-  private openedPath: string | null = null
+  private readonly scoped: ScopedSqliteDatabase
 
-  constructor(private readonly profileDirectory: ProfileDirectorySource) {}
+  constructor(profileDirectory: ScopedDatabaseDirectorySource) {
+    this.scoped = new ScopedSqliteDatabase({
+      profileDirectory,
+      supportsInMemory: false,
+      subdirectory: 'fork-heimdall',
+      filename: 'heimdall.db',
+      schemaVersion: HEIMDALL_DATABASE_SCHEMA_VERSION,
+      migrations: HEIMDALL_MIGRATIONS,
+      busyTimeoutMs: HEIMDALL_DATABASE_BUSY_TIMEOUT_MS,
+      missingDirectoryMessage: 'Heimdall requires a profile storage directory',
+      readOnlyMessage: 'Heimdall database schema is newer than this build; database is read-only'
+    })
+  }
 
   connection(): Database.Database {
-    if (this.opened) {
-      return this.opened
-    }
-
-    const databasePath = this.resolveDatabasePath()
-    mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 })
-    const probe = new Database(databasePath, { timeout: HEIMDALL_DATABASE_BUSY_TIMEOUT_MS })
-    let storedVersion: number
-    try {
-      storedVersion = Number(probe.pragma('user_version', { simple: true }) ?? 0)
-    } catch (error) {
-      probe.close()
-      throw error
-    }
-    if (storedVersion > HEIMDALL_DATABASE_SCHEMA_VERSION) {
-      probe.close()
-      const readOnly = new Database(databasePath, {
-        readonly: true,
-        fileMustExist: true,
-        timeout: HEIMDALL_DATABASE_BUSY_TIMEOUT_MS
-      })
-      this.opened = readOnly
-      this.openedReadOnly = true
-      this.openedPath = databasePath
-      return readOnly
-    }
-
-    let probeOpen = true
-    let transferred = false
-    try {
-      this.configure(probe)
-      const initialization = this.createSchema(probe, storedVersion)
-      if (initialization === 'future-schema') {
-        probe.close()
-        probeOpen = false
-        const readOnly = new Database(databasePath, {
-          readonly: true,
-          fileMustExist: true,
-          timeout: HEIMDALL_DATABASE_BUSY_TIMEOUT_MS
-        })
-        this.opened = readOnly
-        this.openedReadOnly = true
-        this.openedPath = databasePath
-        transferred = true
-        return readOnly
-      }
-      hardenSqliteDatabaseFiles(databasePath)
-      this.opened = probe
-      this.openedReadOnly = false
-      this.openedPath = databasePath
-      transferred = true
-      return probe
-    } finally {
-      if (!transferred && probeOpen) {
-        probe.close()
-      }
-    }
+    return this.scoped.connection()
   }
 
   isReadOnly(): boolean {
-    this.connection()
-    return this.openedReadOnly
+    return this.scoped.isReadOnly()
   }
 
   databasePath(): string {
-    return this.openedPath ?? this.resolveDatabasePath()
+    return this.scoped.databasePath()
   }
 
   assertWritable(): void {
-    if (this.isReadOnly()) {
-      throw new Error('Heimdall database schema is newer than this build; database is read-only')
-    }
+    this.scoped.assertWritable()
   }
 
   close(): void {
-    this.opened?.close()
-    this.opened = null
-    this.openedReadOnly = false
-    this.openedPath = null
-  }
-
-  private resolveDatabasePath(): string {
-    const profileDirectory =
-      typeof this.profileDirectory === 'string'
-        ? this.profileDirectory
-        : typeof this.profileDirectory === 'function'
-          ? this.profileDirectory()
-          : this.profileDirectory.getProfileStorageDirectory()
-    if (!profileDirectory) {
-      throw new Error('Heimdall requires a profile storage directory')
-    }
-    return join(profileDirectory, 'fork-heimdall', 'heimdall.db')
-  }
-
-  private configure(database: Database.Database): void {
-    database.pragma('journal_mode = WAL')
-    database.pragma(`busy_timeout = ${HEIMDALL_DATABASE_BUSY_TIMEOUT_MS}`)
-    database.pragma('foreign_keys = ON')
-    database.pragma('synchronous = FULL')
-  }
-
-  /**
-   * The initial version probe chooses the no-write future-schema path. A second process can still
-   * initialize or upgrade the fresh file before this connection obtains its writer lock, so the
-   * version that authorizes DDL and the version write must be read again inside that transaction.
-   */
-  private createSchema(
-    database: Database.Database,
-    storedVersion: number
-  ): 'writable' | 'future-schema' {
-    if (storedVersion >= HEIMDALL_DATABASE_SCHEMA_VERSION) {
-      return 'writable'
-    }
-
-    database.exec('BEGIN IMMEDIATE')
-    try {
-      const lockedVersion = Number(database.pragma('user_version', { simple: true }) ?? 0)
-      if (lockedVersion > HEIMDALL_DATABASE_SCHEMA_VERSION) {
-        database.exec('ROLLBACK')
-        return 'future-schema'
-      }
-      if (lockedVersion < 1) {
-        database.exec(HEIMDALL_SCHEMA_V1_SQL)
-      }
-      if (lockedVersion < 2) {
-        database.exec(HEIMDALL_SCHEMA_V2_SQL)
-      }
-      if (lockedVersion < 3) {
-        database.exec(HEIMDALL_SCHEMA_V3_SQL)
-      }
-      if (lockedVersion < 4) {
-        database.exec(HEIMDALL_SCHEMA_V4_SQL)
-      }
-      if (lockedVersion < HEIMDALL_DATABASE_SCHEMA_VERSION) {
-        database.pragma(`user_version = ${HEIMDALL_DATABASE_SCHEMA_VERSION}`)
-      }
-      database.exec('COMMIT')
-      return 'writable'
-    } catch (error) {
-      if (database.isTransaction) {
-        database.exec('ROLLBACK')
-      }
-      throw error
-    }
+    this.scoped.close()
   }
 }

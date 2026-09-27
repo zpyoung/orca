@@ -7,7 +7,8 @@ import {
   CoordinatorSeatLostError,
   QuestionAlreadyAnsweredError,
   RuntimeHeimdallOrchestrationAdapter,
-  orchestrationRequestIdForAttemptFingerprint
+  orchestrationRequestIdForAttemptFingerprint,
+  type HeimdallOrchestrationPersistence
 } from './orchestration-adapter'
 
 const upstream = vi.hoisted(() => ({
@@ -185,6 +186,15 @@ function fakeRuntime(firstDb = fakeDb('run-1')) {
   }
 }
 
+function createAdapter(
+  world: ReturnType<typeof fakeRuntime>,
+  persistence: HeimdallOrchestrationPersistence = {
+    persistOrchestrationRunId: async () => undefined
+  }
+): RuntimeHeimdallOrchestrationAdapter {
+  return new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, persistence)
+}
+
 function invokeMutation() {
   upstream.mutationRun.mockImplementation(
     async (
@@ -263,9 +273,7 @@ describe('Heimdall orchestration adapter', () => {
     const first = fakeDb('run-1')
     const second = fakeDb('run-2')
     const world = fakeRuntime(first)
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await adapter.ensureRun(enrollment())
     world.replaceDb(second)
@@ -286,9 +294,7 @@ describe('Heimdall orchestration adapter', () => {
 
   it('uses the stable attempt-derived mutation request and the exact enrolled workspace', async () => {
     const world = fakeRuntime()
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
     const watched = enrollment({ orchestrationRunId: 'run-1' })
 
     await expect(
@@ -337,9 +343,7 @@ describe('Heimdall orchestration adapter', () => {
     upstream.mutationRun.mockRejectedValueOnce(
       new OrchestrationError('task_not_startable', 'dependency task failed')
     )
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.dispatchWorker({
@@ -363,9 +367,7 @@ describe('Heimdall orchestration adapter', () => {
       .mockImplementationOnce(() => {
         throw new Error('database unavailable')
       })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
     const watched = enrollment()
 
     await expect(
@@ -395,9 +397,7 @@ describe('Heimdall orchestration adapter', () => {
 
   it('routes a folder repo through its authoritative root worktree identity', async () => {
     const world = fakeRuntime()
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await adapter.dispatchWorker({
       enrollment: enrollment({
@@ -426,9 +426,7 @@ describe('Heimdall orchestration adapter', () => {
       run_id: 'run-1',
       dispatch_id: 'dispatch-1'
     })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await adapter.answerQuestion(
       enrollment({ orchestrationRunId: 'run-1' }),
@@ -457,9 +455,7 @@ describe('Heimdall orchestration adapter', () => {
     db.answerQuestion.mockImplementation(() => {
       throw new OrchestrationError('answer_conflict', 'another answer won')
     })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.answerQuestion(
@@ -473,9 +469,7 @@ describe('Heimdall orchestration adapter', () => {
 
   it('returns no workers without opening an orchestration database or Run', async () => {
     const world = fakeRuntime()
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(adapter.listWorkers(enrollment())).resolves.toEqual([])
     expect(world.runtime.getOrchestrationDb).not.toHaveBeenCalled()
@@ -566,9 +560,7 @@ describe('Heimdall orchestration adapter', () => {
         ],
         page: { hasMore: false, nextCursor: null }
       })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(adapter.listWorkers(enrollment({ orchestrationRunId: 'run-1' }))).resolves.toEqual(
       [
@@ -617,9 +609,7 @@ describe('Heimdall orchestration adapter', () => {
       process_incarnation: 'runtime:pty:incarnation-1'
     })
     db.getWorkerDispatch.mockReturnValue({ state: 'ready' })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
@@ -653,9 +643,7 @@ describe('Heimdall orchestration adapter', () => {
       remote_runtime_epoch: 'remote-epoch',
       remote_terminal_handle: 'terminal-remote'
     })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-remote')
@@ -678,9 +666,7 @@ describe('Heimdall orchestration adapter', () => {
     upstream.stopWorker.mockRejectedValue(
       new OrchestrationError('server_required', 'Worker host is unavailable')
     )
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
@@ -710,9 +696,7 @@ describe('Heimdall orchestration adapter', () => {
       .mockImplementationOnce(() => {
         throw new OrchestrationError('consumer_fenced', 'Coordinator seat changed')
       })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
@@ -743,9 +727,7 @@ describe('Heimdall orchestration adapter', () => {
     })
     db.getWorkerDispatch.mockReturnValue({ state: 'ready' })
     upstream.stopWorker.mockResolvedValue(receipt)
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
@@ -760,9 +742,7 @@ describe('Heimdall orchestration adapter', () => {
       run_id: 'run-other',
       process_incarnation: 'runtime:pty:other'
     })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-other')
@@ -778,9 +758,7 @@ describe('Heimdall orchestration adapter', () => {
       id: 'dispatch-other',
       run_id: 'run-other'
     })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.releaseWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-other')
@@ -799,9 +777,7 @@ describe('Heimdall orchestration adapter', () => {
       upstream.resolveRunScope.mockImplementation(() => {
         throw new OrchestrationError(code, 'seat missing')
       })
-      const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-        persistOrchestrationRunId: async () => undefined
-      })
+      const adapter = createAdapter(world)
 
       await expect(
         adapter.ensureRun(enrollment({ orchestrationRunId: 'run-lost' }))
@@ -812,9 +788,7 @@ describe('Heimdall orchestration adapter', () => {
 
   it('keeps a pending receipt indeterminate without retrying it', async () => {
     const world = fakeRuntime()
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
     const input = {
       enrollment: enrollment({ orchestrationRunId: 'run-1' }),
       spec: 'work',
@@ -833,9 +807,7 @@ describe('Heimdall orchestration adapter', () => {
   it('keeps an unclassified failure after worker start crosses the effect boundary indeterminate', async () => {
     const world = fakeRuntime()
     upstream.startLocalWorker.mockRejectedValueOnce(new Error('worker start response lost'))
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.dispatchWorker({
@@ -853,9 +825,7 @@ describe('Heimdall orchestration adapter', () => {
   it('recovers only an existing receipt and reports a missing receipt without creating it', async () => {
     const db = fakeDb('run-1')
     const world = fakeRuntime(db)
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
     const input = {
       enrollment: enrollment({ orchestrationRunId: 'run-1' }),
       spec: 'work',
@@ -905,9 +875,7 @@ describe('Heimdall orchestration adapter', () => {
 
   it('maps a superseded coordinator generation to a fenced refusal', async () => {
     const world = fakeRuntime()
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
     upstream.resolveRunScope.mockImplementation(() => {
       throw new OrchestrationError('consumer_fenced', 'seat replaced')
     })
@@ -944,9 +912,7 @@ describe('Heimdall orchestration adapter', () => {
     world.runtime.inspectTerminalProcessIncarnationLiveness.mockRejectedValueOnce(
       new Error('SSH transport disconnected')
     )
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.readDispatch(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
@@ -973,9 +939,7 @@ describe('Heimdall orchestration adapter', () => {
       exact: true,
       status: 'live'
     })
-    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
-      persistOrchestrationRunId: async () => undefined
-    })
+    const adapter = createAdapter(world)
 
     await expect(
       adapter.readDispatch(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-structured')

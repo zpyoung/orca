@@ -6,35 +6,13 @@ import {
   type ComputedJudgmentIdentity,
   type JudgmentState
 } from './identity'
+import { ledger as buildLedger, world as buildWorld } from './judgment-test-world'
 import { expandJudgmentState } from './state-normalization'
 
 const watcherId = 'identity-watcher'
 
 function world(): ObjectiveWorld {
-  return {
-    contract: {
-      objectiveText: 'Implement the objective',
-      tier: 'standard',
-      landingBar: 'files-on-disk',
-      maxConcurrency: 1,
-      workspaceKind: 'folder',
-      writeTerritory: ['**'],
-      roleAgents: {},
-      sitterOverrides: {}
-    },
-    workspaceKind: 'folder',
-    plan: { revisions: [], nodes: [], verdicts: [], landing: [] },
-    reports: [],
-    budget: { wallClockActiveMs: null, turns: null },
-    capabilities: { plan: 'gated', implement: 'on', review: 'on', check: 'on', land: 'off' },
-    landingContext: {
-      branch: null,
-      headSha: null,
-      worktreeContentDigest: null,
-      pushTarget: null,
-      hostedReview: null
-    }
-  }
+  return buildWorld({ withCapabilities: true })
 }
 
 function escalation(
@@ -63,7 +41,7 @@ function escalation(
 }
 
 function ledger(entries: WatcherLedger['entries']): WatcherLedger {
-  return { watcherId, entries }
+  return buildLedger(watcherId, entries)
 }
 
 function expanded(result: ComputedJudgmentIdentity): JudgmentState {

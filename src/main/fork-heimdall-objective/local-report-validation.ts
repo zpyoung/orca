@@ -97,3 +97,69 @@ export function rejectedWorkerReport(args: {
     reportedFiles: args.evidence.filesModified
   })
 }
+
+export type WorkerReportEvidenceVerification =
+  | { ok: true; evidence: ObjectiveWorkerEvidence }
+  | { ok: false; outcome: ActionOutcome }
+
+/**
+ * Runs the rejection / evidence-mismatch / filesModifiedValid gate every ingest-report action
+ * applies before trusting a worker's accepted completion evidence. `reasonPrefix` and `detailPrefix`
+ * are passed explicitly rather than derived from `role`, since role and reason-prefix diverge for
+ * the plan-review and verdict actions.
+ */
+export function verifyWorkerReportEvidence(args: {
+  evidence: ObjectiveWorkerEvidence | null
+  role: ReportValidationProvenance['role']
+  reasonPrefix: string
+  detailPrefix: string
+  dispatchId: string
+  taskKey?: string
+  reportPath: string | null
+  orchestrationTaskId?: string
+}): WorkerReportEvidenceVerification {
+  const rejection = rejectedWorkerReport({
+    evidence: args.evidence,
+    role: args.role,
+    dispatchId: args.dispatchId,
+    ...(args.taskKey === undefined ? {} : { taskKey: args.taskKey }),
+    reportPath: args.reportPath
+  })
+  if (rejection) {
+    return { ok: false, outcome: rejection }
+  }
+  if (
+    args.evidence?.outcome !== 'succeeded' ||
+    args.evidence.reportPath !== args.reportPath ||
+    (args.orchestrationTaskId !== undefined &&
+      args.evidence.orchestrationTaskId !== args.orchestrationTaskId)
+  ) {
+    return {
+      ok: false,
+      outcome: invalidObjectiveReport({
+        reason: `${args.reasonPrefix}-report-evidence-mismatch`,
+        code: 'evidence-mismatch',
+        role: args.role,
+        dispatchId: args.dispatchId,
+        ...(args.taskKey === undefined ? {} : { taskKey: args.taskKey }),
+        reportPath: args.reportPath,
+        detail: `${args.detailPrefix} report does not match accepted worker completion evidence`
+      })
+    }
+  }
+  if (!args.evidence.filesModifiedValid) {
+    return {
+      ok: false,
+      outcome: invalidObjectiveReport({
+        reason: `${args.reasonPrefix}-report-evidence-malformed`,
+        code: 'evidence-malformed',
+        role: args.role,
+        dispatchId: args.dispatchId,
+        ...(args.taskKey === undefined ? {} : { taskKey: args.taskKey }),
+        reportPath: args.reportPath,
+        detail: 'Worker completion filesModified must be an array of workspace-relative paths'
+      })
+    }
+  }
+  return { ok: true, evidence: args.evidence }
+}

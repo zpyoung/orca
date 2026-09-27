@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from '../fork-heimdall/ledger-types'
 import { decideObjective } from './decision'
-import { attempt, ledger, node, projection, snapshot } from './decision-test-harness'
+import {
+  attempt,
+  ledger,
+  node,
+  projection,
+  snapshot,
+  task as planTask
+} from './decision-test-harness'
 import type { ObjectiveAction } from './objective-actions'
 import type { ObjectiveDispatchRecord } from './parallel-types'
 
@@ -15,17 +22,6 @@ function dispatchAction(taskKey: string): Extract<ObjectiveAction, { kind: 'disp
     revisionId: 'revision-1',
     taskKey,
     depsOrchestrationIds: []
-  }
-}
-
-function planTask(taskKey: string, deps: string[] = []) {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec: `Implement ${taskKey}`,
-    deps,
-    criteria: [{ body: `${taskKey} works`, shellCheckable: false, checkCommand: null }],
-    declaresDependencyChange: false
   }
 }
 

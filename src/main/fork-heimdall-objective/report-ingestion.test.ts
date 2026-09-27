@@ -12,18 +12,15 @@ import {
   readObjectiveRoleReport,
   resolveExpectedObjectiveReportPath
 } from './report-ingestion'
+import {
+  cleanupTemporaryDirectories,
+  createLocalFolderTarget
+} from './objective-temp-workspace-test-fixtures'
 
 const temporaryDirectories: string[] = []
 
 async function localFolderTarget(): Promise<ObjectiveWorkspaceTarget> {
-  const workspacePath = await mkdtemp(join(tmpdir(), 'orca-objective-report-'))
-  temporaryDirectories.push(workspacePath)
-  return {
-    kind: 'folder',
-    executionHostId: 'local',
-    workspacePath,
-    fileProvider: null
-  }
+  return createLocalFolderTarget(temporaryDirectories, 'orca-objective-report-')
 }
 
 function remoteFolderTarget(provider: IFilesystemProvider): ObjectiveWorkspaceTarget {
@@ -37,11 +34,7 @@ function remoteFolderTarget(provider: IFilesystemProvider): ObjectiveWorkspaceTa
 
 afterEach(async () => {
   unregisterSshGitProvider('objective-report-git-test')
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  )
+  await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
 describe('objective role report ingestion', () => {

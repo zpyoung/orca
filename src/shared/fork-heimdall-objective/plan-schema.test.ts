@@ -24,18 +24,7 @@ import {
   parseAndValidateReviewerReport,
   type ObjectivePlanTask
 } from './plan-schema'
-
-function task(taskKey: string, overrides: Partial<ObjectivePlanTask> = {}): ObjectivePlanTask {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec: `Implement ${taskKey}`,
-    deps: [],
-    criteria: [{ body: `${taskKey} works`, shellCheckable: true, checkCommand: 'pnpm check' }],
-    declaresDependencyChange: false,
-    ...overrides
-  }
-}
+import { checkableTask as task } from './decision-test-harness'
 
 describe('objective plan schema', () => {
   it('accepts a bounded acyclic task graph', () => {

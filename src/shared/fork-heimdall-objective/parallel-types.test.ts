@@ -1,18 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES } from './contract-types'
+import { task as planTask } from './decision-test-harness'
 import { ObjectiveDispatchRecordSchema, type ObjectiveDispatchRecord } from './parallel-types'
 import type { ObjectivePlanTask } from './plan-schema'
-
-function planTask(taskKey: string, spec: string): ObjectivePlanTask {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec,
-    deps: [],
-    criteria: [{ body: `${taskKey} works`, shellCheckable: false, checkCommand: null }],
-    declaresDependencyChange: false
-  }
-}
 
 function dispatchRecord(task: ObjectivePlanTask): ObjectiveDispatchRecord {
   return {
@@ -48,9 +38,11 @@ function dispatchRecord(task: ObjectivePlanTask): ObjectiveDispatchRecord {
 describe('ObjectiveDispatchRecordSchema task snapshot cap', () => {
   it('accepts a task snapshot exactly at the byte cap', () => {
     // pad spec so the whole serialized task lands exactly at the cap
-    const probeBytes = new TextEncoder().encode(JSON.stringify(planTask('at-cap', ''))).byteLength
+    const probeBytes = new TextEncoder().encode(
+      JSON.stringify(planTask('at-cap', { spec: '' }))
+    ).byteLength
     const spec = 's'.repeat(OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES - probeBytes)
-    const record = dispatchRecord(planTask('at-cap', spec))
+    const record = dispatchRecord(planTask('at-cap', { spec }))
     expect(new TextEncoder().encode(JSON.stringify(record.task)).byteLength).toBe(
       OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES
     )
@@ -58,9 +50,11 @@ describe('ObjectiveDispatchRecordSchema task snapshot cap', () => {
   })
 
   it('rejects a task snapshot one byte over the cap, naming the size limit', () => {
-    const probeBytes = new TextEncoder().encode(JSON.stringify(planTask('over-cap', ''))).byteLength
+    const probeBytes = new TextEncoder().encode(
+      JSON.stringify(planTask('over-cap', { spec: '' }))
+    ).byteLength
     const spec = 's'.repeat(OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES - probeBytes + 1)
-    const record = dispatchRecord(planTask('over-cap', spec))
+    const record = dispatchRecord(planTask('over-cap', { spec }))
     const result = ObjectiveDispatchRecordSchema.safeParse(record)
     expect(result.success).toBe(false)
     expect(

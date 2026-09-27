@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { attempt, ledger, node, projection, snapshot } from './decision-test-harness'
+import {
+  attempt,
+  ledger,
+  node,
+  projection,
+  snapshot,
+  task as planTask
+} from './decision-test-harness'
 import { objectiveFrozenTaskKeys, nextObjectiveRepairOrdinal } from './objective-repair-state'
 import type { ObjectiveAction } from './objective-actions'
 import type { ObjectiveDispatchRecord } from './parallel-types'
@@ -15,17 +22,6 @@ function dispatchNodeAction(taskKey: string): Extract<ObjectiveAction, { kind: '
     revisionId: 'revision-1',
     taskKey,
     depsOrchestrationIds: []
-  }
-}
-
-function planTask(taskKey: string) {
-  return {
-    taskKey,
-    title: `Task ${taskKey}`,
-    spec: `Implement ${taskKey}`,
-    deps: [],
-    criteria: [{ body: `${taskKey} works`, shellCheckable: false, checkCommand: null }],
-    declaresDependencyChange: false
   }
 }
 
