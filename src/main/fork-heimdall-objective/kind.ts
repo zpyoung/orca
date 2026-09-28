@@ -12,7 +12,7 @@ import type { PacingTier } from '../../shared/fork-heimdall/pacing'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
-import { ObjectiveEnrollmentPayloadSchema } from '../../shared/fork-heimdall-objective/contract-types'
+import { ObjectiveEnrollmentRequestSchema } from '../../shared/fork-heimdall-objective/contract-types'
 import {
   highestReachedRung,
   reachedRungs,
@@ -292,7 +292,7 @@ export function createObjectiveKind(args: {
   return {
     id: 'objective',
     displayName: 'Objective',
-    enrollmentPayloadSchema: ObjectiveEnrollmentPayloadSchema,
+    enrollmentPayloadSchema: ObjectiveEnrollmentRequestSchema,
     authorizeEnrollment: (input) =>
       authorizeObjectiveEnrollment(args.runtime, args.store, input, storageAuthority, forge),
     validateEnrollment(candidate, existing) {

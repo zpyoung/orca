@@ -1,10 +1,11 @@
 import type { AutomationSchedulerOwner } from '../../shared/automations-types'
-import type { ExecutionHostId } from '../../shared/execution-host'
+import { getRepoExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { ResolvedRuntimeFileTarget } from '../runtime/runtime-file-command-target'
 import {
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
+  ObjectiveEnrollmentRequestSchema,
   type ObjectiveCapabilities,
   type ObjectiveEnrollmentPayload
 } from '../../shared/fork-heimdall-objective/contract-types'
@@ -21,6 +22,10 @@ import type { Repo } from '../../shared/repo-types'
 import type { Store } from '../persistence'
 import { getAutomationSchedulerOwnerForExecutionHost } from '../persistence/scheduling-automations/automation-context-migration'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import {
+  createObjectiveEnrollmentWorktree,
+  rollbackObjectiveEnrollmentWorktree
+} from './enrollment-worktree'
 import {
   defaultObjectiveForgeAccess,
   objectiveForgeContext,
@@ -197,7 +202,7 @@ export async function authorizeObjectiveEnrollment(
     throw new Error('Objective enrollment requires the objective kind')
   }
   const capabilities = parseCapabilities(input.capabilities)
-  const candidate = ObjectiveEnrollmentPayloadSchema.parse(input.kindPayload)
+  const { newWorktree, ...candidate } = ObjectiveEnrollmentRequestSchema.parse(input.kindPayload)
   const folderScope = input.worktreeId ? parseWorkspaceKey(input.worktreeId) : null
   const canonicalFolderWorktreeId = folderScope?.type === 'folder' ? input.worktreeId : null
   const repo = store.getRepo(input.repoId)
@@ -205,85 +210,127 @@ export async function authorizeObjectiveEnrollment(
     throw new Error('Objective repository is unavailable')
   }
 
-  let workspace:
-    | Awaited<ReturnType<typeof resolveGitWorkspace>>
-    | Awaited<ReturnType<typeof resolveLegacyFolderWorkspace>>
-    | Awaited<ReturnType<typeof resolveCanonicalFolderWorkspace>>
-  if (canonicalFolderWorktreeId !== null) {
-    workspace = await resolveCanonicalFolderWorkspace(
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeFileTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
-      runtime as unknown as ObjectiveRuntimeResolver,
-      input.repoId,
-      canonicalFolderWorktreeId
-    )
-  } else if (repo && isFolderRepo(repo)) {
-    if (input.worktreeId !== null) {
-      throw new Error('Folder objective enrollment cannot name a Git worktree')
+  if (newWorktree) {
+    if (canonicalFolderWorktreeId !== null || (repo && isFolderRepo(repo))) {
+      throw new Error('New objective worktree requires a Git repository')
     }
-    workspace = await resolveLegacyFolderWorkspace(
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeFileTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
-      runtime as unknown as ObjectiveRuntimeResolver,
-      repo
-    )
-  } else {
+    if (input.worktreeId !== null) {
+      throw new Error('New objective worktree cannot name an existing worktree')
+    }
+    if (!newWorktree.name.trim()) {
+      throw new Error('New objective worktree requires a name')
+    }
+    assertRoleAgentsKnown(candidate)
+    if (capabilities.plan === 'off') {
+      throw new Error('plan-off-requires-approved-plan')
+    }
     if (!repo) {
       throw new Error('Objective repository is unavailable')
     }
-    if (!input.worktreeId) {
-      throw new Error('Git objective enrollment requires an explicit worktree')
+    schedulerOwnerFor(getRepoExecutionHostId(repo), storageAuthority)
+  }
+
+  let createdWorktree: { id: string; hostId: ExecutionHostId } | null = null
+  try {
+    let workspace:
+      | Awaited<ReturnType<typeof resolveGitWorkspace>>
+      | Awaited<ReturnType<typeof resolveLegacyFolderWorkspace>>
+      | Awaited<ReturnType<typeof resolveCanonicalFolderWorkspace>>
+    if (canonicalFolderWorktreeId !== null) {
+      workspace = await resolveCanonicalFolderWorkspace(
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeFileTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
+        runtime as unknown as ObjectiveRuntimeResolver,
+        input.repoId,
+        canonicalFolderWorktreeId
+      )
+    } else if (repo && isFolderRepo(repo)) {
+      if (input.worktreeId !== null) {
+        throw new Error('Folder objective enrollment cannot name a Git worktree')
+      }
+      workspace = await resolveLegacyFolderWorkspace(
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeFileTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
+        runtime as unknown as ObjectiveRuntimeResolver,
+        repo
+      )
+    } else {
+      if (!repo) {
+        throw new Error('Objective repository is unavailable')
+      }
+      let worktreeId = input.worktreeId
+      if (newWorktree) {
+        const created = await createObjectiveEnrollmentWorktree(runtime, repo, newWorktree)
+        worktreeId = created.worktree.id
+        createdWorktree = { id: worktreeId, hostId: getRepoExecutionHostId(repo) }
+      }
+      if (!worktreeId) {
+        throw new Error('Git objective enrollment requires an explicit worktree')
+      }
+      workspace = await resolveGitWorkspace(
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeGitTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
+        runtime as unknown as ObjectiveRuntimeResolver,
+        repo.id,
+        worktreeId
+      )
     }
-    workspace = await resolveGitWorkspace(
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeGitTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
-      runtime as unknown as ObjectiveRuntimeResolver,
-      repo.id,
-      input.worktreeId
-    )
-  }
 
-  const folder = workspace.kind === 'folder'
-  const contract: ObjectiveEnrollmentPayload = {
-    ...candidate,
-    workspaceKind: folder ? 'folder' : 'git',
-    maxConcurrency: folder ? 1 : candidate.maxConcurrency
-  }
-  if (folder && contract.landingBar !== 'files-on-disk') {
-    throw new Error('landing-bar-requires-git')
-  }
-  const requiresHostedReview =
-    OBJECTIVE_LANDING_LADDER.indexOf(contract.landingBar) >=
-    OBJECTIVE_LANDING_LADDER.indexOf('hosted-review')
-  if (!folder && input.worktreeId === null && requiresHostedReview) {
-    throw new Error('landing-bar-requires-worktree')
-  }
-  assertRoleAgentsKnown(contract)
-
-  if (workspace.kind === 'git' && requiresHostedReview) {
-    const provider = await forge.detectProvider(
-      objectiveForgeContext({
-        kind: 'git',
-        executionHostId: workspace.executionHostId,
-        workspacePath: workspace.workspacePath,
-        fileProvider: null,
-        gitTarget: workspace.gitTarget
-      })
-    )
-    if (provider !== 'github' && provider !== 'gitlab') {
-      throw new Error('landing-bar-requires-supported-forge')
+    const folder = workspace.kind === 'folder'
+    const contract: ObjectiveEnrollmentPayload = {
+      ...candidate,
+      workspaceKind: folder ? 'folder' : 'git',
+      maxConcurrency: folder ? 1 : candidate.maxConcurrency
     }
-  }
-  const schedulerOwner = schedulerOwnerFor(workspace.executionHostId, storageAuthority)
+    if (folder && contract.landingBar !== 'files-on-disk') {
+      throw new Error('landing-bar-requires-git')
+    }
+    const requiresHostedReview =
+      OBJECTIVE_LANDING_LADDER.indexOf(contract.landingBar) >=
+      OBJECTIVE_LANDING_LADDER.indexOf('hosted-review')
+    if (!folder && workspace.worktreeId === null && requiresHostedReview) {
+      throw new Error('landing-bar-requires-worktree')
+    }
+    assertRoleAgentsKnown(contract)
 
-  return {
-    kind: 'objective',
-    workspaceKey: `${workspace.executionHostId}::${workspace.workspacePath}`,
-    executionHostId: workspace.executionHostId,
-    repoId: input.repoId,
-    worktreeId: workspace.worktreeId,
-    workspacePath: workspace.workspacePath,
-    schedulerOwner,
-    capabilities,
-    budget: structuredClone(input.budget),
-    kindPayload: contract
+    if (workspace.kind === 'git' && requiresHostedReview) {
+      const provider = await forge.detectProvider(
+        objectiveForgeContext({
+          kind: 'git',
+          executionHostId: workspace.executionHostId,
+          workspacePath: workspace.workspacePath,
+          fileProvider: null,
+          gitTarget: workspace.gitTarget
+        })
+      )
+      if (provider !== 'github' && provider !== 'gitlab') {
+        throw new Error('landing-bar-requires-supported-forge')
+      }
+    }
+    const schedulerOwner = schedulerOwnerFor(workspace.executionHostId, storageAuthority)
+
+    return {
+      kind: 'objective',
+      workspaceKey: `${workspace.executionHostId}::${workspace.workspacePath}`,
+      executionHostId: workspace.executionHostId,
+      repoId: input.repoId,
+      worktreeId: workspace.worktreeId,
+      workspacePath: workspace.workspacePath,
+      schedulerOwner,
+      capabilities,
+      budget: structuredClone(input.budget),
+      kindPayload: contract
+    }
+  } catch (error) {
+    if (createdWorktree) {
+      try {
+        await rollbackObjectiveEnrollmentWorktree(
+          runtime,
+          createdWorktree.id,
+          createdWorktree.hostId
+        )
+      } catch (rollbackError) {
+        console.warn('Objective enrollment worktree rollback failed', rollbackError)
+      }
+    }
+    throw error
   }
 }
 
