@@ -60,7 +60,17 @@ vi.mock('../../runtime/rpc/methods/orchestration/worker/worker-observation', () 
   inspectWorkerTerminal: upstream.inspectWorkerTerminal
 }))
 vi.mock('../../runtime/rpc/methods/orchestration/runs/run-scope', () => ({
-  resolveRunScope: upstream.resolveRunScope
+  resolveRunScope: upstream.resolveRunScope,
+  // Why: the real builder reads the orchestration db; a terminal-handle caller maps 1:1.
+  orchestrationCallerIdentity: (
+    _runtime: unknown,
+    caller: { handle: string; paneKey: string | null | undefined }
+  ) => ({
+    address: caller.handle,
+    terminalHandle: caller.handle,
+    paneKey: caller.paneKey ?? null,
+    orcaSessionId: null
+  })
 }))
 vi.mock('../../runtime/rpc/orchestration-mutation-executor', () => ({
   getOrchestrationMutationExecutor: () => ({ run: upstream.mutationRun })
@@ -337,7 +347,10 @@ describe('Heimdall orchestration adapter', () => {
     expect(workerArgs.runtime.getTerminalPaneKey('real-terminal')).toBeNull()
     workerArgs.runtime.recordRuntimeMutation()
     expect(world.runtime.mutationCount).toBe(1)
-    expect(workerArgs.coordinatorPane).toBe(IDENTITY.paneKey)
+    expect(workerArgs.coordinator).toMatchObject({
+      terminalHandle: IDENTITY.handle,
+      paneKey: IDENTITY.paneKey
+    })
   })
 
   it('returns a typed refusal when orchestration dependencies are not startable', async () => {
