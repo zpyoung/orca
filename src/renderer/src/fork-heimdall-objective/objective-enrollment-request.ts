@@ -7,6 +7,11 @@ import {
   type ObjectiveRoleLaunchEntry,
   type ObjectiveSitterOverrides
 } from '../../../shared/fork-heimdall-objective/contract-types'
+import {
+  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+} from '../../../shared/fork-heimdall/capability'
+import { adaptObjectiveEnrollmentToCapabilities } from '../../../shared/fork-heimdall-objective/objective-enrollment-compatibility'
 import type { EnrollInput } from '../../../shared/fork-heimdall/watcher-types'
 import {
   watcherOwnerFromDraft,
@@ -89,17 +94,15 @@ export function buildObjectiveEnrollmentSubmission(
     sitterOverrides,
     ...(gates.length > 0 ? { gates } : {})
   }
-  const kindPayload: EnrollInput['kindPayload'] =
-    workspace.parallelExecutionSupported !== false
-      ? parallelKindPayload
-      : (() => {
-          const {
-            lanesEnabled: _lanesEnabled,
-            gates: _gates,
-            ...legacyKindPayload
-          } = parallelKindPayload
-          return { ...legacyKindPayload, maxConcurrency: 1 }
-        })()
+  const capabilities: string[] = []
+  const supportsUnprobedEnrollment = workspace.owner === undefined && !workspace.ownerUnavailable
+  if (workspace.parallelExecutionSupported ?? supportsUnprobedEnrollment) {
+    capabilities.push(HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY)
+  }
+  if (workspace.roleLaunchSupported ?? supportsUnprobedEnrollment) {
+    capabilities.push(HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY)
+  }
+  const kindPayload = adaptObjectiveEnrollmentToCapabilities(parallelKindPayload, capabilities)
   return {
     input: {
       kind: 'objective',

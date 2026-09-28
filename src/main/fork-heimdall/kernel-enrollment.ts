@@ -65,7 +65,8 @@ export async function authorizeKindEnrollment(
     return { status: 'refused', reason: 'unknown-kind', detail: input.kind }
   }
 
-  const payloadResult = kind.enrollmentPayloadSchema.safeParse(input.kindPayload)
+  const payloadInputSchema = kind.enrollmentInputSchema ?? kind.enrollmentPayloadSchema
+  const payloadResult = payloadInputSchema.safeParse(input.kindPayload)
   if (!payloadResult.success) {
     return { status: 'refused', reason: 'invalid-payload', detail: payloadResult.error.message }
   }

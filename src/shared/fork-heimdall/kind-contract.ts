@@ -107,6 +107,11 @@ export type KindIdentity<TEnrollmentPayload = unknown> = {
   displayName: string
   describeEnrollment(enrollment: WatcherEnrollment): string
   enrollmentPayloadSchema: z.ZodType<TEnrollmentPayload>
+  /**
+   * Validates renderer candidate data before authorization; persistence uses
+   * `enrollmentPayloadSchema`.
+   */
+  enrollmentInputSchema?: z.ZodType
   /** Re-resolves every persisted authority field from the renderer's candidate selection. */
   authorizeEnrollment(input: EnrollInput): Promise<AuthorizedEnrollment>
   /**

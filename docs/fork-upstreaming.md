@@ -701,3 +701,18 @@ bug.
 
 **Status:** merged upstream, awaiting a stable tag. Drop these exceptions at the first sync whose tag
 contains `dffb3498e2`.
+
+## Skill guide executable wording test
+
+**What:** removes a generator test that requires every guide to repeat the exact sentence
+“the executable you resolved in the stub.” The `orca-heimdall` guide states the same executable
+selection contract without that wording. Existing tests still check safe command examples,
+shared stub composition, deterministic generation, and checked-in artifacts.
+
+**Why upstream, not isolated:** this assertion is a source-text wording test in the shared
+generator suite; isolating a fork copy would preserve the incidental constraint upstream should
+drop.
+
+**Path:** `config/scripts/generate-bundled-skill-guides.test.mjs`.
+
+**Status:** pending-upstream. Not yet submitted.

@@ -12,6 +12,7 @@ import {
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
   objectiveCapabilityModes
 } from '../../../shared/fork-heimdall-objective/contract-types'
+import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from '../../../shared/fork-heimdall/capability'
 import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
 import { ObjectiveEnrollmentGateFields } from './ObjectiveEnrollmentGateFields'
@@ -76,6 +77,8 @@ function objectiveWorkspace(): ObjectiveWorkspaceOption {
     detail: '/workspace',
     owner: { connectionId: 'hermes', pairingRevision: 22 },
     ownerUnavailable: false,
+    parallelExecutionSupported: true,
+    roleLaunchSupported: true,
     availableAgentIds: ['codex']
   }
 }
@@ -425,6 +428,41 @@ describe('objective enrollment contract', () => {
       worktreeId: null,
       owner: { connectionId: 'hermes', pairingRevision: 22 },
       availableAgentIds: ['codex']
+    })
+  })
+
+  it('requires role-launch support independently of parallel-execution support', () => {
+    const runtimeStatusEntries = new Map([
+      [
+        'hermes',
+        {
+          status: { capabilities: [HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY] },
+          connectionGeneration: 1
+        }
+      ]
+    ])
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Projection reads only capabilities.
+    const runtimeStatusByEnvironmentId = runtimeStatusEntries as never
+    const options = buildObjectiveWorkspaceOptions({
+      ...runtimeState(),
+      runtimeStatusByEnvironmentId
+    })
+    const runtimeFolder = options.find((option) => option.repoId === 'folder-repo')
+
+    expect(runtimeFolder).toMatchObject({
+      parallelExecutionSupported: true,
+      roleLaunchSupported: false
+    })
+  })
+
+  it('treats missing runtime capability status as unsupported for role launch', () => {
+    const runtimeFolder = buildObjectiveWorkspaceOptions(runtimeState()).find(
+      (option) => option.repoId === 'folder-repo'
+    )
+
+    expect(runtimeFolder).toMatchObject({
+      parallelExecutionSupported: false,
+      roleLaunchSupported: false
     })
   })
 

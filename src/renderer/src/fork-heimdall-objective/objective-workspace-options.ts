@@ -8,7 +8,10 @@ import {
 } from '../../../shared/execution-host'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import type { HeimdallRemoteOwner } from '../../../shared/fork-heimdall/api'
-import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from '../../../shared/fork-heimdall/capability'
+import {
+  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+} from '../../../shared/fork-heimdall/capability'
 import {
   filterEnabledTuiAgents,
   TUI_AGENT_AUTO_PICK_ORDER
@@ -27,6 +30,7 @@ export type ObjectiveWorkspaceOption = {
   owner: HeimdallRemoteOwner | undefined
   ownerUnavailable: boolean
   parallelExecutionSupported?: boolean
+  roleLaunchSupported?: boolean
   availableAgentIds: readonly string[]
 }
 
@@ -61,13 +65,17 @@ function agentsForHost(state: ObjectiveWorkspaceState, hostId: string): readonly
 function remoteOwner(
   state: ObjectiveWorkspaceState,
   hostId: string
-): Pick<ObjectiveWorkspaceOption, 'owner' | 'ownerUnavailable' | 'parallelExecutionSupported'> {
+): Pick<
+  ObjectiveWorkspaceOption,
+  'owner' | 'ownerUnavailable' | 'parallelExecutionSupported' | 'roleLaunchSupported'
+> {
   const host = parseExecutionHostId(hostId)
   if (host?.kind !== 'runtime') {
     return {
       owner: undefined,
       ownerUnavailable: false,
-      parallelExecutionSupported: true
+      parallelExecutionSupported: true,
+      roleLaunchSupported: true
     }
   }
   const environment = state.runtimeEnvironments.find(
@@ -84,12 +92,18 @@ function remoteOwner(
           state.runtimeStatusByEnvironmentId
             .get(environment.id)
             ?.status?.capabilities?.includes(HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY) ===
+          true,
+        roleLaunchSupported:
+          state.runtimeStatusByEnvironmentId
+            .get(environment.id)
+            ?.status?.capabilities?.includes(HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY) ===
           true
       }
     : {
         owner: undefined,
         ownerUnavailable: true,
-        parallelExecutionSupported: false
+        parallelExecutionSupported: false,
+        roleLaunchSupported: false
       }
 }
 

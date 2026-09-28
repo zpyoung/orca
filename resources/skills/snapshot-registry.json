@@ -596,6 +596,24 @@
           }
         ]
       }
+    ],
+    "orca-heimdall": [
+      {
+        "releaseRevision": 1,
+        "packageDigest": "3620e94da60672b586875617c5866d1784c0e1660093a27130edc866d010a243",
+        "gitTreeSha": "545548501ab08aa149d766a8d99af00824c43611",
+        "files": [
+          {
+            "path": "SKILL.md",
+            "size": 2807,
+            "executable": false,
+            "classification": "text",
+            "exactSha256": "9c1901990ce40f13e0e3d378831fc0d7953000c0eaa42f8bec9f8d48c306d6f4",
+            "textNormalizedSha256": "9c1901990ce40f13e0e3d378831fc0d7953000c0eaa42f8bec9f8d48c306d6f4",
+            "identitySha256": "9c1901990ce40f13e0e3d378831fc0d7953000c0eaa42f8bec9f8d48c306d6f4"
+          }
+        ]
+      }
     ]
   }
 }

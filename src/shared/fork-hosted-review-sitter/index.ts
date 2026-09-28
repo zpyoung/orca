@@ -1,4 +1,5 @@
 export * from './types'
+export * from './enrollment-candidate'
 export * from './action-identity'
 export * from './decision'
 export * from './decision-action-builders'
