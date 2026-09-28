@@ -57,7 +57,7 @@ describe('judgment shared-string normalization', () => {
     expect(result.serializedBytes).toBe(Buffer.byteLength(result.serializedState, 'utf8'))
     expect(result.serializedBytes).toBeLessThan(Buffer.byteLength(canonical, 'utf8'))
     expect(expandJudgmentState(result.state)).toEqual(JSON.parse(canonical))
-    expect((expandJudgmentState(result.state) as typeof state).objective.nested.constructor).toBe(
+    expect(expandJudgmentState<typeof state>(result.state).objective.nested.constructor).toBe(
       repeated
     )
   })
@@ -80,8 +80,10 @@ describe('judgment shared-string normalization', () => {
     const second = normalizeJudgmentState(state)
     expect(first.serializedState).toBe(second.serializedState)
     expect(isNormalizedJudgmentState(first.state)).toBe(true)
-
-    const normalized = first.state as NormalizedJudgmentState
+    if (!isNormalizedJudgmentState(first.state)) {
+      throw new Error('expected normalized state')
+    }
+    const normalized = first.state
     expect(normalized.normalization.strings).toEqual({ s5: repeated })
     expect(referencedIds({ objective: normalized.objective, ledger: normalized.ledger })).toEqual(
       new Set(['s5'])

@@ -16,6 +16,7 @@ function context(
 ): HandlerContext {
   return {
     flags: new Map(flags),
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: handlers under test call only client.call; RuntimeClient's other members are unused.
     client: { call: callMock } as unknown as HandlerContext['client'],
     cwd: overrides.cwd ?? '/repo',
     json: overrides.json ?? false

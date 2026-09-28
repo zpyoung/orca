@@ -65,6 +65,7 @@ function store(args: {
   plan?: ObjectivePlanTask[]
   save: (record: ObjectiveDispatchRecord) => void
 }): ObjectiveStore {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
   return {
     listDispatches: () => [args.record],
     getTask: () => originalTask,

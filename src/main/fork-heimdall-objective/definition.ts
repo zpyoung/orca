@@ -211,6 +211,7 @@ export async function authorizeObjectiveEnrollment(
     | Awaited<ReturnType<typeof resolveCanonicalFolderWorkspace>>
   if (canonicalFolderWorktreeId !== null) {
     workspace = await resolveCanonicalFolderWorkspace(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeFileTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
       runtime as unknown as ObjectiveRuntimeResolver,
       input.repoId,
       canonicalFolderWorktreeId
@@ -220,6 +221,7 @@ export async function authorizeObjectiveEnrollment(
       throw new Error('Folder objective enrollment cannot name a Git worktree')
     }
     workspace = await resolveLegacyFolderWorkspace(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeFileTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
       runtime as unknown as ObjectiveRuntimeResolver,
       repo
     )
@@ -231,6 +233,7 @@ export async function authorizeObjectiveEnrollment(
       throw new Error('Git objective enrollment requires an explicit worktree')
     }
     workspace = await resolveGitWorkspace(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeGitTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
       runtime as unknown as ObjectiveRuntimeResolver,
       repo.id,
       input.worktreeId

@@ -55,11 +55,15 @@ function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function payloadString(payload: unknown, field: string): string {
-  if (typeof payload !== 'object' || payload === null) {
+  if (!isRecord(payload)) {
     throw new Error(`Authorized handoff payload is missing ${field}`)
   }
-  const value = (payload as Record<string, unknown>)[field]
+  const value = payload[field]
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error(`Authorized handoff payload is missing ${field}`)
   }
@@ -289,6 +293,7 @@ export class KernelTerminalTransition {
               contentIdentity: fired.detail ?? fired.predicateId,
               reachedRung: 'hosted-review',
               inheritedBudget: prepared.enrollment.budget,
+              // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: enrollment.capabilities is a generic capabilities Record; the sitter kind's contract guarantees it carries exactly HandoffOriginPayload['derivedCapabilities']'s keys by convention, which the generic Record type cannot express.
               derivedCapabilities: prepared.enrollment
                 .capabilities as HandoffOriginPayload['derivedCapabilities']
             }

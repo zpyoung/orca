@@ -11,6 +11,7 @@ export function coordinatorRuntimeFacade(
   const boundMethods = new Map<PropertyKey, { source: object; bound: object }>()
   const syntheticShow = async (handle: string) => {
     if (handle === identity.handle) {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: worker-start reads only worktreeId from the coordinator seat's synthetic show.
       return { worktreeId: workspaceId } as RuntimeTerminalShow
     }
     return runtime.showTerminal(handle)
@@ -29,6 +30,7 @@ export function coordinatorRuntimeFacade(
       if (property === 'getTerminalPaneKey') {
         return syntheticPaneKey
       }
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- a Proxy trap forwards arbitrary keys; there is no named property to read.
       const value = Reflect.get(target, property, target)
       if (typeof value !== 'function') {
         return value
@@ -37,7 +39,7 @@ export function coordinatorRuntimeFacade(
       if (cached && cached.source === value) {
         return cached.bound
       }
-      const bound = value.bind(target) as object
+      const bound: object = value.bind(target)
       boundMethods.set(property, { source: value, bound })
       return bound
     },

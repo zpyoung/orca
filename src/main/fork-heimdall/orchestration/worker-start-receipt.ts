@@ -6,16 +6,20 @@ export type WorkerStartReceipt = {
   lastError?: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 export function parseWorkerStartReceipt(serialized: string | null): WorkerStartReceipt | null {
   if (!serialized) {
     return null
   }
   try {
     const value: unknown = JSON.parse(serialized)
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!isRecord(value)) {
       return null
     }
-    const receipt = value as Record<string, unknown>
+    const receipt = value
     if (typeof receipt.state !== 'string') {
       return null
     }

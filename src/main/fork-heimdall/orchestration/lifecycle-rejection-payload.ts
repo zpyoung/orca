@@ -4,14 +4,18 @@ export type ParsedLifecycleRejection = {
   originalBody?: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
 export function parseLifecycleRejectionPayload(
   payload: Record<string, unknown>
 ): ParsedLifecycleRejection | null {
   const marker = payload._orcaLifecycleRejection
-  if (!marker || typeof marker !== 'object') {
+  if (!isRecord(marker)) {
     return null
   }
-  const rejection = marker as Record<string, unknown>
+  const rejection = marker
   const reason =
     typeof rejection.originalReason === 'string'
       ? rejection.originalReason

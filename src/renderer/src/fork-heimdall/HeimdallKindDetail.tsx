@@ -41,7 +41,7 @@ function HostedReviewHandoffOrigin({
           type="button"
           variant="link"
           size="xs"
-          className="h-auto justify-start p-0 text-xs"
+          className="h-auto justify-start"
           onClick={() => selectWatcher(objective.target)}
         >
           {label}

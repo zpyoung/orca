@@ -157,7 +157,7 @@ describe('nextObjectiveRepairOrdinal', () => {
       evidenceKey: `plan:repair:${ordinal}`,
       revisionNumber: 2,
       reason: 'replan-after-block',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: ordinal,
       repairRevisionId: 'revision-1'
     })
@@ -197,7 +197,7 @@ describe('nextObjectiveRepairOrdinal', () => {
       evidenceKey: 'plan:repair:7',
       revisionNumber: 2,
       reason: 'replan-after-block',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 7,
       repairRevisionId: 'revision-1'
     }

@@ -33,10 +33,11 @@ function enrollment(
     orchestrationRunId: null,
     createdAtMs: 1,
     terminalAtMs: null
-  } as unknown as WatcherEnrollment
+  }
 }
 
 function fileTarget(executionHostId: WatcherEnrollment['executionHostId']) {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by workspace target resolution.
   return {
     executionHostId,
     worktree: {
@@ -47,6 +48,13 @@ function fileTarget(executionHostId: WatcherEnrollment['executionHostId']) {
   } as ResolvedRuntimeFileTarget
 }
 
+function fileRuntime(
+  resolveRuntimeFileTarget: (selector: string) => Promise<unknown>
+): OrcaRuntimeService {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only resolveRuntimeFileTarget is exercised.
+  return { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
+}
+
 afterEach(() => unregisterSshFilesystemProvider(SSH_TARGET))
 
 describe('resolveObjectiveWorkspaceTarget', () => {
@@ -54,7 +62,7 @@ describe('resolveObjectiveWorkspaceTarget', () => {
     const resolveRuntimeFileTarget = vi.fn().mockResolvedValue(fileTarget('local'))
 
     const target = await resolveObjectiveWorkspaceTarget(
-      { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService,
+      fileRuntime(resolveRuntimeFileTarget),
       enrollment()
     )
 
@@ -84,7 +92,7 @@ describe('resolveObjectiveWorkspaceTarget', () => {
     }
 
     const target = await resolveObjectiveWorkspaceTarget(
-      { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService,
+      fileRuntime(resolveRuntimeFileTarget),
       canonical
     )
 
@@ -97,13 +105,14 @@ describe('resolveObjectiveWorkspaceTarget', () => {
   })
 
   it('keeps the canonical folder repo root bound to its enrolled SSH host', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: opaque marker only; resolveObjectiveWorkspaceTarget never calls provider methods, only threads the reference through.
     const provider = {} as IFilesystemProvider
     registerSshFilesystemProvider(SSH_TARGET, provider)
     const executionHostId = `ssh:${SSH_TARGET}` as const
     const resolveRuntimeFileTarget = vi.fn().mockResolvedValue(fileTarget(executionHostId))
 
     const target = await resolveObjectiveWorkspaceTarget(
-      { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService,
+      fileRuntime(resolveRuntimeFileTarget),
       enrollment(executionHostId)
     )
 

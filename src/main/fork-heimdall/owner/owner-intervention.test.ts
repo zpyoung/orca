@@ -43,6 +43,7 @@ function fakeOwner(rejection: OwnerInterventionRejection | null): OwnerAdapter<W
   return {
     describeState: () => ({ text: 'state', truncated: false }),
     describeInterventions: () => 'accept-report',
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a strict discriminated-union schema has no index signature, so it cannot structurally satisfy z.ZodType<Intervention>'s passthrough shape even though it validates the same fields at runtime.
     interventionSchema: KindInterventionSchema as unknown as z.ZodType<Intervention>,
     rejectIntervention: () => rejection,
     actionForIntervention: () => ({
@@ -62,6 +63,7 @@ const snapshot: Snapshot<World> = {
   world: { revision: 'revision-1' }
 }
 const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [] }
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeOwner's rejectIntervention/actionForIntervention ignore their enrollment argument, so it is never read by this suite.
 const enrollment = {} as WatcherEnrollment
 
 function readOk(report: unknown): OwnerReportReadResult<unknown> {

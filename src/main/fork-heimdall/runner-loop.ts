@@ -133,9 +133,7 @@ export class WatcherRunnerLoop {
       return runner.operationTail
     }
     runner.tickQueued = true
-    const operation = runner.operationTail.then(() =>
-      this.tick(runner as WatcherRunner & { kind: RegisteredWatcherKind })
-    )
+    const operation = runner.operationTail.then(() => this.tick(runner))
     runner.operationTail = operation.then(
       () => undefined,
       () => undefined

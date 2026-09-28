@@ -50,7 +50,15 @@ function runtimeStatus(capabilities: string[]): RuntimeRpcResponse<RuntimeStatus
   return {
     id: 'status.get',
     ok: true,
-    result: { capabilities } as RuntimeStatus,
+    result: {
+      runtimeId: 'runtime-remote',
+      rendererGraphEpoch: 0,
+      graphStatus: 'ready',
+      authoritativeWindowId: null,
+      liveTabCount: 0,
+      liveLeafCount: 0,
+      capabilities
+    },
     _meta: { runtimeId: 'runtime-remote' }
   }
 }

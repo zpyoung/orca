@@ -89,16 +89,16 @@ export function deleteWatcherEnrollment(input: EnrollmentDeletion): EnrollmentDe
 }
 
 export function readPendingKindPurges(database: HeimdallDatabase): PendingKindPurge[] {
-  return (
-    database
-      .connection()
-      .prepare(
-        `SELECT watcher_id AS watcherId, kind
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
+  const rows = database
+    .connection()
+    .prepare(
+      `SELECT watcher_id AS watcherId, kind
          FROM heimdall_pending_kind_purge
          ORDER BY watcher_id`
-      )
-      .all() as { watcherId: string; kind: string }[]
-  ).map((row) => ({
+    )
+    .all() as { watcherId: string; kind: string }[]
+  return rows.map((row) => ({
     watcherId: row.watcherId,
     kind: WatcherKindIdSchema.parse(row.kind)
   }))

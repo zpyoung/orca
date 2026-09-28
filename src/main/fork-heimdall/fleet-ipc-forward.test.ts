@@ -26,8 +26,10 @@ describe('forwardHeimdallFleetToRenderer', () => {
     const main = fakeWindow()
     const dashboard = fakeWindow()
     const stop = forwardHeimdallFleetToRenderer(
-      transport as never,
+      transport,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeWindow() only needs isDestroyed/webContents.send, which is all forwardHeimdallFleetToRenderer calls; the full Electron.BrowserWindow class is not worth doubling.
       () => main as unknown as Electron.BrowserWindow,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeWindow() only needs isDestroyed/webContents.send, which is all forwardHeimdallFleetToRenderer calls; the full Electron.BrowserWindow class is not worth doubling.
       () => dashboard as unknown as Electron.BrowserWindow
     )
     const snapshot = { entries: [], generatedAtMs: 10 }
@@ -51,8 +53,10 @@ describe('forwardHeimdallFleetToRenderer', () => {
     const main = fakeWindow(true)
     const dashboard = fakeWindow()
     forwardHeimdallFleetToRenderer(
-      transport as never,
+      transport,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeWindow() only needs isDestroyed/webContents.send, which is all forwardHeimdallFleetToRenderer calls; the full Electron.BrowserWindow class is not worth doubling.
       () => main as unknown as Electron.BrowserWindow,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeWindow() only needs isDestroyed/webContents.send, which is all forwardHeimdallFleetToRenderer calls; the full Electron.BrowserWindow class is not worth doubling.
       () => dashboard as unknown as Electron.BrowserWindow
     )
 

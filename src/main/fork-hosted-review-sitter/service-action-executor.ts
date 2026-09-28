@@ -1,7 +1,7 @@
 import type { ActionOutcome, EffectCertainty } from '../../shared/fork-heimdall/effect-certainty'
 import { resolveByExpectedState } from '../../shared/fork-heimdall/effect-certainty'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
-import type { AttemptEntry } from '../../shared/fork-heimdall/ledger-types'
+import type { AttemptEntry, KernelAction } from '../../shared/fork-heimdall/ledger-types'
 import type { LiveSnapshot } from '../../shared/fork-heimdall/snapshot'
 import { hostedReviewAttemptFingerprint } from '../../shared/fork-hosted-review-sitter/action-identity'
 import type {
@@ -18,6 +18,21 @@ import {
 import { publishHostedReviewPreparation } from './agent-publication'
 import { tagHostedReviewPreDispatchError } from './provider-action-effect'
 import type { HostedReviewSitterGitExecution, HostedReviewSitterProviderAdapter } from './provider'
+
+const HOSTED_REVIEW_ACTION_KINDS: Record<HostedReviewSitterAction['kind'], true> = {
+  'rerun-check': true,
+  'prepare-fix': true,
+  'publish-fix': true,
+  'prepare-conflict-resolution': true,
+  'publish-conflict-resolution': true,
+  'update-branch': true,
+  merge: true,
+  enqueue: true
+}
+
+function isHostedReviewSitterAction(action: KernelAction): action is HostedReviewSitterAction {
+  return Object.hasOwn(HOSTED_REVIEW_ACTION_KINDS, action.kind)
+}
 
 export function hostedReviewAttemptExpectation(
   action: HostedReviewSitterAction
@@ -235,7 +250,10 @@ export async function resolveHostedReviewSitterOutcome(
   git?: HostedReviewSitterGitExecution,
   assertLeaseHeld?: () => Promise<void>
 ): Promise<EffectCertainty> {
-  const action = attempt.action as HostedReviewSitterAction
+  if (!isHostedReviewSitterAction(attempt.action)) {
+    return 'indeterminate'
+  }
+  const action = attempt.action
   if (action.kind === 'prepare-fix' || action.kind === 'prepare-conflict-resolution') {
     return resolveByExpectedState(
       observedStateForPreparation(attempt, snapshot),

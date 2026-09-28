@@ -39,8 +39,11 @@ function makeClock(): HeimdallBudgetClock {
 
 function makeRunner(recovered = false): WatcherRunner {
   return {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: minimal WatcherEnrollment double; suspend/stop/remove under test only read enrollment.watcherId.
     enrollment: { watcherId: 'watcher-1' } as WatcherEnrollment,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: runner.kind is never read by the control-lifecycle methods under test.
     kind: {} as WatcherRunner['kind'],
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: runner.status is only ever spread/overwritten by the methods under test, never read.
     status: {} as WatcherRunner['status'],
     timer: null,
     operationTail: Promise.resolve(),
@@ -66,6 +69,7 @@ function makeRunner(recovered = false): WatcherRunner {
 function makeLifecycle(clock: HeimdallBudgetClock): WatcherRunnerControlLifecycle {
   return new WatcherRunnerControlLifecycle({
     budgetClock: clock,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherLedgerLifecycle is a class with private fields, so a structural test double can never satisfy it without this cast; only the two overridden methods are exercised by the code under test.
     dispatchLifecycle: {
       closeForContactLoss: vi.fn(),
       closeForShutdown: vi.fn()

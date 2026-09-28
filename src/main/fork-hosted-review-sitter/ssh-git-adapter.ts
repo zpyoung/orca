@@ -74,6 +74,7 @@ export class HostedReviewSitterSshGitProvider extends SshGitWorkingTreeProvider 
       try {
         return await this.runWithGitReadInvalidation(
           async () =>
+            // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: git.hostedReviewBranchUpdate's response shape is defined by the relay's JSON-RPC contract, not verifiable from this call site.
             (await this.mux.request('git.hostedReviewBranchUpdate', input, {
               signal,
               timeoutMs: HOSTED_REVIEW_BRANCH_UPDATE_RPC_TIMEOUT_MS

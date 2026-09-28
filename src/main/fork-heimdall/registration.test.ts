@@ -13,6 +13,7 @@ import {
 } from '../runtime/rpc/methods/fork-heimdall/kernel-binding'
 
 function unopenedStore(): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Store class; only the two methods startHeimdall's isolation path calls are relevant here.
   return {
     getProfileStorageDirectory: () => {
       throw new Error('startup opened profile storage')
@@ -28,6 +29,7 @@ afterEach(() => vi.useRealTimers())
 describe('Heimdall startup isolation', () => {
   it('binds a partial runtime without opening profile storage or scheduling work', () => {
     vi.useFakeTimers()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: empty double of the large OrcaRuntimeService class; startHeimdall's isolation path under test never calls into it.
     const runtime = {} as OrcaRuntimeService
     const kernel = startHeimdall(runtime, unopenedStore(), false)
     expect(requireHeimdallKernel(runtime)).toBe(kernel)
@@ -38,6 +40,7 @@ describe('Heimdall startup isolation', () => {
 
   it('binds a lazy serve-mode owner without opening storage or scheduling work', () => {
     vi.useFakeTimers()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: empty double of the large OrcaRuntimeService class; startHeimdall's isolation path under test never calls into it.
     const runtime = {} as OrcaRuntimeService
     const kernel = startHeimdall(runtime, unopenedStore(), true)
     expect(requireHeimdallKernel(runtime)).toBe(kernel)

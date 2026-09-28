@@ -216,10 +216,11 @@ describe('hosted-review kind preflight', () => {
   it('classifies worktree writes by action and provider execution path', () => {
     const github = definition()
     const gitlab = definition({ provider: 'gitlab' })
-    const rebaseUpdate = {
-      ...(action('update-branch') as Extract<HostedReviewSitterAction, { kind: 'update-branch' }>),
-      mode: 'rebase' as const
+    const updateBranchAction = action('update-branch')
+    if (updateBranchAction.kind !== 'update-branch') {
+      throw new Error('expected update-branch action')
     }
+    const rebaseUpdate = { ...updateBranchAction, mode: 'rebase' as const }
 
     expect(actionWritesWorktree(action('prepare-fix'), github)).toBe(true)
     expect(actionWritesWorktree(action('publish-fix'), github)).toBe(true)

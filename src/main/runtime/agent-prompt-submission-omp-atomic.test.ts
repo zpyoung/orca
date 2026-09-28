@@ -107,6 +107,7 @@ async function buildBundledWriter(): Promise<BundledWriterConstructor> {
       }
     }
   })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: write:false build() resolves to RollupOutput (or an array of them); the watch-mode union member never occurs here.
   const output = (Array.isArray(result) ? result[0] : result) as Rollup.RollupOutput
   const chunk = output.output.find(
     (item): item is Rollup.OutputChunk => item.type === 'chunk' && item.isEntry
@@ -114,7 +115,8 @@ async function buildBundledWriter(): Promise<BundledWriterConstructor> {
   if (!chunk) {
     throw new Error('OMP writer bundle emitted no entry chunk')
   }
-  const module = { exports: {} as Record<string, unknown> }
+  const exports: Record<string, unknown> = {}
+  const module = { exports }
   runInNewContext(chunk.code, {
     Buffer,
     TextEncoder,
@@ -132,6 +134,7 @@ async function buildBundledWriter(): Promise<BundledWriterConstructor> {
   if (typeof constructor !== 'function') {
     throw new Error('OMP writer bundle emitted no runtime constructor')
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the bundle evaluated from the real writer module exports this class; only its constructor signature is used.
   return constructor as unknown as BundledWriterConstructor
 }
 

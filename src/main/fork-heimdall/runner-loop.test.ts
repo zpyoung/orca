@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { getUnresolvedAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type {
@@ -33,6 +34,16 @@ function inFlightAttempt(watcherId: string): LedgerEntry[] {
     attempted,
     { ...attempted, eventId: 'running-event', atMs: 11, state: 'running', dispatchId: 'dispatch-1' }
   ]
+}
+
+function lastScheduledDelayMs(
+  schedule: Mock<(callback: () => void, delay: number) => void>
+): number {
+  const lastCall = schedule.mock.calls.at(-1)
+  if (!lastCall) {
+    throw new Error('expected a scheduled reconcile')
+  }
+  return lastCall[1]
 }
 
 describe('lease-refused status', () => {
@@ -247,7 +258,7 @@ describe('gate-hold pacing', () => {
     for (let tickIndex = 0; tickIndex < 3; tickIndex += 1) {
       world.schedule.mockClear()
       await world.service.reconcileForTesting(watcherId)
-      delays.push(world.schedule.mock.calls.at(-1)?.[1] as number)
+      delays.push(lastScheduledDelayMs(world.schedule))
     }
 
     expect(delays[1]).toBeGreaterThan(delays[0]!)
@@ -366,7 +377,7 @@ describe('gate-hold pacing', () => {
     for (let tickIndex = 0; tickIndex < 2; tickIndex += 1) {
       world.schedule.mockClear()
       await world.service.reconcileForTesting(watcherId)
-      delays.push(world.schedule.mock.calls.at(-1)?.[1] as number)
+      delays.push(lastScheduledDelayMs(world.schedule))
     }
     // a residual increment from the race would start this ramp at 60s (consecutiveGateHolds=2)
     // instead of 30s (=1)

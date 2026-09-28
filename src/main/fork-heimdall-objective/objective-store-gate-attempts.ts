@@ -83,6 +83,7 @@ function readGateAttemptRow(
   gateName: string,
   contentIdentity: string
 ): GateAttemptRow | undefined {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; gate_attempt's selected columns are written only by this store to match GateAttemptRow's field types.
   return db
     .prepare(
       `SELECT ${GATE_ATTEMPT_COLUMNS} FROM gate_attempt
@@ -190,6 +191,7 @@ export function projectGateAttempts(
   startedAtMs: number
   completedAtMs: number | null
 }[] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; gate_attempt's selected columns are written only by this store to match GateAttemptRow's field types.
   const rows = db
     .prepare(
       `SELECT ${GATE_ATTEMPT_COLUMNS} FROM gate_attempt WHERE watcher_id = ?

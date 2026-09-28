@@ -22,6 +22,7 @@ export function gitTarget(
   } = overrides
   const runtimeTarget = {
     executionHostId: 'local',
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double of Worktree/GitWorktreeInfo; only the fields objective code reads (id, repoId, path, git) are populated.
     worktree: {
       id,
       repoId,

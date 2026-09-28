@@ -232,10 +232,10 @@ describe('hosted review sitter owner adapter', () => {
         }
       }
     )
-    const state = JSON.parse(brief.text) as {
+    const state: {
       checks: { checkKey: string; required: boolean; current: boolean; state: string }[]
       omissions?: { checks?: { count: number; reference: string } }
-    }
+    } = JSON.parse(brief.text)
 
     expect(Buffer.byteLength(brief.text, 'utf8')).toBeLessThanOrEqual(2_048)
     expect(brief.truncated).toBe(true)

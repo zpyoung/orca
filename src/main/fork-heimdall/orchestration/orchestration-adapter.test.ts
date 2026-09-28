@@ -78,7 +78,7 @@ const IDENTITY = {
   paneKey: 'heimdall-pane-persisted'
 }
 
-function enrollment(overrides: Record<string, unknown> = {}): WatcherEnrollment {
+function enrollment(overrides: Partial<WatcherEnrollment> = {}): WatcherEnrollment {
   return {
     watcherId: 'watcher-1',
     kind: 'hosted-review',
@@ -99,7 +99,7 @@ function enrollment(overrides: Record<string, unknown> = {}): WatcherEnrollment 
     createdAtMs: 1,
     terminalAtMs: null,
     ...overrides
-  } as unknown as WatcherEnrollment
+  }
 }
 
 type FakeRun = {
@@ -192,6 +192,7 @@ function createAdapter(
     persistOrchestrationRunId: async () => undefined
   }
 ): RuntimeHeimdallOrchestrationAdapter {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeRuntime() implements only the OrcaRuntimeService members this adapter calls, not the full interface.
   return new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, persistence)
 }
 
@@ -251,6 +252,7 @@ describe('Heimdall orchestration adapter', () => {
   it('creates one run, persists it, and reuses the pane-bound run on a second call', async () => {
     const { runtime } = fakeRuntime()
     const persist = vi.fn(async () => undefined)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeRuntime() implements only the OrcaRuntimeService members this adapter calls, not the full interface.
     const adapter = new RuntimeHeimdallOrchestrationAdapter(runtime as never, {
       persistOrchestrationRunId: persist
     })

@@ -53,6 +53,8 @@ export const OBJECTIVE_SITTER_CAPABILITIES = [
 export type ObjectiveSitterCapability = (typeof OBJECTIVE_SITTER_CAPABILITIES)[number]
 
 export type ObjectiveEnrollmentGateDraft = {
+  /** Stable React identity for an editable row; never sent to the host. */
+  rowKey: string
   name: string
   command: string
   timeoutSecondsText: string

@@ -128,7 +128,7 @@ export function HeimdallWorkers({
                   {question.body}
                 </div>
                 <Textarea
-                  className="mt-2 min-h-20 text-xs"
+                  className="mt-2 min-h-20"
                   value={answer}
                   disabled={disabled || busyKey !== null}
                   onChange={(event) =>

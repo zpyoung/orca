@@ -2,6 +2,7 @@ import type {
   OwnerAdapter,
   OwnerInterventionRejection
 } from '../../shared/fork-heimdall/kind-contract'
+import type { Intervention } from '../../shared/fork-heimdall/owner/intervention'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { makeHostedReviewEvidenceKey } from '../../shared/fork-hosted-review-sitter/action-identity'
@@ -43,6 +44,12 @@ function rejectCapabilityGrant(
   return mode === 'off'
     ? { gate: 'sitter-overrides', reason: `The enrollment withheld the ${capability} capability.` }
     : null
+}
+
+function isHostedReviewSitterSpecificIntervention(
+  intervention: Intervention
+): intervention is HostedReviewSitterSpecificIntervention {
+  return intervention.kind === 'retry-rung' || intervention.kind === 'skip-capability'
 }
 
 function firstFailedGroup(review: HostedReviewSnapshot) {
@@ -116,27 +123,31 @@ export function createHostedReviewOwnerAdapter(): OwnerAdapter<
     describeInterventions: describeHostedReviewInterventions,
     interventionSchema: HostedReviewSitterInterventionSchema,
     rejectIntervention(intervention, _snapshot, _ledger, enrollment) {
-      const sitterIntervention = intervention as HostedReviewSitterSpecificIntervention
-      return sitterIntervention.kind === 'skip-capability'
-        ? rejectCapabilityGrant(sitterIntervention.capability, enrollment)
-        : rejectCapabilityGrant(RUNG_CAPABILITY[sitterIntervention.rung], enrollment)
+      if (!isHostedReviewSitterSpecificIntervention(intervention)) {
+        throw new Error('Hosted review owner adapter received a non-sitter intervention.')
+      }
+      return intervention.kind === 'skip-capability'
+        ? rejectCapabilityGrant(intervention.capability, enrollment)
+        : rejectCapabilityGrant(RUNG_CAPABILITY[intervention.rung], enrollment)
     },
     actionForIntervention(intervention, snapshot: Snapshot<HostedReviewWorld>) {
-      const sitterIntervention = intervention as HostedReviewSitterSpecificIntervention
-      if (sitterIntervention.kind === 'skip-capability') {
-        if (sitterIntervention.capability === 'merge') {
+      if (!isHostedReviewSitterSpecificIntervention(intervention)) {
+        throw new Error('Hosted review owner adapter received a non-sitter intervention.')
+      }
+      if (intervention.kind === 'skip-capability') {
+        if (intervention.capability === 'merge') {
           throw new Error('skip-capability for merge is always rejected before this point')
         }
-        return skipCapabilityAction(sitterIntervention.capability, snapshot.world)
+        return skipCapabilityAction(intervention.capability, snapshot.world)
       }
-      const base = baseRungAction(sitterIntervention.rung, snapshot.world)
+      const base = baseRungAction(intervention.rung, snapshot.world)
       return {
         ...base,
         evidenceKey: makeHostedReviewEvidenceKey([
           'owner-retry',
-          sitterIntervention.rung,
+          intervention.rung,
           snapshot.world.review.headSha,
-          sitterIntervention.rationale
+          intervention.rationale
         ])
       }
     }

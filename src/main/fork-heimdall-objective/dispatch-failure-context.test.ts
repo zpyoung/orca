@@ -22,6 +22,7 @@ const gate = (overrides: Partial<ObjectiveGate> = {}): ObjectiveGate => ({
 
 function binding(gates: ObjectiveGate[] | undefined): ObjectiveSnapshotBinding {
   return {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; only watcherId is exercised.
     enrollment: { watcherId: 'watcher-1' } as unknown as ObjectiveSnapshotBinding['enrollment'],
     contract: {
       objectiveText: 'Implement the objective.',
@@ -65,6 +66,7 @@ function gateAttempt(overrides: Partial<ObjectiveGateAttempt> = {}): ObjectiveGa
 function storeWithGateAttempts(
   attempts: Record<string, ObjectiveGateAttempt | null>
 ): ObjectiveStore {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only getGateAttempt is exercised.
   return {
     getGateAttempt: (_watcherId: string, gateName: string) => attempts[gateName] ?? null
   } as unknown as ObjectiveStore
@@ -77,7 +79,7 @@ function planPatch(overrides: Partial<ObjectivePlanPatchRecord> = {}): Objective
     revisionId: 'revision-1',
     createdByDispatchId: 'repair-planner-1',
     repairOrdinal: 1,
-    report: {} as ObjectivePlanPatchRecord['report'],
+    report: { repair: { upsertTasks: [], dropTaskKeys: [] } },
     digest: 'patch-digest-1',
     status: 'rejected',
     rejection: 'invalid-report:malformed json',
@@ -88,6 +90,7 @@ function planPatch(overrides: Partial<ObjectivePlanPatchRecord> = {}): Objective
 }
 
 function storeWithPlanPatches(patches: ObjectivePlanPatchRecord[]): ObjectiveStore {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
   return {
     getGateAttempt: () => null,
     listPlanPatches: (_watcherId: string) => patches
@@ -311,6 +314,7 @@ describe('deriveObjectiveFailureContext gate failure', () => {
   })
 
   it('swallows a store lookup failure instead of throwing', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
     const objectiveStore = {
       getGateAttempt: () => {
         throw new Error('database unavailable')
@@ -391,6 +395,7 @@ describe('deriveObjectiveFailureContext previous repair rejection (C5)', () => {
   })
 
   it('swallows a listPlanPatches failure instead of throwing', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
     const objectiveStore = {
       getGateAttempt: () => null,
       listPlanPatches: () => {

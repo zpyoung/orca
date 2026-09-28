@@ -36,8 +36,7 @@ import {
   OBJECTIVE_SITTER_CAPABILITIES,
   OBJECTIVE_TIERS,
   type ObjectiveEnrollmentDraft,
-  type ObjectiveLandingBarAvailability,
-  type ObjectiveLandingBar
+  type ObjectiveLandingBarAvailability
 } from './objective-enrollment-model'
 import type { ObjectiveWorkspaceOption } from './objective-workspace-options'
 import {
@@ -51,7 +50,7 @@ import {
 
 const CAPABILITY_MODES: readonly CapabilityMode[] = ['off', 'gated', 'on']
 
-function CompactSelect({
+function CompactSelect<V extends string>({
   label,
   help,
   value,
@@ -61,33 +60,41 @@ function CompactSelect({
 }: {
   label: string
   help?: ObjectiveEnrollmentHelpCopy
-  value: string
+  value: V
   disabled: boolean
-  options: readonly { value: string; label: string; disabled?: boolean }[]
-  onChange: (value: string) => void
+  options: readonly { value: V; label: string; disabled?: boolean }[]
+  onChange: (value: V) => void
 }): React.JSX.Element {
   const labelId = useId()
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
       <div className="flex min-w-0 items-center gap-1">
-        <Label id={labelId} className="truncate text-xs">
-          {label}
+        <Label id={labelId}>
+          <span className="min-w-0 truncate text-xs">{label}</span>
         </Label>
         {help ? <ObjectiveEnrollmentFieldHelp {...help} /> : null}
       </div>
-      <Select value={value} disabled={disabled} onValueChange={onChange}>
-        <SelectTrigger aria-labelledby={labelId} size="sm" className="w-full text-xs">
-          <SelectValue />
+      <Select
+        value={value}
+        disabled={disabled}
+        onValueChange={(next) => {
+          const match = options.find((option) => option.value === next)
+          if (match) {
+            onChange(match.value)
+          }
+        }}
+      >
+        <SelectTrigger aria-labelledby={labelId} size="sm" className="w-full">
+          <SelectValue>
+            <span className="text-xs">
+              {options.find((option) => option.value === value)?.label ?? value}
+            </span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
-            <SelectItem
-              key={option.value}
-              value={option.value}
-              disabled={option.disabled}
-              className="text-xs"
-            >
-              {option.label}
+            <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+              <span className="text-xs">{option.label}</span>
             </SelectItem>
           ))}
         </SelectContent>
@@ -135,7 +142,7 @@ export function ObjectiveEnrollmentFields({
     value: mode,
     label: objectiveCapabilityModeLabel(mode)
   }))
-  const sitterOptions = [
+  const sitterOptions: readonly { value: CapabilityMode | 'inherit'; label: string }[] = [
     {
       value: 'inherit',
       label: translate('fork.heimdallObjective.enrollment.inherit', 'Use landing defaults')
@@ -213,9 +220,7 @@ export function ObjectiveEnrollmentFields({
             value: tier,
             label: objectiveTierLabel(tier)
           }))}
-          onChange={(tier) =>
-            onDraftChange({ ...draft, tier: tier as ObjectiveEnrollmentDraft['tier'] })
-          }
+          onChange={(tier) => onDraftChange({ ...draft, tier })}
         />
         <CompactSelect
           label={translate('fork.heimdallObjective.enrollment.landingBar', 'Landing bar')}
@@ -227,8 +232,7 @@ export function ObjectiveEnrollmentFields({
             label: objectiveLandingBarLabel(bar),
             disabled: !isObjectiveLandingBarAvailable(landingAvailability, bar)
           }))}
-          onChange={(value) => {
-            const landingBar = value as ObjectiveLandingBar
+          onChange={(landingBar) => {
             onDraftChange({
               ...draft,
               landingBar,
@@ -261,20 +265,21 @@ export function ObjectiveEnrollmentFields({
             </Label>
             <ObjectiveEnrollmentFieldHelp {...objectiveTerritoryHelp()} />
           </div>
-          <Textarea
-            id={territoryId}
-            rows={4}
-            placeholder={translate(
-              'fork.heimdallObjective.enrollment.territoryPlaceholder',
-              'Whole workspace (default)'
-            )}
-            value={draft.writeTerritoryText}
-            disabled={disabled}
-            className="font-mono text-xs"
-            onChange={(event) =>
-              onDraftChange({ ...draft, writeTerritoryText: event.target.value })
-            }
-          />
+          <div className="font-mono">
+            <Textarea
+              id={territoryId}
+              rows={4}
+              placeholder={translate(
+                'fork.heimdallObjective.enrollment.territoryPlaceholder',
+                'Whole workspace (default)'
+              )}
+              value={draft.writeTerritoryText}
+              disabled={disabled}
+              onChange={(event) =>
+                onDraftChange({ ...draft, writeTerritoryText: event.target.value })
+              }
+            />
+          </div>
           <p className="text-[11px] text-muted-foreground">
             {translate(
               'fork.heimdallObjective.enrollment.territoryHelp',
@@ -293,18 +298,20 @@ export function ObjectiveEnrollmentFields({
             <Label id={activeBudgetId} htmlFor={activeBudgetInputId}>
               {translate('fork.heimdallObjective.enrollment.activeBudget', 'Active work (hours)')}
             </Label>
-            <Input
-              id={activeBudgetInputId}
-              type="number"
-              min="0.25"
-              step="0.25"
-              value={Number.isFinite(draft.activeBudgetHours) ? draft.activeBudgetHours : ''}
-              disabled={disabled}
-              className="h-8 w-24 text-xs tabular-nums"
-              onChange={(event) =>
-                onDraftChange({ ...draft, activeBudgetHours: event.currentTarget.valueAsNumber })
-              }
-            />
+            <div className="tabular-nums">
+              <Input
+                id={activeBudgetInputId}
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={Number.isFinite(draft.activeBudgetHours) ? draft.activeBudgetHours : ''}
+                disabled={disabled}
+                className="h-8 w-24"
+                onChange={(event) =>
+                  onDraftChange({ ...draft, activeBudgetHours: event.currentTarget.valueAsNumber })
+                }
+              />
+            </div>
           </div>
           <Slider
             aria-labelledby={activeBudgetId}
@@ -368,7 +375,7 @@ export function ObjectiveEnrollmentFields({
               onChange={(mode) =>
                 onDraftChange({
                   ...draft,
-                  capabilities: { ...draft.capabilities, [capability]: mode as CapabilityMode }
+                  capabilities: { ...draft.capabilities, [capability]: mode }
                 })
               }
             />
@@ -454,7 +461,7 @@ export function ObjectiveEnrollmentFields({
                 ...draft,
                 sitterOverrides: {
                   ...draft.sitterOverrides,
-                  [capability]: mode as CapabilityMode | 'inherit'
+                  [capability]: mode
                 }
               })
             }

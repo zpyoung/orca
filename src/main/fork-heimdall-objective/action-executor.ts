@@ -43,6 +43,12 @@ type StoreLocalAction = Exclude<
   }
 >
 
+function isDispatchAction(
+  action: ObjectiveAction
+): action is Extract<ObjectiveAction, { kind: `dispatch-${string}` }> {
+  return action.kind.startsWith('dispatch-')
+}
+
 function localActionOutcome(
   action: StoreLocalAction,
   binding: ObjectiveSnapshotBinding,
@@ -163,9 +169,9 @@ export function createObjectiveActionExecutor(
         dependencies.snapshotBindings,
         context.snapshot
       )
-      if (action.kind.startsWith('dispatch-')) {
+      if (isDispatchAction(action)) {
         return executeObjectiveDispatch({
-          action: action as Extract<ObjectiveAction, { kind: `dispatch-${string}` }>,
+          action,
           binding,
           context,
           objectiveStore: dependencies.objectiveStore,
@@ -183,7 +189,7 @@ export function createObjectiveActionExecutor(
         return executeOpenHostedReview({ action, binding, context, ...landingDependencies })
       }
       return executeObjectiveLocalAction({
-        action: action as StoreLocalAction,
+        action,
         binding,
         context,
         objectiveStore: dependencies.objectiveStore,
@@ -231,18 +237,14 @@ export function createObjectiveActionExecutor(
           objectiveStore: dependencies.objectiveStore
         }).then((effect) => ({ effect }))
       }
-      if (!parsed.data.kind.startsWith('dispatch-')) {
+      if (!isDispatchAction(parsed.data)) {
         return {
-          effect: localActionOutcome(
-            parsed.data as StoreLocalAction,
-            binding,
-            dependencies.objectiveStore
-          )
+          effect: localActionOutcome(parsed.data, binding, dependencies.objectiveStore)
         }
       }
       return resolveObjectiveDispatchOutcome({
         attempt,
-        action: parsed.data as Extract<ObjectiveAction, { kind: `dispatch-${string}` }>,
+        action: parsed.data,
         runtime: dependencies.runtime,
         lease,
         ledger,

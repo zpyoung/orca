@@ -116,15 +116,11 @@ export function importFederatedRelayItem(
           ? { code: lifecycle.code, reason: lifecycle.reason }
           : { code: params.lifecycle.code, reason: params.lifecycle.reason }
       if (!duplicate) {
-        message = this.convertLifecycleMessageToRejection(
-          message.id,
-          rejection.code,
-          rejection.reason,
-          {
+        message =
+          this.convertLifecycleMessageToRejection(message.id, rejection.code, rejection.reason, {
             originalReason:
               lifecycle.action === 'rejected' ? lifecycle.reason : params.lifecycle.originalReason
-          }
-        ) as MessageRow
+          }) ?? message
       }
     } else if (persistedRejection) {
       lifecycle = { action: 'rejected', ...persistedRejection }
@@ -159,7 +155,7 @@ export function importFederatedRelayItem(
         ) as MessageRow
         if (params.lifecycle.suppressMessage) {
           this.db.prepare('UPDATE messages SET read = 1 WHERE id = ?').run(message.id)
-          message = this.getMessageById(message.id) as MessageRow
+          message = this.getMessageById(message.id) ?? message
         }
       }
     }

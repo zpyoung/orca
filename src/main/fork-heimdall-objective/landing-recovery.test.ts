@@ -29,6 +29,7 @@ import {
 import { createLandingRepositoryFixture, git, gitText } from './objective-git-test-fixtures'
 import { cleanupTemporaryDirectories } from './objective-temp-workspace-test-fixtures'
 import { ObjectiveStore } from './objective-store'
+import { oneRow } from './objective-store-queries'
 import { computeObjectiveWorktreeContentDigest } from './objective-workspace-manifest'
 
 const WATCHER_ID = 'objective-landing-recovery'
@@ -91,6 +92,7 @@ async function recoveryFixture(): Promise<RecoveryFixture> {
     roleAgents: {},
     sitterOverrides: {}
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; only watcherId and kindPayload are read by the landing recovery probes.
   const binding = {
     enrollment: { watcherId: WATCHER_ID, kindPayload },
     contract: kindPayload,
@@ -192,6 +194,7 @@ function hostedReview(
 }
 
 function forgeReturning(getReview: () => Promise<HostedReviewInfo | null>): ObjectiveForgeAccess {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ForgeProvider interface; only the methods below are exercised.
   const provider = {
     id: 'github',
     supportsReviewCreation: true,
@@ -242,13 +245,17 @@ describe('landing recovery probes', () => {
       commitSha: await gitText(fixture.root, ['rev-parse', 'HEAD']),
       branch: 'main'
     })
-    const persisted = fixture.database
-      .connection()
-      .prepare(
-        'SELECT epoch FROM landing_evidence WHERE watcher_id = ? AND rung = ? AND content_identity = ?'
-      )
-      .get(WATCHER_ID, 'committed-local-branch', postCommitIdentity) as { epoch: number }
-    expect(persisted.epoch).toBe(recoveryLease.epoch)
+    const persisted = oneRow<{ epoch: number }>(
+      fixture.database
+        .connection()
+        .prepare(
+          'SELECT epoch FROM landing_evidence WHERE watcher_id = ? AND rung = ? AND content_identity = ?'
+        ),
+      WATCHER_ID,
+      'committed-local-branch',
+      postCommitIdentity
+    )
+    expect(persisted?.epoch).toBe(recoveryLease.epoch)
   })
 
   it.each([

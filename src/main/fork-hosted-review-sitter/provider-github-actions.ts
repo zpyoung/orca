@@ -57,7 +57,10 @@ async function assertQueueMergeMethod(
   if (definition.mergeMethod === null) {
     return
   }
-  const response = JSON.parse(
+  const response: {
+    data?: { repository?: { mergeQueue?: { configuration?: { mergeMethod?: unknown } } | null } }
+    errors?: unknown[]
+  } = JSON.parse(
     await runGitHubApi(
       state.ownerRepo,
       state.ghOptions,
@@ -76,10 +79,7 @@ async function assertQueueMergeMethod(
       ],
       signal
     )
-  ) as {
-    data?: { repository?: { mergeQueue?: { configuration?: { mergeMethod?: unknown } } | null } }
-    errors?: unknown[]
-  }
+  )
   const method = stringValue(
     response.data?.repository?.mergeQueue?.configuration?.mergeMethod
   ).toLowerCase()
@@ -240,7 +240,7 @@ async function updateBranch(
     () => tracker.markDispatched()
   )
   for (let attempt = 0; attempt < 20; attempt++) {
-    const review = JSON.parse(
+    const review: { head?: { sha?: unknown } } = JSON.parse(
       await runGitHubApi(
         state.ownerRepo,
         state.ghOptions,
@@ -251,10 +251,10 @@ async function updateBranch(
         ],
         signal
       )
-    ) as { head?: { sha?: unknown } }
+    )
     const updatedHead = stringValue(review.head?.sha)
     if (updatedHead && updatedHead !== action.headSha) {
-      const commit = JSON.parse(
+      const commit: { parents?: { sha?: unknown }[] } = JSON.parse(
         await runGitHubApi(
           state.ownerRepo,
           state.ghOptions,
@@ -265,7 +265,7 @@ async function updateBranch(
           ],
           signal
         )
-      ) as { parents?: { sha?: unknown }[] }
+      )
       const parents = commit.parents?.map((parent) => stringValue(parent.sha)) ?? []
       if (parents.length !== 2 || parents[0] !== action.headSha || parents[1] !== action.baseSha) {
         throw new Error('GitHub branch head changed to an unattributable commit after update.')
@@ -292,7 +292,7 @@ async function mergeOrEnqueue(
       throw new Error('GitHub requires this pull request to use the merge queue.')
     }
     await assertLeaseHeld()
-    const response = JSON.parse(
+    const response: { merged?: unknown; message?: unknown } = JSON.parse(
       await runGitHubApi(
         state.ownerRepo,
         state.ghOptions,
@@ -310,7 +310,7 @@ async function mergeOrEnqueue(
         signal,
         () => tracker.markDispatched()
       )
-    ) as { merged?: unknown; message?: unknown }
+    )
     if (response.merged !== true) {
       throw new Error(
         stringValue(response.message) || 'GitHub did not confirm that the pull request merged.'
@@ -327,7 +327,10 @@ async function mergeOrEnqueue(
   }
   throwIfAborted(signal)
   await assertLeaseHeld()
-  const response = JSON.parse(
+  const response: {
+    data?: { enqueuePullRequest?: { mergeQueueEntry?: { state?: unknown } | null } | null }
+    errors?: unknown[]
+  } = JSON.parse(
     await runGitHubApi(
       state.ownerRepo,
       state.ghOptions,
@@ -345,10 +348,7 @@ async function mergeOrEnqueue(
       signal,
       () => tracker.markDispatched()
     )
-  ) as {
-    data?: { enqueuePullRequest?: { mergeQueueEntry?: { state?: unknown } | null } | null }
-    errors?: unknown[]
-  }
+  )
   const queuedState = stringValue(
     response.data?.enqueuePullRequest?.mergeQueueEntry?.state
   ).toUpperCase()

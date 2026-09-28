@@ -1,4 +1,4 @@
-import { isFullGitObjectId } from '../git-handler-branch-diff-ops'
+import { isFullGitObjectId } from './git-object-id'
 import {
   OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE,
   OBJECTIVE_PATH_MODES_ALIAS,

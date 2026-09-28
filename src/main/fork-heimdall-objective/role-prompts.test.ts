@@ -498,14 +498,14 @@ describe('objective role prompts', () => {
       )
     })
 
-    it('replaces the full-plan contract with the repair contract when shape is repair', () => {
+    it('replaces the full-plan contract with the repair contract when plannerMode is repair', () => {
       const prompt = buildObjectiveRolePrompt({
         role: 'planner',
         contract,
         reportPath: '/tmp/objective/report.json',
         budgetBucket: 'plenty',
         ...parallel,
-        shape: 'repair'
+        plannerMode: 'repair'
       })
 
       expect(prompt).toContain('upsertTasks')
@@ -516,23 +516,23 @@ describe('objective role prompts', () => {
     })
 
     it('states the per-task dispatch snapshot byte cap in both the full-plan and repair contracts', () => {
-      const fullShape = buildObjectiveRolePrompt({
+      const fullPrompt = buildObjectiveRolePrompt({
         role: 'planner',
         contract,
         reportPath: '/tmp/objective/report.json',
         budgetBucket: 'plenty',
         ...parallel
       })
-      const repairShape = buildObjectiveRolePrompt({
+      const repairPrompt = buildObjectiveRolePrompt({
         role: 'planner',
         contract,
         reportPath: '/tmp/objective/report.json',
         budgetBucket: 'plenty',
         ...parallel,
-        shape: 'repair'
+        plannerMode: 'repair'
       })
 
-      for (const prompt of [fullShape, repairShape]) {
+      for (const prompt of [fullPrompt, repairPrompt]) {
         expect(prompt).toContain(`under ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES} bytes`)
         expect(prompt).toContain('can never dispatch')
       }
@@ -561,7 +561,7 @@ describe('objective role prompts', () => {
         reportPath: '/tmp/objective/report.json',
         budgetBucket: 'plenty',
         ...parallel,
-        shape: 'repair',
+        plannerMode: 'repair',
         repairContext
       })
 
@@ -572,7 +572,7 @@ describe('objective role prompts', () => {
     })
 
     it('renders plan review findings for either report shape', () => {
-      const fullShape = buildObjectiveRolePrompt({
+      const fullPrompt = buildObjectiveRolePrompt({
         role: 'planner',
         contract,
         reportPath: '/tmp/objective/report.json',
@@ -580,21 +580,21 @@ describe('objective role prompts', () => {
         ...parallel,
         planReviewFindings: 'The prior plan left task ordering ambiguous.'
       })
-      const repairShape = buildObjectiveRolePrompt({
+      const repairPrompt = buildObjectiveRolePrompt({
         role: 'planner',
         contract,
         reportPath: '/tmp/objective/report.json',
         budgetBucket: 'plenty',
         ...parallel,
-        shape: 'repair',
+        plannerMode: 'repair',
         repairContext,
         planReviewFindings: 'The prior plan left task ordering ambiguous.'
       })
 
-      expect(fullShape).toContain(
+      expect(fullPrompt).toContain(
         'PLAN REVIEW FINDINGS:\nThe prior plan left task ordering ambiguous.'
       )
-      expect(repairShape).toContain(
+      expect(repairPrompt).toContain(
         'PLAN REVIEW FINDINGS:\nThe prior plan left task ordering ambiguous.'
       )
     })
@@ -620,7 +620,7 @@ describe('objective role prompts', () => {
         reportPath: '/tmp/objective/report.json',
         budgetBucket: 'plenty',
         ...parallel,
-        shape: 'repair',
+        plannerMode: 'repair',
         repairContext: hugeRepairContext
       }
 

@@ -121,11 +121,11 @@ export function createHostedReviewKind(
     execute: (action, context) =>
       executeHostedReviewSitterAction(runtime, store, provider, action, context),
     async resolveOutcome(attempt, snapshot, _ledger, lease) {
-      const action = attempt.action as HostedReviewSitterAction
+      const actionKind = attempt.action.kind
       if (
-        action.kind !== 'publish-fix' &&
-        action.kind !== 'publish-conflict-resolution' &&
-        action.kind !== 'update-branch'
+        actionKind !== 'publish-fix' &&
+        actionKind !== 'publish-conflict-resolution' &&
+        actionKind !== 'update-branch'
       ) {
         return { effect: await resolveHostedReviewSitterOutcome(attempt, snapshot) }
       }

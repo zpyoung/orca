@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
+import type { ExecuteContext, PreflightContext } from '../../shared/fork-heimdall/kind-contract'
 import type { LiveSnapshot, Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { AttemptEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import {
@@ -70,6 +70,7 @@ const snapshot: Snapshot<HostedReviewWorld> = {
 }
 
 function fakeStore(): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double of Store; only the members this suite reaches are stubbed.
   return {
     getRepo: () => ({ id: 'repo-1' }),
     getSettings: () => ({
@@ -81,6 +82,7 @@ function fakeStore(): Store {
   } as unknown as Store
 }
 
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double of OrcaRuntimeService; only launchAgentTerminal is reached by kind.execute in this suite.
 const runtime = { launchAgentTerminal: vi.fn() } as unknown as OrcaRuntimeService
 
 function attemptLedger(
@@ -106,6 +108,38 @@ function attemptLedger(
       }
     ]
   }
+}
+
+// Only `kind` (and `mode` for update-branch) drive the gating/preflight paths these fixtures exercise.
+function fakeAction(
+  kind: HostedReviewSitterAction['kind'],
+  overrides: Record<string, unknown> = {}
+): HostedReviewSitterAction {
+  const base = {
+    kind,
+    capability: 'fixChecks',
+    visibility: 'external',
+    contentIdentity: snapshot.contentIdentity,
+    evidenceKey: 'evidence',
+    headSha: review.headSha,
+    reviewUrl: definition.reviewUrl,
+    ...overrides
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: test fixture; gating.ts and hostedReviewPreflight only read `kind` (and `mode` for update-branch) from these actions.
+  return base as HostedReviewSitterAction
+}
+
+// kind.ts's own preflight implementation takes no context argument; this only satisfies the type.
+function fakePreflightContext(): PreflightContext {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: never read by kind.preflight, which ignores its fourth argument.
+  return { enrollment: {} } as PreflightContext
+}
+
+function fakeGit(
+  overrides: Partial<HostedReviewSitterGitExecution>
+): HostedReviewSitterGitExecution {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double; each scenario only exercises the git methods it overrides.
+  return overrides as HostedReviewSitterGitExecution
 }
 
 describe('hosted review kind', () => {
@@ -146,6 +180,7 @@ describe('hosted review kind', () => {
       }
       const terminal = vi.fn()
       const assertHeld = vi.fn(async () => undefined)
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double of WatcherRunner; only kind and leaseGuard are reached by stopLifecycle.evaluate.
       const runner = {
         kind,
         leaseGuard: {
@@ -155,10 +190,13 @@ describe('hosted review kind', () => {
           renewLoop: () => ({ dispose: () => undefined })
         }
       } as unknown as WatcherRunner
-      const stopLifecycle = new WatcherRunnerStopLifecycle({
-        terminal,
-        park: vi.fn()
-      } as unknown as WatcherRunnerStatusLifecycle)
+      const stopLifecycle = new WatcherRunnerStopLifecycle(
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double of WatcherRunnerStatusLifecycle; only terminal and park are reached.
+        {
+          terminal,
+          park: vi.fn()
+        } as unknown as WatcherRunnerStatusLifecycle
+      )
 
       await expect(
         stopLifecycle.evaluate(runner, terminalSnapshot, attemptLedger(action, 'running'))
@@ -215,13 +253,15 @@ describe('hosted review kind', () => {
     ]
   ] as const)('maps contention %j through kind preflight', async (contention, verdict) => {
     inspectContention.mockResolvedValueOnce(contention)
-    const action = {
-      kind: 'prepare-fix',
-      reviewUrl: definition.reviewUrl
-    } as HostedReviewSitterAction
+    const action = fakeAction('prepare-fix')
     const kind = createHostedReviewKind(runtime, fakeStore())
     await expect(
-      kind.preflight!(action, snapshot, { watcherId: 'watcher-1', entries: [] }, {} as never)
+      kind.preflight!(
+        action,
+        snapshot,
+        { watcherId: 'watcher-1', entries: [] },
+        fakePreflightContext()
+      )
     ).resolves.toEqual(verdict)
   })
 
@@ -267,7 +307,9 @@ describe('hosted review kind', () => {
     } as const satisfies HostedReviewSitterAction
     const kind = createHostedReviewKind(runtime, fakeStore())
 
-    await expect(kind.preflight!(publication, snapshot, ledger, {} as never)).resolves.toEqual({
+    await expect(
+      kind.preflight!(publication, snapshot, ledger, fakePreflightContext())
+    ).resolves.toEqual({
       verdict: 'allow'
     })
     expect(inspectContention).toHaveBeenCalledWith(runtime, expect.anything(), definition, {
@@ -277,56 +319,32 @@ describe('hosted review kind', () => {
   })
 
   it('marks only local worktree mutations as contention-sensitive', async () => {
+    expect(actionWritesWorktree(fakeAction('prepare-fix'), definition)).toBe(true)
+    expect(actionWritesWorktree(fakeAction('prepare-conflict-resolution'), definition)).toBe(true)
+    expect(actionWritesWorktree(fakeAction('publish-fix'), definition)).toBe(true)
+    expect(actionWritesWorktree(fakeAction('publish-conflict-resolution'), definition)).toBe(true)
     expect(
-      actionWritesWorktree({ kind: 'prepare-fix' } as HostedReviewSitterAction, definition)
-    ).toBe(true)
-    expect(
-      actionWritesWorktree(
-        { kind: 'prepare-conflict-resolution' } as HostedReviewSitterAction,
-        definition
-      )
-    ).toBe(true)
-    expect(
-      actionWritesWorktree({ kind: 'publish-fix' } as HostedReviewSitterAction, definition)
-    ).toBe(true)
-    expect(
-      actionWritesWorktree(
-        { kind: 'publish-conflict-resolution' } as HostedReviewSitterAction,
-        definition
-      )
-    ).toBe(true)
-    expect(
-      actionWritesWorktree(
-        { kind: 'update-branch', mode: 'merge-base-update' } as HostedReviewSitterAction,
-        definition
-      )
+      actionWritesWorktree(fakeAction('update-branch', { mode: 'merge-base-update' }), definition)
     ).toBe(false)
-    expect(
-      actionWritesWorktree(
-        { kind: 'update-branch', mode: 'rebase' } as HostedReviewSitterAction,
-        definition
-      )
-    ).toBe(true)
-    expect(
-      actionWritesWorktree(
-        { kind: 'update-branch', mode: 'merge-base-update' } as HostedReviewSitterAction,
-        { ...definition, provider: 'gitlab' }
-      )
-    ).toBe(true)
-    expect(
-      actionWritesWorktree({ kind: 'rerun-check' } as HostedReviewSitterAction, definition)
-    ).toBe(false)
-    expect(actionWritesWorktree({ kind: 'merge' } as HostedReviewSitterAction, definition)).toBe(
-      false
+    expect(actionWritesWorktree(fakeAction('update-branch', { mode: 'rebase' }), definition)).toBe(
+      true
     )
+    expect(
+      actionWritesWorktree(fakeAction('update-branch', { mode: 'merge-base-update' }), {
+        ...definition,
+        provider: 'gitlab'
+      })
+    ).toBe(true)
+    expect(actionWritesWorktree(fakeAction('rerun-check'), definition)).toBe(false)
+    expect(actionWritesWorktree(fakeAction('merge'), definition)).toBe(false)
     inspectContention.mockClear()
     const kind = createHostedReviewKind(runtime, fakeStore())
     await expect(
       kind.preflight!(
-        { kind: 'rerun-check', reviewUrl: definition.reviewUrl } as HostedReviewSitterAction,
+        fakeAction('rerun-check'),
         snapshot,
         { watcherId: 'watcher-1', entries: [] },
-        {} as never
+        fakePreflightContext()
       )
     ).resolves.toEqual({ verdict: 'allow' })
     expect(inspectContention).not.toHaveBeenCalled()
@@ -538,13 +556,13 @@ describe('hosted review kind', () => {
         ...snapshot,
         freshness: 'live'
       }
-      const landedGit = {
+      const landedGit = fakeGit({
         remoteHeadSha: async () => scenario.landedReview.headSha,
         currentHeadSha: async () => scenario.landedReview.headSha
-      } as unknown as HostedReviewSitterGitExecution
-      const unchangedGit = {
+      })
+      const unchangedGit = fakeGit({
         remoteHeadSha: async () => review.headSha
-      } as unknown as HostedReviewSitterGitExecution
+      })
       const needsGit =
         scenario.action.kind === 'publish-fix' ||
         scenario.action.kind === 'publish-conflict-resolution' ||
@@ -565,11 +583,11 @@ describe('hosted review kind', () => {
         )
       ).toBe(scenario.unchangedEffect)
       if (needsGit) {
-        const unavailableGit = {
+        const unavailableGit = fakeGit({
           remoteHeadSha: async () => {
             throw new Error('execution host unavailable')
           }
-        } as unknown as HostedReviewSitterGitExecution
+        })
         expect(
           await resolveHostedReviewSitterOutcome(attempt, landedSnapshot, unavailableGit)
         ).toBe('indeterminate')
@@ -584,19 +602,25 @@ describe('hosted review kind', () => {
             review: { ...review, headSha: hostedHead, behindBase: false }
           }
         }
-        const hostedGit = {
+        const hostedGit = fakeGit({
           remoteHeadSha: async () => hostedHead,
           currentHeadSha: async () => review.headSha,
-          commitParents: async () => [scenario.action.headSha, scenario.action.baseSha]
-        } as unknown as HostedReviewSitterGitExecution
+          commitParents: async () =>
+            [scenario.action.headSha, scenario.action.baseSha].filter(
+              (sha): sha is string => typeof sha === 'string'
+            )
+        })
         expect(await resolveHostedReviewSitterOutcome(attempt, hostedSnapshot, hostedGit)).toBe(
           'landed'
         )
 
-        const foreignGit = {
+        const foreignGit = fakeGit({
           ...hostedGit,
-          commitParents: async () => ['f'.repeat(40), scenario.action.baseSha]
-        } as unknown as HostedReviewSitterGitExecution
+          commitParents: async () =>
+            ['f'.repeat(40), scenario.action.baseSha].filter(
+              (sha): sha is string => typeof sha === 'string'
+            )
+        })
         expect(await resolveHostedReviewSitterOutcome(attempt, hostedSnapshot, foreignGit)).toBe(
           'indeterminate'
         )

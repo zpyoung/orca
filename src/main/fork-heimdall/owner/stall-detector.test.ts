@@ -207,7 +207,7 @@ describe('detectStall', () => {
 
   it('ignores an attempted (not yet running) attempt', () => {
     const attempted: AttemptEntry = { ...runningAttempt(0), state: 'attempted' }
-    delete (attempted as { dispatchId?: string }).dispatchId
+    delete attempted.dispatchId
     expect(detectStall(ledger([attempted]), 1_000_000)).toBeNull()
   })
 })

@@ -60,7 +60,7 @@ export function nextObjectiveRepairOrdinal(
   for (const { action } of attempts) {
     if (
       action.kind === 'dispatch-planner' &&
-      action.shape === 'repair' &&
+      action.plannerMode === 'repair' &&
       action.repairRevisionId === revisionId &&
       action.repairOrdinal !== undefined
     ) {
@@ -109,7 +109,7 @@ export function objectiveRepairEpisodeAttempts(
     attempts,
     (action) =>
       action.kind === 'dispatch-planner' &&
-      action.shape === 'repair' &&
+      action.plannerMode === 'repair' &&
       action.repairRevisionId === revisionId &&
       (action.repairOrdinal ?? 0) > sinceOrdinal
   )

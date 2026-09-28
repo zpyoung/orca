@@ -35,7 +35,7 @@ function notLandedRepairIngestionCount(
   for (const { attempt, action } of attempts) {
     if (
       action.kind === 'dispatch-planner' &&
-      action.shape === 'repair' &&
+      action.plannerMode === 'repair' &&
       action.repairRevisionId === revisionId &&
       action.repairOrdinal !== undefined &&
       attempt.dispatchId !== undefined
@@ -47,7 +47,7 @@ function notLandedRepairIngestionCount(
   for (const { attempt, action } of attempts) {
     if (
       action.kind !== 'ingest-plan' ||
-      action.shape !== 'repair' ||
+      action.plannerMode !== 'repair' ||
       action.targetRevisionId !== revisionId
     ) {
       continue
@@ -116,7 +116,7 @@ export function decideRepairPlannerAction(
             // owner-directed dispatch's revisionNumber is guaranteed to match on ingest
             revisionNumber: latest.action.revisionNumber,
             reportPath: report.reportPath,
-            shape: 'repair',
+            plannerMode: 'repair',
             targetRevisionId: revisionId
           }
         }
@@ -159,7 +159,7 @@ export function decideRepairPlannerAction(
       evidenceKey: `plan-repair:${revisionId}:${repairOrdinal}`,
       revisionNumber: revision.number,
       reason,
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal,
       repairRevisionId: revisionId,
       ...(consumedRetryBudget >= REPAIR_ESCALATION_REJECTED_PATCH_THRESHOLD

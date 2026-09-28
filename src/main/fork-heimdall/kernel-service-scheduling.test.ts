@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND } from '../../shared/fork-heimdall/budget'
-import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import {
@@ -27,14 +26,15 @@ describe('Heimdall kernel enrollment and scheduling', () => {
       reason: 'duplicate-workspace'
     })
 
-    const remote = kind({
-      id: 'objective',
-      authorizeEnrollment: async (input) => ({
-        ...authorized({ ...input, kind: 'hosted-review' }, 'remote_host_service'),
-        kind: 'objective'
+    service.registerKind(
+      kind({
+        id: 'objective',
+        authorizeEnrollment: async (input) => ({
+          ...authorized({ ...input, kind: 'hosted-review' }, 'remote_host_service'),
+          kind: 'objective'
+        })
       })
-    }) as unknown as WatcherKind<World, KernelAction, { label: string }>
-    service.registerKind(remote)
+    )
     await expect(
       service.enroll({ ...enrollmentInput(), kind: 'objective', repoId: 'repo-2' })
     ).resolves.toEqual({

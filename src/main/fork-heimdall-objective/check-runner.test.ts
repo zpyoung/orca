@@ -34,6 +34,11 @@ function target(args: {
   }
 }
 
+function stubProvider(): IFilesystemProvider {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: opaque marker only; runCriterionCheck branches on presence/null, never calls provider methods.
+  return {} as IFilesystemProvider
+}
+
 function precheckResult(overrides: Record<string, unknown> = {}) {
   return {
     command: 'test -f ready',
@@ -94,7 +99,7 @@ describe('runCriterionCheck', () => {
   })
 
   it('routes a POSIX provider-backed execution host to its exact SSH target', async () => {
-    const provider = {} as IFilesystemProvider
+    const provider = stubProvider()
     precheckState.sshTargetId.mockReturnValue('build-host')
     precheckState.sshState.mockReturnValue({ remotePlatform: 'linux' })
     precheckState.run.mockResolvedValue(
@@ -120,7 +125,7 @@ describe('runCriterionCheck', () => {
   })
 
   it('fails closed without executing a POSIX-wrapped check on a Windows SSH host', async () => {
-    const provider = {} as IFilesystemProvider
+    const provider = stubProvider()
     precheckState.sshTargetId.mockReturnValue('windows-host')
     precheckState.sshState.mockReturnValue({ remotePlatform: 'win32' })
 
@@ -147,7 +152,7 @@ describe('runCriterionCheck', () => {
   })
 
   it('fails closed when the SSH command dialect is unavailable', async () => {
-    const provider = {} as IFilesystemProvider
+    const provider = stubProvider()
     precheckState.sshTargetId.mockReturnValue('unknown-host')
     precheckState.sshState.mockReturnValue({ status: 'connected' })
 
@@ -202,7 +207,7 @@ describe('runCriterionCheck', () => {
 
   it('fails closed when a provider-backed target has no SSH route', async () => {
     precheckState.sshTargetId.mockReturnValue(undefined)
-    const provider = {} as IFilesystemProvider
+    const provider = stubProvider()
 
     await expect(
       runCriterionCheck({

@@ -11,6 +11,7 @@ function shutdownInput(
   close: () => void,
   release: LeaseStore['release'] = async () => {}
 ): KernelShutdownInput {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of WatcherRunner; shutdownHeimdallKernel only reads operationTail, leaseGuard, and enrollment.workspaceKey.
   const runner = {
     operationTail,
     leaseGuard: { epoch: 7, holder: 'holder-a' },
@@ -22,6 +23,7 @@ function shutdownInput(
     drainedListeners: new Set(),
     subscribers: new Set(),
     runners: [runner],
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerLoop is a class with private lifecycle fields; shutdownHeimdallKernel only calls .stop().
     runnerLoop: { stop: vi.fn() } as unknown as WatcherRunnerLoop,
     leaseStore: {
       acquireOrRenew: async () => ({
@@ -34,6 +36,7 @@ function shutdownInput(
     },
     host: null,
     unsubscribeLedger: null,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: HeimdallDatabase is a class with a private field; shutdownHeimdallKernel only calls .close().
     database: { close } as unknown as HeimdallDatabase
   }
 }

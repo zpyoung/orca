@@ -29,13 +29,32 @@ function buildRunner(args: {
   stopPredicates: readonly StopPredicate<World>[]
   owner?: { agent: 'claude' }
 }): WatcherRunner {
-  const enrollment = {
+  const enrollment: WatcherEnrollment = {
     watcherId: 'watcher-1',
+    kind: 'hosted-review',
+    workspaceKey: 'local::/repo',
+    executionHostId: 'local',
+    repoId: 'repo-1',
+    worktreeId: null,
+    workspacePath: '/repo',
+    schedulerOwner: 'local_host_service',
+    enabled: true,
+    paused: false,
+    commandRevision: 0,
+    capabilities: {},
+    budget: { wallClockActiveMs: null, turns: null },
+    kindPayload: {},
+    coordinatorIdentity: { handle: 'coordinator', paneKey: 'coordinator-pane' },
+    orchestrationRunId: null,
+    createdAtMs: 1,
+    terminalAtMs: null,
     ...(args.owner ? { owner: args.owner } : {})
-  } as unknown as WatcherEnrollment
+  }
   return {
     enrollment,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerStopLifecycle.evaluate only reads kind.stopPredicates here; RegisteredWatcherKind's identity/decision/execution methods are unused in this fixture.
     kind: { stopPredicates: args.stopPredicates } as unknown as WatcherRunner['kind'],
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this suite never reads runner.status; WatcherStatus's full schema shape is unused here.
     status: {} as WatcherRunner['status'],
     timer: null,
     operationTail: Promise.resolve(),
@@ -90,6 +109,7 @@ describe('WatcherRunnerStopLifecycle: owner-routable predicates', () => {
   it('records a deviation instead of parking when an owner is configured', async () => {
     const ledgerStore = memoryLedgerStore()
     const park = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerStopLifecycle only calls status.park/status.terminal; the class's private dependencies field makes any plain object double require a cast, and no other public method is exercised here.
     const statusLifecycle = { park, terminal: vi.fn() } as unknown as WatcherRunnerStatusLifecycle
     const stopLifecycle = new WatcherRunnerStopLifecycle(statusLifecycle, {
       ledgerStore,
@@ -112,6 +132,7 @@ describe('WatcherRunnerStopLifecycle: owner-routable predicates', () => {
   it('parks exactly as before when no owner is configured, even for an opted-in predicate', async () => {
     const ledgerStore = memoryLedgerStore()
     const park = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerStopLifecycle only calls status.park/status.terminal; the class's private dependencies field makes any plain object double require a cast, and no other public method is exercised here.
     const statusLifecycle = { park, terminal: vi.fn() } as unknown as WatcherRunnerStatusLifecycle
     const stopLifecycle = new WatcherRunnerStopLifecycle(statusLifecycle, {
       ledgerStore,
@@ -130,6 +151,7 @@ describe('WatcherRunnerStopLifecycle: owner-routable predicates', () => {
   it('parks as before for a predicate that never opted in, even with an owner configured', async () => {
     const ledgerStore = memoryLedgerStore()
     const park = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerStopLifecycle only calls status.park/status.terminal; the class's private dependencies field makes any plain object double require a cast, and no other public method is exercised here.
     const statusLifecycle = { park, terminal: vi.fn() } as unknown as WatcherRunnerStatusLifecycle
     const stopLifecycle = new WatcherRunnerStopLifecycle(statusLifecycle, {
       ledgerStore,
@@ -147,6 +169,7 @@ describe('WatcherRunnerStopLifecycle: owner-routable predicates', () => {
   it('does not persist a stop transition when deletion begins during lease validation', async () => {
     const ledgerStore = memoryLedgerStore()
     const park = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerStopLifecycle only calls status.park/status.terminal; the class's private dependencies field makes any plain object double require a cast, and no other public method is exercised here.
     const statusLifecycle = { park, terminal: vi.fn() } as unknown as WatcherRunnerStatusLifecycle
     const stopLifecycle = new WatcherRunnerStopLifecycle(statusLifecycle)
     const runner = buildRunner({ stopPredicates: [plainParkPredicate] })

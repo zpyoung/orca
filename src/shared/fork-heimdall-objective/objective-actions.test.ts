@@ -147,7 +147,7 @@ describe('objective repair plumbing action contracts', () => {
       evidenceKey: 'plan:2',
       revisionNumber: 2,
       reason: 'replan-after-block',
-      shape: 'repair'
+      plannerMode: 'repair'
     }
     expect(ObjectiveActionSchema.safeParse(base).success).toBe(false)
     expect(ObjectiveActionSchema.safeParse({ ...base, repairOrdinal: 1 }).success).toBe(false)
@@ -201,7 +201,7 @@ describe('objective repair plumbing action contracts', () => {
       dispatchId: 'dispatch-plan',
       revisionNumber: 2,
       reportPath: '/outside/plan.json',
-      shape: 'repair'
+      plannerMode: 'repair'
     }
     expect(ObjectiveActionSchema.safeParse(base).success).toBe(false)
     expect(
@@ -227,7 +227,7 @@ describe('objective repair plumbing action contracts', () => {
     expect(
       ObjectiveActionSchema.safeParse({
         ...full,
-        shape: 'full',
+        plannerMode: 'full',
         repairOrdinal: 1,
         repairRevisionId: 'revision-1'
       }).success
@@ -253,7 +253,7 @@ describe('objective repair plumbing action contracts', () => {
     expect(
       ObjectiveActionSchema.safeParse({
         ...full,
-        shape: 'full',
+        plannerMode: 'full',
         targetRevisionId: 'revision-1'
       }).success
     ).toBe(false)

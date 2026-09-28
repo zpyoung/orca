@@ -104,10 +104,8 @@ export function withHeimdallGlyph(
   status: WorktreeStatus
 ): React.JSX.Element {
   const laneGlyph =
-    glyph?.type === HeimdallLaneGlyph
-      ? React.cloneElement(glyph as React.ReactElement<HeimdallLaneGlyphProps>, {
-          withTooltip: false
-        })
+    React.isValidElement<HeimdallLaneGlyphProps>(glyph) && glyph.type === HeimdallLaneGlyph
+      ? React.cloneElement(glyph, { withTooltip: false })
       : glyph
   return (
     <span className="transition-opacity group-hover/unread:opacity-0 group-focus-within/unread:opacity-0">

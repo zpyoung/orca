@@ -51,21 +51,26 @@ export function ObjectiveEnrollmentParallelFields({
                   )}
           </p>
         </div>
-        <Input
-          id={concurrencyId}
-          type="number"
-          min="1"
-          max="1024"
-          step="1"
-          value={
-            concurrencyFixed ? 1 : Number.isFinite(draft.maxConcurrency) ? draft.maxConcurrency : ''
-          }
-          disabled={disabled || concurrencyFixed}
-          className="text-xs tabular-nums"
-          onChange={(event) =>
-            onDraftChange({ ...draft, maxConcurrency: event.currentTarget.valueAsNumber })
-          }
-        />
+        <div className="tabular-nums">
+          <Input
+            id={concurrencyId}
+            type="number"
+            min="1"
+            max="1024"
+            step="1"
+            value={
+              concurrencyFixed
+                ? 1
+                : Number.isFinite(draft.maxConcurrency)
+                  ? draft.maxConcurrency
+                  : ''
+            }
+            disabled={disabled || concurrencyFixed}
+            onChange={(event) =>
+              onDraftChange({ ...draft, maxConcurrency: event.currentTarget.valueAsNumber })
+            }
+          />
+        </div>
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
         <div className="space-y-0.5">

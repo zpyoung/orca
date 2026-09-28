@@ -70,7 +70,7 @@ async function rerunChecks(
   for (const target of targets) {
     throwIfAborted(signal)
     await assertLeaseHeld()
-    const result = JSON.parse(
+    const result: Record<string, unknown> = JSON.parse(
       await runGitLabApi(
         definition,
         git,
@@ -78,7 +78,7 @@ async function rerunChecks(
         ['-X', 'POST', `projects/${target![1]}/jobs/${target![2]}/retry`],
         { idempotent: false, signal, onDispatch: () => tracker.markDispatched() }
       )
-    ) as Record<string, unknown>
+    )
     if (!numberValue(result.id)) {
       throw new Error('GitLab did not confirm the retried job attempt.')
     }
@@ -151,7 +151,7 @@ async function mergeOrEnqueue(
     }
     throwIfAborted(signal)
     await assertLeaseHeld()
-    const response = JSON.parse(
+    const response: Record<string, unknown> = JSON.parse(
       await runGitLabApi(
         definition,
         git,
@@ -169,7 +169,7 @@ async function mergeOrEnqueue(
         ],
         { idempotent: false, signal, onDispatch: () => tracker.markDispatched() }
       )
-    ) as Record<string, unknown>
+    )
     if (
       stringValue(response.state).toLowerCase() !== 'merged' &&
       !stringValue(response.merged_at)
@@ -185,7 +185,7 @@ async function mergeOrEnqueue(
   }
   throwIfAborted(signal)
   await assertLeaseHeld()
-  const response = JSON.parse(
+  const response: Record<string, unknown> = JSON.parse(
     await runGitLabApi(
       definition,
       git,
@@ -201,7 +201,7 @@ async function mergeOrEnqueue(
       ],
       { idempotent: false, signal, onDispatch: () => tracker.markDispatched() }
     )
-  ) as Record<string, unknown>
+  )
   if (!['fresh', 'idle', 'merging'].includes(stringValue(response.status).toLowerCase())) {
     throw new Error('GitLab did not confirm merge train enrollment.')
   }

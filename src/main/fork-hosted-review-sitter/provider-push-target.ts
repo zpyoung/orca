@@ -102,9 +102,9 @@ async function resolveGitHubPushTarget(
         ...(signal ? { signal } : {})
       }
     )
-    const review = JSON.parse(stdout) as {
+    const review: {
       head?: { ref?: unknown; repo?: { full_name?: unknown } | null }
-    }
+    } = JSON.parse(stdout)
     const sourcePath = stringValue(review.head?.repo?.full_name)
     const separator = sourcePath.indexOf('/')
     sourceOwner = separator > 0 ? sourcePath.slice(0, separator) : ''
@@ -173,7 +173,7 @@ async function resolveGitLabPushTarget(
       ],
       options
     )
-    const mergeRequest = JSON.parse(mergeRequestJson) as Record<string, unknown>
+    const mergeRequest: Record<string, unknown> = JSON.parse(mergeRequestJson)
     sourceProjectId =
       typeof mergeRequest.source_project_id === 'number' ? mergeRequest.source_project_id : null
     sourceBranch = stringValue(mergeRequest.source_branch)
@@ -188,7 +188,7 @@ async function resolveGitLabPushTarget(
       ],
       options
     )
-    const sourceProject = JSON.parse(sourceProjectJson) as Record<string, unknown>
+    const sourceProject: Record<string, unknown> = JSON.parse(sourceProjectJson)
     sourceProjectPath = stringValue(sourceProject.path_with_namespace)
   } finally {
     releaseGitLab()

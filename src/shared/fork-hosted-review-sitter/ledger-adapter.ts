@@ -35,9 +35,13 @@ const HOSTED_REVIEW_ACTION_KINDS: Record<HostedReviewSitterActionKind, true> = {
   enqueue: true
 }
 
+function isHostedReviewActionKind(kind: string): kind is HostedReviewSitterActionKind {
+  return Object.hasOwn(HOSTED_REVIEW_ACTION_KINDS, kind)
+}
+
 function isHostedReviewAction(action: KernelAction): action is HostedReviewSitterAction {
   return (
-    HOSTED_REVIEW_ACTION_KINDS[action.kind as HostedReviewSitterActionKind] === true &&
+    isHostedReviewActionKind(action.kind) &&
     typeof action.headSha === 'string' &&
     typeof action.reviewUrl === 'string'
   )
@@ -47,28 +51,28 @@ function isHostedReviewActionResult(value: unknown): value is HostedReviewSitter
   if (!value || typeof value !== 'object' || !('kind' in value)) {
     return false
   }
-  const result = value as Record<string, unknown>
-  switch (result.kind) {
+  switch (value.kind) {
     case 'none':
     case 'rerun-requested':
       return true
     case 'worker-dispatched':
-      return typeof result.dispatchId === 'string'
+      return 'dispatchId' in value && typeof value.dispatchId === 'string'
     case 'published':
-      return typeof result.resultingHeadSha === 'string'
+      return 'resultingHeadSha' in value && typeof value.resultingHeadSha === 'string'
     default:
       return false
   }
 }
 
+function isHostedReviewAttemptEntry(entry: AttemptEntry): entry is HostedReviewAttemptEntry {
+  return (
+    isHostedReviewAction(entry.action) &&
+    (entry.result === undefined || isHostedReviewActionResult(entry.result))
+  )
+}
+
 function asHostedReviewAttempt(entry: AttemptEntry): HostedReviewAttemptEntry | null {
-  if (!isHostedReviewAction(entry.action)) {
-    return null
-  }
-  if (entry.result !== undefined && !isHostedReviewActionResult(entry.result)) {
-    return null
-  }
-  return entry as HostedReviewAttemptEntry
+  return isHostedReviewAttemptEntry(entry) ? entry : null
 }
 
 export function getLatestHostedReviewAttempts(
@@ -141,17 +145,25 @@ export function getHostedReviewEscalations(ledger: WatcherLedger): readonly Esca
 }
 
 function isHostedReviewFixAttribution(value: unknown): value is HostedReviewFixAttribution {
-  if (!value || typeof value !== 'object') {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('sourceHeadSha' in value) ||
+    !('producedHeadSha' in value) ||
+    !('preparedCommitSha' in value) ||
+    !('checkKey' in value) ||
+    !('failureSignature' in value) ||
+    !('publishActionId' in value)
+  ) {
     return false
   }
-  const payload = value as Record<string, unknown>
   return (
-    typeof payload.sourceHeadSha === 'string' &&
-    typeof payload.producedHeadSha === 'string' &&
-    typeof payload.preparedCommitSha === 'string' &&
-    typeof payload.checkKey === 'string' &&
-    typeof payload.failureSignature === 'string' &&
-    typeof payload.publishActionId === 'string'
+    typeof value.sourceHeadSha === 'string' &&
+    typeof value.producedHeadSha === 'string' &&
+    typeof value.preparedCommitSha === 'string' &&
+    typeof value.checkKey === 'string' &&
+    typeof value.failureSignature === 'string' &&
+    typeof value.publishActionId === 'string'
   )
 }
 

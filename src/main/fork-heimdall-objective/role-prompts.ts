@@ -100,8 +100,8 @@ export type ObjectiveRolePromptInput = {
   /** Free-text steer from an owning agent's `dispatch-planner` or `set-role-agent` intervention. */
   ownerGuidance?: string
   /** Selects the planner report contract: a full plan, or a patch against the frozen plan. */
-  shape?: 'full' | 'repair'
-  /** Open/frozen task context for a repair planner prompt; ignored unless `shape` is `'repair'`. */
+  plannerMode?: 'full' | 'repair'
+  /** Open/frozen task context for a repair planner prompt; ignored unless `plannerMode` is `'repair'`. */
   repairContext?: RepairPlanContext
   /** Prior plan-review verdict text to react to, for either report shape. */
   planReviewFindings?: string
@@ -123,7 +123,7 @@ const STRING_UNIT_NOTE =
   'String maxima below use JavaScript UTF-16 code units (`string.length`), not UTF-8 bytes.'
 
 /** Task-shape limits shared by the full-plan and repair report contracts. */
-function plannerTaskShapeLines(): string[] {
+function plannerTaskLimitLines(): string[] {
   return [
     `taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH}; title max ${OBJECTIVE_TASK_TITLE_MAX_LENGTH}; spec max ${OBJECTIVE_TASK_SPEC_MAX_LENGTH}. Summarize context and cite existing files or artifacts instead of pasting unlimited verbatim output.`,
     `The whole task — taskKey, title, spec, deps, criteria, territory and declaredPaths together — must serialize to under ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES} bytes of JSON; a task over that limit can never dispatch, so split it instead of maximizing every field.`,
@@ -142,7 +142,7 @@ function plannerFullReportContract(): string {
     STRING_UNIT_NOTE,
     'Write one strict JSON object: {"plan":[task,...],"assumptions":[assumption,...]}.',
     `plan contains 1-${OBJECTIVE_PLAN_MAX_TASKS} tasks. Each task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,territory,declaredPaths?}.`,
-    ...plannerTaskShapeLines(),
+    ...plannerTaskLimitLines(),
     'Task keys are unique, dependencies name other tasks, and the graph is acyclic.'
   ].join('\n')
 }
@@ -154,7 +154,7 @@ function plannerRepairReportContract(): string {
     'Frozen tasks cannot be changed or dropped; new tasks may depend on frozen tasks by their task key.',
     `upsertTasks and dropTaskKeys each has max ${OBJECTIVE_PLAN_MAX_TASKS} entries; a task key must not appear in both.`,
     'Each upserted task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,territory,declaredPaths?}, using the same limits as a full plan task.',
-    ...plannerTaskShapeLines()
+    ...plannerTaskLimitLines()
   ].join('\n')
 }
 
@@ -172,7 +172,7 @@ function planReviewReportContract(): string {
 
 function reportContract(
   role: ObjectiveRole,
-  shape: 'full' | 'repair' | undefined,
+  plannerMode: 'full' | 'repair' | undefined,
   mode: 'plan-review' | undefined
 ): string {
   if (role === 'reviewer' && mode === 'plan-review') {
@@ -180,7 +180,7 @@ function reportContract(
   }
   switch (role) {
     case 'planner':
-      return shape === 'repair' ? plannerRepairReportContract() : plannerFullReportContract()
+      return plannerMode === 'repair' ? plannerRepairReportContract() : plannerFullReportContract()
     case 'implementer':
       return [
         STRING_UNIT_NOTE,
@@ -452,14 +452,14 @@ function buildSections(
       ? []
       : [`OWNER REQUESTED SKIP STAGE:\n${input.requestedSkipStage}`]),
     ...(input.ownerGuidance === undefined ? [] : [`OWNER GUIDANCE:\n${input.ownerGuidance}`]),
-    `REPORT CONTRACT:\n${reportContract(input.role, input.shape, input.mode)}`,
+    `REPORT CONTRACT:\n${reportContract(input.role, input.plannerMode, input.mode)}`,
     finishInstructions(input.reportPath)
   ]
 }
 
 export function buildObjectiveRolePrompt(input: ObjectiveRolePromptInput): string {
   let repairSection: string[] = []
-  if (input.role === 'planner' && input.shape === 'repair' && input.repairContext) {
+  if (input.role === 'planner' && input.plannerMode === 'repair' && input.repairContext) {
     const restBytes = Buffer.byteLength(buildSections(input, []).join('\n\n'), 'utf8')
     const budget = Math.max(
       0,

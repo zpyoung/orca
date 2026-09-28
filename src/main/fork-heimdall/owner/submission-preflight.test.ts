@@ -38,12 +38,14 @@ const PENDING: OwnerDeviationEscalation = {
   reason: 'waiting for owner'
 }
 const LEDGER: WatcherLedger = { watcherId: 'watcher-1', entries: [PENDING] }
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the 18-field WatcherEnrollment; only kind/kindPayload are read by the preflight paths under test.
 const ENROLLMENT = {
   kind: 'objective',
   kindPayload: CONTRACT
 } as unknown as WatcherEnrollment
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: bridges the concrete ObjectiveWorld/ObjectiveAction generics to the OwnerAdapter<unknown, KernelAction> shape preflightOwnerInterventionSubmission expects; the adapter's methods are structurally compatible but TS cannot verify it through the generic parameter.
 const OWNER = createObjectiveOwnerAdapter() as unknown as OwnerAdapter<unknown, KernelAction>
-const SNAPSHOT = snapshot(projection()) as Snapshot<unknown>
+const SNAPSHOT: Snapshot<unknown> = snapshot(projection())
 
 function expectActionableRejection(
   result: SubmissionPreflightResult,
@@ -120,18 +122,19 @@ describe('owner intervention submission preflight', () => {
 
   it('propagates an unverifiable host read instead of mislabeling it as invalid input', async () => {
     const hostFailure = new Error('remote host unavailable')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only realpath (the rejecting call under test), lstat and readFile are exercised.
     const fileProvider = {
       realpath: vi.fn().mockRejectedValue(hostFailure),
       lstat: vi.fn(),
       readFile: vi.fn()
     } as unknown as IFilesystemProvider
-    const remoteTarget = {
+    const remoteTarget: LeaseWorkspaceTarget = {
       kind: 'folder',
       executionHostId: 'ssh:host-1',
       workspacePath: '/workspace',
       watcherId: 'watcher-1',
       fileProvider
-    } as LeaseWorkspaceTarget
+    }
 
     await expect(
       preflightOwnerInterventionSubmission({

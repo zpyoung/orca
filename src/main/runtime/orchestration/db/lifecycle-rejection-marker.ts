@@ -32,12 +32,12 @@ export function readLifecycleRejectionMarker(
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return null
     }
-    const marker = (value as Record<string, unknown>)._orcaLifecycleRejection
+    const marker = '_orcaLifecycleRejection' in value ? value._orcaLifecycleRejection : null
     if (!marker || typeof marker !== 'object' || Array.isArray(marker)) {
       return null
     }
-    const code = (marker as Record<string, unknown>).code
-    const reason = (marker as Record<string, unknown>).reason
+    const code = 'code' in marker ? marker.code : undefined
+    const reason = 'reason' in marker ? marker.reason : undefined
     return typeof code === 'string' && typeof reason === 'string' ? { code, reason } : null
   } catch {
     return null

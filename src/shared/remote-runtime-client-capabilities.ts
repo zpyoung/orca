@@ -11,9 +11,7 @@ import {
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
   type RuntimeCapability
 } from './protocol-version'
-import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'
-import { HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY } from './fork-heimdall/capability'
-import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from './fork-heimdall/capability'
+import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from './fork-heimdall/capability'
 import { SKILL_INSTALL_RESULT_V2_CAPABILITY } from './skill-install-capability'
 
 // Keep every remote request transport on the same mixed-version capability contract.
@@ -33,9 +31,7 @@ export function remoteRuntimeClientCapabilities(
       WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
       WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
       AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY,
-      HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,
-      HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,
-      HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
+      ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES,
       ...additionalCapabilities
     ])
   )

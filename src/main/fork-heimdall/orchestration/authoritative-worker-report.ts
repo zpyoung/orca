@@ -4,6 +4,10 @@ import type { AttemptObservationFact, OrchestrationDb } from '../../runtime/orch
 import { parseLifecycleRejectionPayload } from './lifecycle-rejection-payload'
 import { mailboxEvidenceForMessage } from './mailbox-drain'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
 type AcceptedWorkerReportResult = {
   provenance: 'worker_report'
   outcome: 'succeeded' | 'failed'
@@ -103,10 +107,10 @@ function parseWorkerReportResult(
   } catch {
     return null
   }
-  if (!parsed || typeof parsed !== 'object') {
+  if (!isRecord(parsed)) {
     return null
   }
-  const record = parsed as Record<string, unknown>
+  const record = parsed
   if (
     typeof record.messageId !== 'string' ||
     !record.messageId.trim() ||
@@ -152,19 +156,17 @@ function parseObject(payload: string | null | undefined): Record<string, unknown
   }
   try {
     const parsed: unknown = JSON.parse(payload)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null
+    return isRecord(parsed) && !Array.isArray(parsed) ? parsed : null
   } catch {
     return null
   }
 }
 
 function parsePreflightRejection(value: unknown): { code: string; reason: string } | null {
-  if (!value || typeof value !== 'object') {
+  if (!isRecord(value)) {
     return null
   }
-  const rejection = value as Record<string, unknown>
+  const rejection = value
   if (
     typeof rejection.code !== 'string' ||
     !rejection.code.trim() ||

@@ -80,7 +80,7 @@ function repairDispatch(
     evidenceKey: 'plan-repair:revision-1:1',
     revisionNumber: 1,
     reason: 'replan-after-failure',
-    shape: 'repair',
+    plannerMode: 'repair',
     repairOrdinal: 1,
     repairRevisionId: 'revision-1',
     ...overrides
@@ -95,7 +95,7 @@ describe('decideObjective repair episode, end to end', () => {
     const decision = decideObjective(snapshot(plan), ledger())
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       repairOrdinal: 1,
       reason: 'replan-after-failure'
@@ -121,7 +121,7 @@ describe('decideObjective repair episode, end to end', () => {
     )
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       repairOrdinal: 1,
       reason: 'replan-after-failure'
@@ -229,10 +229,10 @@ describe('decideObjective repair episode, end to end', () => {
       round: 1
     })
 
-    const reviewDispatch = dispatched.action as Extract<
-      ObjectiveAction,
-      { kind: 'dispatch-plan-review' }
-    >
+    if (dispatched.action?.kind !== 'dispatch-plan-review') {
+      throw new Error('expected a dispatch-plan-review action')
+    }
+    const reviewDispatch = dispatched.action
     const reviewedLedger = ledger([
       attempt(reviewDispatch, {
         dispatchId: 'review-dispatch-1',
@@ -283,7 +283,7 @@ describe('decideObjective repair episode, end to end', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       reason: 'replan-after-block',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1'
     })
   })
@@ -297,7 +297,7 @@ describe('decideObjective repair episode, end to end', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       reason: 'replan-after-failure',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1'
     })
   })

@@ -22,6 +22,10 @@ export type OmissionUnit = {
   subjectIds: readonly string[]
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 type SubjectGroup = {
   subjectId: string
   attempts: AttemptItem[]
@@ -58,20 +62,13 @@ export function activeEscalationIds(ledger: LedgerProjection): {
   messageId?: string
   dispatchId?: string
 } {
-  if (
-    ledger.latestEscalation === null ||
-    typeof ledger.latestEscalation !== 'object' ||
-    Array.isArray(ledger.latestEscalation)
-  ) {
+  if (!isRecord(ledger.latestEscalation)) {
     return {}
   }
-  const escalation = ledger.latestEscalation as Record<string, unknown>
+  const escalation = ledger.latestEscalation
   const messageId = stringField(escalation, 'subjectId')
   const payload = escalation.payload
-  const dispatchId =
-    payload !== null && typeof payload === 'object' && !Array.isArray(payload)
-      ? stringField(payload as Record<string, unknown>, 'dispatchId')
-      : undefined
+  const dispatchId = isRecord(payload) ? stringField(payload, 'dispatchId') : undefined
   return {
     ...(messageId === undefined ? {} : { messageId }),
     ...(dispatchId === undefined ? {} : { dispatchId })
@@ -323,7 +320,7 @@ export function buildOmissionUnits(
       if (item.status !== 'open' && item.status !== 'escalated') {
         return []
       }
-      const scope = (item.value as Record<string, unknown>).approvalScope
+      const scope = isRecord(item.value) ? item.value.approvalScope : undefined
       return scope === undefined ? [] : [stableJson(scope)]
     })
   )

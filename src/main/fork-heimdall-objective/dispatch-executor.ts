@@ -20,6 +20,7 @@ import {
   type ObjectivePlanTask
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import type {
+  ObjectiveNodeProjection,
   ObjectiveNodeState,
   ObjectiveWorld
 } from '../../shared/fork-heimdall-objective/detail-types'
@@ -83,6 +84,13 @@ function requirePlan(objectiveStore: ObjectiveStore, revisionId: string): Object
   return plan
 }
 
+function requireOrchestrationTaskId(node: ObjectiveNodeProjection): string {
+  if (node.orchestrationTaskId === null) {
+    throw new Error(`Objective node ${node.taskKey} has no orchestration task id`)
+  }
+  return node.orchestrationTaskId
+}
+
 function completedNodeDependencies(
   objectiveStore: ObjectiveStore,
   watcherId: string,
@@ -92,11 +100,7 @@ function completedNodeDependencies(
   const nodes = objectiveStore
     .project(watcherId, ledger)
     .nodes.filter((node) => node.revisionId === revisionId)
-  const missing = nodes.find((node) => node.orchestrationTaskId === null)
-  if (missing) {
-    throw new Error(`Objective node ${missing.taskKey} has no orchestration task id`)
-  }
-  return nodes.map((node) => node.orchestrationTaskId as string)
+  return nodes.map((node) => requireOrchestrationTaskId(node))
 }
 
 function buildDispatchSpec(args: {
@@ -185,15 +189,21 @@ function buildDispatchSpec(args: {
   }
 }
 
+function hasDispatchReport(
+  record: ObjectiveDispatchRecord
+): record is ObjectiveDispatchRecord & { dispatchId: string; report: ImplementerReport } {
+  return record.dispatchId !== null && record.report !== null
+}
+
 function dispatchWithReport(
   records: readonly ObjectiveDispatchRecord[],
   dispatchId: string
 ): ObjectiveDispatchRecord & { dispatchId: string; report: ImplementerReport } {
   const record = records.find((candidate) => candidate.dispatchId === dispatchId)
-  if (!record || record.dispatchId === null || record.report === null) {
+  if (!record || !hasDispatchReport(record)) {
     throw new Error(`Conflict context for objective Dispatch ${dispatchId} is unavailable`)
   }
-  return record as ObjectiveDispatchRecord & { dispatchId: string; report: ImplementerReport }
+  return record
 }
 
 function resolvingDispatchWithReport(
@@ -210,15 +220,12 @@ function resolvingDispatchWithReport(
       candidate.report !== null
   )
   const record = matches.sort((left, right) => right.createdAtMs - left.createdAtMs)[0]
-  if (!record || record.dispatchId === null || record.report === null) {
+  if (!record || !hasDispatchReport(record)) {
     throw new Error(
       `Resolving conflict Dispatch for objective task ${retry.taskKey} is unavailable`
     )
   }
-  return record as ObjectiveDispatchRecord & {
-    dispatchId: string
-    report: ImplementerReport
-  }
+  return record
 }
 
 function dispatchConflictContext(
@@ -345,7 +352,7 @@ export async function executeObjectiveDispatch(args: {
         : undefined
     const repairContext =
       args.action.kind === 'dispatch-planner' &&
-      args.action.shape === 'repair' &&
+      args.action.plannerMode === 'repair' &&
       args.action.repairRevisionId !== undefined
         ? deriveObjectiveRepairContext(
             args.objectiveStore,

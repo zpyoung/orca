@@ -337,9 +337,7 @@ describe('park-reason wire projection is exhaustive over the schema', () => {
     }
   }
 
-  const kinds = WatcherParkReasonSchema.options.map(
-    (option) => option.shape.kind.value as WatcherParkReason['kind']
-  )
+  const kinds = WatcherParkReasonSchema.options.map((option) => option.shape.kind.value)
 
   it.each(kinds)(
     'degrades %s for an un-negotiated reader unless it predates the capability',

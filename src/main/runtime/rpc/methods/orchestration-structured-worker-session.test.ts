@@ -236,6 +236,7 @@ describe('structured worker dispatch preamble', () => {
         ? { cursor: 1, value: { clientMessageId: 'c1', submission: settled } }
         : undefined
     })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial host double; the preamble reads only deps.store, send, and waitForSendSettlement.
     return {
       deps: { store: { getRecord: () => ({ lease: { runtimeFence: 7 } }) } },
       send: async () => ({ ok: true, value: { clientMessageId: 'c1', submission } }),
@@ -277,6 +278,7 @@ describe('structured worker dispatch preamble', () => {
     )
     await expect(send(host)).resolves.toBeUndefined()
     expect(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: host is the double built above, whose waitForSendSettlement is a vi.fn spy.
       (host as unknown as { waitForSendSettlement: ReturnType<typeof vi.fn> }).waitForSendSettlement
     ).toHaveBeenCalledWith('s1', 'c1')
   })

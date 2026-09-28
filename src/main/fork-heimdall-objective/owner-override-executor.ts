@@ -55,6 +55,10 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
 function samePaths(left: readonly string[], right: readonly string[]): boolean {
   return [...left].sort().join('\0') === [...right].sort().join('\0')
 }
@@ -66,10 +70,7 @@ export function findRejectedIngestReportAttempt(
 ): AttemptEntry | null {
   for (const attempt of getLatestAttempts(ledger)) {
     const parsed = ObjectiveActionSchema.safeParse(attempt.action)
-    const result =
-      attempt.result !== null && typeof attempt.result === 'object'
-        ? (attempt.result as Record<string, unknown>)
-        : {}
+    const result = isRecord(attempt.result) ? attempt.result : {}
     const validation = ReportValidationProvenanceSchema.safeParse(result.reportValidation)
     if (
       parsed.success &&
@@ -96,9 +97,7 @@ export function rejectedReportAudit(attempt: AttemptEntry): {
   reportedFiles: string[]
   observedFiles: string[]
 } {
-  const result = attempt.result
-  const record =
-    result !== null && typeof result === 'object' ? (result as Record<string, unknown>) : {}
+  const record = isRecord(attempt.result) ? attempt.result : {}
   return {
     rejectionReason: attempt.reason ?? 'unknown',
     reportDigest: typeof record.reportDigest === 'string' ? record.reportDigest : '',

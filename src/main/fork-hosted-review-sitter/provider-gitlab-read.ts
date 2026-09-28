@@ -72,6 +72,10 @@ export function booleanValue(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export async function runGitLabApi(
   definition: HostedReviewSitterDefinition,
   git: HostedReviewSitterGitExecution,
@@ -99,7 +103,7 @@ export async function runGitLabApi(
 }
 
 export function isNotFound(error: unknown): boolean {
-  const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : null
+  const record = isRecord(error) ? error : null
   const text = [
     error instanceof Error ? error.message : String(error),
     stringValue(record?.stderr),
@@ -115,11 +119,13 @@ async function loadMergeRequest(
   signal?: AbortSignal
 ): Promise<GitLabMergeRequest> {
   const endpoint = `projects/${encodedProject(projectRef.path)}/merge_requests/${definition.reviewNumber}?with_merge_status_recheck=true`
-  const value = JSON.parse(await runGitLabApi(definition, git, projectRef, [endpoint], { signal }))
-  if (!value || typeof value !== 'object') {
+  const value: GitLabMergeRequest = JSON.parse(
+    await runGitLabApi(definition, git, projectRef, [endpoint], { signal })
+  )
+  if (!isRecord(value)) {
     throw new Error('GitLab returned invalid merge request data.')
   }
-  return value as GitLabMergeRequest
+  return value
 }
 
 async function loadProject(
@@ -128,7 +134,7 @@ async function loadProject(
   projectRef: ProjectRef,
   signal?: AbortSignal
 ): Promise<GitLabProject> {
-  const value = JSON.parse(
+  const value: GitLabProject = JSON.parse(
     await runGitLabApi(
       definition,
       git,
@@ -137,10 +143,10 @@ async function loadProject(
       { signal }
     )
   )
-  if (!value || typeof value !== 'object') {
+  if (!isRecord(value)) {
     throw new Error('GitLab returned invalid project policy data.')
   }
-  return value as GitLabProject
+  return value
 }
 
 export async function loadGitLabState(
@@ -178,10 +184,12 @@ export async function loadGitLabState(
   }
 
   const mergeRequest = await loadMergeRequest(definition, git, projectRef, signal)
-  const project = await loadProject(definition, git, projectRef, signal).catch(() => {
-    throwIfAborted(signal)
-    return {} as GitLabProject
-  })
+  const project = await loadProject(definition, git, projectRef, signal).catch(
+    (): GitLabProject => {
+      throwIfAborted(signal)
+      return {}
+    }
+  )
   const pipelinePolicy = booleanValue(project.only_allow_merge_if_pipeline_succeeds)
   const externalPolicy = booleanValue(project.only_allow_merge_if_all_status_checks_passed)
   const projectPolicyComplete = pipelinePolicy !== null && externalPolicy !== null
@@ -201,12 +209,15 @@ export async function loadGitLabState(
     : ''
   const pipeline = pipelineFromMergeRequest(mergeRequest)
   const pipelineRequired = pipelinePolicy === true
-  let pipelineRows = { jobs: [] as GitLabJob[], complete: !pipelineRequired }
+  let pipelineRows: { jobs: GitLabJob[]; complete: boolean } = {
+    jobs: [],
+    complete: !pipelineRequired
+  }
   if (pipeline) {
     pipelineRows = await loadAllPipelineRows(definition, git, projectRef, pipeline, signal).catch(
-      () => {
+      (): { jobs: GitLabJob[]; complete: boolean } => {
         throwIfAborted(signal)
-        return { jobs: [] as GitLabJob[], complete: false }
+        return { jobs: [], complete: false }
       }
     )
   }

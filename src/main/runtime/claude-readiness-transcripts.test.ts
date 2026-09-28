@@ -141,15 +141,17 @@ describe('Claude Code tui-idle wait at cold start', () => {
       vi.spyOn(runtime, 'readTerminal').mockImplementation(async () => {
         reads += 1
         if (reads === 1) {
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a null read is what a pane with no provider screen yet yields at runtime, which the probe must survive.
           return null as never
         }
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the tui-idle probe reads only source and tail from a screen read.
         return { source: 'screen', tail: reads === 2 ? [] : readyScreen } as never
       })
 
-      const result = (await runtime.waitForTerminal(handle, {
+      const result = await runtime.waitForTerminal(handle, {
         condition: 'tui-idle',
         timeoutMs: 5_000
-      })) as { satisfied?: boolean }
+      })
 
       expect(result.satisfied).toBe(true)
       expect(reads).toBeGreaterThan(2)

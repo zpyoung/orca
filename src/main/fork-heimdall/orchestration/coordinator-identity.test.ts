@@ -15,7 +15,7 @@ describe('Heimdall coordinator identity', () => {
 
   it('derives a stable mutation caller fingerprint from the persisted identity', () => {
     const persisted = mintCoordinatorIdentity('watcher-1')
-    const restored = JSON.parse(JSON.stringify(persisted)) as typeof persisted
+    const restored: typeof persisted = JSON.parse(JSON.stringify(persisted))
 
     expect(coordinatorIdentityFingerprint(restored)).toBe(coordinatorIdentityFingerprint(persisted))
     expect(

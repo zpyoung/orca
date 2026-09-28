@@ -33,7 +33,7 @@ vi.mock('../fork-heimdall-objective/observed-workspace-changes', () => ({
   validateObjectiveWorkspaceChanges: validateChanges
 }))
 
-const enrollment = {
+const enrollment: WatcherEnrollment = {
   watcherId: 'watcher-1',
   kind: 'objective',
   workspaceKey: 'local::/workspace',
@@ -42,14 +42,17 @@ const enrollment = {
   worktreeId: null,
   workspacePath: '/workspace',
   schedulerOwner: 'local_host_service',
+  enabled: true,
+  paused: false,
+  commandRevision: 0,
   capabilities: { plan: 'on', implement: 'on', review: 'on', check: 'on', land: 'on' },
   budget: { wallClockActiveMs: 60_000, turns: 10 },
   kindPayload: {},
-  enabled: true,
-  generation: 1,
+  coordinatorIdentity: { handle: 'coordinator-1', paneKey: 'pane-1' },
+  orchestrationRunId: null,
   createdAtMs: 1,
-  updatedAtMs: 1
-} as unknown as WatcherEnrollment
+  terminalAtMs: null
+}
 
 const contract = {
   objectiveText: 'Implement the objective.',
@@ -67,8 +70,12 @@ function fakeLedgerStore(entries: LedgerEntry[]): RunnerLedgerStore {
     read: (): WatcherLedger => ({ watcherId: 'watcher-1', entries }),
     append: (_watcherId: string, entry: LedgerEntry) => {
       entries.push(entry)
-    }
-  } as unknown as RunnerLedgerStore
+    },
+    appendTickTrace: () => undefined,
+    readTickTraces: () => [],
+    releaseTickTracePin: () => undefined,
+    readTerminalSummary: () => null
+  }
 }
 
 function fakeLease(): LeaseGuard {
@@ -119,6 +126,14 @@ function unresolvedFailedAttempt(): AttemptEntry {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isMailboxWorkerDonePayload(value: unknown): value is { payload: Record<string, unknown> } {
+  return isRecord(value) && isRecord(value.payload)
+}
+
 function workerDoneFailed(): LedgerEntry {
   return {
     eventId: 'mailbox-1',
@@ -147,6 +162,7 @@ function buildHarness(): {
   ledgerStore: RunnerLedgerStore
   entries: LedgerEntry[]
 } {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only getPlan/getDispatch/getTask are reached while resolving a dispatch-node outcome; ObjectiveStore's other ~30 persistence methods are unused here.
   const objectiveStore = {
     getPlan: () => [
       {
@@ -228,10 +244,13 @@ function buildHarness(): {
   })
 
   const executor = createObjectiveActionExecutor({
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: dispatchRecord stays null in this fixture, so resolveObjectiveDispatchOutcome's only runtime access (resolveObjectiveDispatchTarget) is never reached.
     runtime: {} as OrcaRuntimeService,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this test only calls resolveOutcome(), which never reads dependencies.store (only execute() does).
     store: {} as Store,
     objectiveStore,
     snapshotBindings,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: forge is only reached by execute()'s landing paths, which this test never calls.
     forge: {} as ObjectiveForgeAccess
   })
 
@@ -243,6 +262,7 @@ function buildHarness(): {
     createId: () => 'resolution-event',
     replay: vi.fn(async () => false)
   })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherAttemptRecovery.recover only reads enrollment, kind.resolveOutcome/describeSnapshot, leaseGuard, and traces off a runner; the rest of WatcherRunner's scheduler-loop state is unused here.
   const runner = {
     enrollment,
     kind: {
@@ -332,9 +352,10 @@ describe('WatcherAttemptRecovery / objective classifier integration', () => {
     if (!completion || completion.kind !== 'evidence') {
       throw new Error('expected worker completion evidence')
     }
-    const message = completion.payload as {
-      payload: Record<string, unknown>
+    if (!isMailboxWorkerDonePayload(completion.payload)) {
+      throw new Error('expected mailbox worker_done payload')
     }
+    const message = completion.payload
     message.payload.reportRejection = {
       code: 'sender_not_assignee',
       reason: 'The submitting worker is not the authoritative assignee.'

@@ -44,13 +44,17 @@ function ownerOverridableCapability<T extends string>(capability: T) {
   return z.union([z.literal(capability), z.literal(OWNER_INTERVENTION_CAPABILITY)])
 }
 
-/** A repair-only field must be present exactly when `shape` is `'repair'` — never both, never neither. */
+/** A repair-only field must be present exactly when `plannerMode` is `'repair'` — never both, never neither. */
 function repairIssue(ok: boolean, repair: boolean, path: string, ctx: z.RefinementCtx): void {
   if (ok) {
     return
   }
   const verb = repair ? 'is required' : 'is only allowed'
-  ctx.addIssue({ code: 'custom', path: [path], message: `${path} ${verb} when shape is repair` })
+  ctx.addIssue({
+    code: 'custom',
+    path: [path],
+    message: `${path} ${verb} when plannerMode is repair`
+  })
 }
 
 export const DispatchPlannerActionSchema = z
@@ -65,16 +69,16 @@ export const DispatchPlannerActionSchema = z
     /** Landing-ladder stage an owner asked to skip, kept separate from the exact rationale text. */
     requestedSkipStage: IdSchema.optional(),
     /** Absent means a wholesale replan; 'repair' asks the planner to patch the approved revision. */
-    shape: z.enum(['full', 'repair']).optional(),
+    plannerMode: z.enum(['full', 'repair']).optional(),
     repairOrdinal: z.number().int().positive().optional(),
-    /** The approved revision this repair targets; only set alongside `shape: 'repair'`. */
+    /** The approved revision this repair targets; only set alongside `plannerMode: 'repair'`. */
     repairRevisionId: IdSchema.optional(),
     /** Escalation: the next gate check treats an 'on' capability as 'gated' for this action. */
     approvalRequired: z.literal(true).optional()
   })
   .strict()
   .superRefine((action, ctx) => {
-    const repair = action.shape === 'repair'
+    const repair = action.plannerMode === 'repair'
     repairIssue(repair === (action.repairOrdinal !== undefined), repair, 'repairOrdinal', ctx)
     repairIssue(repair === (action.repairRevisionId !== undefined), repair, 'repairRevisionId', ctx)
   })
@@ -90,12 +94,12 @@ export const IngestPlanActionSchema = z
     revisionNumber: z.number().int().positive(),
     reportPath: z.string().trim().min(1).max(OBJECTIVE_PATH_MAX_LENGTH),
     /** Absent means a wholesale replan; 'repair' ingests a patch against `targetRevisionId`. */
-    shape: z.enum(['full', 'repair']).optional(),
+    plannerMode: z.enum(['full', 'repair']).optional(),
     targetRevisionId: IdSchema.optional()
   })
   .strict()
   .superRefine((action, ctx) => {
-    const repair = action.shape === 'repair'
+    const repair = action.plannerMode === 'repair'
     repairIssue(repair === (action.targetRevisionId !== undefined), repair, 'targetRevisionId', ctx)
   })
 export type IngestPlanAction = z.infer<typeof IngestPlanActionSchema>

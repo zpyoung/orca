@@ -90,6 +90,7 @@ function fakeOwner(
   return {
     describeState: () => ({ text: 'state', truncated: false }),
     describeInterventions: () => 'accept-report',
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the ZodType class; only safeParse is called by the code under test.
     interventionSchema: {
       safeParse: (input: unknown) => ({ success: true, data: input })
     } as never,
@@ -104,13 +105,18 @@ function fakeOwner(
   }
 }
 
+function kindWithOwner(owner: OwnerAdapter<World, KernelAction>): RegisteredWatcherKind {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the WatcherKind contract (KindIdentity & SnapshotSource & Decision & ActionExecutor); these tests only ever read runner.kind.owner.
+  return { owner } as unknown as RegisteredWatcherKind
+}
+
 function buildRunner(args: {
   paused: boolean
   owner?: { agent: 'claude' }
   enabled?: boolean
   capabilities?: Record<string, 'off' | 'gated' | 'on'>
 }): WatcherRunner {
-  const enrollment = {
+  const enrollment: WatcherEnrollment = {
     watcherId: 'watcher-1',
     kind: 'objective',
     workspaceKey: 'local::/workspace',
@@ -134,10 +140,11 @@ function buildRunner(args: {
     createdAtMs: 0,
     terminalAtMs: null,
     ...(args.owner ? { owner: args.owner } : {})
-  } as unknown as WatcherEnrollment
+  }
   return {
     enrollment,
-    kind: { owner: fakeOwner(null) } as unknown as RegisteredWatcherKind,
+    kind: kindWithOwner(fakeOwner(null)),
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherStatus is never read by driveOwnerDeviation or these tests; only its presence on WatcherRunner matters.
     status: {} as WatcherRunner['status'],
     timer: null,
     operationTail: Promise.resolve(),
@@ -177,9 +184,13 @@ function baseDeps(ledgerStore: MemoryLedgerStore): TestRoutingDependencies {
   let openInterval: { watcherId: string; intervalId: string } | null = null
   const notifyApproval = vi.fn<(enrollment: WatcherEnrollment, action: KernelAction) => void>()
   const actions = new WatcherRunnerActions({
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: MemoryLedgerStore only implements read/append; actions.execute is mocked below so RunnerLedgerStore's other members are never called.
     ledgerStore: ledgerStore as never,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: RunnerBudgetClock is unused — actions.execute is mocked below, so the constructor never calls into it.
     budgetClock: {} as never,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: HeimdallOrchestrationAdapter is unused — actions.execute is mocked below, so the constructor never calls into it.
     orchestration: {} as never,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherLedgerLifecycle is unused — actions.execute is mocked below, so the constructor never calls into it.
     dispatchLifecycle: {} as never,
     notifyApproval,
     now: () => ++clock,
@@ -188,6 +199,7 @@ function baseDeps(ledgerStore: MemoryLedgerStore): TestRoutingDependencies {
   vi.spyOn(actions, 'execute').mockResolvedValue(true)
   return {
     owner: {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrcaRuntimeService is a large class; ensureOwnerSession/sendOwnerTurn are mocked via vi.mock, so this runtime handle is never dereferenced.
       runtime: {} as never,
       resolveWorkspaceTarget: async () => ({
         kind: 'folder',
@@ -348,12 +360,10 @@ describe('driveOwnerDeviation: first wake', () => {
     const ledgerStore = memoryLedgerStore()
     recordDeviation({ ledgerStore, now: () => 1, createId: () => 'e1' }, 'watcher-1', deviation)
     const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
-    runner.kind = {
-      owner: {
-        ...fakeOwner(null),
-        describeState: () => ({ text: 'x'.repeat(40_000), truncated: false })
-      }
-    } as unknown as typeof runner.kind
+    runner.kind = kindWithOwner({
+      ...fakeOwner(null),
+      describeState: () => ({ text: 'x'.repeat(40_000), truncated: false })
+    })
     const deps = baseDeps(ledgerStore)
 
     const outcome = await driveOwnerDeviation(deps, runner, snapshot)
@@ -429,9 +439,7 @@ describe('driveOwnerDeviation: accepted ready evidence', () => {
     const ledgerStore = memoryLedgerStore()
     recordDeviation({ ledgerStore, now: () => 1, createId: () => 'e1' }, 'watcher-1', deviation)
     const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
-    runner.kind = {
-      owner: fakeOwner({ gate: 'write-territory', reason: 'outside territory' })
-    } as unknown as typeof runner.kind
+    runner.kind = kindWithOwner(fakeOwner({ gate: 'write-territory', reason: 'outside territory' }))
     const deps = baseDeps(ledgerStore)
 
     await driveOwnerDeviation(deps, runner, snapshot)
@@ -444,7 +452,7 @@ describe('driveOwnerDeviation: accepted ready evidence', () => {
     await driveOwnerDeviation(deps, runner, snapshot)
     expect(requireOpenOwnerDeviation(ledgerStore).foldCount).toBe(2)
 
-    runner.kind = { owner: fakeOwner(null) } as unknown as typeof runner.kind
+    runner.kind = kindWithOwner(fakeOwner(null))
     readOwnerReport.mockClear()
     await driveOwnerDeviation(deps, runner, snapshot)
     expect(readOwnerReport).not.toHaveBeenCalled()
@@ -497,9 +505,7 @@ describe('driveOwnerDeviation: rejected reply is re-raised once then escalated',
     const ledgerStore = memoryLedgerStore()
     recordDeviation({ ledgerStore, now: () => 1, createId: () => 'e1' }, 'watcher-1', deviation)
     const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
-    runner.kind = {
-      owner: fakeOwner({ gate: 'write-territory', reason: 'outside territory' })
-    } as unknown as typeof runner.kind
+    runner.kind = kindWithOwner(fakeOwner({ gate: 'write-territory', reason: 'outside territory' }))
     const deps = baseDeps(ledgerStore)
 
     // wake 1: sends the brief
@@ -563,7 +569,7 @@ async function submitOwnerReport(capabilities: Record<string, 'off' | 'gated' | 
     owner: { agent: 'claude' },
     capabilities
   })
-  runner.kind = { owner: fakeOwner(null, 'plan') } as unknown as typeof runner.kind
+  runner.kind = kindWithOwner(fakeOwner(null, 'plan'))
   const deps = baseDeps(ledgerStore)
   await driveOwnerDeviation(deps, runner, snapshot)
   appendAcceptedOwnerReady(ledgerStore, requireOpenOwnerDeviation(ledgerStore))
@@ -696,9 +702,7 @@ describe('driveOwnerDeviation: an over-cap reply parks with a readable reason', 
         rationale: z.string().trim().min(1).max(10)
       })
       .strict()
-    runner.kind = {
-      owner: { ...fakeOwner(null), interventionSchema: cappedSchema }
-    } as unknown as typeof runner.kind
+    runner.kind = kindWithOwner({ ...fakeOwner(null), interventionSchema: cappedSchema })
     const deps = baseDeps(ledgerStore)
     const rationale = 'far too long for the field cap'
     const overCapReply = {

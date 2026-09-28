@@ -11,8 +11,10 @@ import {
 } from '../../shared/fork-heimdall/fleet-types'
 import type { Store } from '../persistence'
 import type { HeimdallDebugReport } from './debug-report'
+import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import {
   createFleetEnvironmentTransport,
+  type FleetEnvironmentIdentity,
   type FleetEnvironmentTransport
 } from './fleet-environment-transport'
 import { buildFleetSnapshot } from './fleet-projection'
@@ -38,6 +40,7 @@ export type HeimdallFleetTransportOptions = {
 export class HeimdallFleetTransport {
   private readonly kernel: HeimdallFleetKernel
   private readonly remote: HeimdallRemoteFleetMirrors
+  private readonly environments: FleetEnvironmentTransport
   private readonly now: () => number
   private readonly listeners = new Set<(snapshot: HeimdallFleetSnapshot) => void>()
   private localEntries: WatcherFleetEntry[] = []
@@ -52,10 +55,10 @@ export class HeimdallFleetTransport {
   constructor(options: HeimdallFleetTransportOptions) {
     this.kernel = options.kernel
     this.now = options.now ?? Date.now
-    const environments =
+    this.environments =
       options.environments ?? createFleetEnvironmentTransport(options.userDataPath)
     this.remote = new HeimdallRemoteFleetMirrors(
-      environments,
+      this.environments,
       () => this.schedulePublish(false),
       options.store
     )
@@ -86,22 +89,31 @@ export class HeimdallFleetTransport {
   }
 
   detail(target: WatcherTarget): Promise<WatcherDetail> {
-    assertTargetShape(target)
+    assertWellFormedTarget(target)
     return target.connectionId === null ? this.kernel.detail(target) : this.remote.detail(target)
   }
 
   command(request: WatcherCommandRequest): Promise<WatcherCommandResult> {
-    assertTargetShape(request.target)
+    assertWellFormedTarget(request.target)
     return request.target.connectionId === null
       ? this.kernel.command(request)
       : this.remote.command(request)
   }
 
   async debugReport(target: WatcherTarget): Promise<unknown> {
-    assertTargetShape(target)
+    assertWellFormedTarget(target)
     return target.connectionId === null
       ? this.kernel.debugReport(target.watcherId)
       : this.remote.debugReport(target)
+  }
+
+  /** One read against an owning runtime, for callers the fleet mirrors do not cover. */
+  readRemote(
+    identity: FleetEnvironmentIdentity,
+    method: string,
+    params: unknown
+  ): Promise<RuntimeRpcResponse<unknown>> {
+    return this.environments.read(identity, method, params)
   }
 
   dispose(): void {
@@ -166,7 +178,7 @@ export class HeimdallFleetTransport {
   }
 }
 
-function assertTargetShape(target: WatcherTarget): void {
+function assertWellFormedTarget(target: WatcherTarget): void {
   const valid =
     (target.connectionId === null && target.pairingRevision === null) ||
     (target.connectionId !== null && target.pairingRevision !== null)

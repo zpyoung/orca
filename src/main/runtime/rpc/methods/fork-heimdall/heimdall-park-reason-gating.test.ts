@@ -15,6 +15,7 @@ import type {
   WatcherListEntry,
   WatcherParkReason
 } from '../../../../../shared/fork-heimdall/watcher-types'
+import { OrcaRuntimeService } from '../../../orca-runtime'
 import { eraseRpcMethods, isStreamingMethod, type RpcContext, type RpcMethod } from '../../core'
 import { HEIMDALL_METHODS } from './heimdall'
 import { bindHeimdallKernel, bindHeimdallTransport } from './kernel-binding'
@@ -93,21 +94,29 @@ function method(name: string): RpcMethod {
   return found
 }
 
-async function call(
-  runtime: object,
+async function call<TResult>(
+  runtime: OrcaRuntimeService,
   name: string,
   params: unknown,
   context: Pick<RpcContext, 'clientKind' | 'clientCapabilities'> = {}
-): Promise<unknown> {
+): Promise<TResult> {
   const target = method(name)
-  return await target.handler(target.params?.parse(params), {
-    runtime: runtime as never,
+  const result = await target.handler(target.params?.parse(params), {
+    runtime,
     ...context
   })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: RPC handlers return unknown by design; callers assert the response shape their request produces.
+  return result as TResult
+}
+
+function isReadySnapshotEvent(
+  event: unknown
+): event is { type: 'ready'; snapshot: HeimdallFleetSnapshot } {
+  return typeof event === 'object' && event !== null && 'type' in event && event.type === 'ready'
 }
 
 function harness() {
-  const runtime = {}
+  const runtime = new OrcaRuntimeService(null)
   const kernel = {
     enroll: vi.fn(async (): Promise<EnrollResult> => ({
       status: 'enrolled' as const,
@@ -136,7 +145,9 @@ function harness() {
       entry: listEntry(WORKER_ESCALATION)
     }))
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double covers only the HeimdallKernelService methods these tests exercise, not the full interface.
   bindHeimdallKernel(runtime, kernel as never)
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double covers only the HeimdallFleetTransport methods these tests exercise, not the full class.
   bindHeimdallTransport(runtime, transport as never)
   return { runtime, kernel, transport }
 }
@@ -150,18 +161,18 @@ const CAPABLE_CONTEXT = {
 describe('Heimdall watcher park reason capability gating', () => {
   it('degrades a worker-escalation park reason on fleet reads without the capability', async () => {
     const { runtime } = harness()
-    const legacy = (await call(
+    const legacy = await call<HeimdallFleetSnapshot>(
       runtime,
       HEIMDALL_CHANNELS.fleet,
       {},
       LEGACY_CONTEXT
-    )) as HeimdallFleetSnapshot
-    const capable = (await call(
+    )
+    const capable = await call<HeimdallFleetSnapshot>(
       runtime,
       HEIMDALL_CHANNELS.fleet,
       {},
       CAPABLE_CONTEXT
-    )) as HeimdallFleetSnapshot
+    )
 
     expect(legacy.entries[0]?.entry.status.parkReason).toBeNull()
     expect(capable.entries[0]?.entry.status.parkReason).toEqual(WORKER_ESCALATION)
@@ -170,18 +181,18 @@ describe('Heimdall watcher park reason capability gating', () => {
   it('degrades a worker-escalation park reason on detail reads without the capability', async () => {
     const { runtime } = harness()
     const target = { watcherId: 'watcher-1', connectionId: null, pairingRevision: null }
-    const legacy = (await call(
+    const legacy = await call<WatcherDetail>(
       runtime,
       HEIMDALL_CHANNELS.detail,
       target,
       LEGACY_CONTEXT
-    )) as WatcherDetail
-    const capable = (await call(
+    )
+    const capable = await call<WatcherDetail>(
       runtime,
       HEIMDALL_CHANNELS.detail,
       target,
       CAPABLE_CONTEXT
-    )) as WatcherDetail
+    )
 
     expect(legacy.watcher.entry.status.parkReason).toBeNull()
     expect(capable.watcher.entry.status.parkReason).toEqual(WORKER_ESCALATION)
@@ -200,12 +211,18 @@ describe('Heimdall watcher park reason capability gating', () => {
       },
       owner: null
     }
-    const legacy = (await call(runtime, HEIMDALL_CHANNELS.enroll, input, LEGACY_CONTEXT)) as {
-      entry: WatcherListEntry
-    }
-    const capable = (await call(runtime, HEIMDALL_CHANNELS.enroll, input, CAPABLE_CONTEXT)) as {
-      entry: WatcherListEntry
-    }
+    const legacy = await call<{ entry: WatcherListEntry }>(
+      runtime,
+      HEIMDALL_CHANNELS.enroll,
+      input,
+      LEGACY_CONTEXT
+    )
+    const capable = await call<{ entry: WatcherListEntry }>(
+      runtime,
+      HEIMDALL_CHANNELS.enroll,
+      input,
+      CAPABLE_CONTEXT
+    )
 
     expect(legacy.entry.status.parkReason).toBeNull()
     expect(capable.entry.status.parkReason).toEqual(WORKER_ESCALATION)
@@ -213,7 +230,7 @@ describe('Heimdall watcher park reason capability gating', () => {
 
   it('never degrades an in-process read', async () => {
     const { runtime } = harness()
-    const local = (await call(runtime, HEIMDALL_CHANNELS.fleet, {})) as HeimdallFleetSnapshot
+    const local = await call<HeimdallFleetSnapshot>(runtime, HEIMDALL_CHANNELS.fleet, {})
     expect(local.entries[0]?.entry.status.parkReason).toEqual(WORKER_ESCALATION)
   })
 
@@ -232,20 +249,25 @@ describe('Heimdall watcher park reason capability gating', () => {
     const emitted: unknown[] = []
     const done = subscribeMethod.handler(
       {},
-      { runtime: runtime as never, connectionId: 'conn-1', ...LEGACY_CONTEXT },
+      {
+        runtime,
+        connectionId: 'conn-1',
+        ...LEGACY_CONTEXT
+      },
       (result) => emitted.push(result)
     )
     // The handler computes the ready snapshot through an async `kernel.fleet()` call before
     // emitting it; calling cleanup before that settles sets `closed` first, and the handler
     // drops the emission it was mid-flight to send.
     await vi.waitFor(() => {
-      expect(emitted.some((event) => (event as { type: string }).type === 'ready')).toBe(true)
+      expect(emitted.some((event) => isReadySnapshotEvent(event))).toBe(true)
     })
     cleanups.forEach((cleanup) => cleanup())
     await done
 
-    const ready = emitted.find((event) => (event as { type: string }).type === 'ready') as {
-      snapshot: HeimdallFleetSnapshot
+    const ready = emitted.find(isReadySnapshotEvent)
+    if (!ready) {
+      throw new Error('Missing ready event')
     }
     expect(ready.snapshot.entries[0]?.entry.status.parkReason).toBeNull()
   })

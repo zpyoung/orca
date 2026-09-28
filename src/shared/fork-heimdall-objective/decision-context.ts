@@ -7,13 +7,7 @@ import {
 import type { DecisionOutcome } from '../fork-heimdall/kind-contract'
 import { getAttemptResolution, getLatestAttempts } from '../fork-heimdall/ledger-queries'
 import type { AttemptEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
-import type { Snapshot } from '../fork-heimdall/snapshot'
-import { decideRepairPlannerAction } from './decide-repair-planner'
-import {
-  ObjectiveActionSchema,
-  type ObjectiveAction,
-  type DispatchPlannerAction
-} from './objective-actions'
+import { ObjectiveActionSchema, type ObjectiveAction } from './objective-actions'
 import {
   ObjectivePendingReportSchema,
   type ObjectivePendingReport,
@@ -113,7 +107,7 @@ export function objectiveAttemptReportValidation(
   }
   const result =
     attempt.result !== null && typeof attempt.result === 'object'
-      ? (attempt.result as Record<string, unknown>)
+      ? Object.fromEntries(Object.entries(attempt.result))
       : null
   const parsed = ReportValidationProvenanceSchema.safeParse(result?.reportValidation)
   return parsed.success ? parsed.data : null
@@ -291,7 +285,7 @@ function mailboxPayload(value: unknown): {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null
   }
-  const record = value as Record<string, unknown>
+  const record: Record<string, unknown> = Object.fromEntries(Object.entries(value))
   if (
     typeof record.type !== 'string' ||
     typeof record.payload !== 'object' ||
@@ -311,7 +305,7 @@ function mailboxPayload(value: unknown): {
       : undefined
   return {
     type: record.type,
-    payload: record.payload as Record<string, unknown>,
+    payload: Object.fromEntries(Object.entries(record.payload)),
     ...(subject === undefined ? {} : { subject }),
     ...(body === undefined ? {} : { body })
   }
@@ -329,7 +323,7 @@ function projectedReportRejection(args: {
   }
   const record =
     typeof args.value === 'object' && args.value !== null && !Array.isArray(args.value)
-      ? (args.value as Record<string, unknown>)
+      ? Object.fromEntries(Object.entries(args.value))
       : null
   const sourceCode =
     record !== null && typeof record.code === 'string' && record.code.trim().length > 0
@@ -461,95 +455,4 @@ export function activeObjectiveRevision(world: ObjectiveWorld): ObjectiveRevisio
       .filter((revision) => revision.status === 'approved')
       .sort((left, right) => right.number - left.number)[0] ?? null
   )
-}
-
-function highestRevisionNumber(
-  world: ObjectiveWorld,
-  attempts: readonly ObjectiveAttempt[]
-): number {
-  let highest = world.plan.revisions.reduce(
-    (maximum, revision) => Math.max(maximum, revision.number),
-    0
-  )
-  for (const { action } of attempts) {
-    if (action.kind === 'dispatch-planner') {
-      highest = Math.max(highest, action.revisionNumber)
-    }
-  }
-  return highest
-}
-
-export function decidePlannerAction(
-  snapshot: Snapshot<ObjectiveWorld>,
-  ledger: WatcherLedger,
-  attempts: readonly ObjectiveAttempt[],
-  reports: readonly ObjectivePendingReport[],
-  reason: DispatchPlannerAction['reason'],
-  afterRevisionNumber: number
-): ObjectiveDecisionOutcome {
-  // an approved revision turns every redispatch into a patch against it, never a new revision
-  if (activeObjectiveRevision(snapshot.world)) {
-    return decideRepairPlannerAction(snapshot, ledger, attempts, reports, reason)
-  }
-  const planner = latestObjectiveAttempt(
-    attempts,
-    (action) => action.kind === 'dispatch-planner' && action.revisionNumber > afterRevisionNumber
-  )
-  if (planner?.action.kind === 'dispatch-planner') {
-    const disposition = objectiveAttemptDisposition(planner.attempt, ledger)
-    const report = reports.find((candidate) => candidate.dispatchId === planner.attempt.dispatchId)
-    const reportValidation = objectiveAttemptReportValidation(planner.attempt, ledger)
-    if (
-      report?.outcome === 'succeeded' &&
-      report.reportPath !== null &&
-      report.evidenceIssue === undefined &&
-      report.reportValidation === undefined &&
-      reportValidation === null
-    ) {
-      const ingestion = latestObjectiveAttempt(
-        attempts,
-        (action) => action.kind === 'ingest-plan' && action.dispatchId === report.dispatchId
-      )
-      if (ingestion) {
-        const ingestionDisposition = objectiveAttemptDisposition(ingestion.attempt, ledger)
-        if (ingestionDisposition === 'in-flight' || ingestionDisposition === 'indeterminate') {
-          return objectiveNoAction('plan', 'plan-ingestion-in-flight', report.dispatchId)
-        }
-        if (ingestionDisposition === 'landed') {
-          return objectiveNoAction('plan', 'projection-refresh-pending', report.dispatchId)
-        }
-      } else {
-        return {
-          action: {
-            kind: 'ingest-plan',
-            capability: 'plan',
-            visibility: 'local',
-            recovery: 'replay-safe',
-            contentIdentity: snapshot.contentIdentity,
-            evidenceKey: report.dispatchId,
-            dispatchId: report.dispatchId,
-            revisionNumber: planner.action.revisionNumber,
-            reportPath: report.reportPath
-          }
-        }
-      }
-    }
-    if (disposition === 'in-flight' || disposition === 'indeterminate') {
-      return objectiveNoAction('plan', 'planner-in-flight', planner.action.evidenceKey)
-    }
-  }
-
-  const revisionNumber = highestRevisionNumber(snapshot.world, attempts) + 1
-  return {
-    action: {
-      kind: 'dispatch-planner',
-      capability: 'plan',
-      visibility: 'local',
-      contentIdentity: snapshot.contentIdentity,
-      evidenceKey: `plan:${revisionNumber}`,
-      revisionNumber,
-      reason: revisionNumber === 1 ? 'initial' : reason,
-      shape: 'full'
-    }
-  }
 }

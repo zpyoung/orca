@@ -1,5 +1,5 @@
 import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
-import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { KernelAction, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type {
   HostedReviewSitterDefinition,
@@ -17,6 +17,16 @@ import {
 } from './contention'
 import { expectedStateMismatch, tagHostedReviewPreDispatchError } from './provider-action-effect'
 import { resolveHostedReviewSitterGitExecution } from './provider-git'
+
+function isPrepareFixAction(action: KernelAction): action is PrepareFixAction {
+  return action.kind === 'prepare-fix'
+}
+
+function isPrepareConflictResolutionAction(
+  action: KernelAction
+): action is PrepareConflictResolutionAction {
+  return action.kind === 'prepare-conflict-resolution'
+}
 
 function preparationForPublication(
   action: PublishAction,
@@ -36,9 +46,9 @@ function preparationForPublication(
     throw new Error('Hosted review publication lost its preparation attempt.')
   }
   const preparation = entry.action
-  if (action.kind === 'publish-fix' && preparation.kind === 'prepare-fix') {
+  if (action.kind === 'publish-fix' && isPrepareFixAction(preparation)) {
     return {
-      action: preparation as PrepareFixAction,
+      action: preparation,
       fingerprint: entry.fingerprint,
       worker: entry.dispatchId
         ? { attemptId: entry.attemptId, dispatchId: entry.dispatchId }
@@ -47,10 +57,10 @@ function preparationForPublication(
   }
   if (
     action.kind === 'publish-conflict-resolution' &&
-    preparation.kind === 'prepare-conflict-resolution'
+    isPrepareConflictResolutionAction(preparation)
   ) {
     return {
-      action: preparation as PrepareConflictResolutionAction,
+      action: preparation,
       fingerprint: entry.fingerprint,
       worker: entry.dispatchId
         ? { attemptId: entry.attemptId, dispatchId: entry.dispatchId }

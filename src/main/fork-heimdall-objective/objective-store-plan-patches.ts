@@ -87,6 +87,7 @@ function planPatchRecord(row: PlanPatchRow): ObjectivePlanPatchRecord {
 }
 
 function readPlanPatchRowById(db: Database.Database, patchId: string): PlanPatchRow | undefined {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_PATCH_COLUMNS lists every PlanPatchRow field in order.
   return db.prepare(`SELECT ${PLAN_PATCH_COLUMNS} FROM plan_patch WHERE id = ?`).get(patchId) as
     | PlanPatchRow
     | undefined
@@ -97,6 +98,7 @@ function readPlanPatchRowByDispatch(
   watcherId: string,
   dispatchId: string
 ): PlanPatchRow | undefined {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_PATCH_COLUMNS lists every PlanPatchRow field in order.
   return db
     .prepare(
       `SELECT ${PLAN_PATCH_COLUMNS} FROM plan_patch WHERE watcher_id = ? AND created_by_dispatch_id = ?`
@@ -189,6 +191,7 @@ function mergeAssumptionsOntoRevision(
   previousAssumptions: readonly ObjectivePlanAssumption[],
   patchAssumptions: readonly ObjectivePlanAssumption[]
 ): void {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: revisionId is only reached here after amendObjectiveRevisionInTransaction already confirmed the row exists.
   const revision = db
     .prepare('SELECT payload_json FROM plan_revision WHERE id = ?')
     .get(revisionId) as { payload_json: string }
@@ -243,6 +246,7 @@ export function applyPlanPatch(
       throw new Error('Plan patch cannot be applied from rejected')
     }
     const report = parseJson(PlannerRepairReportSchema, row.payload_json, 'plan patch payload')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; the query selects only payload_json.
     const previousRevision = db
       .prepare('SELECT payload_json FROM plan_revision WHERE id = ?')
       .get(row.revision_id) as { payload_json: string } | undefined
@@ -307,6 +311,7 @@ export function listPlanPatches(
   database: ObjectiveDatabase,
   watcherId: string
 ): ObjectivePlanPatchRecord[] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_PATCH_COLUMNS lists every PlanPatchRow field in order.
   const rows = database
     .connection()
     .prepare(
@@ -325,6 +330,7 @@ export function rejectDraftRevisionInTransaction(
   db: Database.Database,
   args: { watcherId: string; revisionId: string }
 ): void {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; the query selects only status.
   const row = db
     .prepare('SELECT status FROM plan_revision WHERE id = ? AND watcher_id = ?')
     .get(args.revisionId, args.watcherId) as { status: string } | undefined
@@ -368,6 +374,7 @@ export function projectPlanPatches(
   createdAtMs: number
   resolvedAtMs: number | null
 }[] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_PATCH_COLUMNS lists every PlanPatchRow field in order.
   const rows = db
     .prepare(
       `SELECT ${PLAN_PATCH_COLUMNS} FROM plan_patch WHERE watcher_id = ?

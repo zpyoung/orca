@@ -1,21 +1,28 @@
+import type { OrcaRuntimeService } from '../../../../runtime/orca-runtime'
 import type { HeimdallKernelService } from '../../../../fork-heimdall/kernel-service'
 import type { HeimdallFleetTransport } from '../../../../fork-heimdall/fleet-transport'
 import { bindOrchestrationSubmissionPreflight } from '../../../../fork-heimdall/orchestration/submission-preflight'
 
-const kernels = new WeakMap<object, HeimdallKernelService>()
-const transports = new WeakMap<object, HeimdallFleetTransport>()
+const kernels = new WeakMap<OrcaRuntimeService, HeimdallKernelService>()
+const transports = new WeakMap<OrcaRuntimeService, HeimdallFleetTransport>()
 
-export function bindHeimdallKernel(runtime: object, kernel: HeimdallKernelService): void {
+export function bindHeimdallKernel(
+  runtime: OrcaRuntimeService,
+  kernel: HeimdallKernelService
+): void {
   kernels.set(runtime, kernel)
   bindOrchestrationSubmissionPreflight(runtime, (submission) =>
     kernel.preflightSubmission(submission)
   )
 }
-export function bindHeimdallTransport(runtime: object, transport: HeimdallFleetTransport): void {
+export function bindHeimdallTransport(
+  runtime: OrcaRuntimeService,
+  transport: HeimdallFleetTransport
+): void {
   transports.set(runtime, transport)
 }
 
-export function requireHeimdallTransport(runtime: object): HeimdallFleetTransport {
+export function requireHeimdallTransport(runtime: OrcaRuntimeService): HeimdallFleetTransport {
   const transport = transports.get(runtime)
   if (!transport) {
     throw new Error('Heimdall fleet transport is unavailable on this runtime')
@@ -23,7 +30,7 @@ export function requireHeimdallTransport(runtime: object): HeimdallFleetTranspor
   return transport
 }
 
-export function requireHeimdallKernel(runtime: object): HeimdallKernelService {
+export function requireHeimdallKernel(runtime: OrcaRuntimeService): HeimdallKernelService {
   const kernel = kernels.get(runtime)
   if (!kernel) {
     throw new Error('Heimdall is unavailable on this runtime: owner-not-executable')

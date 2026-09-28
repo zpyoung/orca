@@ -1,5 +1,5 @@
 // Forked from src/main/runtime/rpc/methods/orchestration/messaging/send-point-to-point.ts at 141652b38ae0aed68a274cbf1ab49b56ac6d7ca9.
-import type { MessagePriority, MessageType, OrchestrationDb } from '../../runtime/orchestration/db'
+import type { MessageType, OrchestrationDb } from '../../runtime/orchestration/db'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import { reconcileLifecycleMessage } from '../../runtime/orchestration/lifecycle-reconciliation'
 import { bindCoordinatorMutationPayload } from '../../runtime/orchestration/dispatch-message-binding'
@@ -54,7 +54,7 @@ export async function sendPointToPointMessage(args: {
   } = args
   // Point-to-point — existing single-recipient behavior
   revalidateLegacyCoordinator?.()
-  const messageType = (params.type ?? 'status') as MessageType
+  const messageType: MessageType = params.type ?? 'status'
   const processIncarnation = isDispatchMutationMessageType(messageType)
     ? resolveProcessIncarnation()
     : undefined
@@ -104,7 +104,7 @@ export async function sendPointToPointMessage(args: {
       subject: params.subject,
       body: params.body,
       type: messageType,
-      priority: params.priority as MessagePriority,
+      priority: params.priority,
       threadId: params.threadId,
       payload: dispatch
         ? bindCoordinatorMutationPayload(messageType, params.payload, dispatch.id)

@@ -82,6 +82,7 @@ function repairFixture(
     digest: revision.digest,
     approvedAtMs: 2
   })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the plan report action.
   const binding = {
     enrollment: { watcherId: WATCHER_ID },
     contract: { writeTerritory: ['src/**'] },
@@ -100,7 +101,7 @@ function repairFixture(
     evidenceKey: 'plan:2:repair',
     revisionNumber: 2,
     reason: 'replan-after-block',
-    shape: 'repair',
+    plannerMode: 'repair',
     repairOrdinal: 1,
     repairRevisionId: revision.revisionId,
     ...dispatchOverrides
@@ -112,6 +113,7 @@ function repairFixture(
   )
 
   function contextWith(extraLedgerEntries: unknown[] = []): ExecuteContext<ObjectiveWorld> {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the plan report action.
     return {
       snapshot: { contentIdentity: 'content-1', world: { plan: { nodes: [] } } },
       ledger: {
@@ -184,7 +186,7 @@ function ingestAction(
     dispatchId: 'dispatch-planner-repair-1',
     revisionNumber: 2,
     reportPath: REPORT_PATH,
-    shape: 'repair',
+    plannerMode: 'repair',
     targetRevisionId: fixture.revisionId,
     ...overrides
   }
@@ -397,7 +399,7 @@ describe('objective repair-shaped plan ingestion', () => {
     const fixture = repairFixture()
 
     const outcome = await ingestObjectivePlanReport({
-      action: ingestAction(fixture, { shape: undefined, targetRevisionId: undefined }),
+      action: ingestAction(fixture, { plannerMode: undefined, targetRevisionId: undefined }),
       binding: fixture.binding,
       context: fixture.contextWith(),
       objectiveStore: fixture.objectiveStore
@@ -412,7 +414,7 @@ describe('objective repair-shaped plan ingestion', () => {
 
   it('rejects a repair-shaped ingest whose origin dispatch was full-shaped', async () => {
     const fixture = repairFixture({
-      shape: undefined,
+      plannerMode: undefined,
       repairOrdinal: undefined,
       repairRevisionId: undefined
     })
@@ -429,7 +431,7 @@ describe('objective repair-shaped plan ingestion', () => {
   })
 
   it('accepts a repair report whose origin dispatch was owner-directed', async () => {
-    // mirrors the fixed shape: an owner-directed repair dispatch carries the approved revision's
+    // mirrors the fixed plannerMode: an owner-directed repair dispatch carries the approved revision's
     // own number, so its landed report ingests without a dispatch/ingest revisionNumber mismatch
     const fixture = repairFixture({
       reason: 'owner-directed',

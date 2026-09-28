@@ -58,6 +58,14 @@ import type { WatcherRunnerLoop } from './runner-loop'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 
 export type { HeimdallKernelService } from './kernel-service-contract'
+
+function eraseWatcherKind<TWorld, TAction extends KernelAction, TResult>(
+  kind: WatcherKind<TWorld, TAction, TResult>
+): RegisteredWatcherKind {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: type-erases a specific WatcherKind<TWorld, TAction, TResult> for storage in the heterogeneous kind registry; every reader narrows it back through KernelAction.
+  return kind as RegisteredWatcherKind
+}
+
 export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   private readonly registry = new WatcherKindRegistry()
   private readonly runners = new Map<string, WatcherRunner>()
@@ -86,7 +94,7 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   registerKind<TWorld, TAction extends KernelAction, TResult>(
     kind: WatcherKind<TWorld, TAction, TResult>
   ): void {
-    this.registry.register(kind as RegisteredWatcherKind)
+    this.registry.register(eraseWatcherKind(kind))
     if (!this.loaded) {
       return
     }
@@ -109,11 +117,7 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
         this.malformedEnrollments!.record(record, this.database?.isReadOnly() !== true)
         continue
       }
-      this.restoreRunner(
-        record,
-        kind as RegisteredWatcherKind,
-        this.database?.isReadOnly() !== true
-      )
+      this.restoreRunner(record, eraseWatcherKind(kind), this.database?.isReadOnly() !== true)
     }
     this.publishChanged()
   }

@@ -4,6 +4,7 @@ import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-sc
 import type { RevisionAmendmentPatch } from '../../shared/fork-heimdall-objective/revision-amendment'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
+import { oneRow } from './objective-store-queries'
 
 const WATCHER_ID = 'watcher-amend-1'
 const REPORT: PlannerReport = {
@@ -176,11 +177,13 @@ describe('ObjectiveStore.amendRevision', () => {
     const replay = store.amendRevision({ ...args, amendedAtMs: 401 })
     expect(replay).toEqual({ ...first, replayed: true })
 
-    const count = database
-      .connection()
-      .prepare('SELECT COUNT(*) AS count FROM revision_amendment WHERE revision_id = ?')
-      .get(revision.revisionId) as { count: number }
-    expect(count.count).toBe(1)
+    const count = oneRow<{ count: number }>(
+      database
+        .connection()
+        .prepare('SELECT COUNT(*) AS count FROM revision_amendment WHERE revision_id = ?'),
+      revision.revisionId
+    )
+    expect(count?.count).toBe(1)
   })
 
   it('refuses an owner upsert whose task exceeds the dispatch snapshot cap', () => {
@@ -383,11 +386,10 @@ describe('ObjectiveStore.amendRevision', () => {
     })
 
     expect(() => store.purge(WATCHER_ID)).not.toThrow()
-    const count = database
-      .connection()
-      .prepare('SELECT COUNT(*) AS count FROM revision_amendment')
-      .get() as { count: number }
-    expect(count.count).toBe(0)
+    const count = oneRow<{ count: number }>(
+      database.connection().prepare('SELECT COUNT(*) AS count FROM revision_amendment')
+    )
+    expect(count?.count).toBe(0)
   })
 
   it('invalidates changed criterion checks and every prior review verdict', () => {
@@ -466,11 +468,13 @@ describe('ObjectiveStore.amendRevision', () => {
 
     expect(result).toEqual({ ok: false, reason: 'changes-frozen-node', taskKey: 'task-a' })
     expect(store.getTask(revision.revisionId, 'task-a')?.spec).toBe('Implement A')
-    const count = database
-      .connection()
-      .prepare('SELECT COUNT(*) AS count FROM revision_amendment WHERE revision_id = ?')
-      .get(revision.revisionId) as { count: number }
-    expect(count.count).toBe(0)
+    const count = oneRow<{ count: number }>(
+      database
+        .connection()
+        .prepare('SELECT COUNT(*) AS count FROM revision_amendment WHERE revision_id = ?'),
+      revision.revisionId
+    )
+    expect(count?.count).toBe(0)
   })
 
   it('refuses to drop a frozen task', () => {

@@ -11,6 +11,7 @@ import {
 import { getRepeatedFailureAfterOwnFixEvidence } from './stop-policy'
 import type {
   DerivedHostedReviewSitterDiscrepancy,
+  HostedReviewAttemptEntry,
   HostedReviewCheckSnapshot,
   HostedReviewSitterAction,
   HostedReviewSitterContention,
@@ -99,11 +100,11 @@ function checkFailureDrafts(review: HostedReviewSnapshot): readonly DiscrepancyD
 function latestCompletedReruns(ledger: WatcherLedger): readonly RerunCheckAction[] {
   return getLatestHostedReviewAttempts(ledger)
     .filter(
-      (entry) =>
+      (entry): entry is HostedReviewAttemptEntry & { action: RerunCheckAction } =>
         entry.action.kind === 'rerun-check' &&
         getHostedReviewAttemptDisposition(ledger, entry.action) === 'completed'
     )
-    .map((entry) => entry.action as RerunCheckAction)
+    .map((entry) => entry.action)
 }
 
 function unverifiableFailureDrafts(
@@ -219,7 +220,7 @@ function parseDiscrepancyId(
   value: string
 ): Pick<DerivedHostedReviewSitterDiscrepancy, 'kind' | 'headSha' | 'evidenceKey'> | null {
   try {
-    const parsed = JSON.parse(value) as unknown
+    const parsed: unknown = JSON.parse(value)
     if (
       !Array.isArray(parsed) ||
       parsed.length !== 3 ||
@@ -230,6 +231,7 @@ function parseDiscrepancyId(
       return null
     }
     return {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the escalation id is untyped persisted ledger data; only its shape (3 strings) is checked so a forward-compatible discrepancy kind from a newer build still round-trips.
       kind: parsed[0] as HostedReviewSitterDiscrepancyKind,
       headSha: parsed[1],
       evidenceKey: parsed[2]

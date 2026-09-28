@@ -40,11 +40,11 @@ type StringDetails = {
   definitionBytes: number
 }
 
-function ownEntries(value: Record<string, unknown>): [string, unknown][] {
+function ownEntries<T extends object>(value: T): [string, unknown][] {
   return Object.entries(value).sort(([left], [right]) => compareCodeUnits(left, right))
 }
 
-function recordFrom(entries: readonly (readonly [string, unknown])[]): Record<string, unknown> {
+function recordFrom<V>(entries: readonly (readonly [string, V])[]): Record<string, V> {
   return Object.fromEntries(entries)
 }
 
@@ -134,7 +134,7 @@ function encodeValue(
   if (value === null || typeof value !== 'object') {
     return value
   }
-  const record = value as Record<string, unknown>
+  const record = value
   const encoded = recordFrom(
     ownEntries(record).map(([key, child]) => [key, encodeValue(child, selected, details)] as const)
   )
@@ -149,9 +149,9 @@ export function normalizeJudgmentState<T extends { contentIdentity: string }>(
 ): JudgmentNormalizationResult<T> {
   const canonicalJson = stableJson(state)
   const originalBytes = utf8Bytes(canonicalJson)
-  const canonical = JSON.parse(canonicalJson) as T
+  const canonical: T = JSON.parse(canonicalJson)
   const counts = new Map<string, number>()
-  for (const [key, value] of ownEntries(canonical as Record<string, unknown>)) {
+  for (const [key, value] of ownEntries(canonical)) {
     if (key === 'contentIdentity') {
       if (typeof value === 'string' && !counts.has(value)) {
         counts.set(value, 0)
@@ -175,9 +175,9 @@ export function normalizeJudgmentState<T extends { contentIdentity: string }>(
     [...selected]
       .sort((left, right) => compareCodeUnits(details.get(left)!.id, details.get(right)!.id))
       .map((value) => [details.get(value)!.id, value] as const)
-  ) as Record<string, string>
+  )
   const encodedEntries: [string, unknown][] = []
-  for (const [key, value] of ownEntries(canonical as Record<string, unknown>)) {
+  for (const [key, value] of ownEntries(canonical)) {
     encodedEntries.push([
       key,
       key === 'contentIdentity' ? value : encodeValue(value, selected, details)
@@ -185,6 +185,7 @@ export function normalizeJudgmentState<T extends { contentIdentity: string }>(
   }
   encodedEntries.push(['normalization', { format: JUDGMENT_STATE_NORMALIZATION_FORMAT, strings }])
   encodedEntries.sort(([left], [right]) => compareCodeUnits(left, right))
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: encodedEntries is assembled dynamically from canonical's own keys plus the normalization envelope; its NormalizedJudgmentState shape is a runtime invariant of this function, not something Record<string, unknown> can express.
   const encoded = recordFrom(encodedEntries) as unknown as NormalizedJudgmentState
   const serializedState = JSON.stringify(encoded)
   if (serializedState === undefined) {
@@ -215,19 +216,19 @@ export function normalizeJudgmentState<T extends { contentIdentity: string }>(
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 export function isNormalizedJudgmentState(value: unknown): value is NormalizedJudgmentState {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+  if (!isRecord(value)) {
     return false
   }
-  const candidate = value as Record<string, unknown>
-  if (
-    candidate.normalization === null ||
-    typeof candidate.normalization !== 'object' ||
-    Array.isArray(candidate.normalization)
-  ) {
+  const candidate = value
+  if (!isRecord(candidate.normalization)) {
     return false
   }
-  const normalization = candidate.normalization as Record<string, unknown>
+  const normalization = candidate.normalization
   return (
     normalization.format === JUDGMENT_STATE_NORMALIZATION_FORMAT &&
     normalization.strings !== null &&
@@ -244,7 +245,7 @@ function decodeValue(value: unknown, strings: Readonly<Record<string, string>>):
   if (value === null || typeof value !== 'object') {
     return value
   }
-  const record = value as Record<string, unknown>
+  const record = value
   const entries = ownEntries(record)
   if (entries.length === 1 && entries[0]![0] === '$ref') {
     const id = entries[0]![1]
@@ -259,9 +260,7 @@ function decodeValue(value: unknown, strings: Readonly<Record<string, string>>):
       throw new Error('Normalized judgment state contains an invalid literal escape')
     }
     return recordFrom(
-      ownEntries(escaped as Record<string, unknown>).map(
-        ([key, child]) => [key, decodeValue(child, strings)] as const
-      )
+      ownEntries(escaped).map(([key, child]) => [key, decodeValue(child, strings)] as const)
     )
   }
   return recordFrom(entries.map(([key, child]) => [key, decodeValue(child, strings)] as const))
@@ -269,11 +268,12 @@ function decodeValue(value: unknown, strings: Readonly<Record<string, string>>):
 
 export function expandJudgmentState<T>(state: JudgmentWireState<T>): T {
   if (!isNormalizedJudgmentState(state)) {
-    return state as T
+    return state
   }
   const strings = state.normalization.strings
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the wire format's own contract is that stripping `normalization` and decoding string refs reconstructs the original T; no runtime check can express that back to a fully generic T.
   return recordFrom(
-    ownEntries(state as unknown as Record<string, unknown>)
+    ownEntries(state)
       .filter(([key]) => key !== 'normalization')
       .map(
         ([key, value]) =>

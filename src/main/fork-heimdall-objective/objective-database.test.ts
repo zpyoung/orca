@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import Database from '../sqlite/sync-database'
 import { OBJECTIVE_DATABASE_SCHEMA_VERSION, ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
+import { allRows } from './objective-store-queries'
 
 const WATCHER_ID = 'watcher-objective-1'
 let root: string
@@ -27,11 +28,11 @@ describe('Objective database initialization', () => {
     const disk = new ObjectiveDatabase(root)
     opened.push(disk)
     const connection = disk.connection()
-    const tables = connection
-      .prepare(
+    const tables = allRows<{ name: string }>(
+      connection.prepare(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
       )
-      .all() as unknown as { name: string }[]
+    )
     // sorted so a future table only needs adding here, not placed correctly against SQLite's
     // own ORDER BY name collation (which sorts review_verdict before revision_amendment)
     expect(tables.map(({ name }) => name)).toEqual(

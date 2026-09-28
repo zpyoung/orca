@@ -143,12 +143,12 @@ export async function reconcileObjectiveDispatchWorktrees(args: {
   const records = args.objectiveStore.listDispatches(watcherId)
   const recordsByFingerprint = new Map(records.map((record) => [record.attemptFingerprint, record]))
   const listed = await args.runtime.listManagedWorktrees(`id:${args.binding.enrollment.repoId}`)
-  const children = listed.worktrees.filter(
-    (worktree) => markerFingerprint(worktree.comment, watcherId) !== null
-  )
+  const children = listed.worktrees.flatMap((worktree) => {
+    const fingerprint = markerFingerprint(worktree.comment, watcherId)
+    return fingerprint === null ? [] : [{ child: worktree, fingerprint }]
+  })
 
-  for (const child of children) {
-    const fingerprint = markerFingerprint(child.comment, watcherId) as string
+  for (const { child, fingerprint } of children) {
     const record = recordsByFingerprint.get(fingerprint)
     if (!record) {
       await args.lease.assertHeld()

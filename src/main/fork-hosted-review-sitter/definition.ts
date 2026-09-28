@@ -26,7 +26,7 @@ const CAPABILITY_KEYS = ['updateBranch', 'resolveConflicts', 'fixChecks', 'merge
 function parseCapabilities(value: EnrollInput['capabilities']): HostedReviewSitterCapabilities {
   const hasAllRequired = CAPABILITY_KEYS.every((key) => Object.hasOwn(value, key))
   const extraKeys = Object.keys(value).filter(
-    (key) => !(CAPABILITY_KEYS as readonly string[]).includes(key)
+    (key) => !CAPABILITY_KEYS.some((capability) => capability === key)
   )
   const extrasAreOnlyOwnerIntervention =
     extraKeys.length === 0 ||

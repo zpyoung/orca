@@ -3,13 +3,13 @@ import type { Snapshot } from '../fork-heimdall/snapshot'
 import type { ObjectiveGate } from './contract-types'
 import { objectiveCheckFailedDeviation } from './deviation-context'
 import {
-  decidePlannerAction,
   latestObjectiveAttempt,
   objectiveAttemptDisposition,
   objectiveNoAction,
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import { decidePlannerAction } from './decide-planner'
 import {
   objectiveReadOnlyWorkerInFlight,
   objectiveStaleEvidenceReissueEvidenceKey

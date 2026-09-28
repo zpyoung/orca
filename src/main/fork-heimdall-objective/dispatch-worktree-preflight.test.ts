@@ -29,11 +29,13 @@ it('pauses before creating a child when serial output is still dirty in the enro
   classifyDirtyPaths.mockReturnValue({ inside: ['src/serial-output.ts'], outside: [] })
   const createManagedWorktree = vi.fn()
   const setParallelNote = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
   const objectiveStore = {
     getDispatch: () => null,
     setParallelNote,
     clearParallelNoteWithPrefix: vi.fn()
   } as unknown as ObjectiveStore
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment/ObjectiveEnrollmentPayload types; only the fields below are read by workspace preflight.
   const binding = {
     enrollment: {
       watcherId: 'watcher-1',
@@ -53,6 +55,7 @@ it('pauses before creating a child when serial output is still dirty in the enro
       }
     }
   } as unknown as ObjectiveSnapshotBinding
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by workspace preflight.
   const context = {
     snapshot: {
       world: {
@@ -64,6 +67,7 @@ it('pauses before creating a child when serial output is still dirty in the enro
   } as unknown as ExecuteContext<ObjectiveWorld>
 
   const preparation = prepareObjectiveDispatchWorkspace({
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only createManagedWorktree is exercised.
     runtime: { createManagedWorktree } as unknown as OrcaRuntimeService,
     binding,
     context,

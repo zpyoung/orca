@@ -30,27 +30,24 @@ function workerEscalationMessageId(escalationId: string): string | null {
   }
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 function mailboxEscalation(entry: LedgerEntry): ActiveWorkerEscalation | null {
   if (
     entry.kind !== 'evidence' ||
     entry.evidenceKind !== 'orchestration-mailbox' ||
-    entry.payload === null ||
-    typeof entry.payload !== 'object' ||
-    Array.isArray(entry.payload)
+    !isPlainRecord(entry.payload)
   ) {
     return null
   }
-  const message = entry.payload as Record<string, unknown>
+  const message = entry.payload
   if (message.type !== 'escalation') {
     return null
   }
   const subjectId = entry.source?.messageId ?? entry.eventId
-  const body =
-    message.payload !== null &&
-    typeof message.payload === 'object' &&
-    !Array.isArray(message.payload)
-      ? (message.payload as Record<string, unknown>)
-      : {}
+  const body = isPlainRecord(message.payload) ? message.payload : {}
   return {
     subjectId,
     report: {

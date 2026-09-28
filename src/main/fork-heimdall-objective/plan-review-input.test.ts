@@ -184,11 +184,13 @@ describe('writePlanReviewInputFile', () => {
 
   it('writes through the file provider for a remote target', async () => {
     const writeFileMock = vi.fn().mockResolvedValue(undefined)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only writeFile is exercised.
+    const fileProvider = { writeFile: writeFileMock } as unknown as IFilesystemProvider
     const target: ObjectiveWorkspaceTarget = {
       kind: 'folder',
       executionHostId: 'ssh:plan-review-input-test',
       workspacePath: '/srv/objective',
-      fileProvider: { writeFile: writeFileMock } as unknown as IFilesystemProvider
+      fileProvider
     }
     const reportPath = '/srv/objective/.orca/heimdall/objective/reports/deadbeef.json'
 

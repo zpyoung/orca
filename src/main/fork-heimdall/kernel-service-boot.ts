@@ -136,6 +136,7 @@ export function bootHeimdallKernelService(
     })
   const runnerLoop = new WatcherRunnerLoop({
     ledgerStore: runnerLedger,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: BudgetClock and RunnerBudgetClock are deliberately separate module-boundary interfaces with equivalent handle/method shapes (IntervalHandle vs DispatchIntervalHandle); bridging them is this wiring's job.
     budgetClock: budgetClock as RunnerBudgetClock,
     leaseStore,
     orchestration,

@@ -30,6 +30,10 @@ type QueueEvidence = {
   known: boolean
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export async function loadBaseSha(
   definition: HostedReviewSitterDefinition,
   git: HostedReviewSitterGitExecution,
@@ -37,7 +41,7 @@ export async function loadBaseSha(
   branch: string,
   signal?: AbortSignal
 ): Promise<string> {
-  const value = JSON.parse(
+  const value: { commit?: { id?: unknown } } = JSON.parse(
     await runGitLabApi(
       definition,
       git,
@@ -47,7 +51,7 @@ export async function loadBaseSha(
       ],
       { signal }
     )
-  ) as { commit?: { id?: unknown } }
+  )
   return stringValue(value.commit?.id)
 }
 
@@ -139,18 +143,16 @@ export async function loadAllPipelineRows(
               ...row,
               sitter_pipeline_path: target.logicalPath,
               sitter_project_key: target.projectKey,
-              pipeline:
-                row.pipeline && typeof row.pipeline === 'object'
-                  ? (row.pipeline as GitLabPipeline)
-                  : { id: target.pipelineId, sha: target.sha }
+              pipeline: isRecord(row.pipeline)
+                ? row.pipeline
+                : { id: target.pipelineId, sha: target.sha }
             })
           }
         } else {
           for (const row of rows) {
-            const downstream =
-              row.downstream_pipeline && typeof row.downstream_pipeline === 'object'
-                ? (row.downstream_pipeline as GitLabPipeline)
-                : null
+            const downstream: GitLabPipeline | null = isRecord(row.downstream_pipeline)
+              ? row.downstream_pipeline
+              : null
             const childId = numberValue(downstream?.id)
             if (!childId) {
               continue
@@ -279,10 +281,10 @@ export async function loadExternalStatusChecks(
     }
     const checks: HostedReviewCheckSnapshot[] = []
     for (const raw of rows) {
-      if (!raw || typeof raw !== 'object') {
+      if (!isRecord(raw)) {
         return { checks, complete: false }
       }
-      const status = raw as Record<string, unknown>
+      const status = raw
       const name = stringValue(status.name)
       const id = numberValue(status.id)
       if (!name || !id) {
@@ -402,7 +404,7 @@ export async function loadQueueEvidence(
     return { queue: { required: false, membership: 'not-enqueued' }, known: true }
   }
   try {
-    const value = JSON.parse(
+    const value: Record<string, unknown> = JSON.parse(
       await runGitLabApi(
         definition,
         git,
@@ -412,7 +414,7 @@ export async function loadQueueEvidence(
         ],
         { signal }
       )
-    ) as Record<string, unknown>
+    )
     const status = stringValue(value.status).toLowerCase()
     if (status === 'stale') {
       return { queue: { required: true, membership: 'ejected' }, known: true }

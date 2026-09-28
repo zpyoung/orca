@@ -103,6 +103,7 @@ function binding(
   landingBar: ObjectiveEnrollmentPayload['landingBar']
 ): ObjectiveSnapshotBinding {
   const kindPayload = contract(landingBar)
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; only watcherId and kindPayload are read by the landing action executors.
   return {
     enrollment: { watcherId: WATCHER_ID, kindPayload },
     contract: kindPayload,
@@ -253,6 +254,7 @@ function reviewForge(args: {
       args.createResult ?? { ok: true, number: 42, url: 'https://github.test/acme/repo/pull/42' }
     )
   })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ForgeProvider interface; only the methods below are exercised.
   const provider = {
     id: 'github',
     supportsReviewCreation: true,

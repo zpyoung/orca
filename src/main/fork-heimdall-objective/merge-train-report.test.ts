@@ -18,12 +18,12 @@ const leaseGuard: LeaseGuard = {
   renewLoop: () => ({ dispose() {} })
 }
 
-const target = {
+const target: ObjectiveWorkspaceTarget = {
   kind: 'folder',
   executionHostId: 'local',
   workspacePath: '/does-not-matter',
   fileProvider: null
-} as unknown as ObjectiveWorkspaceTarget
+}
 
 const TASK: ObjectivePlanTask = {
   taskKey: 'node-1',
@@ -74,6 +74,7 @@ function baseRecord(overrides: Partial<ObjectiveDispatchRecord> = {}): Objective
 }
 
 function objectiveStoreStub(record: ObjectiveDispatchRecord): ObjectiveStore {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
   return {
     saveDispatch: vi.fn((next: ObjectiveDispatchRecord) => next),
     dispatchForId: vi.fn(() => record)

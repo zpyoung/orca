@@ -100,10 +100,12 @@ describe('ingestObjectivePlanReviewReport', () => {
       reportPath,
       target: { kind: 'revision', revisionId: revision.revisionId }
     } satisfies ObjectiveAction
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; this action only reads binding.enrollment.watcherId and binding.target.
     const binding = {
       enrollment: { watcherId: WATCHER_ID },
       target
     } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this action only reads context.ledger and context.lease; ExecuteContext's snapshot/dispatchWorker fields are unused here and not worth faking.
     const context = {
       ledger: {
         watcherId: WATCHER_ID,
@@ -176,10 +178,12 @@ describe('ingestObjectivePlanReviewReport', () => {
       reportPath,
       target: { kind: 'revision', revisionId: revision.revisionId }
     } satisfies ObjectiveAction
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; this action only reads binding.enrollment.watcherId and binding.target.
     const binding = {
       enrollment: { watcherId: WATCHER_ID },
       target
     } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this action only reads context.ledger and context.lease; ExecuteContext's snapshot/dispatchWorker fields are unused here and not worth faking.
     const context = {
       ledger: {
         watcherId: WATCHER_ID,
@@ -248,10 +252,12 @@ describe('ingestObjectivePlanReviewReport', () => {
       reportPath,
       target: { kind: 'revision', revisionId: revision.revisionId }
     } satisfies ObjectiveAction
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; this action only reads binding.enrollment.watcherId and binding.target.
     const binding = {
       enrollment: { watcherId: WATCHER_ID },
       target
     } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this action only reads context.ledger and context.lease; ExecuteContext's snapshot/dispatchWorker fields are unused here and not worth faking.
     const context = {
       ledger: {
         watcherId: WATCHER_ID,
@@ -349,10 +355,12 @@ describe('ingestObjectivePlanReviewReport', () => {
       reportPath,
       target: { kind: 'patch', patchId: patch.id }
     } satisfies ObjectiveAction
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; this action only reads binding.enrollment.watcherId and binding.target.
     const binding = {
       enrollment: { watcherId: WATCHER_ID },
       target
     } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this action only reads context.ledger and context.lease; ExecuteContext's snapshot/dispatchWorker fields are unused here and not worth faking.
     const context = {
       ledger: {
         watcherId: WATCHER_ID,
@@ -412,10 +420,12 @@ describe('ingestObjectivePlanReviewReport', () => {
       reportPath: '/outside/report.json',
       target: { kind: 'revision', revisionId: 'a-different-revision' }
     } satisfies ObjectiveAction
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; this action only reads binding.enrollment.watcherId and binding.target.
     const binding = {
       enrollment: { watcherId: WATCHER_ID },
       target
     } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this action only reads context.ledger and context.lease; ExecuteContext's snapshot/dispatchWorker fields are unused here and not worth faking.
     const context = {
       ledger: {
         watcherId: WATCHER_ID,
@@ -515,6 +525,7 @@ async function ingestPlanReview(
     reportPath,
     target: { kind: 'revision', revisionId: revision.revisionId }
   } satisfies ObjectiveAction
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; this action only reads binding.enrollment.watcherId and binding.target.
   const binding = {
     enrollment: { watcherId: WATCHER_ID },
     target
@@ -591,6 +602,7 @@ function attemptEntry(
   fingerprint: string,
   dispatchId: string
 ): ExecuteContext<ObjectiveWorld>['ledger']['entries'][number] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ledger entry union; only the fields constructed here are read by report ingestion.
   return {
     eventId: `attempt-${dispatchId}`,
     watcherId: WATCHER_ID,
@@ -612,6 +624,7 @@ function workerDoneEvidence(
   dispatchId: string,
   reportPath: string
 ): ExecuteContext<ObjectiveWorld>['ledger']['entries'][number] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ledger entry union; only the fields constructed here are read by report ingestion.
   return {
     eventId: `evidence-${dispatchId}`,
     watcherId: WATCHER_ID,
@@ -730,6 +743,7 @@ async function ingestRoundTwoDeltaReview(
     reportPath,
     target: { kind: 'revision', revisionId: second.revisionId }
   } satisfies ObjectiveAction
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; this action only reads binding.enrollment.watcherId and binding.target.
   const binding = {
     enrollment: { watcherId: WATCHER_ID },
     target

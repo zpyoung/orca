@@ -11,7 +11,13 @@ import type { ObjectiveWorkspaceOption } from './objective-workspace-options'
 function gateDraft(
   overrides: Partial<ObjectiveEnrollmentGateDraft> = {}
 ): ObjectiveEnrollmentGateDraft {
-  return { name: 'lint', command: 'pnpm lint', timeoutSecondsText: '', ...overrides }
+  return {
+    rowKey: 'gate-1',
+    name: 'lint',
+    command: 'pnpm lint',
+    timeoutSecondsText: '',
+    ...overrides
+  }
 }
 
 function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnrollmentDraft {

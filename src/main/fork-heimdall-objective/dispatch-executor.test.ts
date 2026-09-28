@@ -17,7 +17,10 @@ import { deriveObjectiveFailureContext } from './dispatch-failure-context'
 import { executeObjectiveDispatch } from './dispatch-executor'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrcaRuntimeService is a class with private fields; executeObjectiveDispatch never calls it in these tests.
 const runtime = {} as OrcaRuntimeService
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Store is a class with private fields; executeObjectiveDispatch never calls it in these tests.
+const store = {} as Store
 
 const {
   issueReportPath,
@@ -65,10 +68,13 @@ const binding: ObjectiveSnapshotBinding = {
     budget: { wallClockActiveMs: 60_000, turns: 10 },
     kindPayload: {},
     enabled: true,
-    generation: 1,
+    paused: false,
+    commandRevision: 0,
+    coordinatorIdentity: { handle: 'watcher-1', paneKey: 'pane-1' },
+    orchestrationRunId: null,
     createdAtMs: 1,
-    updatedAtMs: 1
-  } as unknown as ObjectiveSnapshotBinding['enrollment'],
+    terminalAtMs: null
+  },
   contract: {
     objectiveText: 'Implement the objective.',
     tier: 'standard',
@@ -104,6 +110,7 @@ const retryDispatchNode: ObjectiveAction = {
   retryOf: 'revision-1:node-a'
 }
 
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
 const objectiveStore = {
   getPlan: () => [
     {
@@ -167,7 +174,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     expect(outcome).toEqual({
@@ -192,7 +199,7 @@ describe('executeObjectiveDispatch', () => {
       },
       context: executeContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     expect(executeContext.dispatchWorker).toHaveBeenCalledWith(
@@ -210,7 +217,7 @@ describe('executeObjectiveDispatch', () => {
       binding,
       context: executeContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     const call = vi.mocked(executeContext.dispatchWorker).mock.calls[0][0]
@@ -230,7 +237,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     expect(outcome).toEqual({
@@ -250,7 +257,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'refused', reason: 'fenced', detail: 'lease unavailable' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     expect(outcome).toEqual({
@@ -272,7 +279,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     expect(outcome).toMatchObject({ effect: 'not-landed', failureClass: 'criteria' })
@@ -291,7 +298,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     expect(outcome).toMatchObject({ effect: 'not-landed', failureClass: 'criteria' })
@@ -307,7 +314,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
     expect(outcome).toEqual({
@@ -342,7 +349,7 @@ describe('executeObjectiveDispatch', () => {
       binding,
       context: executeContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -364,8 +371,9 @@ describe('executeObjectiveDispatch', () => {
       evidenceKey: 'plan:3',
       revisionNumber: 3,
       reason: 'replan-after-block',
-      shape: 'full'
+      plannerMode: 'full'
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods above are exercised.
     const reviewingStore = {
       ...objectiveStore,
       getPlanReviewReport: vi.fn().mockReturnValue({
@@ -408,7 +416,7 @@ describe('executeObjectiveDispatch', () => {
       binding,
       context: executeContext,
       objectiveStore: reviewingStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -429,7 +437,7 @@ describe('executeObjectiveDispatch', () => {
       evidenceKey: 'plan:1',
       revisionNumber: 1,
       reason: 'initial',
-      shape: 'full'
+      plannerMode: 'full'
     }
     const executeContext = context(
       { watcherId: 'watcher-1', entries: [] },
@@ -442,7 +450,7 @@ describe('executeObjectiveDispatch', () => {
       binding,
       context: executeContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -460,7 +468,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -487,7 +495,7 @@ describe('executeObjectiveDispatch', () => {
       binding,
       context: executeContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -505,7 +513,7 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -535,7 +543,7 @@ describe('executeObjectiveDispatch', () => {
       binding,
       context: executeContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -553,7 +561,7 @@ describe('executeObjectiveDispatch', () => {
       evidenceKey: 'plan-repair:revision-1:1',
       revisionNumber: 1,
       reason: 'replan-after-failure',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 1,
       repairRevisionId: 'revision-1'
     }
@@ -573,6 +581,7 @@ describe('executeObjectiveDispatch', () => {
       criteria: [{ body: 'A works', shellCheckable: false, checkCommand: null }],
       declaresDependencyChange: false
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods above are exercised.
     const repairStore = {
       ...objectiveStore,
       getPlan: () => [frozenTask, openTask],
@@ -641,14 +650,14 @@ describe('executeObjectiveDispatch', () => {
       binding,
       context: executeContext,
       objectiveStore: repairStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
     expect(buildRolePrompt).toHaveBeenCalledWith(
       expect.objectContaining({
         role: 'planner',
-        shape: 'repair',
+        plannerMode: 'repair',
         repairContext: {
           openTasks: [openTask],
           frozenTasks: [
@@ -752,7 +761,7 @@ describe('executeObjectiveDispatch for dispatch-plan-review', () => {
       binding,
       context: dispatchContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 
@@ -796,7 +805,7 @@ describe('executeObjectiveDispatch for dispatch-plan-review', () => {
       binding,
       context: dispatchContext,
       objectiveStore,
-      store: {} as Store,
+      store,
       runtime
     })
 

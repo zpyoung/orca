@@ -37,6 +37,7 @@ import {
 } from './objective-store-data'
 import { projectPlanPatches } from './objective-store-plan-patches'
 import { projectPlanReviews } from './objective-store-plan-reviews'
+import { allRows } from './objective-store-queries'
 
 export function projectObjective(
   database: ObjectiveDatabase,
@@ -45,58 +46,66 @@ export function projectObjective(
   contentIdentity?: string
 ): ObjectiveProjection {
   const db = database.connection()
-  const revisions = db
-    .prepare(`SELECT id, revision_number, status, digest, created_by_dispatch_id, created_at_ms, approved_at_ms
-    FROM plan_revision WHERE watcher_id = ? ORDER BY revision_number, id`)
-    .all(watcherId) as unknown as RevisionRow[]
-  const nodes = db
-    .prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.deps_json, n.ordinal,
+  const revisions = allRows<RevisionRow>(
+    db.prepare(`SELECT id, revision_number, status, digest, created_by_dispatch_id, created_at_ms, approved_at_ms
+    FROM plan_revision WHERE watcher_id = ? ORDER BY revision_number, id`),
+    watcherId
+  )
+  const nodes = allRows<NodeRow>(
+    db.prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.deps_json, n.ordinal,
     n.orchestration_task_id, n.dispatch_id FROM plan_node n JOIN plan_revision r ON r.id = n.revision_id
-    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`)
-    .all(watcherId) as unknown as NodeRow[]
-  const criteria = db
-    .prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
-    FROM acceptance_criterion WHERE watcher_id = ? ORDER BY revision_id, task_key, ordinal`)
-    .all(watcherId) as unknown as CriterionRow[]
-  const checks = (contentIdentity === undefined
-    ? db
-        .prepare(`SELECT criterion_id, content_identity, exit_code, timed_out, started_at_ms, completed_at_ms
-          FROM check_attempt WHERE watcher_id = ? ORDER BY started_at_ms, id`)
-        .all(watcherId)
-    : db
-        .prepare(`SELECT criterion_id, content_identity, exit_code, timed_out, started_at_ms, completed_at_ms
-          FROM check_attempt WHERE watcher_id = ? AND content_identity = ? ORDER BY started_at_ms, id`)
-        .all(watcherId, contentIdentity)) as unknown as ProjectionCheckRow[]
-  const verdicts = db
-    .prepare(`SELECT revision_id, dispatch_id, role, content_identity, verdict, criteria_results_json,
-    report_digest, created_at_ms FROM review_verdict WHERE watcher_id = ? ORDER BY created_at_ms, dispatch_id`)
-    .all(watcherId) as unknown as VerdictRow[]
-  const landing = db
-    .prepare(`SELECT rung, content_identity, payload_json, created_at_ms
-    FROM landing_evidence WHERE watcher_id = ? ORDER BY created_at_ms, rung`)
-    .all(watcherId) as unknown as LandingRow[]
-  const amendments = db
-    .prepare(`SELECT revision_id, ordinal, digest, amended_at_ms, attestation, touched_task_keys_json
-    FROM revision_amendment WHERE watcher_id = ? ORDER BY revision_id, ordinal`)
-    .all(watcherId) as unknown as AmendmentRow[]
-  const isolatedDispatchIds = new Set(
-    (
-      db
-        .prepare(
-          `SELECT dispatch_id FROM objective_dispatch
-          WHERE watcher_id = ? AND dispatch_id IS NOT NULL`
+    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`),
+    watcherId
+  )
+  const criteria = allRows<CriterionRow>(
+    db.prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
+    FROM acceptance_criterion WHERE watcher_id = ? ORDER BY revision_id, task_key, ordinal`),
+    watcherId
+  )
+  const checks =
+    contentIdentity === undefined
+      ? allRows<ProjectionCheckRow>(
+          db.prepare(`SELECT criterion_id, content_identity, exit_code, timed_out, started_at_ms, completed_at_ms
+          FROM check_attempt WHERE watcher_id = ? ORDER BY started_at_ms, id`),
+          watcherId
         )
-        .all(watcherId) as unknown as { dispatch_id: string }[]
+      : allRows<ProjectionCheckRow>(
+          db.prepare(`SELECT criterion_id, content_identity, exit_code, timed_out, started_at_ms, completed_at_ms
+          FROM check_attempt WHERE watcher_id = ? AND content_identity = ? ORDER BY started_at_ms, id`),
+          watcherId,
+          contentIdentity
+        )
+  const verdicts = allRows<VerdictRow>(
+    db.prepare(`SELECT revision_id, dispatch_id, role, content_identity, verdict, criteria_results_json,
+    report_digest, created_at_ms FROM review_verdict WHERE watcher_id = ? ORDER BY created_at_ms, dispatch_id`),
+    watcherId
+  )
+  const landing = allRows<LandingRow>(
+    db.prepare(`SELECT rung, content_identity, payload_json, created_at_ms
+    FROM landing_evidence WHERE watcher_id = ? ORDER BY created_at_ms, rung`),
+    watcherId
+  )
+  const amendments = allRows<AmendmentRow>(
+    db.prepare(`SELECT revision_id, ordinal, digest, amended_at_ms, attestation, touched_task_keys_json
+    FROM revision_amendment WHERE watcher_id = ? ORDER BY revision_id, ordinal`),
+    watcherId
+  )
+  const isolatedDispatchIds = new Set(
+    allRows<{ dispatch_id: string }>(
+      db.prepare(
+        `SELECT dispatch_id FROM objective_dispatch
+          WHERE watcher_id = ? AND dispatch_id IS NOT NULL`
+      ),
+      watcherId
     ).map((row) => row.dispatch_id)
   )
   const appliedDispatchIds = new Set(
-    (
-      db
-        .prepare(
-          `SELECT dispatch_id FROM objective_dispatch
+    allRows<{ dispatch_id: string }>(
+      db.prepare(
+        `SELECT dispatch_id FROM objective_dispatch
           WHERE watcher_id = ? AND state = 'applied' AND dispatch_id IS NOT NULL`
-        )
-        .all(watcherId) as unknown as { dispatch_id: string }[]
+      ),
+      watcherId
     ).map((row) => row.dispatch_id)
   )
   return ObjectiveProjectionSchema.parse({
@@ -128,16 +137,18 @@ export function detailObjective(
   const parsedContract = ObjectiveEnrollmentPayloadSchema.parse(contract)
   const projection = projectObjective(database, watcherId, ledger)
   const db = database.connection()
-  const nodes = db
-    .prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.title, n.deps_json,
+  const nodes = allRows<NodeRow>(
+    db.prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.title, n.deps_json,
     n.ordinal, n.orchestration_task_id, n.dispatch_id
     FROM plan_node n JOIN plan_revision r ON r.id = n.revision_id
-    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`)
-    .all(watcherId) as unknown as NodeRow[]
-  const criteria = db
-    .prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
-    FROM acceptance_criterion WHERE watcher_id = ? ORDER BY revision_id, task_key, ordinal`)
-    .all(watcherId) as unknown as CriterionRow[]
+    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`),
+    watcherId
+  )
+  const criteria = allRows<CriterionRow>(
+    db.prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
+    FROM acceptance_criterion WHERE watcher_id = ? ORDER BY revision_id, task_key, ordinal`),
+    watcherId
+  )
   const projectedNodes = new Map(
     projection.nodes.map((node) => [`${node.revisionId}\0${node.taskKey}`, node])
   )
@@ -397,7 +408,7 @@ function nodeStates(
   if (ledger) {
     const parsedAttempts = objectiveAttempts(ledger)
     for (const attempt of getLatestAttempts(ledger)) {
-      const action = attempt.action as Record<string, unknown>
+      const action = attempt.action
       if (typeof action.revisionId !== 'string' || typeof action.taskKey !== 'string') {
         continue
       }
@@ -442,10 +453,11 @@ function nodeStates(
   }
   for (const node of nodes) {
     const key = `${node.revision_id}\0${node.task_key}`
+    const outcome = outcomes.get(key)
     if (node.revision_status === 'rejected' || node.revision_status === 'superseded') {
       states.set(key, 'replanned')
-    } else if (outcomes.has(key)) {
-      states.set(key, outcomes.get(key) as ObjectiveNodeState)
+    } else if (outcome !== undefined) {
+      states.set(key, outcome)
     } else if (node.dispatch_id) {
       states.set(key, 'succeeded')
     } else if (ledger && awaitingApproval(ledger, node.revision_id, node.task_key)) {

@@ -87,6 +87,7 @@ export class HeimdallLedgerStore implements LedgerStore {
 
   read(watcherId: string): WatcherLedger {
     this.requireWatcherId(watcherId)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const rows = this.database
       .connection()
       .prepare(
@@ -177,6 +178,7 @@ export class HeimdallLedgerStore implements LedgerStore {
     this.database.assertWritable()
     const connection = this.database.connection()
     withReentrantImmediateTransaction(connection, () => {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
       const row = connection
         .prepare('SELECT watcher_id FROM heimdall_ledger WHERE event_id = ?')
         .get(eventId) as { watcher_id: string } | undefined
@@ -222,6 +224,7 @@ export class HeimdallLedgerStore implements LedgerStore {
 
   readTickTraces(watcherId: string): WatcherTickTrace[] {
     this.requireWatcherId(watcherId)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const rows = this.database
       .connection()
       .prepare(
@@ -294,6 +297,7 @@ export class HeimdallLedgerStore implements LedgerStore {
   }
 
   private assertLedgerOpen(connection: Database.Database, entry: LedgerEntry): void {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const terminal = connection
       .prepare(
         `SELECT kind
@@ -334,6 +338,7 @@ export class HeimdallLedgerStore implements LedgerStore {
   }
 
   private readWithConnection(connection: Database.Database, watcherId: string): WatcherLedger {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const rows = connection
       .prepare(
         `SELECT watcher_id, seq, event_id, at_ms, class, kind, origin, resolved, entry_json
@@ -386,6 +391,7 @@ export class HeimdallLedgerStore implements LedgerStore {
     table: 'heimdall_ledger' | 'heimdall_tick_trace',
     watcherId: string
   ): number {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const row = connection
       .prepare(`SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM ${table} WHERE watcher_id = ?`)
       .get(watcherId) as { seq: number }

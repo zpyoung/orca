@@ -46,16 +46,17 @@ function latestSnapshotString(traces: readonly WatcherTickTrace[], key: string):
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function workspaceSummary(
   entry: WatcherListEntry,
   traces: readonly WatcherTickTrace[],
   label: string | null
 ): WatcherFleetWorkspace {
   const enrollment = entry.enrollment
-  const payload =
-    typeof enrollment.kindPayload === 'object' && enrollment.kindPayload !== null
-      ? (enrollment.kindPayload as Record<string, unknown>)
-      : null
+  const payload = isRecord(enrollment.kindPayload) ? enrollment.kindPayload : null
   const objectiveWorkspaceKind =
     enrollment.kind === 'objective' &&
     (payload?.workspaceKind === 'git' || payload?.workspaceKind === 'folder')

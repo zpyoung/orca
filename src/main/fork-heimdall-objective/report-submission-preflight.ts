@@ -190,7 +190,9 @@ export function createObjectiveSubmissionAdapter(args: {
           mailboxReportPath: reportPath,
           role,
           ...(action.kind === 'dispatch-node' ? { taskKey: action.taskKey } : {}),
-          ...(action.kind === 'dispatch-planner' ? { plannerShape: action.shape ?? 'full' } : {})
+          ...(action.kind === 'dispatch-planner'
+            ? { plannerMode: action.plannerMode ?? 'full' }
+            : {})
         })
       } catch {
         return ACCEPTED
@@ -201,7 +203,7 @@ export function createObjectiveSubmissionAdapter(args: {
 
       let evidenceFiles: readonly string[] = []
       if (action.kind === 'dispatch-planner') {
-        if (action.shape === 'repair') {
+        if (action.plannerMode === 'repair') {
           const currentPlan = args.objectiveStore.getPlan(action.repairRevisionId ?? '')
           if (!currentPlan) {
             return ACCEPTED

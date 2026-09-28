@@ -16,6 +16,8 @@ import {
   type PlannerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { ObjectiveDatabase } from './objective-database'
+import type Database from '../sqlite/sync-database'
+import type { SqliteStatement } from '../sqlite/sync-database'
 import {
   DependenciesSchema,
   parseJson,
@@ -28,6 +30,22 @@ import {
   type ObjectiveLandingPayload,
   type ObjectiveStoredCriterion
 } from './objective-store-data'
+
+export function allRows<T>(
+  statement: SqliteStatement,
+  ...params: readonly Database.BindValue[]
+): T[] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as Record<string, SQLOutputValue>; each call site's T matches its SELECT column list.
+  return statement.all(...params) as T[]
+}
+
+export function oneRow<T>(
+  statement: SqliteStatement,
+  ...params: readonly Database.BindValue[]
+): T | undefined {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as Record<string, SQLOutputValue>; each call site's T matches its SELECT column list.
+  return statement.get(...params) as T | undefined
+}
 
 const DISPATCH_COLUMNS = `attempt_fingerprint, watcher_id, execution_host_id, revision_id, task_key, plan_task_digest,
   dispatch_id, workspace_id, workspace_path, base_commit, lane_task_keys_json, session_node_count,
@@ -86,13 +104,14 @@ export function readObjectiveCheckAttempt(
   criterionId: string,
   contentIdentity: string
 ): ObjectiveCheckAttempt | null {
-  const row = database
-    .connection()
-    .prepare(`SELECT id, watcher_id, criterion_id, content_identity,
+  const row = oneRow<CheckRow>(
+    database.connection().prepare(`SELECT id, watcher_id, criterion_id, content_identity,
     execution_host_id, command, exit_code, timed_out, stdout_tail, stderr_tail, epoch, started_at_ms, completed_at_ms,
     owner_skip
-    FROM check_attempt WHERE criterion_id = ? AND content_identity = ?`)
-    .get(criterionId, contentIdentity) as CheckRow | undefined
+    FROM check_attempt WHERE criterion_id = ? AND content_identity = ?`),
+    criterionId,
+    contentIdentity
+  )
   return row
     ? {
         id: row.id,
@@ -117,37 +136,44 @@ export class ObjectiveStoreQueries {
   constructor(private readonly database: ObjectiveDatabase) {}
 
   getDispatch(attemptFingerprint: string): ObjectiveDispatchRecord | null {
-    const row = this.database
-      .connection()
-      .prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch WHERE attempt_fingerprint = ?`)
-      .get(attemptFingerprint) as DispatchRow | undefined
+    const row = oneRow<DispatchRow>(
+      this.database
+        .connection()
+        .prepare(
+          `SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch WHERE attempt_fingerprint = ?`
+        ),
+      attemptFingerprint
+    )
     return row ? dispatchRecord(row) : null
   }
 
   listDispatches(watcherId: string): ObjectiveDispatchRecord[] {
-    const rows = this.database
-      .connection()
-      .prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch
+    const rows = allRows<DispatchRow>(
+      this.database.connection().prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch
         WHERE watcher_id = ?
-        ORDER BY COALESCE(completed_at_ms, 9223372036854775807), created_at_ms, attempt_fingerprint`)
-      .all(watcherId) as unknown as DispatchRow[]
+        ORDER BY COALESCE(completed_at_ms, 9223372036854775807), created_at_ms, attempt_fingerprint`),
+      watcherId
+    )
     return rows.map(dispatchRecord)
   }
 
   dispatchForId(watcherId: string, dispatchId: string): ObjectiveDispatchRecord | null {
-    const row = this.database
-      .connection()
-      .prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch
-        WHERE watcher_id = ? AND dispatch_id = ?`)
-      .get(watcherId, dispatchId) as DispatchRow | undefined
+    const row = oneRow<DispatchRow>(
+      this.database.connection().prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch
+        WHERE watcher_id = ? AND dispatch_id = ?`),
+      watcherId,
+      dispatchId
+    )
     return row ? dispatchRecord(row) : null
   }
 
   parallelNote(watcherId: string): string | null {
-    const row = this.database
-      .connection()
-      .prepare('SELECT note FROM objective_parallel_state WHERE watcher_id = ?')
-      .get(watcherId) as { note: string | null } | undefined
+    const row = oneRow<{ note: string | null }>(
+      this.database
+        .connection()
+        .prepare('SELECT note FROM objective_parallel_state WHERE watcher_id = ?'),
+      watcherId
+    )
     return row?.note ?? null
   }
 
@@ -155,20 +181,23 @@ export class ObjectiveStoreQueries {
     watcherId: string,
     dispatchId: string
   ): { revisionId: string; taskKey: string } | null {
-    const row = this.database
-      .connection()
-      .prepare(
-        'SELECT revision_id, task_key FROM plan_node WHERE watcher_id = ? AND dispatch_id = ?'
-      )
-      .get(watcherId, dispatchId) as { revision_id: string; task_key: string } | undefined
+    const row = oneRow<{ revision_id: string; task_key: string }>(
+      this.database
+        .connection()
+        .prepare(
+          'SELECT revision_id, task_key FROM plan_node WHERE watcher_id = ? AND dispatch_id = ?'
+        ),
+      watcherId,
+      dispatchId
+    )
     return row ? { revisionId: row.revision_id, taskKey: row.task_key } : null
   }
 
   getPlan(revisionId: string): ObjectivePlan | null {
-    const row = this.database
-      .connection()
-      .prepare('SELECT payload_json FROM plan_revision WHERE id = ?')
-      .get(revisionId) as { payload_json: string } | undefined
+    const row = oneRow<{ payload_json: string }>(
+      this.database.connection().prepare('SELECT payload_json FROM plan_revision WHERE id = ?'),
+      revisionId
+    )
     return row ? parseJson(PlannerReportSchema, row.payload_json, 'plan payload').plan : null
   }
 
@@ -177,19 +206,20 @@ export class ObjectiveStoreQueries {
   }
 
   getPlanReport(revisionId: string): PlannerReport | null {
-    const row = this.database
-      .connection()
-      .prepare('SELECT payload_json FROM plan_revision WHERE id = ?')
-      .get(revisionId) as { payload_json: string } | undefined
+    const row = oneRow<{ payload_json: string }>(
+      this.database.connection().prepare('SELECT payload_json FROM plan_revision WHERE id = ?'),
+      revisionId
+    )
     return row ? parseJson(PlannerReportSchema, row.payload_json, 'plan payload') : null
   }
 
   getCriterion(criterionId: string): ObjectiveStoredCriterion | null {
-    const row = this.database
-      .connection()
-      .prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
-      FROM acceptance_criterion WHERE id = ?`)
-      .get(criterionId) as CriterionRow | undefined
+    const row = oneRow<CriterionRow>(
+      this.database.connection()
+        .prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
+      FROM acceptance_criterion WHERE id = ?`),
+      criterionId
+    )
     if (!row || row.body === undefined) {
       return null
     }
@@ -234,13 +264,13 @@ export class ObjectiveStoreQueries {
     watcherId: string,
     dispatchId: string
   ): { revisionId: string; revisionNumber: number; digest: string } | null {
-    const row = this.database
-      .connection()
-      .prepare(`SELECT id, revision_number, digest FROM plan_revision WHERE watcher_id = ?
-      AND created_by_dispatch_id = ? ORDER BY revision_number DESC LIMIT 1`)
-      .get(watcherId, dispatchId) as
-      | { id: string; revision_number: number; digest: string }
-      | undefined
+    const row = oneRow<{ id: string; revision_number: number; digest: string }>(
+      this.database.connection()
+        .prepare(`SELECT id, revision_number, digest FROM plan_revision WHERE watcher_id = ?
+      AND created_by_dispatch_id = ? ORDER BY revision_number DESC LIMIT 1`),
+      watcherId,
+      dispatchId
+    )
     return row
       ? { revisionId: row.id, revisionNumber: row.revision_number, digest: row.digest }
       : null
@@ -257,10 +287,12 @@ export class ObjectiveStoreQueries {
   }
 
   hasVerdict(dispatchId: string, reportDigest?: string): boolean {
-    const row = this.database
-      .connection()
-      .prepare('SELECT report_digest FROM review_verdict WHERE dispatch_id = ?')
-      .get(dispatchId) as { report_digest: string } | undefined
+    const row = oneRow<{ report_digest: string }>(
+      this.database
+        .connection()
+        .prepare('SELECT report_digest FROM review_verdict WHERE dispatch_id = ?'),
+      dispatchId
+    )
     return Boolean(row && (reportDigest === undefined || row.report_digest === reportDigest))
   }
 
@@ -289,13 +321,15 @@ export class ObjectiveStoreQueries {
     rung: ObjectiveLandingBar,
     contentIdentity: string
   ): ObjectiveLandingPayload | null {
-    const row = this.database
-      .connection()
-      .prepare(
+    const row = oneRow<LandingRow>(
+      this.database.connection().prepare(
         `SELECT rung, content_identity, payload_json, created_at_ms
          FROM landing_evidence WHERE watcher_id = ? AND rung = ? AND content_identity = ?`
-      )
-      .get(watcherId, rung, contentIdentity) as LandingRow | undefined
+      ),
+      watcherId,
+      rung,
+      contentIdentity
+    )
     return row ? parseLandingPayloadJson(row.rung, row.payload_json, 'landing payload') : null
   }
 }

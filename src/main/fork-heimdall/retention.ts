@@ -18,6 +18,7 @@ function excessRows(
   watcherId: string,
   predicate = ''
 ): number {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
   const row = database
     .prepare(
       `SELECT COUNT(*) AS count
@@ -105,6 +106,7 @@ export function readTerminalRetentionSummary(
   database: Database.Database,
   watcherId: string
 ): WatcherTerminalSummary | null {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
   const row = database
     .prepare(
       `SELECT watcher_id, kind, terminal_state, reason, totals_json, at_ms
@@ -137,6 +139,7 @@ export function compactTerminalRetention(
     const ledger = readLedger(database, watcherId)
     let summary = existing
     if (!summary) {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
       const enrollment = database
         .prepare(
           `SELECT kind, terminal_at_ms
@@ -180,6 +183,7 @@ export function compactTerminalRetention(
     }
 
     const pinnedEventIds = new Set(getUnresolvedAttempts(ledger).map((entry) => entry.eventId))
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const rows = database
       .prepare(
         `SELECT event_id, class, kind, resolved

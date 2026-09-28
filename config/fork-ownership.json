@@ -384,12 +384,8 @@
       "feature": "heimdall",
       "kind": "registration",
       "lines": [
-        "import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "      HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,",
-        "      HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,",
-        "      HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,"
+        "import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from './fork-heimdall/capability'",
+        "      ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES,"
       ]
     },
     {
@@ -531,6 +527,12 @@
       "lines": ["  'src/renderer/src/fork-hosted-review-sitter/fix-checks-agent-launch.ts',"]
     },
     {
+      "path": "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["  'src/renderer/src/fork-heimdall/heimdall-worker-navigation.ts',"]
+    },
+    {
       "path": "src/main/startup/main-process-runtime-service.ts",
       "feature": "heimdall",
       "kind": "registration",
@@ -547,6 +549,7 @@
       "kind": "registration",
       "lines": [
         "import type { HeimdallKernelService } from '../fork-heimdall/kernel-service'",
+        "  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: widens the null initializer to the slot's type, the idiom every sibling field uses.",
         "  heimdall: null as HeimdallKernelService | null,"
       ]
     },
@@ -3021,7 +3024,7 @@
       "lines": [
         "import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'",
         "import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'",
-        "/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', \u2026)`. */",
+        "/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */",
         "export type AskApi = {",
         "  onSet: (callback: (event: AskRegistryEvent) => void) => () => void",
         "  getSuppressionVerdict: () => Promise<ClaudeSuppressionVerdict>",
@@ -4285,6 +4288,30 @@
         "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
         "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
       ]
+    },
+    {
+      "path": "src/cli/runtime/websocket-transport.test.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall/capability'",
+        "          ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES"
+      ]
+    },
+    {
+      "path": "src/main/ipc/desktop-renderer-runtime-capabilities.test.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall/capability'",
+        "  ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES"
+      ]
+    },
+    {
+      "path": "src/main/proxy-guarded-fetch-call-site-audit.test.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["  ['main/fork-heimdall/judgment/client.ts', 1]"]
     }
   ],
   "exceptions": [
@@ -4464,7 +4491,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -4596,7 +4623,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -4718,7 +4745,7 @@
       "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
-      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it \u2014 a correctness fix to upstream's own hook, not fork behavior."
+      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it — a correctness fix to upstream's own hook, not fork behavior."
     },
     {
       "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
@@ -4734,7 +4761,7 @@
     },
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -5027,7 +5054,7 @@
     },
     {
       "path": "config/scripts/hourly-build-version.test.mjs",
-      "reason": "Resolves the unpublished-release base explicitly instead of through getHourlyBuildIdentity, which reads this repo's package.json and pins the case to a tree at or below 1.4.203 \u2014 upstream's own v1.4.206 tag fails it too.",
+      "reason": "Resolves the unpublished-release base explicitly instead of through getHourlyBuildIdentity, which reads this repo's package.json and pins the case to a tree at or below 1.4.203 — upstream's own v1.4.206 tag fails it too.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
     },

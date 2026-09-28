@@ -29,3 +29,9 @@ export const HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE =
 // schema rejects it outright unless a client confirms this capability first.
 export const HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY =
   'heimdall.objective-role-launch.v1' as const
+/** Wire-shape capabilities every remote client advertises so hosts publish Heimdall's newer fields. */
+export const HEIMDALL_REMOTE_CLIENT_CAPABILITIES = [
+  HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+] as const

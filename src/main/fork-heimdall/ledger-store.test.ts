@@ -129,6 +129,7 @@ describe('Heimdall ledger store', () => {
   })
 
   it("restricts origin 'client' to client-observation entries", () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: deliberately invalid LedgerEntry (attempt entry with origin 'client') to exercise the append-time rejection.
     const forged = { ...unresolvedAttempt(), origin: 'client' } as unknown as LedgerEntry
 
     expect(() => ledger.append(forged)).toThrow()

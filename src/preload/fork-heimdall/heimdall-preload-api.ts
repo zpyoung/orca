@@ -11,6 +11,7 @@ async function call<TResult>(method: string, params: unknown = {}): Promise<TRes
   if (!response.ok) {
     throw new Error(response.error.message)
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: IPC boundary, response.result is unknown; matches the RPC-unwrap pattern used at every runtime:call site in this codebase.
   return response.result as TResult
 }
 

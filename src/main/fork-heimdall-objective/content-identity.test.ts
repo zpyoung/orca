@@ -8,6 +8,7 @@ import {
   unregisterSshFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import type { SshGitProvider } from '../providers/ssh-git-provider'
 import type { IFilesystemProvider } from '../providers/types'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
@@ -140,9 +141,11 @@ describe('computeWorkspaceContentIdentity', () => {
         throw new Error(`Unexpected Git command: ${args.join(' ')}`)
       }
     }
-    registerSshGitProvider('objective-content-test', provider as never)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the SshGitProvider class; only exec is exercised by content-identity's remote diffing.
+    registerSshGitProvider('objective-content-test', provider as unknown as SshGitProvider)
     const runtimeTarget = {
       executionHostId: 'ssh:objective-content-test',
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by content identity's remote path.
       worktree: {
         id: 'remote-objective',
         repoId: 'remote-objective-repo',
@@ -155,21 +158,19 @@ describe('computeWorkspaceContentIdentity', () => {
         }
       } as unknown as RuntimeGitTarget['worktree']
     } satisfies RuntimeGitTarget
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large filesystem-provider interface; only lstat is exercised by content-identity's dirty-file hashing.
     const fileProvider = {
       async lstat(path: string) {
         expect(path).toBe('/srv/objective/remote.txt')
         return { type: 'file' as const, size: 8, mtime: 1 }
       }
-    }
-    registerSshFilesystemProvider(
-      'objective-content-test',
-      fileProvider as unknown as IFilesystemProvider
-    )
+    } as unknown as IFilesystemProvider
+    registerSshFilesystemProvider('objective-content-test', fileProvider)
     const target: ObjectiveWorkspaceTarget = {
       kind: 'git',
       executionHostId: 'ssh:objective-content-test',
       workspacePath: '/srv/objective',
-      fileProvider: fileProvider as unknown as IFilesystemProvider,
+      fileProvider,
       gitTarget: runtimeTarget
     }
 
@@ -274,6 +275,7 @@ describe('computeWorkspaceContentIdentity', () => {
 
   it('reads remote folder contents through the filesystem provider', async () => {
     let content = 'one\n'
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large filesystem-provider interface; only readDir/readFile/lstat are exercised here.
     const provider = {
       async readDir(path: string) {
         expect(path).toBe('/srv/objective')

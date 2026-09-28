@@ -24,7 +24,7 @@ function repairDispatch(
     evidenceKey: 'plan-repair:revision-1:1',
     revisionNumber: 1,
     reason: 'replan-after-failure',
-    shape: 'repair',
+    plannerMode: 'repair',
     repairOrdinal: 1,
     repairRevisionId: 'revision-1',
     ...overrides
@@ -85,7 +85,7 @@ function unreadableRepairRound(ordinal: number): LedgerEntry[] {
         dispatchId,
         revisionNumber: 1,
         reportPath: `/outside/repair-${ordinal}.json`,
-        shape: 'repair',
+        plannerMode: 'repair',
         targetRevisionId: 'revision-1'
       },
       { state: 'settled', effect: 'not-landed', dispatchId: ingestDispatchId }
@@ -104,7 +104,7 @@ describe('decideRepairPlannerAction', () => {
       evidenceKey: 'plan-repair:revision-1:1',
       revisionNumber: 1,
       reason: 'replan-after-failure',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 1,
       repairRevisionId: 'revision-1'
     })
@@ -151,7 +151,7 @@ describe('decideRepairPlannerAction', () => {
       dispatchId: 'repair-planner-1',
       revisionNumber: 1,
       reportPath: '/outside/repair.json',
-      shape: 'repair',
+      plannerMode: 'repair',
       targetRevisionId: 'revision-1'
     })
   })
@@ -184,7 +184,7 @@ describe('decideRepairPlannerAction', () => {
       dispatchId: 'repair-planner-1',
       revisionNumber: 1,
       reportPath: '/outside/repair.json',
-      shape: 'repair',
+      plannerMode: 'repair',
       targetRevisionId: 'revision-1'
     }
     const ingesting = ledger([
@@ -211,7 +211,7 @@ describe('decideRepairPlannerAction', () => {
       dispatchId: 'repair-planner-1',
       revisionNumber: 1,
       reportPath: '/outside/repair.json',
-      shape: 'repair',
+      plannerMode: 'repair',
       targetRevisionId: 'revision-1'
     }
     const ingested = ledger([
@@ -245,7 +245,7 @@ describe('decideRepairPlannerAction', () => {
     const decision = decide(world)
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 2,
       evidenceKey: 'plan-repair:revision-1:2'
     })
@@ -263,7 +263,7 @@ describe('decideRepairPlannerAction', () => {
     const decision = decide(world)
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 3,
       approvalRequired: true
     })
@@ -281,7 +281,7 @@ describe('decideRepairPlannerAction', () => {
     const decision = decide(world)
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 4
     })
     expect(decision.action).not.toHaveProperty('approvalRequired')
@@ -292,7 +292,7 @@ describe('decideRepairPlannerAction', () => {
     const decision = decide(projection(), rawLedger)
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 3,
       approvalRequired: true
     })
@@ -303,7 +303,7 @@ describe('decideRepairPlannerAction', () => {
     const decision = decide(projection(), rawLedger, 'owner-directed')
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 3,
       approvalRequired: true
     })
@@ -314,7 +314,7 @@ describe('decideRepairPlannerAction', () => {
     const decision = decide(projection(), rawLedger)
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 2
     })
     expect(decision.action).not.toHaveProperty('approvalRequired')

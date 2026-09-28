@@ -20,6 +20,10 @@ export type ObjectiveDispatchSessionReuse =
   | { status: 'gone' }
   | { status: 'unverifiable'; reason: string }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export type ObjectiveDispatchSessionIdentity = {
   dispatchId: string | null
   terminalHandle: string | null
@@ -166,10 +170,7 @@ export function countObjectiveLaneTerminalNodes(args: {
         )
       })
       .sort((left, right) => right.atMs - left.atMs)[0]
-    const result =
-      matching && typeof matching.result === 'object' && matching.result !== null
-        ? (matching.result as Record<string, unknown>)
-        : null
+    const result = matching && isRecord(matching.result) ? matching.result : null
     if (result?.terminalHandle !== args.terminalHandle) {
       break
     }
@@ -211,10 +212,7 @@ export async function resolveObjectiveSerialLaneTerminal(args: {
       )
     })
     .sort((left, right) => right.atMs - left.atMs)[0]
-  const result =
-    previous && typeof previous.result === 'object' && previous.result !== null
-      ? (previous.result as Record<string, unknown>)
-      : null
+  const result = previous && isRecord(previous.result) ? previous.result : null
   if (!previous?.dispatchId) {
     throw new Error('Previous objective lane node has no durable dispatch identity')
   }
@@ -251,10 +249,7 @@ function shouldRetainSerialLaneWorker(
   ledger: WatcherLedger,
   enrollment: WatcherEnrollment | undefined
 ): boolean {
-  const result =
-    typeof attempt.result === 'object' && attempt.result !== null
-      ? (attempt.result as Record<string, unknown>)
-      : null
+  const result = isRecord(attempt.result) ? attempt.result : null
   if (!enrollment || attempt.effect !== 'landed' || typeof result?.terminalHandle !== 'string') {
     return false
   }

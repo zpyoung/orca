@@ -30,6 +30,7 @@ const DEFINITION: HostedReviewSitterDefinition = {
 
 // The repo row decides the sitter's execution host: a bare row is local, a `connectionId` is SSH.
 function fakeStore(connectionId: string | null = null): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double of Store; only getRepo is reached by inspectHostedReviewSitterContention.
   return {
     getRepo: (id: string) => (id === REPO_ID ? { id, connectionId } : undefined)
   } as unknown as Store
@@ -44,6 +45,7 @@ function fakeRuntime(
     dispatchId?: string
   } = {}
 ) {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double of OrcaRuntimeService; only the members this suite exercises are stubbed.
   return {
     showManagedWorktree: async () => ({
       repoId: REPO_ID,

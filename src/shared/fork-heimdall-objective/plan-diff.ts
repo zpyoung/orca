@@ -15,14 +15,17 @@ function sortedKeys(value: Record<string, unknown>): string[] {
   return Object.keys(value).sort()
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
 /** Deep-sorts object keys so field order never masks or fabricates a content difference. */
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalize)
   }
-  if (value !== null && typeof value === 'object') {
-    const record = value as Record<string, unknown>
-    return Object.fromEntries(sortedKeys(record).map((key) => [key, canonicalize(record[key])]))
+  if (isPlainRecord(value)) {
+    return Object.fromEntries(sortedKeys(value).map((key) => [key, canonicalize(value[key])]))
   }
   return value
 }

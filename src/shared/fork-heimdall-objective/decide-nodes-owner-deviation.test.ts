@@ -409,7 +409,7 @@ describe('objective node deviations, owner configured', () => {
     const decision = decideObjective(snapshot(failed), ledger())
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })

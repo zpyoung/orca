@@ -1,9 +1,9 @@
 import { WifiOff } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { translate } from '@/i18n/i18n'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
 import { formatHeimdallAge } from './fleet-format'
-import { watcherStatusClasses, watcherStatusLabel } from './watcher-status-copy'
+import { HeimdallTonePill } from './heimdall-tone-pill'
+import { watcherStatusLabel, watcherStatusTone } from './watcher-status-copy'
 
 export function HeimdallStatusPill({ row }: { row: WatcherFleetEntry }): React.JSX.Element {
   const lostContact = row.contact === 'unverifiable' || row.entry.status.state === 'unreachable'
@@ -13,9 +13,9 @@ export function HeimdallStatusPill({ row }: { row: WatcherFleetEntry }): React.J
       })
     : watcherStatusLabel(row.entry.status.state)
   return (
-    <Badge variant="outline" className={watcherStatusClasses(row)} title={label}>
+    <HeimdallTonePill tone={watcherStatusTone(row)} title={label}>
       {lostContact ? <WifiOff aria-hidden /> : null}
       {label}
-    </Badge>
+    </HeimdallTonePill>
   )
 }

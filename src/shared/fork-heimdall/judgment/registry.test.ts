@@ -53,6 +53,11 @@ function snapshot(
   }
 }
 
+function worldWithJudgment(judgment: ObjectiveWorld['judgment']): ObjectiveWorld {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: judgmentFailureClassification/judgmentPreflightHold/judgmentQualityReviewSubjects only ever read world.judgment, so a judgment-only double exercises them fully.
+  return { judgment } as ObjectiveWorld
+}
+
 function actingRegistry(...questionIds: string[]): JudgmentQuestionRegistry {
   return Object.fromEntries(
     Object.entries(OBJECTIVE_JUDGMENT_REGISTRY).map(([questionId, policy]) => [
@@ -223,12 +228,10 @@ describe('objective judgment authority gate', () => {
       taskKey: 'core',
       depsOrchestrationIds: []
     } satisfies ObjectiveAction
-    const shadowWorld = {
-      judgment: snapshot(preflightQuestion, 'implement', answer, { mode: 'shadow' })
-    } as ObjectiveWorld
-    const actingWorld = {
-      judgment: snapshot(preflightQuestion, 'implement', answer)
-    } as ObjectiveWorld
+    const shadowWorld = worldWithJudgment(
+      snapshot(preflightQuestion, 'implement', answer, { mode: 'shadow' })
+    )
+    const actingWorld = worldWithJudgment(snapshot(preflightQuestion, 'implement', answer))
 
     expect(judgmentPreflightHold(shadowWorld, action)).toBeNull()
     expect(judgmentPreflightHold(actingWorld, action, actingRegistry(preflightQuestion))).toBe(
@@ -239,14 +242,14 @@ describe('objective judgment authority gate', () => {
   it('widens only a criteria fallback and preserves stronger deterministic classes', () => {
     const failureQuestion = OBJECTIVE_JUDGMENT_QUESTION_IDS.failureClassification
     const registry = actingRegistry(failureQuestion)
-    const actingWorld = {
-      judgment: snapshot(failureQuestion, 'dispatch-1', failureAnswer(0.99))
-    } as ObjectiveWorld
-    const shadowWorld = {
-      judgment: snapshot(failureQuestion, 'dispatch-1', failureAnswer(0.99), {
+    const actingWorld = worldWithJudgment(
+      snapshot(failureQuestion, 'dispatch-1', failureAnswer(0.99))
+    )
+    const shadowWorld = worldWithJudgment(
+      snapshot(failureQuestion, 'dispatch-1', failureAnswer(0.99), {
         mode: 'shadow'
       })
-    } as ObjectiveWorld
+    )
 
     expect(judgmentFailureClassification(actingWorld, 'dispatch-1', 'criteria', registry)).toBe(
       'environment'
@@ -271,12 +274,10 @@ describe('objective judgment authority gate', () => {
       probabilities: { '0': 0.15, '1': 0.45, '2': 0.3, '3': 0.1 },
       confidence: 0.7
     }
-    const shadowWorld = {
-      judgment: snapshot(reportQuestion, 'dispatch-1', answer, { mode: 'shadow' })
-    } as ObjectiveWorld
-    const actingWorld = {
-      judgment: snapshot(reportQuestion, 'dispatch-1', answer)
-    } as ObjectiveWorld
+    const shadowWorld = worldWithJudgment(
+      snapshot(reportQuestion, 'dispatch-1', answer, { mode: 'shadow' })
+    )
+    const actingWorld = worldWithJudgment(snapshot(reportQuestion, 'dispatch-1', answer))
 
     expect(judgmentQualityReviewSubjects(shadowWorld)).toEqual([])
     expect(judgmentQualityReviewSubjects(actingWorld, actingRegistry(reportQuestion))).toEqual([

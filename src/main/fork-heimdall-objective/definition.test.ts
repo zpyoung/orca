@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deriveHandoffInput } from '../../shared/fork-heimdall-objective/objective-handoff-policy'
-import { ObjectiveEnrollmentPayloadSchema } from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  ObjectiveEnrollmentPayloadSchema,
+  type ObjectiveEnrollmentPayload
+} from '../../shared/fork-heimdall-objective/contract-types'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
@@ -23,6 +26,27 @@ import {
 import type { ObjectiveForgeAccess } from './objective-forge-access'
 import type { ObjectiveStore } from './objective-store'
 
+function objectiveKindPayload(
+  overrides: Partial<ObjectiveEnrollmentPayload> = {}
+): ObjectiveEnrollmentPayload {
+  return {
+    objectiveText: 'Implement the objective safely.',
+    tier: 'standard',
+    landingBar: 'files-on-disk',
+    maxConcurrency: 1,
+    workspaceKind: 'git',
+    writeTerritory: ['src/**'],
+    roleAgents: { planner: 'codex' },
+    sitterOverrides: {},
+    ...overrides
+  }
+}
+
+/** Reads a dynamically-authorized kindPayload as a spreadable base for building a variant fixture. */
+function asKindPayloadOverride(value: unknown): object {
+  return typeof value === 'object' && value !== null ? value : {}
+}
+
 function input(overrides: Partial<EnrollInput> = {}): EnrollInput {
   return {
     kind: 'objective',
@@ -36,25 +60,30 @@ function input(overrides: Partial<EnrollInput> = {}): EnrollInput {
       land: 'on'
     },
     budget: { wallClockActiveMs: 60_000, turns: 12 },
-    kindPayload: {
-      objectiveText: 'Implement the objective safely.',
-      tier: 'standard',
-      landingBar: 'files-on-disk',
-      maxConcurrency: 1,
-      workspaceKind: 'git',
-      writeTerritory: ['src/**'],
-      roleAgents: { planner: 'codex' },
-      sitterOverrides: {}
-    },
+    kindPayload: objectiveKindPayload(),
     ...overrides
   }
 }
 
 function store(repo: Record<string, unknown>): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of Store, a class with private fields no object literal can structurally satisfy; only getRepo is exercised.
   return { getRepo: () => repo } as unknown as Store
 }
 
+function storeWithoutRepo(): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of Store, a class with private fields no object literal can structurally satisfy; only getRepo is exercised.
+  return { getRepo: () => undefined } as unknown as Store
+}
+
+function fileRuntime(
+  resolveRuntimeFileTarget: (selector: string) => Promise<unknown>
+): OrcaRuntimeService {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only resolveRuntimeFileTarget is exercised.
+  return { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
+}
+
 function gitRuntime(executionHostId: 'local' | `ssh:${string}` | `runtime:${string}`) {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only resolveRuntimeGitTarget is exercised.
   return {
     resolveRuntimeGitTarget: async () => ({
       executionHostId,
@@ -85,11 +114,14 @@ async function authorizeThroughKernel(
   objectiveForge: ObjectiveForgeAccess
 ) {
   const registry = new WatcherKindRegistry()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: ObjectiveStore is a class with private fields; this kind's authorizeEnrollment path never reads it.
+  const objectiveStore = {} as ObjectiveStore
   registry.register(
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: registry erases each kind's specific World/Action/Detail types to `unknown`; the erasure is the registry's documented boundary.
     createObjectiveKind({
       runtime,
       store: repository,
-      objectiveStore: {} as ObjectiveStore,
+      objectiveStore,
       forge: objectiveForge
     }) as unknown as RegisteredWatcherKind
   )
@@ -121,19 +153,16 @@ describe('objective enrollment authorization', () => {
   })
 
   it('refuses landing bars above files-on-disk for folder workspaces', async () => {
-    const runtime = {
-      resolveRuntimeFileTarget: async () => ({
-        executionHostId: 'local',
-        worktree: { repoId: 'repo-1', path: '/workspace/folder' }
-      })
-    } as unknown as OrcaRuntimeService
+    const runtime = fileRuntime(async () => ({
+      executionHostId: 'local',
+      worktree: { repoId: 'repo-1', path: '/workspace/folder' }
+    }))
     const enrollment = input({
       worktreeId: null,
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
+      kindPayload: objectiveKindPayload({
         landingBar: 'merged',
         workspaceKind: 'folder'
-      }
+      })
     })
 
     await expect(
@@ -150,14 +179,13 @@ describe('objective enrollment authorization', () => {
       executionHostId: 'ssh:folder-host' as const,
       worktree: { repoId: 'repo-1', path: '/workspace/folder' }
     }))
-    const runtime = { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
+    const runtime = fileRuntime(resolveRuntimeFileTarget)
     const enrollment = input({
       worktreeId: null,
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
+      kindPayload: objectiveKindPayload({
         workspaceKind: 'folder',
         maxConcurrency: 3
-      }
+      })
     })
 
     const authorized = await authorizeObjectiveEnrollment(
@@ -187,22 +215,17 @@ describe('objective enrollment authorization', () => {
         path: '/workspace/folder'
       }
     }))
-    const runtime = { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
+    const runtime = fileRuntime(resolveRuntimeFileTarget)
     const enrollment = input({
       repoId: 'folder-workspace:group-1',
       worktreeId: 'folder:folder-1',
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
+      kindPayload: objectiveKindPayload({
         workspaceKind: 'folder',
         maxConcurrency: 3
-      }
+      })
     })
 
-    const authorized = await authorizeObjectiveEnrollment(
-      runtime,
-      { getRepo: () => undefined } as unknown as Store,
-      enrollment
-    )
+    const authorized = await authorizeObjectiveEnrollment(runtime, storeWithoutRepo(), enrollment)
     const contract = ObjectiveEnrollmentPayloadSchema.parse(authorized.kindPayload)
 
     expect(resolveRuntimeFileTarget).toHaveBeenCalledWith('id:folder:folder-1')
@@ -217,38 +240,29 @@ describe('objective enrollment authorization', () => {
   })
 
   it('rejects a canonical folder target whose runtime identity does not match enrollment', async () => {
-    const runtime = {
-      resolveRuntimeFileTarget: async () => ({
-        executionHostId: 'local',
-        worktree: {
-          id: 'folder:other-folder',
-          repoId: 'folder-workspace:group-1',
-          path: '/workspace/folder'
-        }
-      })
-    } as unknown as OrcaRuntimeService
+    const runtime = fileRuntime(async () => ({
+      executionHostId: 'local',
+      worktree: {
+        id: 'folder:other-folder',
+        repoId: 'folder-workspace:group-1',
+        path: '/workspace/folder'
+      }
+    }))
     const enrollment = input({
       repoId: 'folder-workspace:group-1',
       worktreeId: 'folder:folder-1',
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
-        workspaceKind: 'folder'
-      }
+      kindPayload: objectiveKindPayload({ workspaceKind: 'folder' })
     })
 
     await expect(
-      authorizeObjectiveEnrollment(
-        runtime,
-        { getRepo: () => undefined } as unknown as Store,
-        enrollment
-      )
+      authorizeObjectiveEnrollment(runtime, storeWithoutRepo(), enrollment)
     ).rejects.toThrow('Invalid objective folder workspace identity')
   })
 
   it('keeps declared gates unchanged in the authorized contract for a git objective', async () => {
     const gates = [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }]
     const enrollment = input({
-      kindPayload: { ...(input().kindPayload as Record<string, unknown>), gates }
+      kindPayload: objectiveKindPayload({ gates })
     })
 
     const authorized = await authorizeObjectiveEnrollment(
@@ -267,15 +281,14 @@ describe('objective enrollment authorization', () => {
       executionHostId: 'ssh:folder-host' as const,
       worktree: { repoId: 'repo-1', path: '/workspace/folder' }
     }))
-    const runtime = { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
+    const runtime = fileRuntime(resolveRuntimeFileTarget)
     const enrollment = input({
       worktreeId: null,
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
+      kindPayload: objectiveKindPayload({
         workspaceKind: 'folder',
         maxConcurrency: 3,
         gates
-      }
+      })
     })
 
     const authorized = await authorizeObjectiveEnrollment(
@@ -291,10 +304,7 @@ describe('objective enrollment authorization', () => {
 
   it('preserves multi-worker concurrency for a git objective', async () => {
     const enrollment = input({
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
-        maxConcurrency: 3
-      }
+      kindPayload: objectiveKindPayload({ maxConcurrency: 3 })
     })
 
     const authorized = await authorizeObjectiveEnrollment(
@@ -311,16 +321,16 @@ describe('objective enrollment authorization', () => {
     const kind = createObjectiveKind({
       runtime: gitRuntime('local'),
       store: store({ id: 'repo-1' }),
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only hasUsablePlan is exercised.
       objectiveStore: { hasUsablePlan } as unknown as ObjectiveStore
     })
     const base = input()
     const authorized = await kind.authorizeEnrollment({
       ...base,
       capabilities: { ...base.capabilities, plan: 'off' },
-      kindPayload: {
-        ...(base.kindPayload as Record<string, unknown>),
+      kindPayload: objectiveKindPayload({
         existingPlan: '# Source that still requires planner normalization'
-      }
+      })
     })
 
     expect(() => kind.validateEnrollment?.(authorized, null)).toThrow(
@@ -349,6 +359,7 @@ describe('objective enrollment authorization', () => {
     const kind = createObjectiveKind({
       runtime: gitRuntime('local'),
       store: store({ id: 'repo-1' }),
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only hasUsablePlan is exercised.
       objectiveStore: { hasUsablePlan } as unknown as ObjectiveStore
     })
     const base = input()
@@ -374,7 +385,7 @@ describe('objective enrollment authorization', () => {
         {
           ...authorized,
           kindPayload: {
-            ...(authorized.kindPayload as Record<string, unknown>),
+            ...asKindPayloadOverride(authorized.kindPayload),
             objectiveText: 'A different objective'
           }
         },
@@ -437,10 +448,7 @@ describe('objective enrollment authorization', () => {
   it('maps a hosted-review objective without an explicit worktree to invalid-payload', async () => {
     const enrollment = input({
       worktreeId: null,
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
-        landingBar: 'hosted-review'
-      }
+      kindPayload: objectiveKindPayload({ landingBar: 'hosted-review' })
     })
 
     await expect(
@@ -458,10 +466,7 @@ describe('objective enrollment authorization', () => {
 
   it('maps an unsupported hosted-review forge to invalid-payload', async () => {
     const enrollment = input({
-      kindPayload: {
-        ...(input().kindPayload as Record<string, unknown>),
-        landingBar: 'hosted-review'
-      }
+      kindPayload: objectiveKindPayload({ landingBar: 'hosted-review' })
     })
 
     await expect(
@@ -480,10 +485,9 @@ describe('objective enrollment authorization', () => {
 
   it('derives a handoff accepted by both the kernel and hosted-review kind schemas', () => {
     const source = input()
-    const contract = ObjectiveEnrollmentPayloadSchema.parse({
-      ...(source.kindPayload as Record<string, unknown>),
-      landingBar: 'hosted-review'
-    })
+    const contract = ObjectiveEnrollmentPayloadSchema.parse(
+      objectiveKindPayload({ landingBar: 'hosted-review' })
+    )
     const enrollment = WatcherEnrollmentSchema.parse({
       watcherId: 'objective-watcher',
       kind: 'objective',

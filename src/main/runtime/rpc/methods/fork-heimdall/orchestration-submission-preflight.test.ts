@@ -11,6 +11,14 @@ const REJECTION = {
 const ACCEPTED = { status: 'accepted' as const }
 const WORKER_PANE = 'tab_worker:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 
+function expectField(result: unknown, field: string): unknown {
+  if (!result || typeof result !== 'object' || !(field in result)) {
+    throw new Error(`Submission response is missing "${field}"`)
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: field is a runtime string, so `in` cannot add a matching index signature; the check above confirms the key exists.
+  return (result as Record<string, unknown>)[field]
+}
+
 function expectActionableRejection(result: unknown): void {
   if (!result || typeof result !== 'object' || !('lifecycle' in result)) {
     throw new Error('Submission did not return a lifecycle result')
@@ -64,12 +72,27 @@ describe('Heimdall orchestration submission preflight', () => {
     expect(db.getTask(task.id)?.status).toBe('dispatched')
     expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
 
-    const accepted = (await harness.call('orchestration.send', params, ctx)) as {
-      message: { id: string }
-      lifecycle: { action: string }
+    const acceptedResult = await harness.call('orchestration.send', params, ctx)
+    const acceptedLifecycle = expectField(acceptedResult, 'lifecycle')
+    if (
+      !acceptedLifecycle ||
+      typeof acceptedLifecycle !== 'object' ||
+      !('action' in acceptedLifecycle) ||
+      typeof acceptedLifecycle.action !== 'string'
+    ) {
+      throw new Error('Submission did not return a lifecycle action')
+    }
+    const acceptedMessage = expectField(acceptedResult, 'message')
+    if (
+      !acceptedMessage ||
+      typeof acceptedMessage !== 'object' ||
+      !('id' in acceptedMessage) ||
+      typeof acceptedMessage.id !== 'string'
+    ) {
+      throw new Error('Submission did not return a message id')
     }
 
-    expect(accepted.lifecycle.action).toBe('completed')
+    expect(acceptedLifecycle.action).toBe('completed')
     expect(db.getInbox(100)).toEqual([
       expect.objectContaining({
         type: 'worker_done',
@@ -82,21 +105,21 @@ describe('Heimdall orchestration submission preflight', () => {
     expect(JSON.parse(db.getTask(task.id)?.result ?? 'null')).toMatchObject({
       provenance: 'worker_report',
       outcome: 'succeeded',
-      messageId: accepted.message.id,
+      messageId: acceptedMessage.id,
       body: '',
       reportPath: null,
       filesModified: []
     })
     expect(db.getAttemptObservationFacts(dispatch.id)).toEqual([
       expect.objectContaining({
-        id: `worker_report:${accepted.message.id}`,
+        id: `worker_report:${acceptedMessage.id}`,
         dispatchId: dispatch.id,
         taskId: task.id,
         facet: 'worker_report',
         payload: {
           status: 'accepted',
           outcome: 'succeeded',
-          reportId: `worker_report:${accepted.message.id}`
+          reportId: `worker_report:${acceptedMessage.id}`
         }
       })
     ])
@@ -110,7 +133,7 @@ describe('Heimdall orchestration submission preflight', () => {
     const task = db.createTask({ spec: 'Ordinary orchestration work' })
     const dispatch = createRootDispatch(db, task.id, 'term_worker', WORKER_PANE)
 
-    const result = (await harness.call(
+    const result = await harness.call(
       'orchestration.send',
       {
         from: 'term_worker',
@@ -123,9 +146,18 @@ describe('Heimdall orchestration submission preflight', () => {
         })
       },
       ctx
-    )) as { lifecycle: { action: string } }
+    )
+    const lifecycle = expectField(result, 'lifecycle')
+    if (
+      !lifecycle ||
+      typeof lifecycle !== 'object' ||
+      !('action' in lifecycle) ||
+      typeof lifecycle.action !== 'string'
+    ) {
+      throw new Error('Submission did not return a lifecycle action')
+    }
 
-    expect(result.lifecycle.action).toBe('completed')
+    expect(lifecycle.action).toBe('completed')
     expect(db.getTask(task.id)?.status).toBe('completed')
     expect(db.getDispatchContextById(dispatch.id)?.status).toBe('completed')
     expect(db.getInbox(100)).toHaveLength(1)
@@ -151,13 +183,20 @@ describe('Heimdall orchestration submission preflight', () => {
     expectActionableRejection(rejected)
     expect(db.getInbox(100)).toHaveLength(0)
 
-    const accepted = (await harness.call('orchestration.send', params, ctx)) as {
-      message: { id: string; type: string; subject: string }
+    const acceptedResult = await harness.call('orchestration.send', params, ctx)
+    const acceptedMessage = expectField(acceptedResult, 'message')
+    if (
+      !acceptedMessage ||
+      typeof acceptedMessage !== 'object' ||
+      !('id' in acceptedMessage) ||
+      typeof acceptedMessage.id !== 'string'
+    ) {
+      throw new Error('Submission did not return a message id')
     }
 
-    expect(accepted.message).toMatchObject({ type: 'status', subject })
+    expect(acceptedMessage).toMatchObject({ type: 'status', subject })
     expect(db.getInbox(100)).toEqual([
-      expect.objectContaining({ id: accepted.message.id, type: 'status', subject })
+      expect.objectContaining({ id: acceptedMessage.id, type: 'status', subject })
     ])
   })
 })

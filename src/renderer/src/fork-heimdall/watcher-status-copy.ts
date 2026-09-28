@@ -1,3 +1,4 @@
+import type { HeimdallPillTone } from './heimdall-tone-pill'
 import { translate } from '@/i18n/i18n'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
 import type { WatcherKindId, WatcherStatusState } from '../../../shared/fork-heimdall/watcher-types'
@@ -31,15 +32,15 @@ export function watcherHostLabel(row: WatcherFleetEntry): string {
     : translate('fork.heimdall.host.local', 'This device')
 }
 
-export function watcherStatusClasses(row: WatcherFleetEntry): string {
+export function watcherStatusTone(row: WatcherFleetEntry): HeimdallPillTone {
   if (row.contact === 'unverifiable' || row.entry.status.state === 'unreachable') {
-    return 'border-status-warning-border bg-status-warning-background text-status-warning-foreground'
+    return 'warning'
   }
   if (isHeimdallAttentionRow(row)) {
-    return 'border-status-warning-border bg-status-warning-background text-status-warning-foreground'
+    return 'warning'
   }
   if (row.entry.status.state === 'watching' || row.entry.status.state === 'acting') {
-    return 'border-status-success-border bg-status-success-background text-status-success'
+    return 'success'
   }
-  return 'border-border bg-muted text-muted-foreground'
+  return 'neutral'
 }

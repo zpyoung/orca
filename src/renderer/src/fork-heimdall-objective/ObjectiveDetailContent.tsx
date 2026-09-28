@@ -350,7 +350,6 @@ function ObjectiveLanding({
                         type="button"
                         variant="link"
                         size="xs"
-                        className="h-auto gap-1 p-0 text-xs"
                         onClick={() => void window.api.shell.openUrl(handoff.reviewUrl)}
                       >
                         {translate('fork.heimdallObjective.detail.openReview', 'Open review')}
@@ -387,10 +386,9 @@ function ObjectiveLanding({
                     type="button"
                     variant="link"
                     size="xs"
-                    className="h-auto p-0 font-mono text-[11px]"
                     onClick={() => selectWatcher(sitter.target)}
                   >
-                    {sitter.target.watcherId}
+                    <span className="font-mono text-[11px]">{sitter.target.watcherId}</span>
                   </Button>
                 </>
               ) : (

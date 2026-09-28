@@ -77,6 +77,7 @@ async function patchFixture(): Promise<{
     report: DROP_EXTRA_REPORT,
     createdAtMs: 3
   })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; only watcherId is read by the plan patch action.
   const binding = { enrollment: { watcherId: WATCHER_ID } } as unknown as ObjectiveSnapshotBinding
   return { objectiveStore, revisionId: revision.revisionId, binding, patch }
 }
@@ -98,6 +99,7 @@ function applyAction(
 }
 
 function context(entries: unknown[] = []): ExecuteContext<ObjectiveWorld> {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the plan patch action.
   return {
     snapshot: { contentIdentity: 'content-1', world: { plan: { nodes: [] } } },
     ledger: { watcherId: WATCHER_ID, entries },

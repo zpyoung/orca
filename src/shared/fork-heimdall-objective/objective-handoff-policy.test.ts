@@ -67,7 +67,11 @@ describe('objective handoff policy', () => {
     'applies the %s override without allowing an ungated merge',
     (overrides, capability, expected) => {
       expect(
-        deriveSitterCapabilities('merged', overrides as ObjectiveSitterOverrides)[capability]
+        deriveSitterCapabilities(
+          'merged',
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: each row above is a hand-authored single-key subset of ObjectiveSitterOverrides; `it.each`'s distributive tuple inference widens it to a union `test.each` can't narrow back on its own.
+          overrides as ObjectiveSitterOverrides
+        )[capability]
       ).toBe(expected)
     }
   )

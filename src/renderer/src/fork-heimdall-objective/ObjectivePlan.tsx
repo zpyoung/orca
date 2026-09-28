@@ -204,9 +204,11 @@ export function ObjectivePlan({ detail }: { detail: ObjectiveDetail }): React.JS
                 type="button"
                 variant="ghost"
                 size="xs"
-                className="group w-full justify-between text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground hover:text-foreground"
+                className="group w-full justify-between"
               >
-                {translate('fork.heimdallObjective.detail.plan', 'Plan')}
+                <span className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground group-hover:text-foreground">
+                  {translate('fork.heimdallObjective.detail.plan', 'Plan')}
+                </span>
                 <ChevronRight
                   aria-hidden
                   className="size-3.5 transition-transform motion-reduce:transition-none group-data-[state=open]:rotate-90"
@@ -245,64 +247,71 @@ export function ObjectivePlan({ detail }: { detail: ObjectiveDetail }): React.JS
             ) : null}
           </div>
         ) : null}
-        <CollapsibleContent className="collapsible-height-content">
-          {selectedRevision ? (
-            <Tabs value={selectedRevision.id} onValueChange={setSelectedRevisionId}>
-              <TabsList
-                className="max-w-full justify-start overflow-x-auto scrollbar-sleek"
-                variant="line"
-              >
-                {revisions.map((revision) => (
-                  <TabsTrigger key={revision.id} value={revision.id}>
-                    {translate('fork.heimdallObjective.detail.revision', 'Revision {{number}}', {
-                      number: revision.number
-                    })}
-                    <Badge variant="outline">{objectiveRevisionStatusLabel(revision.status)}</Badge>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {revisions.map((revision) => (
-                <TabsContent key={revision.id} value={revision.id}>
-                  <RevisionPlan detail={detail} revisionId={revision.id} />
-                </TabsContent>
-              ))}
-            </Tabs>
-          ) : (
-            <p className="rounded-md border border-border bg-muted/10 px-3 py-5 text-center text-xs text-muted-foreground">
-              {translate('fork.heimdallObjective.detail.noPlan', 'No plan revision yet.')}
-            </p>
-          )}
-          <ObjectivePlanQuality detail={detail} />
-          {detail.verdicts.length > 0 ? (
-            <div className="mt-3 space-y-1.5">
-              <h4 className="text-[11px] font-semibold text-muted-foreground">
-                {translate('fork.heimdallObjective.detail.verdicts', 'Review verdicts')}
-              </h4>
-              {detail.verdicts.map((verdict) => (
-                <div
-                  key={`${verdict.dispatchId}:${verdict.role}`}
-                  className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"
-                >
-                  <Badge variant="outline">{objectiveReviewRoleLabel(verdict.role)}</Badge>
-                  <span>{objectiveVerdictLabel(verdict.verdict)}</span>
-                  {verdict.synthesizedByOwner ? (
-                    <Badge variant="secondary">
-                      {translate(
-                        'fork.heimdallObjective.detail.verdictSynthesizedByOwner',
-                        'Synthesized by owner'
-                      )}
-                    </Badge>
-                  ) : null}
-                  <time dateTime={new Date(verdict.atMs).toISOString()}>
-                    {formatHeimdallTime(verdict.atMs)}
-                  </time>
-                  <span className="font-mono" title={verdict.contentIdentity}>
-                    {shortObjectiveIdentity(verdict.contentIdentity)}
-                  </span>
+        <CollapsibleContent asChild>
+          <div className="collapsible-height-content">
+            {selectedRevision ? (
+              <Tabs value={selectedRevision.id} onValueChange={setSelectedRevisionId}>
+                <div className="max-w-full overflow-x-auto scrollbar-sleek">
+                  <TabsList className="justify-start" variant="line">
+                    {revisions.map((revision) => (
+                      <TabsTrigger key={revision.id} value={revision.id}>
+                        {translate(
+                          'fork.heimdallObjective.detail.revision',
+                          'Revision {{number}}',
+                          {
+                            number: revision.number
+                          }
+                        )}
+                        <Badge variant="outline">
+                          {objectiveRevisionStatusLabel(revision.status)}
+                        </Badge>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
                 </div>
-              ))}
-            </div>
-          ) : null}
+                {revisions.map((revision) => (
+                  <TabsContent key={revision.id} value={revision.id}>
+                    <RevisionPlan detail={detail} revisionId={revision.id} />
+                  </TabsContent>
+                ))}
+              </Tabs>
+            ) : (
+              <p className="rounded-md border border-border bg-muted/10 px-3 py-5 text-center text-xs text-muted-foreground">
+                {translate('fork.heimdallObjective.detail.noPlan', 'No plan revision yet.')}
+              </p>
+            )}
+            <ObjectivePlanQuality detail={detail} />
+            {detail.verdicts.length > 0 ? (
+              <div className="mt-3 space-y-1.5">
+                <h4 className="text-[11px] font-semibold text-muted-foreground">
+                  {translate('fork.heimdallObjective.detail.verdicts', 'Review verdicts')}
+                </h4>
+                {detail.verdicts.map((verdict) => (
+                  <div
+                    key={`${verdict.dispatchId}:${verdict.role}`}
+                    className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"
+                  >
+                    <Badge variant="outline">{objectiveReviewRoleLabel(verdict.role)}</Badge>
+                    <span>{objectiveVerdictLabel(verdict.verdict)}</span>
+                    {verdict.synthesizedByOwner ? (
+                      <Badge variant="secondary">
+                        {translate(
+                          'fork.heimdallObjective.detail.verdictSynthesizedByOwner',
+                          'Synthesized by owner'
+                        )}
+                      </Badge>
+                    ) : null}
+                    <time dateTime={new Date(verdict.atMs).toISOString()}>
+                      {formatHeimdallTime(verdict.atMs)}
+                    </time>
+                    <span className="font-mono" title={verdict.contentIdentity}>
+                      {shortObjectiveIdentity(verdict.contentIdentity)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </CollapsibleContent>
       </Collapsible>
     </section>

@@ -18,6 +18,10 @@ import {
 
 const ACCEPTED = { status: 'accepted' } as const
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 type SubmissionPreflightDependencies = {
   enrollments: EnrollmentStore
   runners: ReadonlyMap<string, WatcherRunner>
@@ -58,10 +62,10 @@ export async function preflightKernelSubmission(
     } catch {
       return ACCEPTED
     }
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    if (!isRecord(payload)) {
       return ACCEPTED
     }
-    const report = payload as Record<string, unknown>
+    const report = payload
     const dispatchId =
       typeof report.dispatchId === 'string' ? report.dispatchId : submission.dispatchId
     if (!dispatchId) {

@@ -292,8 +292,7 @@ function methodNames(methods: unknown): string[] {
     if (!method || typeof method !== 'object') {
       return []
     }
-    const name = Reflect.get(method, 'name')
-    return typeof name === 'string' ? [name] : []
+    return 'name' in method && typeof method.name === 'string' ? [method.name] : []
   })
 }
 
@@ -305,7 +304,7 @@ beforeAll(async () => {
   ])
   baselineMethodNames = methodNames(registry.ALL_RPC_METHODS)
   baselineCapabilities = Array.isArray(protocol.RUNTIME_CAPABILITIES)
-    ? (protocol.RUNTIME_CAPABILITIES as string[])
+    ? protocol.RUNTIME_CAPABILITIES
     : []
 }, SUITE_TIMEOUT_MS)
 
@@ -371,16 +370,18 @@ const BASELINE_PARK_REASON_KINDS = new Set([
 ])
 
 function discriminatedUnionLiteralKind(option: z.ZodType): string {
-  const shape = Reflect.get(option, 'shape') as Record<string, z.ZodType> | undefined
-  const kindSchema = shape?.kind
-  const values = kindSchema
-    ? (Reflect.get(kindSchema, 'def') as { values?: unknown[] })?.values
-    : undefined
-  const value = values?.[0]
+  const kindSchema = option instanceof z.ZodObject ? option.shape.kind : undefined
+  const value = kindSchema instanceof z.ZodLiteral ? kindSchema.value : undefined
   if (typeof value !== 'string') {
     throw new Error('Heimdall park reason option has no literal "kind" discriminant')
   }
   return value
+}
+
+function assertNonEmpty<T>(arr: readonly T[]): asserts arr is readonly [T, ...T[]] {
+  if (arr.length === 0) {
+    throw new Error('Expected a non-empty array')
+  }
 }
 
 const baselineParkReasonOptions = WatcherParkReasonSchema.def.options.filter((option) =>
@@ -391,12 +392,11 @@ if (baselineParkReasonOptions.length !== BASELINE_PARK_REASON_KINDS.size) {
     'Heimdall baseline park reason fixture is missing a kind the current union still declares'
   )
 }
+assertNonEmpty(baselineParkReasonOptions)
 const BaselineWatcherStatusSchema = z
   .object({
     ...WatcherStatusSchema.shape,
-    parkReason: z
-      .discriminatedUnion('kind', baselineParkReasonOptions as [z.ZodType, ...z.ZodType[]])
-      .nullable()
+    parkReason: z.discriminatedUnion('kind', baselineParkReasonOptions).nullable()
   })
   .strict()
 const BaselineWatcherStatusReaderSchema = remoteReaderSchema(BaselineWatcherStatusSchema)

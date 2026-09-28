@@ -146,7 +146,7 @@ export function ObjectiveExistingPlanInput({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 shrink-0 text-xs"
+            className="h-8 shrink-0"
             disabled={disabled}
           >
             {open
@@ -161,96 +161,100 @@ export function ObjectiveExistingPlanInput({
         </CollapsibleTrigger>
       </div>
 
-      <CollapsibleContent className="collapsible-height-content">
-        <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <Label htmlFor={textareaId}>
-                {translate(
-                  'fork.heimdallObjective.enrollment.existingPlanSource',
-                  'Existing plan source'
-                )}
-              </Label>
-              <p id={descriptionId} className="text-xs text-muted-foreground">
-                {translate(
-                  'fork.heimdallObjective.enrollment.existingPlanHelp',
-                  'Paste or import Markdown, text, or JSON as source. The planner converts it into executable tasks; normal Plan approval rules still apply.'
-                )}
-              </p>
+      <CollapsibleContent asChild>
+        <div className="collapsible-height-content">
+          <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <Label htmlFor={textareaId}>
+                  {translate(
+                    'fork.heimdallObjective.enrollment.existingPlanSource',
+                    'Existing plan source'
+                  )}
+                </Label>
+                <p id={descriptionId} className="text-xs text-muted-foreground">
+                  {translate(
+                    'fork.heimdallObjective.enrollment.existingPlanHelp',
+                    'Paste or import Markdown, text, or JSON as source. The planner converts it into executable tasks; normal Plan approval rules still apply.'
+                  )}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0"
+                disabled={disabled}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <FileUp aria-hidden className="size-3.5" />
+                {translate('fork.heimdallObjective.enrollment.importExistingPlan', 'Import file')}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={EXISTING_PLAN_ACCEPT}
+                className="hidden"
+                disabled={disabled}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0]
+                  event.currentTarget.value = ''
+                  if (file) {
+                    void importFile(file)
+                  }
+                }}
+              />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 shrink-0 text-xs"
-              disabled={disabled}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <FileUp aria-hidden className="size-3.5" />
-              {translate('fork.heimdallObjective.enrollment.importExistingPlan', 'Import file')}
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={EXISTING_PLAN_ACCEPT}
-              className="hidden"
-              disabled={disabled}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0]
-                event.currentTarget.value = ''
-                if (file) {
-                  void importFile(file)
-                }
-              }}
-            />
+
+            <div className="font-mono">
+              <Textarea
+                id={textareaId}
+                rows={9}
+                value={value}
+                disabled={disabled}
+                aria-invalid={visibleError !== null}
+                aria-describedby={`${descriptionId}${visibleError ? ` ${errorId}` : ''}`}
+                className="max-h-72"
+                placeholder={translate(
+                  'fork.heimdallObjective.enrollment.existingPlanPlaceholder',
+                  'Paste the plan the planner should normalize…'
+                )}
+                onChange={(event) => {
+                  readGenerationRef.current += 1
+                  setImportError(null)
+                  onChangeRef.current(event.currentTarget.value)
+                }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {translate(
+                  'fork.heimdallObjective.enrollment.existingPlanCharacterCount',
+                  '{{current}} / {{maximum}} characters',
+                  {
+                    current: planLength.toLocaleString(),
+                    maximum: OBJECTIVE_EXISTING_PLAN_MAX_LENGTH.toLocaleString()
+                  }
+                )}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={disabled}
+                onClick={removePlan}
+              >
+                {translate('fork.heimdallObjective.enrollment.removeExistingPlan', 'Remove plan')}
+              </Button>
+            </div>
+
+            {visibleError ? (
+              <p id={errorId} className="text-xs text-destructive" role="alert">
+                {importErrorCopy(visibleError)}
+              </p>
+            ) : null}
           </div>
-
-          <Textarea
-            id={textareaId}
-            rows={9}
-            value={value}
-            disabled={disabled}
-            aria-invalid={visibleError !== null}
-            aria-describedby={`${descriptionId}${visibleError ? ` ${errorId}` : ''}`}
-            className="max-h-72 font-mono text-xs"
-            placeholder={translate(
-              'fork.heimdallObjective.enrollment.existingPlanPlaceholder',
-              'Paste the plan the planner should normalize…'
-            )}
-            onChange={(event) => {
-              readGenerationRef.current += 1
-              setImportError(null)
-              onChangeRef.current(event.currentTarget.value)
-            }}
-          />
-
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] tabular-nums text-muted-foreground">
-              {translate(
-                'fork.heimdallObjective.enrollment.existingPlanCharacterCount',
-                '{{current}} / {{maximum}} characters',
-                {
-                  current: planLength.toLocaleString(),
-                  maximum: OBJECTIVE_EXISTING_PLAN_MAX_LENGTH.toLocaleString()
-                }
-              )}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              disabled={disabled}
-              onClick={removePlan}
-            >
-              {translate('fork.heimdallObjective.enrollment.removeExistingPlan', 'Remove plan')}
-            </Button>
-          </div>
-
-          {visibleError ? (
-            <p id={errorId} className="text-xs text-destructive" role="alert">
-              {importErrorCopy(visibleError)}
-            </p>
-          ) : null}
         </div>
       </CollapsibleContent>
 

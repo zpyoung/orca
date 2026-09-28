@@ -61,6 +61,12 @@ export function requireObjectiveSnapshotBinding(
   return binding
 }
 
+function isDispatchAction(
+  action: ObjectiveAction
+): action is Extract<ObjectiveAction, { kind: `dispatch-${string}` }> {
+  return action.kind.startsWith('dispatch-')
+}
+
 export function findObjectiveDispatchAttempt(
   ledger: WatcherLedger,
   dispatchId: string
@@ -70,34 +76,32 @@ export function findObjectiveDispatchAttempt(
       continue
     }
     const parsed = ObjectiveActionSchema.safeParse(attempt.action)
-    if (!parsed.success || !parsed.data.kind.startsWith('dispatch-')) {
+    if (!parsed.success || !isDispatchAction(parsed.data)) {
       continue
     }
     return {
       attempt,
-      action: parsed.data as ObjectiveDispatchAttempt['action']
+      action: parsed.data
     }
   }
   return null
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function mailboxRecord(value: unknown): {
   type: string
   payload: Record<string, unknown>
 } | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (!isPlainRecord(value)) {
     return null
   }
-  const message = value as Record<string, unknown>
-  if (
-    typeof message.type !== 'string' ||
-    typeof message.payload !== 'object' ||
-    message.payload === null ||
-    Array.isArray(message.payload)
-  ) {
+  if (typeof value.type !== 'string' || !isPlainRecord(value.payload)) {
     return null
   }
-  return { type: message.type, payload: message.payload as Record<string, unknown> }
+  return { type: value.type, payload: value.payload }
 }
 
 function reportRejection(value: unknown): {
@@ -107,10 +111,10 @@ function reportRejection(value: unknown): {
   if (value === undefined) {
     return { value: null, valid: true }
   }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (!isPlainRecord(value)) {
     return { value: null, valid: false }
   }
-  const record = value as Record<string, unknown>
+  const record = value
   if (
     typeof record.code !== 'string' ||
     record.code.trim().length === 0 ||

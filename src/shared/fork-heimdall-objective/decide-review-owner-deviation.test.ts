@@ -59,7 +59,7 @@ describe('objective check deviations, owner configured', () => {
     const decision = decideObjective(snapshot(projection({ nodes: [checked] })), ledger())
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -95,7 +95,7 @@ describe('objective review deviations, owner configured', () => {
     const decision = decideObjective(snapshot(blocked), ledger())
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-block'
     })
@@ -348,7 +348,7 @@ describe('judgment quality review deviations', () => {
 
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-block'
     })

@@ -90,20 +90,41 @@ export function assertHostedReviewBranchUpdateInput(
   if (!value || typeof value !== 'object') {
     throw new Error('Invalid hosted review branch update request.')
   }
-  const input = value as Record<string, unknown>
-  for (const key of [
-    'worktreePath',
-    'branch',
-    'pushRemote',
-    'baseRef',
-    'expectedHeadSha',
-    'expectedBaseSha'
-  ]) {
-    if (typeof input[key] !== 'string' || input[key].length === 0) {
-      throw new Error(`Invalid hosted review branch update ${key}.`)
-    }
+  if (
+    !('worktreePath' in value) ||
+    typeof value.worktreePath !== 'string' ||
+    value.worktreePath.length === 0
+  ) {
+    throw new Error('Invalid hosted review branch update worktreePath.')
   }
-  if (input.mode !== 'merge-base-update' && input.mode !== 'rebase') {
+  if (!('branch' in value) || typeof value.branch !== 'string' || value.branch.length === 0) {
+    throw new Error('Invalid hosted review branch update branch.')
+  }
+  if (
+    !('pushRemote' in value) ||
+    typeof value.pushRemote !== 'string' ||
+    value.pushRemote.length === 0
+  ) {
+    throw new Error('Invalid hosted review branch update pushRemote.')
+  }
+  if (!('baseRef' in value) || typeof value.baseRef !== 'string' || value.baseRef.length === 0) {
+    throw new Error('Invalid hosted review branch update baseRef.')
+  }
+  if (
+    !('expectedHeadSha' in value) ||
+    typeof value.expectedHeadSha !== 'string' ||
+    value.expectedHeadSha.length === 0
+  ) {
+    throw new Error('Invalid hosted review branch update expectedHeadSha.')
+  }
+  if (
+    !('expectedBaseSha' in value) ||
+    typeof value.expectedBaseSha !== 'string' ||
+    value.expectedBaseSha.length === 0
+  ) {
+    throw new Error('Invalid hosted review branch update expectedBaseSha.')
+  }
+  if (!('mode' in value) || (value.mode !== 'merge-base-update' && value.mode !== 'rebase')) {
     throw new Error('Invalid hosted review branch update mode.')
   }
 }
@@ -114,14 +135,35 @@ export function assertHostedReviewCommitPushInput(
   if (!value || typeof value !== 'object') {
     throw new Error('Invalid hosted review commit push request.')
   }
-  const input = value as Record<string, unknown>
-  for (const key of ['worktreePath', 'branch', 'pushUrl', 'commitSha', 'expectedHeadSha']) {
-    if (typeof input[key] !== 'string' || input[key].length === 0) {
-      throw new Error(`Invalid hosted review commit push ${key}.`)
-    }
+  if (
+    !('worktreePath' in value) ||
+    typeof value.worktreePath !== 'string' ||
+    value.worktreePath.length === 0
+  ) {
+    throw new Error('Invalid hosted review commit push worktreePath.')
   }
-  assertObjectId(input.commitSha as string, 'publication commit SHA')
-  assertObjectId(input.expectedHeadSha as string, 'expected review head SHA')
+  if (!('branch' in value) || typeof value.branch !== 'string' || value.branch.length === 0) {
+    throw new Error('Invalid hosted review commit push branch.')
+  }
+  if (!('pushUrl' in value) || typeof value.pushUrl !== 'string' || value.pushUrl.length === 0) {
+    throw new Error('Invalid hosted review commit push pushUrl.')
+  }
+  if (
+    !('commitSha' in value) ||
+    typeof value.commitSha !== 'string' ||
+    value.commitSha.length === 0
+  ) {
+    throw new Error('Invalid hosted review commit push commitSha.')
+  }
+  if (
+    !('expectedHeadSha' in value) ||
+    typeof value.expectedHeadSha !== 'string' ||
+    value.expectedHeadSha.length === 0
+  ) {
+    throw new Error('Invalid hosted review commit push expectedHeadSha.')
+  }
+  assertObjectId(value.commitSha, 'publication commit SHA')
+  assertObjectId(value.expectedHeadSha, 'expected review head SHA')
 }
 
 export async function executeHostedReviewCommitPush(

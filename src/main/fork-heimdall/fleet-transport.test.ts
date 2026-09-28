@@ -83,7 +83,15 @@ function runtimeStatus(capabilities: string[]): RuntimeRpcResponse<RuntimeStatus
   return {
     id: 'status.get',
     ok: true,
-    result: { capabilities } as RuntimeStatus,
+    result: {
+      runtimeId: 'runtime-remote',
+      rendererGraphEpoch: 0,
+      graphStatus: 'ready',
+      authoritativeWindowId: null,
+      liveTabCount: 0,
+      liveLeafCount: 0,
+      capabilities
+    },
     _meta: { runtimeId: 'runtime-remote' }
   }
 }
@@ -112,13 +120,15 @@ function watcherDetail(watcher: WatcherFleetEntry): WatcherDetail {
 
 function kernel(): HeimdallFleetKernel {
   return {
-    enroll: vi.fn(),
-    fleet: vi.fn().mockResolvedValue({ entries: [], generatedAtMs: 1 }),
-    detail: vi.fn(),
-    command: vi.fn(),
-    debugReport: vi.fn(),
-    subscribe: vi.fn(() => vi.fn())
-  } as unknown as HeimdallFleetKernel
+    enroll: vi.fn<HeimdallFleetKernel['enroll']>(),
+    fleet: vi
+      .fn<HeimdallFleetKernel['fleet']>()
+      .mockResolvedValue({ entries: [], generatedAtMs: 1 }),
+    detail: vi.fn<HeimdallFleetKernel['detail']>(),
+    command: vi.fn<HeimdallFleetKernel['command']>(),
+    debugReport: vi.fn<HeimdallFleetKernel['debugReport']>(),
+    subscribe: vi.fn<HeimdallFleetKernel['subscribe']>(() => vi.fn())
+  }
 }
 
 function environmentHarness(capabilities = ['heimdall.commands.v1']): {

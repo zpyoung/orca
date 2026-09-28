@@ -43,16 +43,19 @@ function harness(): {
 } {
   const entries: LedgerEntry[] = []
   let nextId = 0
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only read/append are exercised by WatcherRunnerActions in these tests; the tick-trace and terminal-summary members are unused.
   const ledgerStore = {
     read: (): WatcherLedger => ({ watcherId: 'watcher-1', entries }),
     append: (_watcherId: string, entry: LedgerEntry): void => {
       entries.push(entry)
     }
   } as unknown as RunnerLedgerStore
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only enrollment is read off WatcherRunner by the code under test here.
   const runner = {
     enrollment: { watcherId: 'watcher-1' }
   } as unknown as WatcherRunner
   const notifyApproval = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: budgetClock/orchestration/dispatchLifecycle are never invoked by recordGateRejection/abandonFingerprint under test.
   const dependencies = {
     ledgerStore,
     budgetClock: {},

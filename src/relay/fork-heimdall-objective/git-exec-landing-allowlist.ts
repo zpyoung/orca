@@ -1,4 +1,4 @@
-import { isFullGitObjectId } from '../git-handler-branch-diff-ops'
+import { isFullGitObjectId } from './git-object-id'
 import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import { isSafeGitRemoteName } from '../../shared/git-push-target-validation'
 import { hasSafeObjectivePaths } from './git-exec-path-allowlist'

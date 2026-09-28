@@ -6,6 +6,10 @@ import type { EvidenceEntry, LedgerEntry } from '../../../shared/fork-heimdall/l
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { parseLifecycleRejectionPayload } from './lifecycle-rejection-payload'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
 export type MailboxCursor = Readonly<{
   previousDeliveryId: string | null
   lastSequence: number
@@ -31,6 +35,7 @@ export async function drainHeimdallMailbox(input: {
   assertMailboxCursor(input.cursor)
   const db = input.runtime.getOrchestrationDb()
   const identity = input.enrollment.coordinatorIdentity
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: checkRunMailbox is intentionally typed Promise<unknown>; this module keeps its own narrow view of the mailbox check result.
   const checked = (await checkRunMailbox({
     params: {
       terminal: identity.handle,
@@ -131,8 +136,8 @@ function normalizedMailboxFact(message: MessageRow): {
   if (message.payload) {
     try {
       const parsed: unknown = JSON.parse(message.payload)
-      if (typeof parsed === 'object' && parsed !== null) {
-        raw = parsed as Record<string, unknown>
+      if (isRecord(parsed)) {
+        raw = parsed
       }
     } catch {
       raw = {}

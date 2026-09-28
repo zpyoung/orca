@@ -213,11 +213,15 @@ function consumedWorkerEscalationMessageIds(ledger: WatcherLedger): ReadonlySet<
 
 type WorkerEscalationMessage = { reason: string; detail?: string; dispatchId?: string }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 function escalationMessage(value: unknown): WorkerEscalationMessage | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (!isPlainRecord(value)) {
     return null
   }
-  const record = value as Record<string, unknown>
+  const record = value
   if (record.type !== 'escalation') {
     return null
   }
@@ -229,10 +233,7 @@ function escalationMessage(value: unknown): WorkerEscalationMessage | null {
     typeof record.body === 'string' && record.body.trim().length > 0
       ? record.body.trim()
       : undefined
-  const payload =
-    typeof record.payload === 'object' && record.payload !== null && !Array.isArray(record.payload)
-      ? (record.payload as Record<string, unknown>)
-      : null
+  const payload = isPlainRecord(record.payload) ? record.payload : null
   const dispatchId = typeof payload?.dispatchId === 'string' ? payload.dispatchId : undefined
   return {
     reason: subject,

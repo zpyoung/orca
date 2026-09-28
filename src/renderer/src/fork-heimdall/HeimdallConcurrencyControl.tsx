@@ -52,20 +52,24 @@ export function HeimdallConcurrencyControl({
       }}
     >
       <div className="min-w-0 flex-1 space-y-1">
-        <Label htmlFor="heimdall-max-concurrency" className="text-xs">
-          {translate('fork.heimdall.controls.maxConcurrency', 'Max concurrency')}
+        <Label htmlFor="heimdall-max-concurrency">
+          <span className="text-xs">
+            {translate('fork.heimdall.controls.maxConcurrency', 'Max concurrency')}
+          </span>
         </Label>
-        <Input
-          id="heimdall-max-concurrency"
-          type="number"
-          min="1"
-          max="1024"
-          step="1"
-          value={draft}
-          disabled={readOnly || busy || !supported || fixed}
-          className="h-8 text-xs tabular-nums"
-          onChange={(event) => setDraft(event.currentTarget.value)}
-        />
+        <div className="tabular-nums">
+          <Input
+            id="heimdall-max-concurrency"
+            type="number"
+            min="1"
+            max="1024"
+            step="1"
+            value={draft}
+            disabled={readOnly || busy || !supported || fixed}
+            className="h-8"
+            onChange={(event) => setDraft(event.currentTarget.value)}
+          />
+        </div>
       </div>
       <Button
         type="submit"

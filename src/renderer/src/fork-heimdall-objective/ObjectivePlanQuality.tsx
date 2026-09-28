@@ -62,9 +62,9 @@ function LintFindings({
                   translate('fork.heimdallObjective.detail.planLevelFinding', 'Plan-level')}
               </p>
               <ul className="mt-1 space-y-1">
-                {findings.map((finding, index) => (
+                {findings.map((finding) => (
                   <li
-                    key={`${finding.code}-${index}`}
+                    key={`${finding.code}-${finding.detail}`}
                     className="flex flex-wrap items-start gap-2 text-xs text-status-warning-foreground"
                   >
                     <Badge variant="outline">{objectivePlanLintCodeLabel(finding.code)}</Badge>
@@ -90,9 +90,9 @@ function Assumptions({
   }
   return (
     <ul className="space-y-1.5">
-      {assumptions.map((assumption, index) => (
+      {assumptions.map((assumption) => (
         <li
-          key={index}
+          key={assumption.claim}
           className="rounded-md border border-border bg-muted/10 px-2.5 py-2 text-xs text-foreground"
         >
           <div className="flex flex-wrap items-start gap-2">

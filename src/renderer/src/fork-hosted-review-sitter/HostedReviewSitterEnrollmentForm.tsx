@@ -30,6 +30,43 @@ const CAPABILITIES: readonly HostedReviewSitterCapability[] = [
 ]
 const CAPABILITY_MODES: readonly CapabilityMode[] = ['off', 'gated', 'on']
 
+function isCapabilityMode(value: string): value is CapabilityMode {
+  return value === 'off' || value === 'gated' || value === 'on'
+}
+
+function isBranchUpdateMode(value: string): value is HostedReviewBranchUpdateMode {
+  return value === 'merge-base-update' || value === 'rebase'
+}
+
+function isMergeMethodChoice(value: string): value is 'default' | HostedReviewMergeMethod {
+  return value === 'default' || value === 'merge' || value === 'squash' || value === 'rebase'
+}
+
+function branchUpdateModeLabel(mode: HostedReviewBranchUpdateMode): string {
+  switch (mode) {
+    case 'merge-base-update':
+      return translate(
+        'fork.hostedReviewSitter.enrollment.updateMergeBase',
+        'Merge base into branch (recommended)'
+      )
+    case 'rebase':
+      return translate('fork.hostedReviewSitter.enrollment.updateRebase', 'Rebase onto base')
+  }
+}
+
+function mergeMethodChoiceLabel(method: 'default' | HostedReviewMergeMethod): string {
+  switch (method) {
+    case 'default':
+      return translate('fork.hostedReviewSitter.enrollment.mergeDefault', 'Repository default')
+    case 'merge':
+      return translate('fork.hostedReviewSitter.enrollment.mergeCommit', 'Merge commit')
+    case 'squash':
+      return translate('fork.hostedReviewSitter.enrollment.mergeSquash', 'Squash and merge')
+    case 'rebase':
+      return translate('fork.hostedReviewSitter.enrollment.mergeRebase', 'Rebase and merge')
+  }
+}
+
 function CapabilityControl({
   capability,
   value,
@@ -49,20 +86,22 @@ function CapabilityControl({
       </label>
       <Select
         value={value}
-        onValueChange={(nextValue) => onChange(nextValue as CapabilityMode)}
+        onValueChange={(nextValue) => {
+          if (isCapabilityMode(nextValue)) {
+            onChange(nextValue)
+          }
+        }}
         disabled={disabled}
       >
-        <SelectTrigger
-          aria-labelledby={capabilityLabelId}
-          size="sm"
-          className="h-7 w-full text-[11px]"
-        >
-          <SelectValue />
+        <SelectTrigger aria-labelledby={capabilityLabelId} size="sm" className="h-7 w-full">
+          <SelectValue>
+            <span className="text-[11px]">{hostedReviewSitterCapabilityModeLabel(value)}</span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {CAPABILITY_MODES.map((mode) => (
-            <SelectItem key={mode} value={mode} className="text-xs">
-              {hostedReviewSitterCapabilityModeLabel(mode)}
+            <SelectItem key={mode} value={mode}>
+              <span className="text-xs">{hostedReviewSitterCapabilityModeLabel(mode)}</span>
             </SelectItem>
           ))}
         </SelectContent>
@@ -157,25 +196,24 @@ export function HostedReviewSitterEnrollmentForm({
         </label>
         <Select
           value={branchUpdateMode}
-          onValueChange={(value) => onBranchUpdateModeChange(value as HostedReviewBranchUpdateMode)}
+          onValueChange={(value) => {
+            if (isBranchUpdateMode(value)) {
+              onBranchUpdateModeChange(value)
+            }
+          }}
           disabled={busy}
         >
-          <SelectTrigger
-            aria-labelledby={branchUpdateLabelId}
-            size="sm"
-            className="h-7 w-full text-[11px]"
-          >
-            <SelectValue />
+          <SelectTrigger aria-labelledby={branchUpdateLabelId} size="sm" className="h-7 w-full">
+            <SelectValue>
+              <span className="text-[11px]">{branchUpdateModeLabel(branchUpdateMode)}</span>
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="merge-base-update" className="text-xs">
-              {translate(
-                'fork.hostedReviewSitter.enrollment.updateMergeBase',
-                'Merge base into branch (recommended)'
-              )}
+            <SelectItem value="merge-base-update">
+              <span className="text-xs">{branchUpdateModeLabel('merge-base-update')}</span>
             </SelectItem>
-            <SelectItem value="rebase" className="text-xs">
-              {translate('fork.hostedReviewSitter.enrollment.updateRebase', 'Rebase onto base')}
+            <SelectItem value="rebase">
+              <span className="text-xs">{branchUpdateModeLabel('rebase')}</span>
             </SelectItem>
           </SelectContent>
         </Select>
@@ -198,30 +236,30 @@ export function HostedReviewSitterEnrollmentForm({
         </label>
         <Select
           value={mergeMethod}
-          onValueChange={(value) =>
-            onMergeMethodChange(value as 'default' | HostedReviewMergeMethod)
-          }
+          onValueChange={(value) => {
+            if (isMergeMethodChoice(value)) {
+              onMergeMethodChange(value)
+            }
+          }}
           disabled={busy}
         >
-          <SelectTrigger
-            aria-labelledby={mergeMethodLabelId}
-            size="sm"
-            className="h-7 w-full text-[11px]"
-          >
-            <SelectValue />
+          <SelectTrigger aria-labelledby={mergeMethodLabelId} size="sm" className="h-7 w-full">
+            <SelectValue>
+              <span className="text-[11px]">{mergeMethodChoiceLabel(mergeMethod)}</span>
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="default" className="text-xs">
-              {translate('fork.hostedReviewSitter.enrollment.mergeDefault', 'Repository default')}
+            <SelectItem value="default">
+              <span className="text-xs">{mergeMethodChoiceLabel('default')}</span>
             </SelectItem>
-            <SelectItem value="merge" className="text-xs">
-              {translate('fork.hostedReviewSitter.enrollment.mergeCommit', 'Merge commit')}
+            <SelectItem value="merge">
+              <span className="text-xs">{mergeMethodChoiceLabel('merge')}</span>
             </SelectItem>
-            <SelectItem value="squash" className="text-xs">
-              {translate('fork.hostedReviewSitter.enrollment.mergeSquash', 'Squash and merge')}
+            <SelectItem value="squash">
+              <span className="text-xs">{mergeMethodChoiceLabel('squash')}</span>
             </SelectItem>
-            <SelectItem value="rebase" className="text-xs">
-              {translate('fork.hostedReviewSitter.enrollment.mergeRebase', 'Rebase and merge')}
+            <SelectItem value="rebase">
+              <span className="text-xs">{mergeMethodChoiceLabel('rebase')}</span>
             </SelectItem>
           </SelectContent>
         </Select>
@@ -242,7 +280,7 @@ export function HostedReviewSitterEnrollmentForm({
           disabled={busy}
           aria-invalid={!validBudget}
           onChange={(event) => onActiveBudgetHoursChange(event.currentTarget.valueAsNumber)}
-          className="h-7 px-2 text-[11px]"
+          className="h-7"
         />
         <p className="text-[10px] text-muted-foreground">
           {translate(

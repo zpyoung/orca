@@ -1,5 +1,5 @@
 import { Bot } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { HeimdallTonePill } from './heimdall-tone-pill'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
@@ -29,9 +29,8 @@ export function HeimdallSidebarNavEntry(): React.JSX.Element {
         {translate('fork.heimdall.sidebar.title', 'Heimdall')}
       </span>
       {count > 0 ? (
-        <Badge
-          variant="outline"
-          className="h-5 min-w-5 border-status-warning-border bg-status-warning-background px-1.5 text-[10px] text-status-warning-foreground"
+        <HeimdallTonePill
+          tone="warning"
           aria-label={translate(
             'fork.heimdall.sidebar.attention',
             '{{count}} watchers need attention',
@@ -39,7 +38,7 @@ export function HeimdallSidebarNavEntry(): React.JSX.Element {
           )}
         >
           {count > 99 ? '99+' : count}
-        </Badge>
+        </HeimdallTonePill>
       ) : null}
     </button>
   )

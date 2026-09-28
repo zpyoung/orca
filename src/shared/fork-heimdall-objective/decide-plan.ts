@@ -2,7 +2,6 @@ import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
 import {
   activeObjectiveRevision,
-  decidePlannerAction,
   latestObjectiveAttempt,
   objectiveAttemptDisposition,
   objectiveAttemptReportValidation,
@@ -11,6 +10,7 @@ import {
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import { decidePlannerAction } from './decide-planner'
 import { decideObjectivePlanReviewGate } from './decide-plan-review'
 import { objectivePlanFailedDeviation } from './deviation-context'
 import type {

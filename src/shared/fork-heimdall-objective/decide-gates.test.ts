@@ -73,7 +73,7 @@ describe('decideObjectiveGates', () => {
     const decision = decideObjectiveGates(snap, ledger(), [], [], revision())
     expect(decision?.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -294,7 +294,7 @@ describe('objective gates run between checks and review', () => {
     )
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })

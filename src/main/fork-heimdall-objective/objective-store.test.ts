@@ -13,6 +13,7 @@ import { decideObjective } from '../../shared/fork-heimdall-objective/decision'
 import { ObjectiveDatabase } from './objective-database'
 import type { ObjectiveLandingPayload } from './objective-store-data'
 import { ObjectiveStore } from './objective-store'
+import { oneRow } from './objective-store-queries'
 import {
   action,
   CONTENT_IDENTITY,
@@ -63,10 +64,10 @@ function rowCounts(): Record<string, number> {
     'review_verdict',
     'landing_evidence'
   ]) {
-    const row = database.connection().prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as {
-      count: number
-    }
-    result[table] = row.count
+    const row = oneRow<{ count: number }>(
+      database.connection().prepare(`SELECT COUNT(*) AS count FROM ${table}`)
+    )
+    result[table] = row?.count ?? 0
   }
   return result
 }

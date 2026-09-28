@@ -21,14 +21,13 @@ function valuesEqual(left: unknown, right: unknown): boolean {
       left.every((value, index) => valuesEqual(value, right[index]))
     )
   }
-  const leftRecord = left as Record<string, unknown>
-  const rightRecord = right as Record<string, unknown>
-  const leftKeys = Object.keys(leftRecord)
-  if (leftKeys.length !== Object.keys(rightRecord).length) {
+  const leftEntries = Object.entries(left)
+  const rightEntries = new Map(Object.entries(right))
+  if (leftEntries.length !== rightEntries.size) {
     return false
   }
-  return leftKeys.every(
-    (key) => Object.hasOwn(rightRecord, key) && valuesEqual(leftRecord[key], rightRecord[key])
+  return leftEntries.every(
+    ([key, value]) => rightEntries.has(key) && valuesEqual(value, rightEntries.get(key))
   )
 }
 

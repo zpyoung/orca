@@ -20,10 +20,10 @@ export type OrchestrationSubmissionPreflight = (
   submission: OrchestrationSubmission
 ) => Promise<OrchestrationSubmissionPreflightResult>
 
-const preflights = new WeakMap<object, OrchestrationSubmissionPreflight>()
+const preflights = new WeakMap<OrcaRuntimeService, OrchestrationSubmissionPreflight>()
 
 export function bindOrchestrationSubmissionPreflight(
-  runtime: object,
+  runtime: OrcaRuntimeService,
   preflight: OrchestrationSubmissionPreflight
 ): void {
   preflights.set(runtime, preflight)
@@ -174,7 +174,7 @@ function legacyTerminalRejectionResult(
   try {
     const parsed: unknown = JSON.parse(lifecycle.result)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      report = parsed as Record<string, unknown>
+      report = Object.fromEntries(Object.entries(parsed))
     }
   } catch {
     // The canonical parser authors this JSON. Keep the terminal failure useful if persisted data is corrupt.

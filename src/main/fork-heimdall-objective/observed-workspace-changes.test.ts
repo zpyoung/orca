@@ -63,6 +63,11 @@ async function gitRepositoryWithIgnore(prefix: string, pattern: string): Promise
   return root
 }
 
+function asFilesystemProvider(memory: MemoryFilesystemProvider): IFilesystemProvider {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only readDir/readFile/lstat are exercised.
+  return memory as unknown as IFilesystemProvider
+}
+
 type MemoryNode =
   | { type: 'directory'; mtime: number }
   | { type: 'file'; content: string; mtime: number }
@@ -389,17 +394,19 @@ describe('objective observed workspace changes', () => {
     const checkIgnoredPaths = vi.fn(async (_worktreePath: string, paths: string[]) =>
       paths.filter((path) => path === 'generated/remote.json')
     )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the SshGitProvider class; only exec and checkIgnoredPaths are exercised.
     const gitProvider = { exec, checkIgnoredPaths } as unknown as SshGitProvider
-    registerSshFilesystemProvider(SSH_TARGET, fileProvider as unknown as IFilesystemProvider)
+    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(fileProvider))
     registerSshGitProvider(SSH_TARGET, gitProvider)
     const workspacePath = '/srv/objective'
     const target: ObjectiveWorkspaceTarget = {
       kind: 'git',
       executionHostId: `ssh:${SSH_TARGET}`,
       workspacePath,
-      fileProvider: fileProvider as unknown as IFilesystemProvider,
+      fileProvider: asFilesystemProvider(fileProvider),
       gitTarget: {
         executionHostId: `ssh:${SSH_TARGET}`,
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by the observed-workspace-changes remote path.
         worktree: {
           id: `objective-remote::${workspacePath}`,
           repoId: 'objective-remote',
@@ -667,12 +674,12 @@ describe('objective observed workspace changes', () => {
     const provider = new MemoryFilesystemProvider()
 
     provider.put('/srv/objective/src/remote.ts', 'before\n')
-    registerSshFilesystemProvider(SSH_TARGET, provider as unknown as IFilesystemProvider)
+    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(provider))
     const target: ObjectiveWorkspaceTarget = {
       kind: 'folder',
       executionHostId: `ssh:${SSH_TARGET}`,
       workspacePath: '/srv/objective',
-      fileProvider: provider as unknown as IFilesystemProvider
+      fileProvider: asFilesystemProvider(provider)
     }
     await captureObjectiveWorkspaceBaseline(target, 'ssh-attempt')
     provider.put('/srv/objective/src/remote.ts', 'after\n')
@@ -693,16 +700,16 @@ describe('objective observed workspace changes', () => {
   it('fails closed when an SSH route is rebound after baseline capture', async () => {
     const originalProvider = new MemoryFilesystemProvider()
     originalProvider.put('/srv/objective/src/remote.ts', 'before\n')
-    registerSshFilesystemProvider(SSH_TARGET, originalProvider as unknown as IFilesystemProvider)
+    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(originalProvider))
     const target: ObjectiveWorkspaceTarget = {
       kind: 'folder',
       executionHostId: `ssh:${SSH_TARGET}`,
       workspacePath: '/srv/objective',
-      fileProvider: originalProvider as unknown as IFilesystemProvider
+      fileProvider: asFilesystemProvider(originalProvider)
     }
     await captureObjectiveWorkspaceBaseline(target, 'rebound-attempt')
     const replacementProvider = new MemoryFilesystemProvider()
-    registerSshFilesystemProvider(SSH_TARGET, replacementProvider as unknown as IFilesystemProvider)
+    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(replacementProvider))
 
     await expect(
       validateObjectiveWorkspaceChanges({

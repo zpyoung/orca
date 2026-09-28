@@ -67,8 +67,8 @@ export function HeimdallFleetActivity({
               <span className="text-[11px] text-muted-foreground">
                 {attempt.action.capability} · {attempt.action.visibility}
               </span>
-              <Badge variant="outline" className="text-[10px]">
-                {attempt.effect ?? attempt.state}
+              <Badge variant="outline">
+                <span className="text-[10px]">{attempt.effect ?? attempt.state}</span>
               </Badge>
               <time
                 className="text-[11px] text-muted-foreground"

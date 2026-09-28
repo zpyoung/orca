@@ -92,23 +92,22 @@ export function numberField(value: Record<string, unknown>, key: string): number
   return typeof value[key] === 'number' ? value[key] : undefined
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 function workerDoneReport(
   payload: unknown,
   subjectId: string
 ): { key: string; subjectId: string; report: unknown } | null {
-  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return null
   }
-  const message = payload as Record<string, unknown>
+  const message = payload
   if (message.type !== 'worker_done') {
     return null
   }
-  const body =
-    message.payload !== null &&
-    typeof message.payload === 'object' &&
-    !Array.isArray(message.payload)
-      ? (message.payload as Record<string, unknown>)
-      : {}
+  const body = isRecord(message.payload) ? message.payload : {}
   const dispatchSubject =
     typeof body.dispatchId === 'string'
       ? body.dispatchId
@@ -142,6 +141,7 @@ function semanticAction(action: Record<string, unknown>): Record<string, unknown
     'role',
     'rung'
   ] as const
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: sanitized() is generically typed unknown -> unknown; this call always passes a plain object, so the result is always a Record.
   return sanitized(
     Object.fromEntries(
       keys.flatMap((key) => (action[key] === undefined ? [] : [[key, action[key]]]))
@@ -166,7 +166,7 @@ export function projectRelevantLedger(ledger: WatcherLedger): LedgerProjection {
   for (const [sourceIndex, entry] of ledger.entries.entries()) {
     if (entry.kind === 'attempt') {
       const key = entry.action.evidenceKey
-      const action = entry.action as Record<string, unknown>
+      const action = entry.action
       attemptKeysById.set(entry.attemptId, key)
       const value = {
         attemptId: entry.attemptId,

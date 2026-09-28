@@ -36,7 +36,7 @@ const ENROLLMENT = {
   orchestrationRunId: 'run-1',
   createdAtMs: 1,
   terminalAtMs: null
-} as WatcherEnrollment
+} satisfies WatcherEnrollment
 
 function message(id: string, sequence: number, body: string) {
   return {
@@ -109,7 +109,7 @@ describe('Heimdall orchestration mailbox drain', () => {
       [second.id]: second
     }
     const db = {
-      getMessageById: vi.fn((id: string) => rows[id as keyof typeof rows])
+      getMessageById: vi.fn((id: string) => rows[id])
     }
     const runtime = { getOrchestrationDb: vi.fn(() => db) }
     upstream.checkRunMailbox
@@ -144,6 +144,7 @@ describe('Heimdall orchestration mailbox drain', () => {
           acknowledged: params.ack ?? null
         }
       })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large OrcaRuntimeService class; drainMailbox only calls runtime.getOrchestrationDb().
     const adapter = new RuntimeHeimdallOrchestrationAdapter(runtime as never, {
       persistOrchestrationRunId: async () => undefined
     })
@@ -298,6 +299,7 @@ describe('Heimdall orchestration mailbox drain', () => {
       count: 1
     })
     const adapter = new RuntimeHeimdallOrchestrationAdapter(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large OrcaRuntimeService class; drainMailbox only calls runtime.getOrchestrationDb().
       { getOrchestrationDb: () => db } as never,
       { persistOrchestrationRunId: async () => undefined }
     )
@@ -335,6 +337,7 @@ describe('Heimdall orchestration mailbox drain', () => {
       count: 1
     })
     const adapter = new RuntimeHeimdallOrchestrationAdapter(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large OrcaRuntimeService class; drainMailbox only calls runtime.getOrchestrationDb().
       { getOrchestrationDb: () => db } as never,
       { persistOrchestrationRunId: async () => undefined }
     )
@@ -357,9 +360,9 @@ describe('Heimdall orchestration mailbox drain', () => {
     }
     expect(entry.payload).not.toHaveProperty('subject')
     expect(entry.payload).not.toHaveProperty('messageId')
-    const fact = entry.payload as { payload: Record<string, unknown> }
-    expect(fact.payload).not.toHaveProperty('reportPath')
-    expect(fact.payload).not.toHaveProperty('filesModified')
+    const fact = normalizedPayload(entry)
+    expect(fact).not.toHaveProperty('reportPath')
+    expect(fact).not.toHaveProperty('filesModified')
   })
 
   it.each([
@@ -388,6 +391,7 @@ describe('Heimdall orchestration mailbox drain', () => {
       count: 1
     })
     const adapter = new RuntimeHeimdallOrchestrationAdapter(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large OrcaRuntimeService class; drainMailbox only calls runtime.getOrchestrationDb().
       { getOrchestrationDb: () => db } as never,
       { persistOrchestrationRunId: async () => undefined }
     )
@@ -407,8 +411,8 @@ describe('Heimdall orchestration mailbox drain', () => {
     if (!entry || entry.kind !== 'evidence') {
       throw new Error('Expected mailbox evidence')
     }
-    const fact = entry.payload as { payload: Record<string, unknown> }
-    expect(fact.payload).not.toHaveProperty('reportPath')
-    expect(fact.payload).not.toHaveProperty('filesModified')
+    const fact = normalizedPayload(entry)
+    expect(fact).not.toHaveProperty('reportPath')
+    expect(fact).not.toHaveProperty('filesModified')
   })
 })

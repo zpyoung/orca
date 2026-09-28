@@ -160,6 +160,7 @@ describe('judgment state budget', () => {
       maxStateBytes: full.serializedBytes - 1
     })
     const state = expanded(bounded)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: objective.plan is typed unknown on the wire state by design; this narrows it back to the known ObjectiveWorld shape the fixture produced.
     const plan = state.objective.plan as ObjectiveWorld['plan']
 
     expect(bounded.fitsStateBudget).toBe(true)
@@ -365,6 +366,7 @@ describe('judgment state budget', () => {
       maxStateBytes: full.serializedBytes - 1
     })
     const state = expanded(bounded)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: objective.plan is typed unknown on the wire state by design; this narrows it back to the known ObjectiveWorld shape the fixture produced.
     const plan = state.objective.plan as ObjectiveWorld['plan']
 
     expect(bounded.fitsStateBudget).toBe(false)

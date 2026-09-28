@@ -80,7 +80,7 @@ function ownerGuidancePlannerAction(
       reason: 'owner-directed',
       guidance,
       ...(requestedSkipStage === undefined ? {} : { requestedSkipStage }),
-      shape: 'full'
+      plannerMode: 'full'
     }
   }
   // an owner-directed repair still patches the approved revision, so its revisionNumber must be
@@ -100,7 +100,7 @@ function ownerGuidancePlannerAction(
     reason: 'owner-directed',
     guidance,
     ...(requestedSkipStage === undefined ? {} : { requestedSkipStage }),
-    shape: 'repair',
+    plannerMode: 'repair',
     repairRevisionId: approved.id,
     repairOrdinal
   }

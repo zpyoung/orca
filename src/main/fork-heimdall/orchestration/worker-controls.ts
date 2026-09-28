@@ -163,6 +163,7 @@ async function listActiveWorkerRows(
       paginate: true,
       ...(cursor ? { cursor } : {})
     })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this module keeps its own narrow view of the RPC method's page shape, decoupled from worker-list-method.ts's internal fleet projection type.
     const listed = (await ORCHESTRATION_WORKER_LIST_METHOD.handler(params, {
       runtime
     })) as OrchestrationWorkerListPage
@@ -226,6 +227,7 @@ export async function stopWatcherWorker(
     orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION
   }
   try {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrchestrationMutationExecutor.run is intentionally typed Promise<unknown>; the invoked handler's actual receipt shape is this call's only source of truth.
     const receipt = (await getOrchestrationMutationExecutor(runtime).run(
       request,
       params,
@@ -292,6 +294,7 @@ export async function releaseWatcherWorker(
     orchestrationRequestId: requestId,
     orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrchestrationMutationExecutor.run is intentionally typed Promise<unknown>; the invoked handler's actual receipt shape is this call's only source of truth.
   return (await getOrchestrationMutationExecutor(runtime).run(
     request,
     params,
@@ -314,6 +317,7 @@ function pendingQuestionsByDispatch(
   if (dispatchIds.length === 0) {
     return new Map()
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
   const rows = db.db
     .prepare(
       `SELECT q.message_id, q.dispatch_id, m.body

@@ -1,14 +1,19 @@
 import type { HeimdallApi } from '../../../shared/fork-heimdall/api'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isHeimdallApiBridge(value: Record<string, unknown>): value is HeimdallApi {
+  return typeof value.enroll === 'function' && typeof value.onFleetChanged === 'function'
+}
+
 export function getObjectiveHeimdallApi(): HeimdallApi | null {
   const candidate: unknown = window.api?.heimdall
-  if (!candidate || typeof candidate !== 'object') {
+  if (!isRecord(candidate)) {
     return null
   }
-  const methods = candidate as Partial<Record<keyof HeimdallApi, unknown>>
-  return typeof methods.enroll === 'function' && typeof methods.onFleetChanged === 'function'
-    ? (candidate as HeimdallApi)
-    : null
+  return isHeimdallApiBridge(candidate) ? candidate : null
 }
 
 export function describeObjectiveError(error: unknown): string {

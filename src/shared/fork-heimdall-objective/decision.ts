@@ -3,7 +3,6 @@ import type { Snapshot } from '../fork-heimdall/snapshot'
 import { objectiveLandingFailedDeviation } from './deviation-context'
 import {
   activeObjectiveRevision,
-  decidePlannerAction,
   latestObjectiveAttempt,
   objectiveAttempts,
   objectiveAttemptDisposition,
@@ -14,6 +13,7 @@ import {
   type ObjectiveDecisionOutcome,
   type ObjectiveNoActionReason
 } from './decision-context'
+import { decidePlannerAction } from './decide-planner'
 import { decideObjectiveGates } from './decide-gates'
 import { decideObjectiveNodes } from './decide-nodes'
 import { decideObjectivePlan } from './decide-plan'

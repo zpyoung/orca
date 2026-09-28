@@ -102,7 +102,7 @@ export type ObjectiveRoleReportReadRequest<R extends ObjectiveReportRole = Objec
    * Selects the planner report contract; ignored for other roles. Omit when the originating
    * `dispatch-planner` action isn't known here — a 'planner' role then accepts either shape.
    */
-  plannerShape?: 'full' | 'repair'
+  plannerMode?: 'full' | 'repair'
 }
 
 function fingerprintFileName(attemptFingerprint: string): string {
@@ -229,17 +229,17 @@ function formatReportSchemaIssues(issues: readonly ZodIssue[]): string {
 
 /**
  * A repair dispatch only ever accepts the repair schema, and a known full dispatch only the full
- * schema — those are today's exact behaviors. A caller with no action to check `shape` against
- * passes no `plannerShape`, which tries the full schema first (preserving its error detail on a
+ * schema — those are today's exact behaviors. A caller with no action to check `plannerMode` against
+ * passes no `plannerMode`, which tries the full schema first (preserving its error detail on a
  * total mismatch) and falls back to the repair schema, so either report shape still parses.
  */
 function parsePlannerReport(
   input: unknown,
-  plannerShape: 'full' | 'repair' | undefined
+  plannerMode: 'full' | 'repair' | undefined
 ):
   | { success: true; data: PlannerReport | PlannerRepairReport }
   | { success: false; detail: string } {
-  if (plannerShape === 'repair') {
+  if (plannerMode === 'repair') {
     const repair = PlannerRepairReportSchema.safeParse(input)
     return repair.success
       ? { success: true, data: repair.data }
@@ -249,7 +249,7 @@ function parsePlannerReport(
   if (full.success) {
     return { success: true, data: full.data }
   }
-  if (plannerShape === undefined) {
+  if (plannerMode === undefined) {
     const repair = PlannerRepairReportSchema.safeParse(input)
     if (repair.success) {
       return { success: true, data: repair.data }
@@ -261,12 +261,16 @@ function parsePlannerReport(
 function parseReportForRole<R extends ObjectiveReportRole>(
   role: R,
   input: unknown,
-  plannerShape: 'full' | 'repair' | undefined
+  plannerMode: 'full' | 'repair' | undefined
 ): { success: true; data: ObjectiveReportByRole[R] } | { success: false; detail: string } {
   if (role === 'planner') {
-    const parsed = parsePlannerReport(input, plannerShape)
+    const parsed = parsePlannerReport(input, plannerMode)
     return parsed.success
-      ? { success: true, data: parsed.data as ObjectiveReportByRole[R] }
+      ? {
+          success: true,
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the `role === 'planner'` check just above ties R to 'planner', but TS cannot correlate a runtime literal check to the generic indexed-access type ObjectiveReportByRole[R].
+          data: parsed.data as ObjectiveReportByRole[R]
+        }
       : parsed
   }
   const result =
@@ -278,7 +282,11 @@ function parseReportForRole<R extends ObjectiveReportRole>(
           ? PlanReviewReportSchema.safeParse(input)
           : IntegratorReportSchema.safeParse(input)
   return result.success
-    ? { success: true, data: result.data as ObjectiveReportByRole[R] }
+    ? {
+        success: true,
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the role branch above ties R's schema to the parsed result, but TS cannot correlate a runtime literal check to the generic indexed-access type ObjectiveReportByRole[R].
+        data: result.data as ObjectiveReportByRole[R]
+      }
     : { success: false, detail: formatReportSchemaIssues(result.error.issues) }
 }
 
@@ -335,7 +343,7 @@ export async function readObjectiveRoleReport<R extends ObjectiveReportRole>(
   } catch {
     return { ok: false, reason: 'malformed' }
   }
-  const parsed = parseReportForRole(request.role, input, request.plannerShape)
+  const parsed = parseReportForRole(request.role, input, request.plannerMode)
   if (!parsed.success) {
     const reason = matchesAnotherRole(input, request.role) ? 'role-mismatch' : 'malformed'
     return {
@@ -355,6 +363,7 @@ export async function readObjectiveRoleReport<R extends ObjectiveReportRole>(
   }
   // The parser selection and the returned role share the same generic; TypeScript cannot
   // preserve that correlation while constructing a distributive conditional type.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: parseReportForRole(request.role, ...) already ties `parsed.data` to `request.role`'s report shape; TS cannot express that correlation through ObjectiveReportReadSuccess<R>'s distributive conditional type.
   const success = {
     ok: true,
     role: request.role,

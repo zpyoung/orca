@@ -19,7 +19,7 @@ export function snapshotSchema<TWorld>(world: z.ZodType<TWorld>): z.ZodType<Snap
     contentIdentity: z.string().min(1),
     observedAtMs: z.number().int().nonnegative(),
     world
-  }) as z.ZodType<Snapshot<TWorld>>
+  })
 }
 
 function isLiveSnapshot<TWorld>(snapshot: Snapshot<TWorld>): snapshot is LiveSnapshot<TWorld> {

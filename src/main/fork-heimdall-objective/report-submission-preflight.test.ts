@@ -49,6 +49,7 @@ const TASK: ObjectivePlanTask = {
   ],
   declaresDependencyChange: false
 }
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large WatcherEnrollment type; only kind and kindPayload are read by the submission preflight adapter.
 const ENROLLMENT = {
   kind: 'objective',
   kindPayload: CONTRACT
@@ -57,11 +58,14 @@ const LEDGER = {
   watcherId: 'watcher-1',
   entries: [attempt(ACTION, { dispatchId: DISPATCH_ID })]
 }
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
 const OBJECTIVE_STORE = {
   getPlan: () => [TASK],
   getTask: () => TASK,
   getDispatch: () => null
 } as unknown as ObjectiveStore
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrcaRuntimeService is a class with private fields; the submission preflight adapter never calls it in these tests.
+const RUNTIME = {} as OrcaRuntimeService
 
 const PLANNER_DISPATCH_ID = 'dispatch-planner-repair'
 const REPAIR_PLANNER_ACTION: ObjectiveAction = {
@@ -72,7 +76,7 @@ const REPAIR_PLANNER_ACTION: ObjectiveAction = {
   evidenceKey: 'plan-repair:revision-1:1',
   revisionNumber: 1,
   reason: 'replan-after-failure',
-  shape: 'repair',
+  plannerMode: 'repair',
   repairOrdinal: 1,
   repairRevisionId: 'revision-1'
 }
@@ -121,7 +125,7 @@ describe('objective report submission preflight', () => {
 
   it('rejects actionable report defects and accepts the corrected same submission', async () => {
     const adapter = createObjectiveSubmissionAdapter({
-      runtime: {} as OrcaRuntimeService,
+      runtime: RUNTIME,
       objectiveStore: OBJECTIVE_STORE
     })
     const submission = {
@@ -183,24 +187,25 @@ describe('objective report submission preflight', () => {
 
   it('accepts an unverifiable host read instead of mislabeling it as invalid input', async () => {
     const hostFailure = new Error('remote host unavailable')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
     const fileProvider = {
       realpath: vi.fn().mockRejectedValue(hostFailure),
       lstat: vi.fn(),
       readFile: vi.fn()
     } as unknown as IFilesystemProvider
-    const remoteTarget = {
+    const remoteTarget: ObjectiveWorkspaceTarget = {
       kind: 'folder',
       executionHostId: 'ssh:host-1',
       workspacePath: '/workspace',
       fileProvider
-    } as ObjectiveWorkspaceTarget
+    }
     resolveWorkspaceTarget.mockResolvedValue(remoteTarget)
     const remoteReportPath = await resolveExpectedObjectiveReportPath(
       remoteTarget,
       `fingerprint-${DISPATCH_ID}`
     )
     const adapter = createObjectiveSubmissionAdapter({
-      runtime: {} as OrcaRuntimeService,
+      runtime: RUNTIME,
       objectiveStore: OBJECTIVE_STORE
     })
 
@@ -218,7 +223,7 @@ describe('objective report submission preflight', () => {
 
   it('accepts a real repair-shaped report for a repair dispatch-planner', async () => {
     const adapter = createObjectiveSubmissionAdapter({
-      runtime: {} as OrcaRuntimeService,
+      runtime: RUNTIME,
       objectiveStore: OBJECTIVE_STORE
     })
     const repairReportPath = await issueObjectiveReportPath(
@@ -269,6 +274,7 @@ describe('objective report submission preflight', () => {
       round: 1
     }
     const planReviewLedger = { watcherId: 'watcher-1', entries: [attempt(action, { dispatchId })] }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
     const store = {
       getDispatch: () => null,
       getPlanReport: () => ({
@@ -277,7 +283,7 @@ describe('objective report submission preflight', () => {
       })
     } as unknown as ObjectiveStore
     const adapter = createObjectiveSubmissionAdapter({
-      runtime: {} as OrcaRuntimeService,
+      runtime: RUNTIME,
       objectiveStore: store
     })
     const planReviewReportPath = await issueObjectiveReportPath(target, `fingerprint-${dispatchId}`)
@@ -317,7 +323,7 @@ describe('objective report submission preflight', () => {
 
   it('rejects a full-shaped report submitted for a repair dispatch-planner', async () => {
     const adapter = createObjectiveSubmissionAdapter({
-      runtime: {} as OrcaRuntimeService,
+      runtime: RUNTIME,
       objectiveStore: OBJECTIVE_STORE
     })
     const repairReportPath = await issueObjectiveReportPath(

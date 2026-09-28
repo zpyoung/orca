@@ -116,6 +116,11 @@ function selectionForPrefix(units: readonly OmissionUnit[], count: number): Drop
   return selected
 }
 
+function typedEntries<T extends Record<string, unknown>>(value: T): [keyof T, T[keyof T]][] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Object.entries widens key/value types even for a statically known object shape; this generic helper restores them once instead of at each call site.
+  return Object.entries(value) as [keyof T, T[keyof T]][]
+}
+
 function truncationNotice(truncation: JudgmentTruncation): string {
   const labels: Record<keyof JudgmentTruncationCounts, string> = {
     existingPlan: 'existing plan seed',
@@ -130,7 +135,7 @@ function truncationNotice(truncation: JudgmentTruncation): string {
     reports: 'ledger report(s)',
     questionSubjects: 'historical question subject(s)'
   }
-  const summary = (Object.entries(truncation.omitted) as [keyof JudgmentTruncationCounts, number][])
+  const summary = typedEntries(truncation.omitted)
     .filter(([, count]) => count > 0)
     .map(([key, count]) => `${count} ${labels[key]}`)
     .join(', ')
@@ -154,8 +159,9 @@ function budgetResult(
     projected = normalizeJudgmentState(state)
   } else {
     const serializedState = stableJson(state)
+    const parsedState: JudgmentState = JSON.parse(serializedState)
     projected = {
-      state: JSON.parse(serializedState) as JudgmentState,
+      state: parsedState,
       serializedState,
       serializedBytes: Buffer.byteLength(serializedState, 'utf8'),
       normalization: null
@@ -198,6 +204,7 @@ export function projectBoundedJudgmentState(
     return base
   }
 
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: sanitized() is generically typed unknown -> unknown; world.plan is always a plain object with these four array fields.
   const plan = sanitized(world.plan) as {
     revisions: unknown[]
     nodes: unknown[]
@@ -205,6 +212,7 @@ export function projectBoundedJudgmentState(
     landing: unknown[]
   }
   const reports = sanitized(world.reports)
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: sanitized() is generically typed unknown -> unknown; world.judgmentReports is always an array.
   const allJudgmentReports = sanitized(world.judgmentReports ?? []) as unknown[]
   const units = buildOmissionUnits(world, ledger)
   const project = (prefix: number): JudgmentStateBudgetResult => {
@@ -251,7 +259,8 @@ export function projectBoundedJudgmentState(
       .filter((id) => !retainedSubjects.has(id))
       .sort(compareCodeUnits)
     const contract = drop.existingPlan
-      ? (Object.fromEntries(
+      ? // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Object.fromEntries widens back to a generic index type; this filter only ever removes the optional existingPlan key from a value already known to be ObjectiveWorld['contract'].
+        (Object.fromEntries(
           Object.entries(world.contract).filter(([key]) => key !== 'existingPlan')
         ) as ObjectiveWorld['contract'])
       : world.contract

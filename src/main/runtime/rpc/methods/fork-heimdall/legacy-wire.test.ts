@@ -7,6 +7,7 @@ import {
 } from '../../../../../shared/protocol-version'
 import { remoteRuntimeClientCapabilities } from '../../../../../shared/remote-runtime-client-capabilities'
 import type { WatcherListEntry } from '../../../../../shared/fork-heimdall/watcher-types'
+import { OrcaRuntimeService } from '../../../orca-runtime'
 import { eraseRpcMethods, isStreamingMethod, type RpcContext, type RpcMethod } from '../../core'
 import { HEIMDALL_METHODS } from './heimdall'
 import { bindHeimdallKernel } from './kernel-binding'
@@ -20,6 +21,7 @@ const INPUT = {
   budget: { wallClockActiveMs: 60_000, turns: 4 },
   kindPayload: {}
 }
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of WatcherListEntry; this suite only reads name/enrollment (the legacy-strip fields) and status.state.
 const ENTRY = {
   name: 'Watcher one',
   enrollment: {
@@ -39,21 +41,21 @@ function method(name: string): RpcMethod {
   return found
 }
 
-async function call(
-  runtime: object,
+async function call<TResult = unknown>(
+  runtime: OrcaRuntimeService,
   name: string,
   params: unknown,
   context: Pick<RpcContext, 'clientKind' | 'clientCapabilities'> = {}
-): Promise<unknown> {
+): Promise<TResult> {
   const target = method(name)
-  return await target.handler(target.params?.parse(params), {
-    runtime: runtime as never,
-    ...context
-  })
+  const rpcContext = { runtime, ...context }
+  const result = await target.handler(target.params?.parse(params), rpcContext)
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: RPC handlers return `unknown`; this test helper narrows to the caller-declared response shape at a single boundary.
+  return result as TResult
 }
 
 function harness(entries: unknown[] = []) {
-  const runtime = {}
+  const runtime = new OrcaRuntimeService(null)
   const ledger = { watcherId: 'watcher-1', entries }
   const debugReport = {
     schemaVersion: 2,
@@ -72,6 +74,7 @@ function harness(entries: unknown[] = []) {
     disarmAll: vi.fn(),
     approve: vi.fn()
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of HeimdallKernelService; this suite only exercises the enroll/list/ledger/detail/debugReport/disarm/disarmAll/approve surface.
   bindHeimdallKernel(runtime, kernel as never)
   return { runtime, kernel, ledger }
 }
@@ -80,13 +83,17 @@ describe('Heimdall Phase 1 wire compatibility', () => {
   it('keeps legacy reads and raw enrollment while stripping new strict enrollment fields', async () => {
     const { runtime, ledger } = harness()
 
-    const listed = (await call(runtime, LEGACY_HEIMDALL_CHANNELS.list, {})) as WatcherListEntry[]
-    const enrolled = (await call(runtime, LEGACY_HEIMDALL_CHANNELS.enroll, INPUT)) as {
-      entry: WatcherListEntry
-    }
-    const report = (await call(runtime, LEGACY_HEIMDALL_CHANNELS.debugReport, {
-      watcherId: 'watcher-1'
-    })) as { enrollment: Record<string, unknown> }
+    const listed = await call<WatcherListEntry[]>(runtime, LEGACY_HEIMDALL_CHANNELS.list, {})
+    const enrolled = await call<{ entry: WatcherListEntry }>(
+      runtime,
+      LEGACY_HEIMDALL_CHANNELS.enroll,
+      INPUT
+    )
+    const report = await call<{ enrollment: Record<string, unknown> }>(
+      runtime,
+      LEGACY_HEIMDALL_CHANNELS.debugReport,
+      { watcherId: 'watcher-1' }
+    )
 
     expect(listed[0]?.enrollment).toEqual({ watcherId: 'watcher-1', enabled: true })
     expect(enrolled.entry.enrollment).toEqual({ watcherId: 'watcher-1', enabled: true })
@@ -131,24 +138,24 @@ describe('Heimdall Phase 1 wire compatibility', () => {
       clientCapabilities: [HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY]
     }
 
-    const legacyLedger = (await call(
+    const legacyLedger = await call<{ entries: Record<string, unknown>[] }>(
       runtime,
       LEGACY_HEIMDALL_CHANNELS.ledger,
       { watcherId: 'watcher-1' },
       legacyContext
-    )) as { entries: Record<string, unknown>[] }
-    const legacyDetail = (await call(
+    )
+    const legacyDetail = await call<{ ledger: { entries: Record<string, unknown>[] } }>(
       runtime,
       HEIMDALL_CHANNELS.detail,
       { watcherId: 'watcher-1', connectionId: null, pairingRevision: null },
       legacyContext
-    )) as { ledger: { entries: Record<string, unknown>[] } }
-    const capableDetail = (await call(
+    )
+    const capableDetail = await call<{ ledger: { entries: Record<string, unknown>[] } }>(
       runtime,
       HEIMDALL_CHANNELS.detail,
       { watcherId: 'watcher-1', connectionId: null, pairingRevision: null },
       capableContext
-    )) as { ledger: { entries: Record<string, unknown>[] } }
+    )
 
     expect(legacyLedger.entries[0]).toMatchObject({
       effect: 'not-landed',

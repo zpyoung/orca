@@ -161,6 +161,7 @@ export async function harness(
     answerQuestion: vi.fn(async () => {}),
     readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double for Store; this harness only ever reads the four accessors implemented above.
   const store = {
     getProfileStorageDirectory: () => directory,
     getSettings: () => ({ notifications: { enabled: false } }),
@@ -168,6 +169,7 @@ export async function harness(
     getWorktreeMetaForHost: () => null
   } as unknown as Store
   const service = new HeimdallKernelServiceImpl({
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double for OrcaRuntimeService; this harness never calls runtime methods directly.
     runtime: {} as OrcaRuntimeService,
     store,
     ...(options.storageAuthority ? { storageAuthority: options.storageAuthority } : {}),
@@ -179,11 +181,13 @@ export async function harness(
     orchestration,
     now: () => 100,
     createId: () => `id-${++identifier}`,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fake implements only the (callback, delay) call shape this harness needs, not setTimeout's full overload set.
     setTimer: ((callback: () => void, delay: number) => {
       schedule(callback, delay)
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double for NodeJS.Timeout; this harness only ever calls unref() on the returned handle.
       return { unref: () => {} } as NodeJS.Timeout
     }) as typeof setTimeout,
-    clearTimer: vi.fn() as unknown as typeof clearTimeout,
+    clearTimer: vi.fn<typeof clearTimeout>(),
     holderId: 'test-holder'
   })
   return {

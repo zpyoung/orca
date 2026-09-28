@@ -22,6 +22,7 @@ import { ObjectiveOwnerInterventionSchema } from '../../shared/fork-heimdall-obj
 import { objectiveRejectIntervention } from './owner-adapter'
 import { objectiveActionForIntervention } from './owner-adapter-actions'
 
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: opaque placeholder; objectiveRejectIntervention never reads enrollment fields in these tests.
 const enrollment = {} as unknown as WatcherEnrollment
 
 function rejectedIngestReport(reportedFiles: string[], observedFiles: string[], reason: string) {
@@ -220,11 +221,11 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
     expect(action).toMatchObject({
       kind: 'dispatch-planner',
       guidance: 'Steer the plan.',
-      shape: 'full'
+      plannerMode: 'full'
     })
   })
 
-  // S1: an owner-directed full dispatch with no `shape` reads as pre-upgrade to
+  // S1: an owner-directed full dispatch with no `plannerMode` reads as pre-upgrade to
   // decideObjectivePlanReviewGate, which then skips mandatory plan review entirely.
   it('gates the resulting draft for plan review, unlike a pre-upgrade dispatch with no shape', () => {
     const action = objectiveActionForIntervention(
@@ -277,7 +278,7 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
     )
     expect(action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       repairOrdinal: 1,
       // must carry the approved revision's own number, not a freshly minted one, or
@@ -296,7 +297,7 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
       evidenceKey: 'plan:2:owner-directed:content-prior',
       revisionNumber: 2,
       reason: 'owner-directed',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairOrdinal: 2,
       repairRevisionId: 'revision-1'
     }
@@ -306,7 +307,7 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
       ledger([attempt(priorRepair)])
     )
     expect(action).toMatchObject({
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       repairOrdinal: 3,
       revisionNumber: 1
@@ -327,7 +328,7 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
     )
     expect(action).toMatchObject({
       kind: 'dispatch-planner',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       revisionNumber: 1
     })

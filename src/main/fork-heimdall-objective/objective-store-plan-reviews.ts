@@ -70,6 +70,7 @@ function readPlanReviewRowByDispatch(
   db: Database.Database,
   dispatchId: string
 ): PlanReviewRow | undefined {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_REVIEW_COLUMNS lists every PlanReviewRow field in order.
   return db
     .prepare(`SELECT ${PLAN_REVIEW_COLUMNS} FROM plan_review WHERE dispatch_id = ?`)
     .get(dispatchId) as PlanReviewRow | undefined
@@ -100,6 +101,7 @@ function recordPlanReviewInTransaction(
     }
     return planReviewRecord(byDispatch)
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; the query selects only dispatch_id.
   const bySlot = db
     .prepare(
       'SELECT dispatch_id FROM plan_review WHERE target_kind = ? AND target_id = ? AND round = ?'
@@ -166,6 +168,7 @@ export function listPlanReviews(
   database: ObjectiveDatabase,
   watcherId: string
 ): ObjectivePlanReviewRecord[] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_REVIEW_COLUMNS lists every PlanReviewRow field in order.
   const rows = database
     .connection()
     .prepare(
@@ -179,6 +182,7 @@ export function getPlanReviewReport(
   database: ObjectiveDatabase,
   id: string
 ): PlanReviewReport | null {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_REVIEW_COLUMNS lists every PlanReviewRow field in order.
   const row = database
     .connection()
     .prepare(`SELECT ${PLAN_REVIEW_COLUMNS} FROM plan_review WHERE id = ?`)
@@ -200,6 +204,7 @@ export function projectPlanReviews(
   reportDigest: string
   createdAtMs: number
 }[] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; PLAN_REVIEW_COLUMNS lists every PlanReviewRow field in order.
   const rows = db
     .prepare(
       `SELECT ${PLAN_REVIEW_COLUMNS} FROM plan_review WHERE watcher_id = ?

@@ -58,10 +58,12 @@ describe('objective role report ingestion', () => {
         stderr: ''
       })
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the SshGitProvider class; only exec is exercised.
     registerSshGitProvider('objective-report-git-test', gitProvider as never)
     const createDir = vi.fn().mockResolvedValue(undefined)
     const runtimeTarget = {
       executionHostId: 'ssh:objective-report-git-test',
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by report path resolution.
       worktree: {
         id: 'objective-worktree',
         repoId: 'objective-repo',
@@ -78,6 +80,7 @@ describe('objective role report ingestion', () => {
       kind: 'git',
       executionHostId: 'ssh:objective-report-git-test',
       workspacePath: '/srv/objective',
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only createDir is exercised.
       fileProvider: { createDir } as unknown as IFilesystemProvider,
       gitTarget: runtimeTarget
     }
@@ -95,6 +98,7 @@ describe('objective role report ingestion', () => {
   it('refuses an arbitrary mailbox path before stat or read reaches the host', async () => {
     const stat = vi.fn()
     const readFile = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only stat and readFile are exercised.
     const provider = { stat, readFile } as unknown as IFilesystemProvider
     const target = remoteFolderTarget(provider)
 
@@ -175,7 +179,7 @@ describe('objective role report ingestion', () => {
       attemptFingerprint: 'repair-schema-invalid',
       mailboxReportPath: path,
       role: 'planner',
-      plannerShape: 'repair'
+      plannerMode: 'repair'
     })
 
     expect(result).toMatchObject({ ok: false, reason: 'malformed' })
@@ -324,7 +328,7 @@ describe('objective role report ingestion', () => {
     }
   })
 
-  it('accepts a real repair-shaped report when plannerShape is repair', async () => {
+  it('accepts a real repair-shaped report when plannerMode is repair', async () => {
     const target = await localFolderTarget()
     const path = await issueObjectiveReportPath(target, 'repair-attempt-explicit')
     await writeFile(
@@ -339,7 +343,7 @@ describe('objective role report ingestion', () => {
       attemptFingerprint: 'repair-attempt-explicit',
       mailboxReportPath: path,
       role: 'planner',
-      plannerShape: 'repair'
+      plannerMode: 'repair'
     })
     expect(result.ok).toBe(true)
     if (result.ok && 'repair' in result.report) {
@@ -347,7 +351,7 @@ describe('objective role report ingestion', () => {
     }
   })
 
-  it('rejects a full-plan report when plannerShape is repair', async () => {
+  it('rejects a full-plan report when plannerMode is repair', async () => {
     const target = await localFolderTarget()
     const path = await issueObjectiveReportPath(target, 'repair-attempt-mismatched')
     await writeFile(
@@ -372,12 +376,12 @@ describe('objective role report ingestion', () => {
         attemptFingerprint: 'repair-attempt-mismatched',
         mailboxReportPath: path,
         role: 'planner',
-        plannerShape: 'repair'
+        plannerMode: 'repair'
       })
     ).resolves.toMatchObject({ ok: false, reason: 'malformed' })
   })
 
-  it('rejects a repair-shaped report when plannerShape is full', async () => {
+  it('rejects a repair-shaped report when plannerMode is full', async () => {
     const target = await localFolderTarget()
     const path = await issueObjectiveReportPath(target, 'full-attempt-mismatched')
     await writeFile(
@@ -391,7 +395,7 @@ describe('objective role report ingestion', () => {
         attemptFingerprint: 'full-attempt-mismatched',
         mailboxReportPath: path,
         role: 'planner',
-        plannerShape: 'full'
+        plannerMode: 'full'
       })
     ).resolves.toMatchObject({ ok: false, reason: 'malformed' })
   })
@@ -436,6 +440,7 @@ describe('objective role report ingestion', () => {
     })
     const readFile = vi.fn().mockResolvedValue({ content: body, isBinary: false })
     const realpath = vi.fn(async (path: string) => path)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
     const provider = { lstat, readFile, realpath } as unknown as IFilesystemProvider
     const target = remoteFolderTarget(provider)
     const path = await resolveExpectedObjectiveReportPath(target, 'remote-attempt')
@@ -501,6 +506,7 @@ describe('objective role report ingestion', () => {
 
   it('fails closed before a remote read when secure lstat is unavailable', async () => {
     const readFile = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
     const provider = {
       readFile,
       realpath: vi.fn(async (path: string) => path)
@@ -521,6 +527,7 @@ describe('objective role report ingestion', () => {
 
   it('rejects a remote report whose canonical ancestor escapes workspace authority', async () => {
     const targetRoot = '/srv/objective'
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
     const provider = {
       lstat: vi.fn(),
       readFile: vi.fn(),

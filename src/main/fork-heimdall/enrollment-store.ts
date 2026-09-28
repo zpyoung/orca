@@ -97,6 +97,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
   constructor(private readonly database: HeimdallDatabase) {}
 
   get(watcherId: string): EnrollmentRecord | null {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const row = this.database
       .connection()
       .prepare(
@@ -113,6 +114,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
   }
 
   list(): EnrollmentRecord[] {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const rows = this.database
       .connection()
       .prepare(
@@ -129,6 +131,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
   }
 
   findLiveByWorkspace(workspaceKey: WorkspaceKey): EnrollmentRecord | null {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const row = this.database
       .connection()
       .prepare(

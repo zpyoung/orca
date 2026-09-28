@@ -5,6 +5,10 @@ import type {
 } from '../../shared/fork-heimdall/ledger-types'
 import type { MailboxCursor } from './orchestration/mailbox-drain'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
 export function mailboxBody(entry: Extract<LedgerEntry, { kind: 'evidence' }>): {
   type: string
   messageId?: string
@@ -14,27 +18,23 @@ export function mailboxBody(entry: Extract<LedgerEntry, { kind: 'evidence' }>): 
   subject?: string
   body?: string
 } | null {
-  if (
-    entry.evidenceKind !== 'orchestration-mailbox' ||
-    typeof entry.payload !== 'object' ||
-    entry.payload === null
-  ) {
+  if (entry.evidenceKind !== 'orchestration-mailbox' || !isRecord(entry.payload)) {
     return null
   }
-  const envelope = entry.payload as Record<string, unknown>
+  const envelope = entry.payload
   const type = typeof envelope.type === 'string' ? envelope.type : ''
   let payload: Record<string, unknown> = {}
   if (typeof envelope.payload === 'string') {
     try {
       const parsed: unknown = JSON.parse(envelope.payload)
-      if (typeof parsed === 'object' && parsed !== null) {
-        payload = parsed as Record<string, unknown>
+      if (isRecord(parsed)) {
+        payload = parsed
       }
     } catch {
       payload = {}
     }
-  } else if (typeof envelope.payload === 'object' && envelope.payload !== null) {
-    payload = envelope.payload as Record<string, unknown>
+  } else if (isRecord(envelope.payload)) {
+    payload = envelope.payload
   }
   return {
     type,

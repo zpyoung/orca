@@ -146,12 +146,14 @@ async function buildFixture(): Promise<Fixture> {
     })
   )
 
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the report ingestion action.
   const binding = {
     enrollment: { watcherId: WATCHER_ID },
     contract: { writeTerritory: ['src/**'] },
     target
   } as unknown as ObjectiveSnapshotBinding
 
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the report ingestion action.
   const context = {
     snapshot: { contentIdentity: 'content-current' },
     ledger: {
@@ -197,7 +199,7 @@ async function buildFixture(): Promise<Fixture> {
     dispatchWorker: vi.fn()
   } as unknown as ExecuteContext<ObjectiveWorld>
 
-  const action = {
+  const action: Extract<ObjectiveAction, { kind: 'ingest-report' }> = {
     kind: 'ingest-report',
     capability: 'implement',
     visibility: 'local',
@@ -211,7 +213,7 @@ async function buildFixture(): Promise<Fixture> {
     reportPath,
     filesModified: ['src/node-1.ts'],
     dispatchedContentIdentity: dispatchAction.contentIdentity
-  } satisfies ObjectiveAction as Extract<ObjectiveAction, { kind: 'ingest-report' }>
+  }
 
   resolveObjectiveDispatchTargetMock.mockResolvedValue(target)
 
@@ -220,6 +222,7 @@ async function buildFixture(): Promise<Fixture> {
     binding,
     context,
     objectiveStore,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrcaRuntimeService is a class with private fields; never called in these tests.
     runtime: {} as OrcaRuntimeService,
     workspacePath,
     database

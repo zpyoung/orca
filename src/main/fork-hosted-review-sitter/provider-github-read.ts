@@ -158,6 +158,10 @@ function numberValue(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export async function runGitHubApi(
   ownerRepo: GitHubApiRepository,
   ghOptions: GitHubRepoExecOptions,
@@ -223,29 +227,26 @@ function requiredStatusesFromRules(value: unknown): {
   const statuses: RequiredStatus[] = []
   let mergeQueueRequired = false
   for (const rawRule of value) {
-    if (!rawRule || typeof rawRule !== 'object') {
+    if (!isRecord(rawRule)) {
       return { complete: false, statuses: [], mergeQueueRequired: false }
     }
-    const rule = rawRule as Record<string, unknown>
+    const rule = rawRule
     if (rule.type === 'merge_queue') {
       mergeQueueRequired = true
     }
     if (rule.type !== 'required_status_checks') {
       continue
     }
-    const parameters =
-      rule.parameters && typeof rule.parameters === 'object'
-        ? (rule.parameters as Record<string, unknown>)
-        : null
+    const parameters = isRecord(rule.parameters) ? rule.parameters : null
     const required = parameters?.required_status_checks
     if (!Array.isArray(required)) {
       return { complete: false, statuses: [], mergeQueueRequired }
     }
     for (const rawStatus of required) {
-      if (!rawStatus || typeof rawStatus !== 'object') {
+      if (!isRecord(rawStatus)) {
         return { complete: false, statuses: [], mergeQueueRequired }
       }
-      const status = rawStatus as Record<string, unknown>
+      const status = rawStatus
       const context = stringValue(status.context)
       if (!context) {
         return { complete: false, statuses: [], mergeQueueRequired }
@@ -276,7 +277,7 @@ async function loadRequiredStatuses(
       ['api', '--method', 'GET', endpoint, '-f', 'per_page=100', '--paginate', '--slurp'],
       signal
     )
-    const parsed = JSON.parse(stdout) as unknown
+    const parsed: unknown = JSON.parse(stdout)
     const rules =
       Array.isArray(parsed) && parsed.every((page) => Array.isArray(page)) ? parsed.flat() : parsed
     return requiredStatusesFromRules(rules)
@@ -318,12 +319,10 @@ async function loadGitHubPages(
     if (after) {
       args.push('-f', `after=${after}`)
     }
-    const parsed = JSON.parse(
-      await runGitHubApi(ownerRepo, ghOptions, 'graphql', args, signal)
-    ) as {
+    const parsed: {
       data?: { repository?: GitHubRepositoryState | null }
       errors?: unknown[]
-    }
+    } = JSON.parse(await runGitHubApi(ownerRepo, ghOptions, 'graphql', args, signal))
     if (parsed.errors?.length || !parsed.data?.repository?.pullRequest) {
       throw new Error('GitHub returned incomplete hosted review data.')
     }

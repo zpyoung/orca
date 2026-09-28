@@ -82,6 +82,7 @@ export const mainProcessState = {
   watcherShutdownPromise: null as Promise<void> | null,
   watcherShutdownDone: false,
   automations: null as AutomationService | null,
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: widens the null initializer to the slot's type, the idiom every sibling field uses.
   heimdall: null as HeimdallKernelService | null,
   pluginService: null as PluginService | null,
   pluginKillListService: null as PluginKillListService | null,

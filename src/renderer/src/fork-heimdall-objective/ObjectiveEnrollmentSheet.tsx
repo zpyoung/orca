@@ -311,12 +311,15 @@ export function ObjectiveEnrollmentSheet({
             landingBar === 'files-on-disk'
               ? { ...current.capabilities, land: 'on' }
               : current.capabilities,
-          roleAgents: Object.fromEntries(
-            OBJECTIVE_ROLES.map((role) => [
-              role,
-              availableAgentIds.includes(current.roleAgents[role]) ? current.roleAgents[role] : ''
-            ])
-          ) as ObjectiveEnrollmentDraft['roleAgents'],
+          roleAgents: OBJECTIVE_ROLES.reduce<ObjectiveEnrollmentDraft['roleAgents']>(
+            (roleAgents, role) => {
+              roleAgents[role] = availableAgentIds.includes(current.roleAgents[role])
+                ? current.roleAgents[role]
+                : ''
+              return roleAgents
+            },
+            { ...current.roleAgents }
+          ),
           availableAgentIds
         }
       })
@@ -405,17 +408,19 @@ export function ObjectiveEnrollmentSheet({
       }}
     >
       <SheetContent className="w-[min(620px,calc(100vw-1rem))] sm:max-w-[620px]">
-        <SheetHeader className="border-b border-border pr-12">
-          <SheetTitle>
-            {translate('fork.heimdallObjective.enrollment.title', 'New objective')}
-          </SheetTitle>
-          <SheetDescription>
-            {translate(
-              'fork.heimdallObjective.enrollment.description',
-              'Define the contract Heimdall will plan, execute, review, and land.'
-            )}
-          </SheetDescription>
-        </SheetHeader>
+        <div className="border-b border-border">
+          <SheetHeader className="mr-12">
+            <SheetTitle>
+              {translate('fork.heimdallObjective.enrollment.title', 'New objective')}
+            </SheetTitle>
+            <SheetDescription>
+              {translate(
+                'fork.heimdallObjective.enrollment.description',
+                'Define the contract Heimdall will plan, execute, review, and land.'
+              )}
+            </SheetDescription>
+          </SheetHeader>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 scrollbar-sleek">
           <ObjectiveEnrollmentFields
             draft={draft}

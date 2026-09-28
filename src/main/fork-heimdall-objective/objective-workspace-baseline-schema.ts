@@ -55,26 +55,27 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boo
   return actual.length === expected.length && actual.every((key, index) => key === expected[index])
 }
 
-function asRecord(input: unknown): Record<string, unknown> | null {
-  return input && typeof input === 'object' && !Array.isArray(input)
-    ? (input as Record<string, unknown>)
-    : null
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === 'object' && input !== null && !Array.isArray(input)
 }
 
 function parseTarget(input: unknown): BaselineTarget | null {
-  const raw = asRecord(input)
-  if (!raw || !exactKeys(raw, ['kind', 'executionHostId', 'workspacePath', 'gitWorktreeId'])) {
-    return null
-  }
   if (
-    (raw.kind !== 'git' && raw.kind !== 'folder') ||
-    typeof raw.executionHostId !== 'string' ||
-    typeof raw.workspacePath !== 'string' ||
-    (raw.gitWorktreeId !== null && typeof raw.gitWorktreeId !== 'string')
+    !isRecord(input) ||
+    !exactKeys(input, ['kind', 'executionHostId', 'workspacePath', 'gitWorktreeId'])
   ) {
     return null
   }
-  return raw as BaselineTarget
+  const { kind, executionHostId, workspacePath, gitWorktreeId } = input
+  if (
+    (kind !== 'git' && kind !== 'folder') ||
+    typeof executionHostId !== 'string' ||
+    typeof workspacePath !== 'string' ||
+    (gitWorktreeId !== null && typeof gitWorktreeId !== 'string')
+  ) {
+    return null
+  }
+  return { kind, executionHostId, workspacePath, gitWorktreeId }
 }
 
 function parseAscendingEntries<T>(
@@ -87,19 +88,22 @@ function parseAscendingEntries<T>(
   const parsed: T[] = []
   let previousPath: string | null = null
   for (const rawEntry of input) {
-    const entry = asRecord(rawEntry)
-    if (!entry || !exactKeys(entry, ['path', 'fingerprint']) || typeof entry.path !== 'string') {
+    if (
+      !isRecord(rawEntry) ||
+      !exactKeys(rawEntry, ['path', 'fingerprint']) ||
+      typeof rawEntry.path !== 'string'
+    ) {
       return null
     }
-    if (previousPath !== null && entry.path <= previousPath) {
+    if (previousPath !== null && rawEntry.path <= previousPath) {
       return null
     }
-    const value = parseEntry(entry)
+    const value = parseEntry(rawEntry)
     if (value === null) {
       return null
     }
     parsed.push(value)
-    previousPath = entry.path
+    previousPath = rawEntry.path
   }
   return parsed
 }
@@ -110,8 +114,10 @@ function parseLegacyBaseline(value: Record<string, unknown>): LegacyWorkspaceBas
   }
   const target = parseTarget(value.target)
   const entries = parseAscendingEntries(value.entries, (entry) =>
-    typeof entry.fingerprint === 'string' && /^[0-9a-f]{64}$/u.test(entry.fingerprint)
-      ? ({ path: entry.path as string, fingerprint: entry.fingerprint } as const)
+    typeof entry.path === 'string' &&
+    typeof entry.fingerprint === 'string' &&
+    /^[0-9a-f]{64}$/u.test(entry.fingerprint)
+      ? ({ path: entry.path, fingerprint: entry.fingerprint } as const)
       : null
   )
   if (!target || !entries) {
@@ -125,18 +131,19 @@ function parseGitBaseline(value: Record<string, unknown>): GitWorkspaceBaseline 
     return null
   }
   const target = parseTarget(value.target)
-  const git = asRecord(value.git)
-  if (!target || target.kind !== 'git' || !git || !exactKeys(git, ['treeOid', 'dirty'])) {
+  const git = value.git
+  if (!target || target.kind !== 'git' || !isRecord(git) || !exactKeys(git, ['treeOid', 'dirty'])) {
     return null
   }
   if (typeof git.treeOid !== 'string' || !/^(?:unborn|[0-9a-f]{40,64})$/u.test(git.treeOid)) {
     return null
   }
   const dirty = parseAscendingEntries(git.dirty, (entry) =>
+    typeof entry.path === 'string' &&
     typeof entry.fingerprint === 'string' &&
     entry.fingerprint.length > 0 &&
     entry.fingerprint.length <= MAX_DIRTY_FINGERPRINT_CHARS
-      ? ({ path: entry.path as string, fingerprint: entry.fingerprint } as const)
+      ? ({ path: entry.path, fingerprint: entry.fingerprint } as const)
       : null
   )
   if (!dirty) {
@@ -151,15 +158,14 @@ function parseGitBaseline(value: Record<string, unknown>): GitWorkspaceBaseline 
 }
 
 export function parseBaseline(input: unknown): WorkspaceBaseline | null {
-  const value = asRecord(input)
-  if (!value || typeof value.attemptFingerprint !== 'string') {
+  if (!isRecord(input) || typeof input.attemptFingerprint !== 'string') {
     return null
   }
   const parsed =
-    value.version === LEGACY_BASELINE_VERSION
-      ? parseLegacyBaseline(value)
-      : value.version === GIT_BASELINE_VERSION
-        ? parseGitBaseline(value)
+    input.version === LEGACY_BASELINE_VERSION
+      ? parseLegacyBaseline(input)
+      : input.version === GIT_BASELINE_VERSION
+        ? parseGitBaseline(input)
         : null
-  return parsed === null ? null : { ...parsed, attemptFingerprint: value.attemptFingerprint }
+  return parsed === null ? null : { ...parsed, attemptFingerprint: input.attemptFingerprint }
 }

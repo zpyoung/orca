@@ -37,10 +37,10 @@ describe('describeObjectiveOwnerState', () => {
         summary: 'the triggering task failed'
       }
     })
-    const state = JSON.parse(brief.text) as {
+    const state: {
       nodes: { taskKey: string; state: string }[]
       omissions?: { nodes?: { count: number; reference: string } }
-    }
+    } = JSON.parse(brief.text)
 
     expect(Buffer.byteLength(brief.text, 'utf8')).toBeLessThanOrEqual(2_048)
     expect(brief.truncated).toBe(true)

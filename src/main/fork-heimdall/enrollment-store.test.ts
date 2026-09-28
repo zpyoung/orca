@@ -129,6 +129,7 @@ describe('Heimdall enrollment store', () => {
 
   it('rejects invalid rearm configuration before changing the disabled watcher', () => {
     const before = enrollments.insert(enrollment({ enabled: false }))
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: deliberately invalid capability mode to exercise rearm's schema rejection path.
     const invalid = {
       ...REARM_CONFIGURATION,
       capabilities: { merge: 'invalid' }

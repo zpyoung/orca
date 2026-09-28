@@ -90,6 +90,10 @@ type CachedOwnerSubmissionRejection = {
 
 const rejectedOwnerSubmissions = new WeakMap<WatcherRunner, CachedOwnerSubmissionRejection>()
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 /** Keeps a rejected, non-durable preflight diagnostic for this escalation's next applicable prompt. */
 export function rememberOwnerSubmissionRejection(
   runner: WatcherRunner,
@@ -263,12 +267,7 @@ function hasAcceptedOwnerInterventionSubmission(
     }
     const fact = entry.payload
     return (
-      typeof fact === 'object' &&
-      fact !== null &&
-      !Array.isArray(fact) &&
-      (fact as Record<string, unknown>).type === 'status' &&
-      (fact as Record<string, unknown>).subject === subject &&
-      (fact as Record<string, unknown>).body === 'ready'
+      isRecord(fact) && fact.type === 'status' && fact.subject === subject && fact.body === 'ready'
     )
   })
 }

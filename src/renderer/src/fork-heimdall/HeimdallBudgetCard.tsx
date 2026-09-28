@@ -114,8 +114,10 @@ export function HeimdallBudgetCard({
           <>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label htmlFor="heimdall-active-minutes" className="text-xs">
-                  {translate('fork.heimdall.budget.minutesLimit', 'Active minutes limit')}
+                <Label htmlFor="heimdall-active-minutes">
+                  <span className="text-xs">
+                    {translate('fork.heimdall.budget.minutesLimit', 'Active minutes limit')}
+                  </span>
                 </Label>
                 <Input
                   id="heimdall-active-minutes"
@@ -131,8 +133,10 @@ export function HeimdallBudgetCard({
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="heimdall-turn-limit" className="text-xs">
-                  {translate('fork.heimdall.budget.turnLimit', 'Worker turn limit')}
+                <Label htmlFor="heimdall-turn-limit">
+                  <span className="text-xs">
+                    {translate('fork.heimdall.budget.turnLimit', 'Worker turn limit')}
+                  </span>
                 </Label>
                 <Input
                   id="heimdall-turn-limit"

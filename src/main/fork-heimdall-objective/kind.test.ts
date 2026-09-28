@@ -123,6 +123,7 @@ async function workspaceFixture(kind: 'folder' | 'git'): Promise<WorkspaceFixtur
   const root = await realpath(createdRoot)
   const repoId = `repo-${kind}`
   const worktreeId = kind === 'git' ? `${repoId}::${root}` : null
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by objective workspace resolution.
   const gitWorktree = {
     id: worktreeId ?? `${repoId}::${root}`,
     repoId,
@@ -147,6 +148,7 @@ async function workspaceFixture(kind: 'folder' | 'git'): Promise<WorkspaceFixtur
           gitTarget: runtimeTarget
         }
       : { kind, executionHostId: 'local', workspacePath: root, fileProvider: null }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
   const runtime = {
     resolveRuntimeFileTarget: vi.fn(async () => runtimeTarget),
     resolveRuntimeGitTarget: vi.fn(async () => runtimeTarget)
@@ -159,6 +161,7 @@ async function workspaceFixture(kind: 'folder' | 'git'): Promise<WorkspaceFixtur
     addedAt: 1,
     kind
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of Store, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
   const store = {
     getProfileStorageDirectory: () => profile,
     getRepo: (id: string) => (id === repoId ? repo : undefined),
@@ -170,6 +173,11 @@ async function workspaceFixture(kind: 'folder' | 'git'): Promise<WorkspaceFixtur
     })
   } as unknown as Store
   return { kind, root, profile, repoId, worktreeId, target, runtime, store }
+}
+
+/** Reads a dynamically-built kindPayload as a spreadable base for building a variant fixture. */
+function asKindPayloadOverride(value: unknown): object {
+  return typeof value === 'object' && value !== null ? value : {}
 }
 
 function enrollmentInput(fixture: WorkspaceFixture): EnrollInput {
@@ -364,6 +372,7 @@ async function kernelHarness(
   }
   let nextId = 0
   let now = 1_000
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fake timer handle; only unref is exercised by the kernel service under test.
   const schedule = vi.fn(() => ({ unref: () => undefined }) as unknown as NodeJS.Timeout)
   const service = new HeimdallKernelServiceImpl({
     runtime: fixture.runtime,
@@ -376,7 +385,9 @@ async function kernelHarness(
     orchestration: orchestration.adapter,
     now: () => ++now,
     createId: () => `${instance}-${++nextId}`,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: mock timers cannot match setTimeout/clearTimeout's overloaded global signatures and __promisify__ statics; only the call itself is exercised.
     setTimer: schedule as unknown as typeof setTimeout,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: mock timers cannot match setTimeout/clearTimeout's overloaded global signatures and __promisify__ statics; only the call itself is exercised.
     clearTimer: vi.fn() as unknown as typeof clearTimeout,
     holderId: `holder-${instance}`
   })
@@ -622,7 +633,7 @@ describe('objective kind through the Heimdall kernel', () => {
       ...baseInput,
       capabilities: { ...baseInput.capabilities, land: 'gated' },
       kindPayload: {
-        ...(baseInput.kindPayload as Record<string, unknown>),
+        ...asKindPayloadOverride(baseInput.kindPayload),
         landingBar: 'pushed-ref'
       }
     })

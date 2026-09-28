@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { Store } from '../persistence'
 import {
@@ -100,12 +101,17 @@ function parseRemoteHead(stdout: string, branch: string): string | null {
   return sha && /^[0-9a-f]{40,64}$/i.test(sha) ? sha : null
 }
 
+const GitErrorOutputSchema = z.object({
+  stdout: z.string().optional().catch(undefined),
+  stderr: z.string().optional().catch(undefined)
+})
+
 function getErrorOutput(error: unknown, key: 'stdout' | 'stderr'): string {
   if (!error || typeof error !== 'object') {
     return ''
   }
-  const value = (error as Record<string, unknown>)[key]
-  return typeof value === 'string' ? value : ''
+  const output = GitErrorOutputSchema.safeParse(error)
+  return output.success ? (output.data[key] ?? '') : ''
 }
 
 async function loadConflicts(

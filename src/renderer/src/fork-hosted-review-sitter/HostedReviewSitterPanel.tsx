@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, ChevronRight, Loader2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { HeimdallTonePill } from '@/fork-heimdall/heimdall-tone-pill'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ import {
   awaitingApprovalScope,
   describeError,
   getHeimdallApi,
+  hostedReviewPayload,
   isSupportedProvider,
   sameHostedReview
 } from './hosted-review-sitter-panel-state'
@@ -121,9 +122,7 @@ function HostedReviewSitterPanelContent({
     worktreeId
   ])
   const currentEntry = currentFleetRow?.entry ?? null
-  const currentPayload = currentEntry
-    ? (currentEntry.enrollment.kindPayload as HostedReviewEnrollmentPayload)
-    : null
+  const currentPayload = currentEntry ? hostedReviewPayload(currentEntry) : null
   const ownerCapabilities: HostedReviewSitterCapabilities = {
     updateBranch:
       currentEntry?.enrollment.capabilities.updateBranch ?? DEFAULT_CAPABILITIES.updateBranch,
@@ -403,18 +402,13 @@ function HostedReviewSitterPanelContent({
               {translate('fork.hostedReviewSitter.title', 'PR Sitter')}
             </span>
             {currentEntry ? (
-              <Badge
-                variant="outline"
-                className={
-                  statusNeedsAttention || lostContact
-                    ? 'h-5 border-status-warning-border bg-status-warning-background text-[10px] text-status-warning-foreground'
-                    : 'h-5 text-[10px]'
-                }
-              >
-                {hostedReviewSitterStatusLabel(
-                  lostContact ? 'unreachable' : currentEntry.status.state
-                )}
-              </Badge>
+              <HeimdallTonePill tone={statusNeedsAttention || lostContact ? 'warning' : 'neutral'}>
+                <span className="text-[10px]">
+                  {hostedReviewSitterStatusLabel(
+                    lostContact ? 'unreachable' : currentEntry.status.state
+                  )}
+                </span>
+              </HeimdallTonePill>
             ) : null}
             {entries === null && !unavailableReason ? (
               <Loader2 className="size-3 shrink-0 animate-spin text-muted-foreground" aria-hidden />

@@ -170,7 +170,9 @@ function harness(entries: LedgerEntry[]) {
   const controlPlane = new WatcherControlPlane({
     enrollments,
     ledger,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: lease is never read by the answer-escalation paths this fixture exercises.
     lease: {} as never,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: orchestration is never read by the answer-escalation paths this fixture exercises.
     orchestration: {} as never,
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerLoop is a class with private fields, so a structural test double can never satisfy it without this cast; only `.schedule` is exercised by the code under test.
     runnerLoop: { schedule, controlLifecycle: {} as never } as never,

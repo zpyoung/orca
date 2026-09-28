@@ -5,17 +5,24 @@ export type HeimdallControlApi = Pick<
   'fleet' | 'detail' | 'command' | 'debugReport' | 'onFleetChanged'
 >
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isHeimdallControlApiBridge(value: Record<string, unknown>): value is HeimdallControlApi {
+  return (
+    typeof value.fleet === 'function' &&
+    typeof value.detail === 'function' &&
+    typeof value.command === 'function' &&
+    typeof value.debugReport === 'function' &&
+    typeof value.onFleetChanged === 'function'
+  )
+}
+
 export function getHeimdallControlApi(): HeimdallControlApi | null {
   const candidate: unknown = window.api?.heimdall
-  if (!candidate || typeof candidate !== 'object') {
+  if (!isRecord(candidate)) {
     return null
   }
-  const methods = candidate as Partial<Record<keyof HeimdallControlApi, unknown>>
-  return typeof methods.fleet === 'function' &&
-    typeof methods.detail === 'function' &&
-    typeof methods.command === 'function' &&
-    typeof methods.debugReport === 'function' &&
-    typeof methods.onFleetChanged === 'function'
-    ? (candidate as HeimdallControlApi)
-    : null
+  return isHeimdallControlApiBridge(candidate) ? candidate : null
 }

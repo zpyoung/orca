@@ -47,7 +47,7 @@ function enrollmentForRun(runId: string): WatcherEnrollment {
     orchestrationRunId: runId,
     createdAtMs: 1,
     terminalAtMs: null
-  } as WatcherEnrollment
+  }
 }
 
 describe('Heimdall federated submission preflight', () => {
@@ -94,7 +94,7 @@ describe('Heimdall federated submission preflight', () => {
           failNextAcknowledgmentBeforeDelivery = false
           throw new Error('connection lost before acknowledgment')
         }
-        return (await workerDispatcher.dispatch({
+        return await workerDispatcher.dispatch({
           id: `remote_${method}`,
           authToken: 'run-home-device-token',
           method,
@@ -102,7 +102,7 @@ describe('Heimdall federated submission preflight', () => {
           orchestrationContractVersion: envelope?.orchestrationContractVersion,
           orchestrationRequestId: envelope?.orchestrationRequestId,
           orchestrationCapability: envelope?.orchestrationCapability
-        })) as RuntimeRpcResponse<unknown>
+        })
       }
     }
     homeRuntime = new OrcaRuntimeService(null, undefined, {
@@ -117,10 +117,15 @@ describe('Heimdall federated submission preflight', () => {
     vi.spyOn(workerRuntime, 'validateOrchestrationAgentLauncher').mockImplementation(() => {})
     vi.spyOn(workerRuntime, 'showRepo').mockResolvedValue({
       id: 'windows-repo',
+      path: '/repo',
+      displayName: 'windows-repo',
+      badgeColor: '#000000',
+      addedAt: 0,
       kind: 'git'
-    } as never)
+    })
     vi.spyOn(workerRuntime, 'createManagedWorktree').mockResolvedValue({
-      worktree: { id: 'repo::windows-worktree', repoId: 'repo' },
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of Worktree; only the id/repoId fields this suite reads are populated.
+      worktree: { id: 'repo::windows-worktree', repoId: 'repo' } as never,
       startupTerminal: { spawned: true, handle: 'term_windows_worker' },
       setupReceipt: {
         requested: 'run',
@@ -128,12 +133,13 @@ describe('Heimdall federated submission preflight', () => {
         startupPolicy: 'start-immediately',
         state: 'running'
       }
-    } as never)
+    })
     vi.spyOn(workerRuntime, 'listTerminals').mockResolvedValue({
-      terminals: [{ handle: 'term_windows_worker', title: 'Codex' }],
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of RuntimeTerminalSummary; only handle/title, which this suite reads, are populated.
+      terminals: [{ handle: 'term_windows_worker', title: 'Codex' }] as never,
       totalCount: 1,
       truncated: false
-    } as never)
+    })
     vi.spyOn(workerRuntime, 'waitForTerminal').mockResolvedValue({
       handle: 'term_windows_worker',
       condition: 'tui-idle',
@@ -200,7 +206,7 @@ describe('Heimdall federated submission preflight', () => {
             outcome: 'succeeded'
           })
         }
-      }) as Promise<RuntimeRpcResponse<unknown>>
+      })
 
     const rejected = submit('remote_watcher_report_rejected')
     await vi.waitFor(() =>
@@ -321,7 +327,7 @@ describe('Heimdall federated submission preflight', () => {
           outcome: 'succeeded'
         })
       }
-    }) as Promise<RuntimeRpcResponse<unknown>>
+    })
     await vi.waitFor(() =>
       expect(workerDb.listPendingFederationRelay(dispatch.id, 'to_home')).toHaveLength(1)
     )
@@ -391,7 +397,7 @@ describe('Heimdall federated submission preflight', () => {
       const preflight = vi.fn().mockResolvedValue(REJECTION)
       bindOrchestrationSubmissionPreflight(homeRuntime, preflight)
 
-      const sent = (await workerDispatcher.dispatch({
+      const sent = await workerDispatcher.dispatch({
         id: `rpc_legacy_protocol_${protocolVersion}_rejected_report`,
         authToken: 'worker-local-token',
         orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
@@ -412,7 +418,7 @@ describe('Heimdall federated submission preflight', () => {
             additiveFutureField: { schema: 4 }
           })
         }
-      })) as RuntimeRpcResponse<unknown>
+      })
       const [relay] = workerDb.listPendingFederationRelay(dispatch.id, 'to_home')
       if (!relay) {
         throw new Error('Legacy worker did not queue its terminal report')
@@ -428,10 +434,7 @@ describe('Heimdall federated submission preflight', () => {
       expect(workerDb.getRemoteDispatchAttachment(dispatch.id)?.state).toBe('succeeded')
 
       await homeRuntime.syncOrchestrationFederatedDispatch(dispatch.id)
-      const result = JSON.parse(homeDb.getTask(task.id)?.result ?? 'null') as Record<
-        string,
-        unknown
-      >
+      const result: Record<string, unknown> = JSON.parse(homeDb.getTask(task.id)?.result ?? 'null')
       const imported = homeDb.getMessageById(relay.message_id)
 
       expect(homeDb.getTask(task.id)?.status).toBe('failed')

@@ -16,43 +16,43 @@ function isCapabilityMode(value: unknown): boolean {
   return value === 'off' || value === 'gated' || value === 'on'
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function isObjectiveHandoffEvidence(value: unknown): value is HandoffEvidencePayload {
-  if (typeof value !== 'object' || value === null) {
+  if (!isRecord(value)) {
     return false
   }
-  const candidate = value as Partial<HandoffEvidencePayload>
   return (
-    isNonEmptyString(candidate.sitterWatcherId) &&
-    isNonEmptyString(candidate.reviewUrl) &&
-    candidate.reachedRung === 'hosted-review' &&
-    isNonEmptyString(candidate.contentIdentity)
+    isNonEmptyString(value.sitterWatcherId) &&
+    isNonEmptyString(value.reviewUrl) &&
+    value.reachedRung === 'hosted-review' &&
+    isNonEmptyString(value.contentIdentity)
   )
 }
 
 function isObjectiveHandoffOrigin(value: unknown): value is HandoffOriginPayload {
-  if (typeof value !== 'object' || value === null) {
+  if (!isRecord(value)) {
     return false
   }
-  const candidate = value as Partial<HandoffOriginPayload>
   if (
-    !isNonEmptyString(candidate.objectiveWatcherId) ||
-    !isNonEmptyString(candidate.objectiveTerminalEventId) ||
-    !isNonEmptyString(candidate.contentIdentity) ||
-    candidate.reachedRung !== 'hosted-review' ||
-    typeof candidate.inheritedBudget !== 'object' ||
-    candidate.inheritedBudget === null ||
-    typeof candidate.derivedCapabilities !== 'object' ||
-    candidate.derivedCapabilities === null
+    !isNonEmptyString(value.objectiveWatcherId) ||
+    !isNonEmptyString(value.objectiveTerminalEventId) ||
+    !isNonEmptyString(value.contentIdentity) ||
+    value.reachedRung !== 'hosted-review' ||
+    !isRecord(value.inheritedBudget) ||
+    !isRecord(value.derivedCapabilities)
   ) {
     return false
   }
   return (
-    isLimit(candidate.inheritedBudget.wallClockActiveMs) &&
-    isLimit(candidate.inheritedBudget.turns) &&
-    isCapabilityMode(candidate.derivedCapabilities.updateBranch) &&
-    isCapabilityMode(candidate.derivedCapabilities.resolveConflicts) &&
-    isCapabilityMode(candidate.derivedCapabilities.fixChecks) &&
-    isCapabilityMode(candidate.derivedCapabilities.merge)
+    isLimit(value.inheritedBudget.wallClockActiveMs) &&
+    isLimit(value.inheritedBudget.turns) &&
+    isCapabilityMode(value.derivedCapabilities.updateBranch) &&
+    isCapabilityMode(value.derivedCapabilities.resolveConflicts) &&
+    isCapabilityMode(value.derivedCapabilities.fixChecks) &&
+    isCapabilityMode(value.derivedCapabilities.merge)
   )
 }
 

@@ -22,8 +22,13 @@ function hasPreDispatchFailureResult(entry: LedgerEntry): boolean {
   if (entry.kind !== 'attempt' || typeof entry.result !== 'object' || entry.result === null) {
     return false
   }
-  const result = entry.result as { status?: unknown; reason?: unknown }
-  return result.status === 'refused' && result.reason === 'pre-dispatch-failure'
+  const result = entry.result
+  return (
+    'status' in result &&
+    result.status === 'refused' &&
+    'reason' in result &&
+    result.reason === 'pre-dispatch-failure'
+  )
 }
 
 function hasHumanReply(entry: LedgerEntry): boolean {

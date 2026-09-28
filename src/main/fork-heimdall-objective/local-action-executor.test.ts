@@ -117,7 +117,10 @@ function seedCompletedCheck(fixture: ObjectiveStoreFixture, contentIdentity: str
   })
 }
 
-const action = (contentIdentity: string, revisionId: string): ObjectiveAction => ({
+const action = (
+  contentIdentity: string,
+  revisionId: string
+): Extract<ObjectiveAction, { kind: 'record-landing' }> => ({
   kind: 'record-landing',
   capability: 'land',
   visibility: 'local',
@@ -143,11 +146,13 @@ describe('objective landing execution', () => {
       const contentIdentity = await computeWorkspaceContentIdentity(target)
       seedCompletedCheck(fixture, contentIdentity)
       await writeFile(join(workspacePath, 'result.txt'), 'after with a different size')
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
       const binding = {
         enrollment: { watcherId: WATCHER_ID },
         contract: { tier: 'express' },
         target
       } as unknown as ObjectiveSnapshotBinding
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
       const context = {
         snapshot: { contentIdentity },
         ledger: { watcherId: WATCHER_ID, entries: [] },
@@ -157,10 +162,7 @@ describe('objective landing execution', () => {
 
       await expect(
         executeObjectiveLocalAction({
-          action: action(contentIdentity, fixture.revisionId) as Extract<
-            ObjectiveAction,
-            { kind: 'record-landing' }
-          >,
+          action: action(contentIdentity, fixture.revisionId),
           binding,
           context,
           objectiveStore: fixture.objectiveStore
@@ -186,11 +188,13 @@ describe('objective landing execution', () => {
       }
       const contentIdentity = await computeWorkspaceContentIdentity(target)
       seedCompletedCheck(fixture, `other-${contentIdentity}`)
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
       const binding = {
         enrollment: { watcherId: WATCHER_ID },
         contract: { tier: 'express' },
         target
       } as unknown as ObjectiveSnapshotBinding
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
       const context = {
         snapshot: { contentIdentity },
         ledger: { watcherId: WATCHER_ID, entries: [] },
@@ -200,10 +204,7 @@ describe('objective landing execution', () => {
 
       await expect(
         executeObjectiveLocalAction({
-          action: action(contentIdentity, fixture.revisionId) as Extract<
-            ObjectiveAction,
-            { kind: 'record-landing' }
-          >,
+          action: action(contentIdentity, fixture.revisionId),
           binding,
           context,
           objectiveStore: fixture.objectiveStore
@@ -236,11 +237,13 @@ describe('objective check execution', () => {
       fileProvider: null
     }
     const contentIdentity = await computeWorkspaceContentIdentity(target)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
     const binding = {
       enrollment: { watcherId: WATCHER_ID },
       contract: { tier: 'express' },
       target
     } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
     const context = {
       snapshot: { contentIdentity },
       ledger: { watcherId: WATCHER_ID, entries: [] },
@@ -378,11 +381,13 @@ describe('objective report ingestion execution', () => {
         revisionNumber: 1,
         reportPath
       } satisfies ObjectiveAction
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
       const binding = {
         enrollment: { watcherId: WATCHER_ID },
         contract: { writeTerritory: ['src/**'] },
         target
       } as unknown as ObjectiveSnapshotBinding
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
       const context = {
         snapshot: { contentIdentity: 'content-1' },
         ledger: {
@@ -531,11 +536,13 @@ describe('objective report ingestion execution', () => {
         })
       )
 
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
       const binding = {
         enrollment: { watcherId: WATCHER_ID },
         contract: { writeTerritory: ['src/**'] },
         target
       } as unknown as ObjectiveSnapshotBinding
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
       const context = {
         snapshot: { contentIdentity: 'content-current' },
         ledger: {
@@ -646,11 +653,13 @@ describe('objective gate execution', () => {
       fileProvider: null
     }
     const contentIdentity = await computeWorkspaceContentIdentity(target)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
     const binding = {
       enrollment: { watcherId: WATCHER_ID },
       contract: { gates: [declaredGate] },
       target
     } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
     const context = {
       snapshot: { contentIdentity },
       ledger: { watcherId: WATCHER_ID, entries: [] },
@@ -765,6 +774,7 @@ describe('objective gate execution', () => {
   it('refuses to run a gate command that no longer matches the enrolled declaration', async () => {
     const { fixture, workspacePath, contentIdentity, context } = await gateFixture()
     try {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
       const staleBinding = {
         enrollment: { watcherId: WATCHER_ID },
         contract: { gates: [{ ...declaredGate, command: 'pnpm test:changed' }] },
@@ -888,7 +898,9 @@ describe('objective plan patch execution', () => {
       },
       createdAtMs: 3
     })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
     const binding = { enrollment: { watcherId: WATCHER_ID } } as unknown as ObjectiveSnapshotBinding
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
     const context = {
       snapshot: { contentIdentity: 'content-1', world: { plan: { nodes: [] } } },
       ledger: { watcherId: WATCHER_ID, entries: [] },
@@ -966,10 +978,12 @@ describe('objective plan review execution', () => {
           summary: 'The plan is sound.'
         })
       )
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
       const binding = {
         enrollment: { watcherId: WATCHER_ID },
         target
       } as unknown as ObjectiveSnapshotBinding
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the local action executor.
       const context = {
         ledger: {
           watcherId: WATCHER_ID,

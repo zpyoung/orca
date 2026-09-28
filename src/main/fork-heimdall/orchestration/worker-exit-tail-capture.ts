@@ -6,13 +6,14 @@ import { buildPreview } from '../../runtime/terminal-tail-state'
 export function captureWorkerExitTail(
   pty: RuntimePtyWorktreeRecord | null | undefined
 ): string | null {
-  if (!pty) {
+  // Why the buffer check: upstream onPtyExit suites register partial records with no tail state.
+  if (!pty || !Array.isArray(pty.tailBuffer)) {
     return null
   }
 
   // Redact before clipping so a truncated capability cannot evade the full-token redactor.
   const completedLines = redactWorkerTerminalLines(pty.tailBuffer).lines
-  const partialLine = redactWorkerTerminalLines([pty.tailPartialLine]).lines[0] ?? ''
+  const partialLine = redactWorkerTerminalLines([pty.tailPartialLine ?? '']).lines[0] ?? ''
   const preview = buildPreview(completedLines, partialLine)
   return preview ? `\n\nLast terminal output:\n${preview}` : null
 }

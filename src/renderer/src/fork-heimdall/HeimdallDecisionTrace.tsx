@@ -93,8 +93,8 @@ export function HeimdallDecisionTrace({
                 ) : null}
               </span>
               {count > 1 ? (
-                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                  ×{count}
+                <Badge variant="outline" className="h-5">
+                  <span className="text-[10px]">×{count}</span>
                 </Badge>
               ) : null}
               <span className="ml-auto text-muted-foreground">

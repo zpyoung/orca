@@ -306,15 +306,15 @@ export function HostedReviewSitterStatusContent({
 
       <Collapsible open={ledgerOpen} onOpenChange={onLedgerOpenChange}>
         <CollapsibleTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            className="w-full justify-between px-1.5 text-muted-foreground"
-          >
-            {translate('fork.hostedReviewSitter.ledger.title', 'Activity ledger')}
+          <Button type="button" variant="ghost" size="xs" className="w-full justify-between">
+            <span className="text-muted-foreground">
+              {translate('fork.hostedReviewSitter.ledger.title', 'Activity ledger')}
+            </span>
             <ChevronDown
-              className={cn('transition-transform', ledgerOpen && 'rotate-180')}
+              className={cn(
+                'text-muted-foreground transition-transform',
+                ledgerOpen && 'rotate-180'
+              )}
               aria-hidden
             />
           </Button>

@@ -29,7 +29,31 @@ const QUESTIONS = {
   }
 } satisfies Record<string, JudgmentQuestion>
 
-function validVendorResponse(): Record<string, unknown> {
+type VendorAnswerFixture = {
+  type: 'choice' | 'score' | 'noul'
+  choice?: string
+  score?: number
+  noul?: number
+  legend?: Record<string, string>
+  probabilities?: Record<string, number>
+  confidence?: number
+}
+
+type VendorResponseFixture = {
+  model: string
+  answers: Record<string, VendorAnswerFixture>
+  usage: { input_tokens: number; output_tokens: number }
+}
+
+type OpenRouterResponseFixture = {
+  id: string
+  provider: string
+  model: string
+  answers: Record<string, VendorAnswerFixture>
+  usage: { input_tokens: number; output_tokens: number; cost?: number }
+}
+
+function validVendorResponse(): VendorResponseFixture {
   return {
     model: 'jev-2026-09-18',
     answers: {
@@ -52,10 +76,10 @@ function validVendorResponse(): Record<string, unknown> {
   }
 }
 
-function validOpenRouterResponse(): Record<string, unknown> {
+function validOpenRouterResponse(): OpenRouterResponseFixture {
   const response = validVendorResponse()
-  const answers = response.answers as Record<string, Record<string, unknown>>
-  delete answers.severity!.legend
+  const answers = response.answers
+  delete answers.severity.legend
   return {
     id: 'decision-123',
     provider: 'TypeSafe',
@@ -76,7 +100,9 @@ async function clientFailure(request: Promise<unknown>): Promise<JudgmentClientF
     await request
   } catch (error) {
     expect(error).toBeInstanceOf(JudgmentClientFailure)
-    return error as JudgmentClientFailure
+    if (error instanceof JudgmentClientFailure) {
+      return error
+    }
   }
   throw new Error('Expected judgment client to reject')
 }
@@ -93,7 +119,7 @@ describe('judgment client', () => {
     expect(fetcher).not.toHaveBeenCalled()
     await expect(client.evaluate({ ticket: 'payment failed' }, QUESTIONS)).resolves.toEqual({
       model: 'jev-2026-09-18',
-      answers: validVendorResponse().answers as Record<string, unknown>
+      answers: validVendorResponse().answers
     })
 
     expect(fetcher).toHaveBeenCalledTimes(1)
@@ -124,7 +150,7 @@ describe('judgment client', () => {
     expect(fetcher).not.toHaveBeenCalled()
     await expect(client.evaluate({ ticket: 'payment failed' }, QUESTIONS)).resolves.toEqual({
       model: 'jev-2026-09-18',
-      answers: validVendorResponse().answers as Record<string, unknown>
+      answers: validVendorResponse().answers
     })
 
     expect(fetcher).toHaveBeenCalledTimes(1)
@@ -153,7 +179,7 @@ describe('judgment client', () => {
 
     for (const [answerId, field] of missingFields) {
       const payload = validOpenRouterResponse()
-      const answer = (payload.answers as Record<string, Record<string, unknown>>)[answerId]!
+      const answer = payload.answers[answerId]
       delete answer[field]
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
       const error = await clientFailure(
@@ -284,9 +310,9 @@ describe('judgment client', () => {
 
   it('rejects missing and unexpected answers', async () => {
     const missing = validVendorResponse()
-    delete (missing.answers as Record<string, unknown>).urgent
+    delete missing.answers.urgent
     const unexpected = validVendorResponse()
-    ;(unexpected.answers as Record<string, unknown>).other = { type: 'noul', noul: 0.5 }
+    unexpected.answers.other = { type: 'noul', noul: 0.5 }
 
     for (const payload of [missing, unexpected]) {
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
@@ -299,14 +325,14 @@ describe('judgment client', () => {
 
   it('validates choice options and probability distributions against the question', async () => {
     const unknownOption = validVendorResponse()
-    ;(unknownOption.answers as Record<string, Record<string, unknown>>).route = {
+    unknownOption.answers.route = {
       type: 'choice',
       choice: 'automatic',
       probabilities: { automatic: 0.5, other: 0.5 },
       confidence: 0.4
     }
     const invalidDistribution = validVendorResponse()
-    ;(invalidDistribution.answers as Record<string, Record<string, unknown>>).route = {
+    invalidDistribution.answers.route = {
       type: 'choice',
       choice: 'human',
       probabilities: { automatic: 0.8, human: 0.1 },
@@ -324,7 +350,7 @@ describe('judgment client', () => {
 
   it('validates score levels, legend, distribution, range, and weighted value', async () => {
     const wrongLegend = validVendorResponse()
-    ;(wrongLegend.answers as Record<string, Record<string, unknown>>).severity = {
+    wrongLegend.answers.severity = {
       type: 'score',
       score: 1,
       legend: { '0': 'Low', '1': 'Medium', '2': 'Critical' },
@@ -332,7 +358,7 @@ describe('judgment client', () => {
       confidence: 0.7
     }
     const outOfRange = validVendorResponse()
-    ;(outOfRange.answers as Record<string, Record<string, unknown>>).severity = {
+    outOfRange.answers.severity = {
       type: 'score',
       score: 3,
       legend: { '0': 'Low', '1': 'Medium', '2': 'High' },
@@ -340,7 +366,7 @@ describe('judgment client', () => {
       confidence: 0.7
     }
     const inconsistentScore = validVendorResponse()
-    ;(inconsistentScore.answers as Record<string, Record<string, unknown>>).severity = {
+    inconsistentScore.answers.severity = {
       type: 'score',
       score: 0,
       legend: { '0': 'Low', '1': 'Medium', '2': 'High' },

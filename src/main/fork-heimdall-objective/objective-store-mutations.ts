@@ -49,6 +49,7 @@ export class ObjectiveStoreMutations {
     const revisionId = naturalId('objective_revision', args.watcherId, args.revisionNumber)
     return this.mutate(() => {
       const db = this.database.connection()
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; plan_revision's selected columns are written only by this store to match their declared field types.
       const replay = db
         .prepare(`SELECT id, revision_number, payload_json, digest, created_at_ms
         FROM plan_revision WHERE watcher_id = ? AND created_by_dispatch_id = ?
@@ -89,6 +90,7 @@ export class ObjectiveStoreMutations {
         args.dispatchId,
         args.createdAtMs
       )
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; the INSERT above just wrote this row's columns to match these field types.
       const stored = db
         .prepare(`SELECT id, payload_json, digest, created_by_dispatch_id, created_at_ms
         FROM plan_revision WHERE watcher_id = ? AND revision_number = ?`)
@@ -148,6 +150,7 @@ export class ObjectiveStoreMutations {
   activatePlan(args: ActivatePlanArgs): ActivatePlanResult {
     return this.mutate(() => {
       const db = this.database.connection()
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; plan_revision's selected columns are written only by this store to match their declared field types.
       const revision = db
         .prepare(
           'SELECT revision_number, status, digest, approved_at_ms FROM plan_revision WHERE id = ? AND watcher_id = ?'
@@ -185,6 +188,7 @@ export class ObjectiveStoreMutations {
   recordNodeDispatch(args: RecordNodeDispatchArgs): RecordNodeDispatchArgs {
     return this.mutate(() => {
       const db = this.database.connection()
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; plan_node's selected columns are written only by this store to match their declared field types.
       const row = db
         .prepare(`SELECT orchestration_task_id, dispatch_id, dispatched_at_ms FROM plan_node
         WHERE watcher_id = ? AND revision_id = ? AND task_key = ?`)
@@ -398,6 +402,7 @@ export class ObjectiveStoreMutations {
         args.reportDigest,
         args.createdAtMs
       )
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; the INSERT above just wrote this row's columns to match VerdictRow's field types.
       const stored = db
         .prepare(`SELECT watcher_id, revision_id, role, content_identity, verdict,
         criteria_results_json, report_digest, created_at_ms FROM review_verdict WHERE dispatch_id = ?`)
@@ -436,6 +441,7 @@ export class ObjectiveStoreMutations {
         args.epoch,
         args.createdAtMs
       )
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; the INSERT above just wrote this row's columns to match these field types.
       const stored = db
         .prepare(`SELECT attempt_fingerprint, payload_json, epoch, created_at_ms
         FROM landing_evidence WHERE watcher_id = ? AND rung = ? AND content_identity = ?`)

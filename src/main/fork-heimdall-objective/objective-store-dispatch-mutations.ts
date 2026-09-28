@@ -13,6 +13,7 @@ export class ObjectiveStoreDispatchMutations {
     const record = ObjectiveDispatchRecordSchema.parse(input)
     return runObjectiveMutation(this.database, () => {
       const db = this.database.connection()
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; objective_dispatch's selected columns are written only by this store to match ObjectiveDispatchRecord's field types.
       const existing = db
         .prepare(`SELECT watcher_id, execution_host_id, revision_id, task_key, plan_task_digest,
           created_at_ms FROM objective_dispatch WHERE attempt_fingerprint = ?`)

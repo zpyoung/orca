@@ -192,6 +192,7 @@
           "what": "The full test suite and other whole-tree checks, not per-node checks."
         },
         "gateName": "Name",
+        "gateNamePlaceholder": "lint",
         "gateCommand": "Command",
         "gateTimeout": "Timeout (s)",
         "removeGate": "Remove gate {{n}}",

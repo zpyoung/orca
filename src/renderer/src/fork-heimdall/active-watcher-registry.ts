@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useStore } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 import { useAppStore } from '@/store'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
 import type {
@@ -37,33 +39,62 @@ function indicatorPriority(row: WatcherFleetEntry): number {
   return 2
 }
 
-function selectWorktreeWatcher(
-  entries: readonly WatcherFleetEntry[],
-  worktreeId: string
-): WatcherFleetEntry | null {
-  let selected: WatcherFleetEntry | null = null
+function indexWorktreeWatchers(
+  entries: readonly WatcherFleetEntry[]
+): ReadonlyMap<string, WatcherFleetEntry> {
+  const selected = new Map<string, WatcherFleetEntry>()
   for (const row of entries) {
-    const needsAttention = isHeimdallAttentionRow(row)
+    const worktreeId = row.entry.enrollment.worktreeId
     if (
-      row.entry.enrollment.worktreeId !== worktreeId ||
-      (!needsAttention && !isActiveHeimdallWatcher(row.entry))
+      worktreeId === null ||
+      (!isHeimdallAttentionRow(row) && !isActiveHeimdallWatcher(row.entry))
     ) {
       continue
     }
-    if (!selected || indicatorPriority(row) < indicatorPriority(selected)) {
-      selected = row
+    const current = selected.get(worktreeId)
+    if (!current || indicatorPriority(row) < indicatorPriority(current)) {
+      selected.set(worktreeId, row)
     }
   }
   return selected
+}
+
+type WorktreeWatcherIndex = {
+  entries: readonly WatcherFleetEntry[] | undefined
+  byWorktree: ReadonlyMap<string, WatcherFleetEntry>
+}
+
+// Why a separate store: one app-store listener per sidebar card is O(cards) work on every app
+// store notification; this keeps the app store at one listener however many cards mount.
+const worktreeWatcherIndex = createStore<WorktreeWatcherIndex>(() => ({
+  entries: undefined,
+  byWorktree: new Map()
+}))
+let worktreeWatcherIndexSubscribed = false
+
+function syncWorktreeWatcherIndex(): void {
+  const entries = useAppStore.getState().heimdallFleet?.entries
+  if (entries === worktreeWatcherIndex.getState().entries) {
+    return
+  }
+  worktreeWatcherIndex.setState({ entries, byWorktree: indexWorktreeWatchers(entries ?? []) })
+}
+
+function ensureWorktreeWatcherIndex(): void {
+  if (worktreeWatcherIndexSubscribed) {
+    return
+  }
+  worktreeWatcherIndexSubscribed = true
+  syncWorktreeWatcherIndex()
+  useAppStore.subscribe(syncWorktreeWatcherIndex)
 }
 
 /** Worktree indicators consume the same seeded push cache as the fleet page. */
 export function useActiveHeimdallWatcherState(
   worktreeId: string
 ): ActiveHeimdallWatcherState | null {
-  const row = useAppStore((state) =>
-    selectWorktreeWatcher(state.heimdallFleet?.entries ?? [], worktreeId)
-  )
+  ensureWorktreeWatcherIndex()
+  const row = useStore(worktreeWatcherIndex, (index) => index.byWorktree.get(worktreeId) ?? null)
   return useMemo(
     () =>
       row

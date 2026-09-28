@@ -17,6 +17,10 @@ export type ResolvedFleetWorkspace = {
   fullPath: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 /** Contact authority wins over cached owner activity so a lost host never looks idle or active. */
 export function resolveFleetActivity(row: WatcherFleetEntry): ResolvedFleetActivity {
   if (row.contact === 'unverifiable' || row.entry.status.state === 'unreachable') {
@@ -35,10 +39,7 @@ export function resolveFleetWorkflowPhase(row: WatcherFleetEntry): string | null
 
 export function resolveFleetWorkspace(row: WatcherFleetEntry): ResolvedFleetWorkspace {
   const enrollment = row.entry.enrollment
-  const payload =
-    typeof enrollment.kindPayload === 'object' && enrollment.kindPayload !== null
-      ? (enrollment.kindPayload as Record<string, unknown>)
-      : null
+  const payload = isRecord(enrollment.kindPayload) ? enrollment.kindPayload : null
   const objectiveWorkspaceKind =
     enrollment.kind === 'objective' &&
     (payload?.workspaceKind === 'git' || payload?.workspaceKind === 'folder')

@@ -28,12 +28,13 @@ function isAgnostic(intervention: Intervention): intervention is KindAgnosticInt
   return AGNOSTIC_KINDS.has(intervention.kind)
 }
 
+function isIndexable(value: unknown): value is Record<PropertyKey, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function valueAtPath(source: unknown, path: readonly PropertyKey[]): unknown {
   return path.reduce<unknown>((current, segment) => {
-    if (typeof current !== 'object' || current === null) {
-      return undefined
-    }
-    return (current as Record<PropertyKey, unknown>)[segment]
+    return isIndexable(current) ? current[segment] : undefined
   }, source)
 }
 

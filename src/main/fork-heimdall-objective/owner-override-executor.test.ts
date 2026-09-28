@@ -83,6 +83,7 @@ function objectiveStoreFixture(): {
   return { objectiveStore, revisionId: revision.revisionId, close: () => database.close() }
 }
 
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the owner override executor.
 const binding = {
   enrollment: { watcherId: WATCHER_ID },
   contract: {},
@@ -90,6 +91,7 @@ const binding = {
 } as unknown as ObjectiveSnapshotBinding
 
 function executeContext(entries: unknown[]): ExecuteContext<ObjectiveWorld> {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ExecuteContext; only the fields below are read by the owner override executor.
   return {
     snapshot: {},
     ledger: { watcherId: WATCHER_ID, entries },

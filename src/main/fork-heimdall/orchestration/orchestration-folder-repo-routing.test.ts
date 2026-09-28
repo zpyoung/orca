@@ -118,6 +118,7 @@ describe('Heimdall folder repo orchestration routing', () => {
       terminalAtMs: null
     }
     const selector = `id:${workspaceRuntimeId(enrollment)}`
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large, private-field-bearing Store class; only the persistence methods OrcaRuntimeService reads for repo/worktree resolution are implemented.
     const runtime = new FolderTestRuntime(store as never)
 
     await expect(runtime.showManagedTerminalWorkspace(selector)).resolves.toMatchObject({

@@ -151,6 +151,7 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
         orchestrationRequestId: requestId,
         orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION
       }
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrchestrationMutationExecutor.run is intentionally typed Promise<unknown>; the invoked handler's actual receipt shape is this call's only source of truth.
       const receipt = (await getOrchestrationMutationExecutor(this.runtime).run(
         request,
         params,

@@ -12,51 +12,56 @@ import type {
   HostedReviewSitterProvider
 } from '../../../shared/fork-hosted-review-sitter/types'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isHeimdallApiBridge(value: Record<string, unknown>): value is HeimdallApi {
+  return (
+    typeof value.fleet === 'function' &&
+    typeof value.detail === 'function' &&
+    typeof value.command === 'function' &&
+    typeof value.enroll === 'function' &&
+    typeof value.debugReport === 'function'
+  )
+}
+
 export function getHeimdallApi(): HeimdallApi | null {
   const candidate: unknown = window.api?.heimdall
-  if (!candidate || typeof candidate !== 'object') {
+  if (!isRecord(candidate)) {
     return null
   }
-  const methods = candidate as Partial<Record<keyof HeimdallApi, unknown>>
-  if (
-    typeof methods.fleet !== 'function' ||
-    typeof methods.detail !== 'function' ||
-    typeof methods.command !== 'function' ||
-    typeof methods.enroll !== 'function' ||
-    typeof methods.debugReport !== 'function'
-  ) {
-    return null
-  }
-  return candidate as HeimdallApi
+  return isHeimdallApiBridge(candidate) ? candidate : null
 }
 export function isSupportedProvider(provider: string): provider is HostedReviewSitterProvider {
   return provider === 'github' || provider === 'gitlab'
 }
 
-function hostedReviewPayload(entry: WatcherListEntry): HostedReviewEnrollmentPayload | null {
+function isHostedReviewEnrollmentPayload(
+  value: Record<string, unknown>
+): value is HostedReviewEnrollmentPayload {
+  return (
+    typeof value.branch === 'string' &&
+    (value.provider === 'github' || value.provider === 'gitlab') &&
+    typeof value.reviewNumber === 'number' &&
+    typeof value.reviewUrl === 'string' &&
+    (value.branchUpdateMode === 'merge-base-update' || value.branchUpdateMode === 'rebase') &&
+    (value.mergeMethod === null ||
+      value.mergeMethod === 'merge' ||
+      value.mergeMethod === 'squash' ||
+      value.mergeMethod === 'rebase')
+  )
+}
+
+export function hostedReviewPayload(entry: WatcherListEntry): HostedReviewEnrollmentPayload | null {
   if (entry.enrollment.kind !== 'hosted-review') {
     return null
   }
   const payload = entry.enrollment.kindPayload
-  if (!payload || typeof payload !== 'object') {
+  if (!isRecord(payload)) {
     return null
   }
-  const candidate = payload as Partial<HostedReviewEnrollmentPayload>
-  if (
-    typeof candidate.branch !== 'string' ||
-    (candidate.provider !== 'github' && candidate.provider !== 'gitlab') ||
-    typeof candidate.reviewNumber !== 'number' ||
-    typeof candidate.reviewUrl !== 'string' ||
-    (candidate.branchUpdateMode !== 'merge-base-update' &&
-      candidate.branchUpdateMode !== 'rebase') ||
-    (candidate.mergeMethod !== null &&
-      candidate.mergeMethod !== 'merge' &&
-      candidate.mergeMethod !== 'squash' &&
-      candidate.mergeMethod !== 'rebase')
-  ) {
-    return null
-  }
-  return candidate as HostedReviewEnrollmentPayload
+  return isHostedReviewEnrollmentPayload(payload) ? payload : null
 }
 
 export type HostedReviewSitterSelection = {

@@ -33,22 +33,21 @@ function OwnerSelect({
   const labelId = useId()
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
-      <Label id={labelId} className="truncate text-xs">
-        {label}
+      <Label id={labelId}>
+        <span className="min-w-0 truncate text-xs">{label}</span>
       </Label>
       <Select value={value} disabled={disabled} onValueChange={onChange}>
-        <SelectTrigger aria-labelledby={labelId} size="sm" className="w-full text-xs">
-          <SelectValue />
+        <SelectTrigger aria-labelledby={labelId} size="sm" className="w-full">
+          <SelectValue>
+            <span className="text-xs">
+              {options.find((option) => option.value === value)?.label ?? value}
+            </span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
-            <SelectItem
-              key={option.value}
-              value={option.value}
-              disabled={option.disabled}
-              className="text-xs"
-            >
-              {option.label}
+            <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+              <span className="text-xs">{option.label}</span>
             </SelectItem>
           ))}
         </SelectContent>

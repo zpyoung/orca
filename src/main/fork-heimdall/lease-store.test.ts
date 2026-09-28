@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DirEntry } from '../../shared/filesystem-entry-types'
 import type { IFilesystemProvider } from '../providers/types'
+import type { SshGitProvider } from '../providers/ssh-git-provider'
+import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
 import {
   HostRoutedLeaseStore,
@@ -111,6 +113,7 @@ class MemoryFilesystem {
   }
 
   asProvider(): IFilesystemProvider {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: lease-store.ts only calls readDir/readFile/writeFile/rename/stat/createDir/createDirNoClobber/deletePath on this provider, all implemented above.
     return this as unknown as IFilesystemProvider
   }
 }
@@ -242,11 +245,11 @@ describe('host-routed epoch lease', () => {
   })
 
   it.each([
-    { crashShape: 'empty', content: '' },
-    { crashShape: 'truncated', content: '{"holder":"owner-a"' },
-    { crashShape: 'malformed', content: JSON.stringify({ holder: 'owner-a' }) }
+    { crashKind: 'empty', content: '' },
+    { crashKind: 'truncated', content: '{"holder":"owner-a"' },
+    { crashKind: 'malformed', content: JSON.stringify({ holder: 'owner-a' }) }
   ])(
-    'expires an $crashShape highest holder from its file mtime, not the older directory mtime',
+    'expires an $crashKind highest holder from its file mtime, not the older directory mtime',
     async ({ content }) => {
       const fs = new MemoryFilesystem()
       const leaseDirectory = '/workspace/.orca/heimdall/lease'
@@ -592,12 +595,13 @@ describe('host-routed epoch lease', () => {
 
   it('strips only the command newline from a remote absolute git directory', async () => {
     const fs = new MemoryFilesystem()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: requireRuntimeGitProvider only calls exec() on this provider; the rest of SshGitProvider's large surface is unused here.
     registerSshGitProvider(GIT_TEST_HOST, {
       exec: vi.fn(async () => ({
         stdout: '/srv/repo/.git \n',
         stderr: ''
       }))
-    } as never)
+    } as unknown as SshGitProvider)
     const workspacePath = '/srv/repo'
     const executionHostId = `ssh:${GIT_TEST_HOST}` as const
     const key = makeWorkspaceKey(executionHostId, workspacePath)
@@ -608,10 +612,11 @@ describe('host-routed epoch lease', () => {
         workspacePath,
         watcherId: 'watcher-1',
         fileProvider: fs.asProvider(),
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only executionHostId is read on this route; the full Worktree/GitWorktreeInfo shape is unused here.
         gitTarget: {
           executionHostId,
           worktree: { id: 'worktree-1', path: workspacePath }
-        } as never
+        } as unknown as RuntimeGitTarget
       })
     })
 

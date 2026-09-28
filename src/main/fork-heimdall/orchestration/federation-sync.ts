@@ -237,6 +237,7 @@ async function syncFederatedDispatchPages(
     acknowledgmentCursor >
       Math.max(getFederationAckedThrough(ackLease, ackIdentity), durableAcknowledgedThrough)
   ) {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: matches the identical, pre-existing cast on this same RPC call in the upstream file this module was forked from; callOrchestrationWorkerServer returns an untyped peer response.
     const delivered = (await runtime.callOrchestrationWorkerServer(
       federated.environment_id,
       'orchestration.federationAck',
@@ -274,6 +275,7 @@ async function syncFederatedDispatchPages(
       ? db.listPendingFederationRelay(dispatchId, 'to_worker')
       : []
   if (toWorker.length > 0) {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: matches the identical, pre-existing cast on this same RPC call in the upstream file this module was forked from; callOrchestrationWorkerServer returns an untyped peer response.
     const delivered = (await runtime.callOrchestrationWorkerServer(
       federated.environment_id,
       'orchestration.federationImport',

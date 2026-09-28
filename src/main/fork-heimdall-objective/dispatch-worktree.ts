@@ -138,6 +138,7 @@ export async function resolveObjectiveDispatchTarget(
   if (isPendingWorkspace(record) || record.setupState === 'pending') {
     throw new Error(`Objective dispatch ${record.attemptFingerprint} worktree setup is incomplete`)
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeGitTarget is protected on OrcaRuntimeService; runtime satisfies this narrower resolver shape at runtime.
   const target = await (runtime as unknown as RuntimeTargetResolver).resolveRuntimeGitTarget(
     `id:${record.workspaceId}`
   )

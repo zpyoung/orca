@@ -23,6 +23,30 @@ type PowerMonitorLike = {
   removeListener?(event: 'suspend' | 'resume', listener: () => void): unknown
 }
 
+function isRuntimeGitTargetResolver(value: unknown): value is RuntimeGitTargetResolver {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'resolveRuntimeGitTarget' in value &&
+    typeof value.resolveRuntimeGitTarget === 'function'
+  )
+}
+
+function isRuntimeFileTargetResolver(value: unknown): value is RuntimeFileTargetResolver {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'resolveRuntimeFileTarget' in value &&
+    typeof value.resolveRuntimeFileTarget === 'function'
+  )
+}
+
+function isPowerMonitorLike(value: unknown): value is PowerMonitorLike {
+  return (
+    typeof value === 'object' && value !== null && 'on' in value && typeof value.on === 'function'
+  )
+}
+
 /** Keeps Electron power and execution-host routing outside the pure kernel loop. */
 export class HeimdallKernelHost {
   private powerMonitor: PowerMonitorLike | null = null
@@ -48,17 +72,10 @@ export class HeimdallKernelHost {
     }
 
     const runtime: unknown = this.runtime
-    if (
-      typeof runtime !== 'object' ||
-      runtime === null ||
-      !('resolveRuntimeGitTarget' in runtime) ||
-      typeof runtime.resolveRuntimeGitTarget !== 'function'
-    ) {
+    if (!isRuntimeGitTargetResolver(runtime)) {
       throw new LeaseConfigurationError('Runtime cannot resolve a Heimdall Git target')
     }
-    const gitTarget = await (runtime as RuntimeGitTargetResolver).resolveRuntimeGitTarget(
-      enrollment.worktreeId
-    )
+    const gitTarget = await runtime.resolveRuntimeGitTarget(enrollment.worktreeId)
     if (
       gitTarget.worktree.id !== enrollment.worktreeId ||
       gitTarget.worktree.path !== enrollment.workspacePath ||
@@ -81,15 +98,10 @@ export class HeimdallKernelHost {
       return
     }
     const monitor: unknown = electron.powerMonitor
-    if (
-      typeof monitor !== 'object' ||
-      monitor === null ||
-      !('on' in monitor) ||
-      typeof monitor.on !== 'function'
-    ) {
+    if (!isPowerMonitorLike(monitor)) {
       return
     }
-    this.powerMonitor = monitor as PowerMonitorLike
+    this.powerMonitor = monitor
     this.powerMonitor.on('suspend', this.onSuspend)
     this.powerMonitor.on('resume', this.onResume)
   }
@@ -111,18 +123,11 @@ export class HeimdallKernelHost {
 
   private async resolveFolderTarget(enrollment: WatcherEnrollment): Promise<LeaseWorkspaceTarget> {
     const runtime: unknown = this.runtime
-    if (
-      typeof runtime !== 'object' ||
-      runtime === null ||
-      !('resolveRuntimeFileTarget' in runtime) ||
-      typeof runtime.resolveRuntimeFileTarget !== 'function'
-    ) {
+    if (!isRuntimeFileTargetResolver(runtime)) {
       throw new LeaseConfigurationError('Runtime cannot resolve a Heimdall folder target')
     }
     const worktreeId = enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
-    const fileTarget = await (runtime as RuntimeFileTargetResolver).resolveRuntimeFileTarget(
-      `id:${worktreeId}`
-    )
+    const fileTarget = await runtime.resolveRuntimeFileTarget(`id:${worktreeId}`)
     if (
       fileTarget.worktree.id !== worktreeId ||
       fileTarget.worktree.repoId !== enrollment.repoId ||

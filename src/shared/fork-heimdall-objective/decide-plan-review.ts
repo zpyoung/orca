@@ -2,13 +2,13 @@ import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
 import {
   activeObjectiveRevision,
-  decidePlannerAction,
   latestObjectiveAttempt,
   objectiveAttemptDisposition,
   objectiveNoAction,
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import { decidePlannerAction } from './decide-planner'
 import { objectiveRepairEpisodeAttempts } from './objective-repair-state'
 import type { ActivatePlanAction, ApplyPlanPatchAction, ObjectiveAction } from './objective-actions'
 import type {
@@ -23,21 +23,25 @@ type PlanReviewDispatchAction = Extract<ObjectiveAction, { kind: 'dispatch-plan-
 type PlanReviewTarget = PlanReviewDispatchAction['target']
 type PlannerDispatchAction = Extract<ObjectiveAction, { kind: 'dispatch-planner' }>
 
+function objectiveReviewRoundForRejectionCount(rejectionCount: number): 1 | 2 {
+  return rejectionCount > 0 ? 2 : 1
+}
+
 export type ObjectivePlanReviewGateTarget =
   | { kind: 'revision'; revision: ObjectiveRevisionProjection }
   | { kind: 'patch'; patch: ObjectivePlanPatchProjection; revision: ObjectiveRevisionProjection }
 
-/** The `shape` the target's creating planner dispatch carried, or `undefined` for a pre-upgrade one with none. */
-function objectivePlannerDispatchShape(
+/** The `plannerMode` the target's creating planner dispatch carried, or `undefined` for a pre-upgrade one with none. */
+function objectivePlannerDispatchMode(
   attempts: readonly ObjectiveAttempt[],
   dispatchId: string | null
-): PlannerDispatchAction['shape'] {
+): PlannerDispatchAction['plannerMode'] {
   if (dispatchId === null) {
     return undefined
   }
   for (const { attempt, action } of attempts) {
     if (attempt.dispatchId === dispatchId && action.kind === 'dispatch-planner') {
-      return action.shape
+      return action.plannerMode
     }
   }
   return undefined
@@ -54,7 +58,7 @@ function objectivePlanReviewApplies(
   if (target.kind === 'patch') {
     return true
   }
-  return objectivePlannerDispatchShape(attempts, target.revision.createdByDispatchId) !== undefined
+  return objectivePlannerDispatchMode(attempts, target.revision.createdByDispatchId) !== undefined
 }
 
 /**
@@ -82,7 +86,7 @@ function objectiveDraftReviewRound(
       review.verdict === 'revise' &&
       priorRejectedIds.has(review.targetId)
   ).length
-  return Math.min(2, 1 + reviseCount) as 1 | 2
+  return objectiveReviewRoundForRejectionCount(reviseCount)
 }
 
 /**
@@ -106,7 +110,7 @@ function objectivePatchReviewRound(
       candidate.status === 'rejected' &&
       candidate.rejection === 'plan-review-revise'
   ).length
-  return Math.min(2, 1 + priorRejectedCount) as 1 | 2
+  return objectiveReviewRoundForRejectionCount(priorRejectedCount)
 }
 
 function objectivePlanReviewWireTarget(target: ObjectivePlanReviewGateTarget): PlanReviewTarget {
@@ -325,7 +329,7 @@ export function latestObjectivePlanReviewForPlannerDispatch(
   action: PlannerDispatchAction
 ): ObjectivePlanReviewProjection | null {
   const reviews = world.plan.planReviews ?? []
-  const repairRevisionId = action.shape === 'repair' ? action.repairRevisionId : undefined
+  const repairRevisionId = action.plannerMode === 'repair' ? action.repairRevisionId : undefined
   const candidates =
     repairRevisionId !== undefined
       ? (() => {

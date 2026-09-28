@@ -56,6 +56,13 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
   }
 }
 
+function textareaValue(element: HTMLElement): string {
+  if (!(element instanceof HTMLTextAreaElement)) {
+    throw new Error('expected a textarea element')
+  }
+  return element.value
+}
+
 function objectiveWorkspace(): ObjectiveWorkspaceOption {
   return {
     key: 'runtime:hermes:repo:worktree',
@@ -243,7 +250,7 @@ describe('objective enrollment contract', () => {
     const objective = screen.getByRole('textbox', { name: 'Objective' })
     fireEvent.change(objective, { target: { value: 'Ship the visible objective' } })
 
-    expect((objective as HTMLTextAreaElement).value).toBe('Ship the visible objective')
+    expect(textareaValue(objective)).toBe('Ship the visible objective')
   })
 
   it('renders the gate editor immediately after the parallel-execution fields', () => {
@@ -273,7 +280,7 @@ describe('objective enrollment contract', () => {
     expect(fileInput).not.toBeNull()
     fireEvent.change(fileInput!, { target: { files: [oversizedFile] } })
 
-    expect((source as HTMLTextAreaElement).value).toBe(priorPlan)
+    expect(textareaValue(source)).toBe(priorPlan)
     expect(source.getAttribute('aria-invalid')).toBe('true')
   })
 
@@ -291,10 +298,10 @@ describe('objective enrollment contract', () => {
       await Promise.resolve()
     })
 
-    expect((objective as HTMLTextAreaElement).value).toBe('Latest objective text')
-    expect(
-      (screen.getByRole('textbox', { name: 'Existing plan source' }) as HTMLTextAreaElement).value
-    ).toBe('# Imported plan')
+    expect(textareaValue(objective)).toBe('Latest objective text')
+    expect(textareaValue(screen.getByRole('textbox', { name: 'Existing plan source' }))).toBe(
+      '# Imported plan'
+    )
 
     const staleImport = deferredPlanFile()
     fireEvent.change(fileInput!, { target: { files: [staleImport.file] } })
@@ -305,9 +312,7 @@ describe('objective enrollment contract', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Add existing plan' }))
 
-    expect(
-      (screen.getByRole('textbox', { name: 'Existing plan source' }) as HTMLTextAreaElement).value
-    ).toBe('')
+    expect(textareaValue(screen.getByRole('textbox', { name: 'Existing plan source' }))).toBe('')
   })
 
   it('rejects source plans only after the shared character limit', () => {
@@ -538,7 +543,7 @@ describe('objective enrollment contract', () => {
   })
 
   it('adds a gate and sends it in the enrollment submission', () => {
-    const onSubmit = vi.fn()
+    const onSubmit = vi.fn<(draft: ObjectiveEnrollmentDraft) => void>()
     render(<EditableObjectiveGateFields onSubmit={onSubmit} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add gate' }))
@@ -547,7 +552,10 @@ describe('objective enrollment contract', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
 
     expect(onSubmit).toHaveBeenCalledTimes(1)
-    const submittedDraft = onSubmit.mock.calls[0]?.[0] as ObjectiveEnrollmentDraft
+    const submittedDraft = onSubmit.mock.calls[0]?.[0]
+    if (!submittedDraft) {
+      throw new Error('expected onSubmit to receive a draft')
+    }
     const submission = buildObjectiveEnrollmentSubmission(submittedDraft, objectiveWorkspace())
     expect(submission.input.kindPayload).toMatchObject({
       gates: [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 1_800 }]
@@ -573,7 +581,9 @@ describe('objective enrollment contract', () => {
       <EditableObjectiveGateFields
         onSubmit={onSubmit}
         parallelUnsupported
-        initialGates={[{ name: 'lint', command: 'pnpm lint', timeoutSecondsText: '' }]}
+        initialGates={[
+          { rowKey: 'gate-1', name: 'lint', command: 'pnpm lint', timeoutSecondsText: '' }
+        ]}
       />
     )
 
@@ -594,7 +604,9 @@ describe('objective enrollment contract', () => {
       <EditableObjectiveGateFields
         onSubmit={onSubmit}
         parallelUnsupported
-        initialGates={[{ name: 'lint', command: 'pnpm lint', timeoutSecondsText: '' }]}
+        initialGates={[
+          { rowKey: 'gate-1', name: 'lint', command: 'pnpm lint', timeoutSecondsText: '' }
+        ]}
       />
     )
 

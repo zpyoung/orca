@@ -1,13 +1,13 @@
 import type { AttemptEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
 import {
-  decidePlannerAction,
   objectiveAttemptFailureClass,
   objectiveAttemptReportValidation,
   objectiveReportValidationDetail,
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import { decidePlannerAction } from './decide-planner'
 import { objectiveNodeFailedDeviation, objectiveReportRejectedDeviation } from './deviation-context'
 import type {
   ObjectiveNodeProjection,
@@ -15,6 +15,10 @@ import type {
   ObjectiveRevisionProjection,
   ObjectiveWorld
 } from './detail-types'
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
 
 export type ObjectiveReportRejection = {
   rejectionReason: string
@@ -40,8 +44,7 @@ export function rejectedObjectiveReportResult(
     }
   }
   const result = attempt.result
-  const record =
-    result !== null && typeof result === 'object' ? (result as Record<string, unknown>) : {}
+  const record = isPlainRecord(result) ? result : {}
   const files = (value: unknown): string[] =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
   const detail =

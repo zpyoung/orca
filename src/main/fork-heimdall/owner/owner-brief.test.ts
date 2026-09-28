@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { KernelAction, OwnerAdapter } from '../../../shared/fork-heimdall/kind-contract'
 import type { LedgerEntry, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
+import { InterventionSchema } from '../../../shared/fork-heimdall/owner/intervention'
 import type { Snapshot } from '../../../shared/fork-heimdall/snapshot'
 import { buildOwnerBrief, buildOwnerPromptText, expandOwnerBrief } from './owner-brief'
 
@@ -31,7 +32,7 @@ function owner(
   return {
     describeState,
     describeInterventions: () => 'kind-specific',
-    interventionSchema: {} as never,
+    interventionSchema: InterventionSchema,
     rejectIntervention: () => null,
     actionForIntervention: () => ({
       kind: 'continue',

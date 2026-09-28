@@ -34,7 +34,7 @@ const PLAN_PATCH_REJECTION_MAX_LENGTH = 2_000
 function dispatchedTaskKeys(context: ExecuteContext<ObjectiveWorld>): string[] {
   const keys = new Set<string>()
   for (const attempt of getLatestAttempts(context.ledger)) {
-    const action = attempt.action as Record<string, unknown>
+    const action = attempt.action
     if (action.kind === 'dispatch-node' && typeof action.taskKey === 'string') {
       keys.add(action.taskKey)
     }
@@ -52,7 +52,7 @@ export async function ingestObjectivePlanReport(args: {
   if (
     origin?.action.kind !== 'dispatch-planner' ||
     origin.action.revisionNumber !== args.action.revisionNumber ||
-    (args.action.shape === 'repair' && origin.action.repairOrdinal === undefined)
+    (args.action.plannerMode === 'repair' && origin.action.repairOrdinal === undefined)
   ) {
     return invalidObjectiveReport({
       reason: 'planner-dispatch-mismatch',
@@ -63,8 +63,8 @@ export async function ingestObjectivePlanReport(args: {
       detail: 'Ingest action does not match its planner dispatch'
     })
   }
-  const originIsRepair = origin.action.shape === 'repair'
-  const actionIsRepair = args.action.shape === 'repair'
+  const originIsRepair = origin.action.plannerMode === 'repair'
+  const actionIsRepair = args.action.plannerMode === 'repair'
   if (
     originIsRepair !== actionIsRepair ||
     (actionIsRepair &&
@@ -97,15 +97,16 @@ export async function ingestObjectivePlanReport(args: {
     attemptFingerprint: origin.attempt.fingerprint,
     mailboxReportPath: args.action.reportPath,
     role: 'planner',
-    ...(args.action.shape === 'repair' ? { plannerShape: 'repair' } : {})
+    ...(args.action.plannerMode === 'repair' ? { plannerMode: 'repair' } : {})
   })
   if (!read.ok) {
     // a repair report that reads as JSON but fails schema/role validation still reaches
     // ingestObjectivePlanRepair, so it lands as a stored rejected patch that counts toward the
     // episode's retry budget (X1) instead of vanishing as a bare not-landed ingest
-    if (args.action.shape === 'repair' && read.rawInput !== undefined) {
+    if (args.action.plannerMode === 'repair' && read.rawInput !== undefined) {
       return ingestObjectivePlanRepair({
         action: args.action,
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatch-planner schema's superRefine requires repairOrdinal whenever shape is 'repair', which this branch (actionIsRepair === originIsRepair) already established.
         repairOrdinal: origin.action.repairOrdinal as number,
         rawReport: read.rawInput,
         evidenceAtMs: evidence.atMs,
@@ -123,9 +124,10 @@ export async function ingestObjectivePlanReport(args: {
       ...(read.detail === undefined ? {} : { detail: read.detail })
     })
   }
-  if (args.action.shape === 'repair') {
+  if (args.action.plannerMode === 'repair') {
     return ingestObjectivePlanRepair({
       action: args.action,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatch-planner schema's superRefine requires repairOrdinal whenever shape is 'repair', which this branch (actionIsRepair === originIsRepair) already established.
       repairOrdinal: origin.action.repairOrdinal as number,
       rawReport: read.report,
       evidenceAtMs: evidence.atMs,
@@ -272,14 +274,16 @@ async function ingestObjectivePlanRepair(args: {
     const message = (
       error instanceof Error ? error.message : 'Planner repair report validation failed'
     ).slice(0, PLAN_PATCH_REJECTION_MAX_LENGTH)
-    const rawShape = PlannerRepairReportSchema.safeParse(args.rawReport)
+    const rawRepairReport = PlannerRepairReportSchema.safeParse(args.rawReport)
     await args.context.lease.assertHeld()
     const stored = args.objectiveStore.ingestPlanPatch({
       watcherId,
       revisionId: targetRevisionId,
       dispatchId: args.action.dispatchId,
       repairOrdinal: args.repairOrdinal,
-      report: rawShape.success ? rawShape.data : { repair: { upsertTasks: [], dropTaskKeys: [] } },
+      report: rawRepairReport.success
+        ? rawRepairReport.data
+        : { repair: { upsertTasks: [], dropTaskKeys: [] } },
       createdAtMs: args.evidenceAtMs,
       rejection: `invalid-report:${message}`
     })

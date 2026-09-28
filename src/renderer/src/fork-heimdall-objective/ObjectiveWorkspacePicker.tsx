@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
+import { Command as CommandPrimitive } from 'cmdk'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList
-} from '@/components/ui/command'
+import { Command, CommandGroup, CommandInput, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { translate } from '@/i18n/i18n'
@@ -16,6 +11,10 @@ import { objectiveWorkspaceKindLabel } from './objective-copy'
 import type { ObjectiveWorkspaceOption } from './objective-workspace-options'
 
 type WorkspaceFilter = 'all' | 'git' | 'folder'
+
+function isWorkspaceFilter(value: string): value is WorkspaceFilter {
+  return value === 'all' || value === 'git' || value === 'folder'
+}
 
 type WorkspaceGroup = {
   key: string
@@ -131,9 +130,9 @@ export function ObjectiveWorkspacePicker({
           aria-expanded={open}
           aria-labelledby={labelledBy}
           disabled={disabled}
-          className="h-9 w-full justify-between px-3 text-sm font-normal"
+          className="h-9 w-full justify-between"
         >
-          <span className={cn('truncate', !selected && 'text-muted-foreground')}>
+          <span className={cn('truncate font-normal', !selected && 'text-muted-foreground')}>
             {selected?.label ??
               translate('fork.heimdallObjective.workspacePicker.placeholder', 'Choose a workspace')}
           </span>
@@ -142,7 +141,7 @@ export function ObjectiveWorkspacePicker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[var(--radix-popover-trigger-width)] min-w-[22rem] p-0"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[22rem]"
         onOpenAutoFocus={(event) => {
           event.preventDefault()
           focusSearchInput()
@@ -173,19 +172,25 @@ export function ObjectiveWorkspacePicker({
                 'Filter workspaces'
               )}
               onValueChange={(nextFilter) => {
-                if (nextFilter) {
-                  setFilter(nextFilter as WorkspaceFilter)
+                if (isWorkspaceFilter(nextFilter)) {
+                  setFilter(nextFilter)
                 }
               }}
             >
-              <ToggleGroupItem value="all" className="h-7 px-2 text-xs">
-                {translate('fork.heimdallObjective.workspacePicker.filterAll', 'All')}
+              <ToggleGroupItem value="all">
+                <span className="text-xs">
+                  {translate('fork.heimdallObjective.workspacePicker.filterAll', 'All')}
+                </span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="git" className="h-7 px-2 text-xs">
-                {translate('fork.heimdallObjective.workspacePicker.filterGit', 'Git worktrees')}
+              <ToggleGroupItem value="git">
+                <span className="text-xs">
+                  {translate('fork.heimdallObjective.workspacePicker.filterGit', 'Git worktrees')}
+                </span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="folder" className="h-7 px-2 text-xs">
-                {translate('fork.heimdallObjective.workspacePicker.filterFolders', 'Folders')}
+              <ToggleGroupItem value="folder">
+                <span className="text-xs">
+                  {translate('fork.heimdallObjective.workspacePicker.filterFolders', 'Folders')}
+                </span>
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
@@ -201,12 +206,13 @@ export function ObjectiveWorkspacePicker({
             {groups.map((group) => (
               <CommandGroup key={group.key} heading={group.path}>
                 {group.options.map((workspace) => (
-                  <CommandItem
+                  <CommandPrimitive.Item
                     key={workspace.key}
                     value={workspace.key}
                     disabled={workspace.ownerUnavailable}
                     onSelect={() => handleSelect(workspace.key)}
-                    className="jump-palette-item items-start py-2"
+                    // Why the raw cmdk item: jump-palette selection chrome lives in main.css, which the primitive lint cannot classify.
+                    className="jump-palette-item relative flex cursor-default select-none items-start gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50"
                   >
                     <Check
                       className={cn(
@@ -227,7 +233,7 @@ export function ObjectiveWorkspacePicker({
                           : ''}
                       </span>
                     </span>
-                  </CommandItem>
+                  </CommandPrimitive.Item>
                 ))}
               </CommandGroup>
             ))}

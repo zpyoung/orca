@@ -3,7 +3,6 @@ import type { Snapshot } from '../fork-heimdall/snapshot'
 import { objectiveCheckFailedDeviation } from './deviation-context'
 import type { IngestVerdictAction, ObjectiveAction } from './objective-actions'
 import {
-  decidePlannerAction,
   latestObjectiveAttempt,
   objectiveAttemptDisposition,
   objectiveAttemptReportValidation,
@@ -12,6 +11,7 @@ import {
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import { decidePlannerAction } from './decide-planner'
 import {
   objectiveReadOnlyWorkerInFlight,
   objectiveStaleEvidenceReissueEvidenceKey

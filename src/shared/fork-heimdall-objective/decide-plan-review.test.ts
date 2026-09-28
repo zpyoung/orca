@@ -3,7 +3,8 @@ import {
   decideObjectivePlanReviewGate,
   type ObjectivePlanReviewGateTarget
 } from './decide-plan-review'
-import { decidePlannerAction, objectiveAttempts, projectObjectiveReports } from './decision-context'
+import { objectiveAttempts, projectObjectiveReports } from './decision-context'
+import { decidePlannerAction } from './decide-planner'
 import {
   attempt,
   capabilities,
@@ -56,8 +57,8 @@ const applyAction: ApplyPlanPatchAction = {
   digest: 'patch-digest-1'
 }
 
-/** The `dispatch-planner` attempt whose report produced `draftRevision`, at a given `shape`. */
-function draftCreatingAttempt(shape: 'full' | 'repair' | undefined) {
+/** The `dispatch-planner` attempt whose report produced `draftRevision`, at a given `plannerMode`. */
+function draftCreatingAttempt(plannerMode: 'full' | 'repair' | undefined) {
   const action: ObjectiveAction = {
     kind: 'dispatch-planner',
     capability: 'plan',
@@ -66,7 +67,7 @@ function draftCreatingAttempt(shape: 'full' | 'repair' | undefined) {
     evidenceKey: 'plan:2',
     revisionNumber: 2,
     reason: 'initial',
-    ...(shape === undefined ? {} : { shape })
+    ...(plannerMode === undefined ? {} : { plannerMode })
   }
   return attempt(action, { dispatchId: 'planner-dispatch-2', state: 'settled', effect: 'landed' })
 }
@@ -261,7 +262,7 @@ describe('decideObjectivePlanReviewGate', () => {
     expect(result.action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:2',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       repairOrdinal: 2,
       reason: 'replan-after-block'
@@ -319,7 +320,7 @@ describe('decideObjectivePlanReviewGate', () => {
         evidenceKey: 'plan:3',
         revisionNumber: 3,
         reason: 'replan-after-block',
-        shape: 'full'
+        plannerMode: 'full'
       },
       { dispatchId: 'planner-dispatch-3', state: 'settled', effect: 'landed' }
     )

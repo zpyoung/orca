@@ -27,23 +27,18 @@ export const OWNER_UNREACHABLE =
 const COMMAND_INDETERMINATE =
   'The connection failed after the command was sent. It may or may not have taken effect; refresh the owner state before trying again.'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export function enrollmentForParallelCompatibility(
   input: EnrollInput,
   parallelExecutionSupported: boolean
 ): EnrollInput {
-  if (
-    parallelExecutionSupported ||
-    input.kind !== 'objective' ||
-    typeof input.kindPayload !== 'object' ||
-    input.kindPayload === null
-  ) {
+  if (parallelExecutionSupported || input.kind !== 'objective' || !isRecord(input.kindPayload)) {
     return input
   }
-  const {
-    lanesEnabled: _lanesEnabled,
-    gates: _gates,
-    ...legacyKindPayload
-  } = input.kindPayload as Record<string, unknown>
+  const { lanesEnabled: _lanesEnabled, gates: _gates, ...legacyKindPayload } = input.kindPayload
   return {
     ...input,
     kindPayload: { ...legacyKindPayload, maxConcurrency: 1 }

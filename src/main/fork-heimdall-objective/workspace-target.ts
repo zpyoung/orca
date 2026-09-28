@@ -31,6 +31,7 @@ export async function resolveObjectiveWorkspaceTarget(
   runtime: OrcaRuntimeService,
   enrollment: WatcherEnrollment
 ): Promise<ObjectiveWorkspaceTarget> {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveRuntimeGitTarget/resolveRuntimeFileTarget are installed on OrcaRuntimeService's prototype at construction but aren't part of its exported command-surface type, which only lists IPC-facing methods.
   const resolver = runtime as unknown as ObjectiveRuntimeResolver
   const folderWorktreeId =
     enrollment.worktreeId && parseWorkspaceKey(enrollment.worktreeId)?.type === 'folder'

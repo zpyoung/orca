@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { LedgerEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import {
   WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND,
+  workerEscalationConsumedMessageId,
   type WorkerEscalationConsumedPayload
 } from '../../shared/fork-heimdall/worker-escalation-consumption'
 import { WatcherRunnerStatusLifecycle } from './runner-status'
@@ -14,12 +15,14 @@ function harness(options: { enabled?: boolean; entries?: LedgerEntry[] } = {}): 
 } {
   const entries: LedgerEntry[] = options.entries ?? []
   let nextId = 0
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of RunnerLedgerStore; the park/parkForWorkerEscalation/readyToResume paths under test only call read and append.
   const ledgerStore = {
     read: (): WatcherLedger => ({ watcherId: 'watcher-1', entries }),
     append: (_watcherId: string, entry: LedgerEntry): void => {
       entries.push(entry)
     }
   } as unknown as RunnerLedgerStore
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of WatcherRunner; the methods under test only read/write runner.enrollment and runner.status.
   const runner = {
     enrollment: {
       watcherId: 'watcher-1',
@@ -63,9 +66,10 @@ function isConsumedMarker(entry: LedgerEntry): entry is Extract<LedgerEntry, { k
 function consumedMarkers(
   entries: readonly LedgerEntry[]
 ): readonly WorkerEscalationConsumedPayload[] {
-  return entries
-    .filter(isConsumedMarker)
-    .map((entry) => entry.payload as WorkerEscalationConsumedPayload)
+  return entries.filter(isConsumedMarker).flatMap((entry) => {
+    const messageId = workerEscalationConsumedMessageId(entry.payload)
+    return messageId === null ? [] : [{ messageId }]
+  })
 }
 
 describe('WatcherRunnerStatusLifecycle worker-escalation consumption marker', () => {

@@ -10,18 +10,22 @@ import type { WatcherRunner } from '../runner-state'
 
 export type JudgmentMailboxBaseline = ReadonlySet<string> | null
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
 export function captureJudgmentMailboxBaseline(
   snapshot: Snapshot<unknown>,
   ledger: WatcherLedger
 ): JudgmentMailboxBaseline {
-  if (snapshot.world === null || typeof snapshot.world !== 'object') {
+  if (!isRecord(snapshot.world)) {
     return null
   }
-  const judgment = (snapshot.world as Record<string, unknown>).judgment
-  if (judgment === null || typeof judgment !== 'object') {
+  const judgment = snapshot.world.judgment
+  if (!isRecord(judgment)) {
     return null
   }
-  const status = (judgment as Record<string, unknown>).status
+  const status = judgment.status
   return status === 'disabled' || status === 'remote'
     ? null
     : new Set(ledger.entries.map((entry) => entry.eventId))
@@ -33,13 +37,12 @@ function hasNewJudgmentEvidence(ledger: WatcherLedger, baseline: ReadonlySet<str
       baseline.has(entry.eventId) ||
       entry.kind !== 'evidence' ||
       entry.evidenceKind !== 'orchestration-mailbox' ||
-      entry.payload === null ||
-      typeof entry.payload !== 'object' ||
+      !isRecord(entry.payload) ||
       Array.isArray(entry.payload)
     ) {
       return false
     }
-    const type = (entry.payload as Record<string, unknown>).type
+    const type = entry.payload.type
     return type === 'worker_done' || type === 'escalation'
   })
 }

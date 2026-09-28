@@ -9,7 +9,6 @@ import type {
   HostedReviewSitterCapability,
   HostedReviewSitterDiscrepancyKind,
   HostedReviewSitterDiscrepancyStatus,
-  HostedReviewSitterActionResult,
   HostedReviewFixAttribution
 } from '../../../shared/fork-hosted-review-sitter/types'
 
@@ -25,7 +24,7 @@ const HOSTED_REVIEW_ACTION_KINDS: Record<HostedReviewSitterActionKind, true> = {
 }
 
 function isHostedReviewActionKind(action: string): action is HostedReviewSitterActionKind {
-  return HOSTED_REVIEW_ACTION_KINDS[action as HostedReviewSitterActionKind] === true
+  return Object.hasOwn(HOSTED_REVIEW_ACTION_KINDS, action)
 }
 
 const HOSTED_REVIEW_DISCREPANCY_KINDS: Record<HostedReviewSitterDiscrepancyKind, true> = {
@@ -39,7 +38,7 @@ const HOSTED_REVIEW_DISCREPANCY_KINDS: Record<HostedReviewSitterDiscrepancyKind,
 }
 
 function isHostedReviewDiscrepancyKind(kind: string): kind is HostedReviewSitterDiscrepancyKind {
-  return HOSTED_REVIEW_DISCREPANCY_KINDS[kind as HostedReviewSitterDiscrepancyKind] === true
+  return Object.hasOwn(HOSTED_REVIEW_DISCREPANCY_KINDS, kind)
 }
 
 export function hostedReviewSitterActionLabel(action: HostedReviewSitterActionKind): string {
@@ -207,24 +206,27 @@ export function hostedReviewSitterKernelActionLabel(actionKind: string): string 
     : actionKind
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function resultDetail(result: unknown): string | null {
-  if (!result || typeof result !== 'object' || !('kind' in result)) {
+  if (!isRecord(result)) {
     return null
   }
-  const actionResult = result as HostedReviewSitterActionResult
-  if (actionResult.kind === 'worker-dispatched') {
+  if (result.kind === 'worker-dispatched' && typeof result.dispatchId === 'string') {
     return translate(
       'fork.hostedReviewSitter.ledger.workerDispatched',
       'Worker dispatched: {{id}}',
-      { id: actionResult.dispatchId }
+      { id: result.dispatchId }
     )
   }
-  if (actionResult.kind === 'published') {
+  if (result.kind === 'published' && typeof result.resultingHeadSha === 'string') {
     return translate('fork.hostedReviewSitter.ledger.resultingHead', 'Resulting head {{sha}}', {
-      sha: actionResult.resultingHeadSha
+      sha: result.resultingHeadSha
     })
   }
-  if (actionResult.kind === 'rerun-requested') {
+  if (result.kind === 'rerun-requested') {
     return translate(
       'fork.hostedReviewSitter.ledger.rerunAccepted',
       'Provider accepted the re-run request'
@@ -234,14 +236,13 @@ function resultDetail(result: unknown): string | null {
 }
 
 function isFixAttribution(value: unknown): value is HostedReviewFixAttribution {
-  if (!value || typeof value !== 'object') {
+  if (!isRecord(value)) {
     return false
   }
-  const candidate = value as Partial<HostedReviewFixAttribution>
   return (
-    typeof candidate.preparedCommitSha === 'string' &&
-    typeof candidate.producedHeadSha === 'string' &&
-    typeof candidate.checkKey === 'string'
+    typeof value.preparedCommitSha === 'string' &&
+    typeof value.producedHeadSha === 'string' &&
+    typeof value.checkKey === 'string'
   )
 }
 

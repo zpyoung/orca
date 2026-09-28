@@ -38,32 +38,30 @@ function GateRow({
   return (
     <div className="grid grid-cols-[1fr_1fr_96px_auto] items-end gap-2">
       <div className="space-y-1">
-        <Label htmlFor={nameId} className="text-xs">
+        <Label htmlFor={nameId}>
           {translate('fork.heimdallObjective.enrollment.gateName', 'Name')}
         </Label>
         <Input
           id={nameId}
           value={gate.name}
           disabled={fieldsDisabled}
-          placeholder="lint"
-          className="h-8 text-xs"
+          placeholder={translate('fork.heimdallObjective.enrollment.gateNamePlaceholder', 'lint')}
           onChange={(event) => onChange({ ...gate, name: event.currentTarget.value })}
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor={commandId} className="text-xs">
+        <Label htmlFor={commandId}>
           {translate('fork.heimdallObjective.enrollment.gateCommand', 'Command')}
         </Label>
         <Input
           id={commandId}
           value={gate.command}
           disabled={fieldsDisabled}
-          className="h-8 font-mono text-xs"
           onChange={(event) => onChange({ ...gate, command: event.currentTarget.value })}
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor={timeoutId} className="text-xs">
+        <Label htmlFor={timeoutId}>
           {translate('fork.heimdallObjective.enrollment.gateTimeout', 'Timeout (s)')}
         </Label>
         <Input
@@ -75,7 +73,6 @@ function GateRow({
           value={gate.timeoutSecondsText}
           disabled={fieldsDisabled}
           placeholder={String(OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS)}
-          className="h-8 text-xs tabular-nums"
           onChange={(event) => onChange({ ...gate, timeoutSecondsText: event.currentTarget.value })}
         />
       </div>
@@ -132,7 +129,7 @@ export function ObjectiveEnrollmentGateFields({
       ) : null}
       {draft.gates.map((gate, index) => (
         <GateRow
-          key={index}
+          key={gate.rowKey}
           gate={gate}
           index={index}
           disabled={disabled}
@@ -157,12 +154,14 @@ export function ObjectiveEnrollmentGateFields({
         type="button"
         variant="outline"
         size="sm"
-        className="h-8 text-xs"
         disabled={disabled || atMax || parallelUnsupported}
         onClick={() =>
           onDraftChange({
             ...draft,
-            gates: [...draft.gates, { name: '', command: '', timeoutSecondsText: '' }]
+            gates: [
+              ...draft.gates,
+              { rowKey: crypto.randomUUID(), name: '', command: '', timeoutSecondsText: '' }
+            ]
           })
         }
       >

@@ -79,7 +79,7 @@ export function buildObjectivePlannerDispatchSpec(args: {
         ? {}
         : { requestedSkipStage: action.requestedSkipStage }),
       ...(action.guidance === undefined ? {} : { ownerGuidance: action.guidance }),
-      ...(action.shape === undefined ? {} : { shape: action.shape }),
+      ...(action.plannerMode === undefined ? {} : { plannerMode: action.plannerMode }),
       ...(args.repairContext === undefined ? {} : { repairContext: args.repairContext }),
       ...(findings === undefined ? {} : { planReviewFindings: findings })
     })

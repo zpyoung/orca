@@ -3,6 +3,7 @@ import { EnrollSuccessSchema, HeimdallSubscriptionEventSchema } from './api'
 import { WatcherCommandResultSchema, WatcherDetailSchema } from './fleet-types'
 
 type TraversableDefinition = z.ZodType['def'] & {
+  // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- zod's object def names its field map `shape`.
   shape?: Record<string, z.ZodType>
   catchall?: z.ZodType
   element?: z.ZodType
@@ -22,6 +23,7 @@ type TraversableDefinition = z.ZodType['def'] & {
 }
 
 function cloneWith(schema: z.ZodType, updates: Partial<TraversableDefinition>): z.ZodType {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: zod's clone() requires the exact discriminated def type; the merge only overwrites known traversal fields already present on that def's variant.
   return schema.clone({ ...schema.def, ...updates } as typeof schema.def)
 }
 
@@ -35,16 +37,18 @@ export function remoteReaderSchema<T extends z.ZodType>(schema: T): T {
       return cached
     }
 
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: current.def is zod's closed base def type for a generic ZodType; the switch below only reads the field that matches definition.type.
     const definition = current.def as TraversableDefinition
     let result: z.ZodType
     switch (definition.type) {
       case 'object': {
-        const shape = Object.fromEntries(
+        const fields = Object.fromEntries(
           Object.entries(definition.shape ?? {}).map(([key, child]) => [key, visit(child)])
         )
         const catchall = definition.catchall ? visit(definition.catchall) : undefined
         result = cloneWith(current, {
-          shape,
+          // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- zod's object def names its field map `shape`.
+          shape: fields,
           catchall: definition.catchall?.type === 'never' ? undefined : catchall
         })
         break
@@ -133,6 +137,7 @@ export function remoteReaderSchema<T extends z.ZodType>(schema: T): T {
     return result
   }
 
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: visit reproduces each node's def.type/shape, so the returned schema is structurally the same variant as the input T.
   return visit(schema) as T
 }
 

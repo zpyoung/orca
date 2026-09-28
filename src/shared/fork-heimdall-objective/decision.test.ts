@@ -84,7 +84,7 @@ describe('objective deterministic phase flow', () => {
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
       revisionNumber: 1,
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       repairOrdinal: 1,
       reason: 'replan-after-failure'
@@ -141,7 +141,7 @@ describe('objective deterministic phase flow', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -189,7 +189,7 @@ describe('objective deterministic phase flow', () => {
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
       revisionNumber: 1,
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -215,7 +215,7 @@ describe('objective deterministic phase flow', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -273,7 +273,7 @@ describe('objective deterministic phase flow', () => {
     ).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -366,7 +366,7 @@ describe('objective checks hold for read-only workers and stale evidence', () =>
       revision()
     )
     expect(decision).toMatchObject({
-      action: { kind: 'dispatch-planner', shape: 'repair', reason: 'replan-after-failure' }
+      action: { kind: 'dispatch-planner', plannerMode: 'repair', reason: 'replan-after-failure' }
     })
   })
 })
@@ -485,7 +485,7 @@ describe('objective tier review policy', () => {
     expect(decideObjective(snapshot(blocked), ledger()).action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-block'
     })

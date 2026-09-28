@@ -29,7 +29,7 @@ const ENROLLMENT = {
   orchestrationRunId: 'run-1',
   createdAtMs: 1,
   terminalAtMs: null
-} as WatcherEnrollment
+} satisfies WatcherEnrollment
 
 const ACTION = {
   kind: 'prepare-fix',
@@ -37,7 +37,7 @@ const ACTION = {
   visibility: 'local',
   contentIdentity: 'head-1',
   evidenceKey: 'check-1'
-} as KernelAction
+} satisfies KernelAction
 
 type DispatchAdapter = Pick<HeimdallOrchestrationAdapter, 'dispatchWorker' | 'recoverDispatch'>
 

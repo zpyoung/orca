@@ -8,7 +8,7 @@ import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-ty
 import { readAuthoritativeWorkerReportEvidence } from './authoritative-worker-report'
 
 const CREATED_AT = '2026-09-22T12:00:00.000Z'
-const ENROLLMENT = {
+const ENROLLMENT: WatcherEnrollment = {
   watcherId: 'watcher-1',
   kind: 'hosted-review',
   workspaceKey: 'local::/repo',
@@ -27,7 +27,7 @@ const ENROLLMENT = {
   orchestrationRunId: 'run-1',
   createdAtMs: 1,
   terminalAtMs: null
-} as WatcherEnrollment
+}
 
 function reportFact(input: {
   messageId: string
@@ -115,6 +115,7 @@ function fixture(input: {
     })),
     getMessageById
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: readAuthoritativeWorkerReportEvidence only calls getDispatchContextById/getAttemptObservationFacts/getTask/getMessageById; OrchestrationDb's much larger sqlite-backed surface is unused here.
   const db = dbMethods as unknown as OrchestrationDb
   return { db, getMessageById }
 }

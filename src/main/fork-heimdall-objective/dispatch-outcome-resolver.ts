@@ -32,6 +32,10 @@ import {
   type ObjectiveRoleReportReadResult
 } from './report-ingestion'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export async function resolveObjectiveDispatchOutcome(args: {
   attempt: AttemptEntry
   action: ObjectiveDispatchAction
@@ -60,10 +64,7 @@ export async function resolveObjectiveDispatchOutcome(args: {
   }
   let dispatchRecord = args.objectiveStore.getDispatch(args.attempt.fingerprint)
   if (dispatchRecord && dispatchRecord.dispatchId === null) {
-    const result =
-      typeof args.attempt.result === 'object' && args.attempt.result !== null
-        ? (args.attempt.result as Record<string, unknown>)
-        : null
+    const result = isRecord(args.attempt.result) ? args.attempt.result : null
     dispatchRecord = {
       ...dispatchRecord,
       dispatchId,
@@ -169,7 +170,7 @@ export async function resolveObjectiveDispatchOutcome(args: {
           provenance('rejected', 'missing', 'Successful worker completion omitted its report path')
         )
   }
-  if (args.action.kind === 'dispatch-planner' && args.action.shape === 'repair') {
+  if (args.action.kind === 'dispatch-planner' && args.action.plannerMode === 'repair') {
     // a repair report's schema/semantic validity is the ingest step's concern (X1): resolving here
     // regardless of content lets an invalid report reach ingestObjectivePlanRepair and land as a
     // stored rejected patch, so the repair retry budget actually counts it instead of the dispatch

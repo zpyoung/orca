@@ -50,7 +50,9 @@ describe('WatcherEnrollmentControlLifecycle.resume', () => {
     const lifecycle = new WatcherEnrollmentControlLifecycle({
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only `.read` is exercised by resume(); HeimdallLedgerStore's other methods are unused here.
       ledger: { read } as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resume() only calls lease.release when the runner carries a leaseGuard, which this fixture omits.
       lease: {} as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerLoop is a class with private fields, so a structural test double can never satisfy it without this cast; only `.schedule` is exercised by the code under test.
       runnerLoop: { schedule } as never,
       runner: () => runner,
       commit,
@@ -86,6 +88,7 @@ describe('WatcherEnrollmentControlLifecycle concurrency fencing', () => {
     })
     const current = enrollment(3)
     const updated = { ...enrollment(1), commandRevision: 2 }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this test double only needs the enrollment/operationTail/controlPending fields setConcurrency() reads; WatcherRunner has 20 fields the code under test never touches.
     const runner = {
       enrollment: current,
       operationTail,
@@ -94,8 +97,11 @@ describe('WatcherEnrollmentControlLifecycle concurrency fencing', () => {
     const commit = vi.fn(() => ({ status: 'committed' as const, enrollment: updated }))
     const schedule = vi.fn()
     const lifecycle = new WatcherEnrollmentControlLifecycle({
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: setConcurrency()'s commitAfterExecutionFence path never calls ledger.read.
       ledger: {} as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: setConcurrency() only calls lease.release when the runner carries a leaseGuard, which this fixture omits.
       lease: {} as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerLoop is a class with private fields, so a structural test double can never satisfy it without this cast; only `.schedule` is exercised by the code under test.
       runnerLoop: { schedule } as never,
       runner: () => runner,
       commit,

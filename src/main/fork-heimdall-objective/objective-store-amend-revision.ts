@@ -43,6 +43,7 @@ export function amendObjectiveRevisionInTransaction(
   args: AmendRevisionArgs
 ): RevisionAmendmentResult {
   const patch = RevisionAmendmentPatchSchema.parse(args.patch)
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; plan_revision's status/payload_json columns are written only by this store to match ObjectiveRevisionStatus and JSON text.
   const revision = db
     .prepare('SELECT status, payload_json FROM plan_revision WHERE id = ? AND watcher_id = ?')
     .get(args.revisionId, args.watcherId) as
@@ -55,6 +56,7 @@ export function amendObjectiveRevisionInTransaction(
     throw new Error(`Plan revision cannot be amended from ${revision.status}`)
   }
 
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; revision_amendment.ordinal is written only by this store as an integer.
   const replay = db
     .prepare('SELECT ordinal FROM revision_amendment WHERE revision_id = ? AND digest = ?')
     .get(args.revisionId, patch.digest) as { ordinal: number } | undefined
@@ -89,13 +91,11 @@ export function amendObjectiveRevisionInTransaction(
 
   // a plan row only ever records a *successful* dispatch; an in-flight node has none either, so
   // the caller-supplied ledger read is the only signal that distinguishes it from a failed one
-  const succeededTaskKeys = new Set(
-    (
-      db
-        .prepare('SELECT task_key FROM plan_node WHERE revision_id = ? AND dispatch_id IS NOT NULL')
-        .all(args.revisionId) as { task_key: string }[]
-    ).map((row) => row.task_key)
-  )
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns untyped rows; plan_node.task_key is written only by this store as a string.
+  const dispatchedNodeRows = db
+    .prepare('SELECT task_key FROM plan_node WHERE revision_id = ? AND dispatch_id IS NOT NULL')
+    .all(args.revisionId) as { task_key: string }[]
+  const succeededTaskKeys = new Set(dispatchedNodeRows.map((row) => row.task_key))
   const inFlightTaskKeys = new Set(args.inFlightTaskKeys ?? [])
   for (const taskKey of patch.dropTaskKeys) {
     if (succeededTaskKeys.has(taskKey)) {
@@ -257,6 +257,7 @@ function upsertAmendedNode(
 }
 
 function nextAmendmentOrdinal(db: Database.Database, revisionId: string): number {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite returns an untyped row; COALESCE(MAX(ordinal), -1) + 1 always yields a numeric value.
   const row = db
     .prepare(
       'SELECT COALESCE(MAX(ordinal), -1) + 1 AS value FROM revision_amendment WHERE revision_id = ?'

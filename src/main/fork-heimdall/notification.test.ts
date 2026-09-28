@@ -11,6 +11,7 @@ function detail(
     reason?: string
   } = {}
 ): WatcherDetail {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of WatcherFleetEntry; omits ownerFence/readOnlyReason/capabilityNotes/paused, which deriveWatcherNotificationTransitions never reads.
   return {
     watcher: {
       target: { watcherId: 'watcher-1', connectionId: 'runtime-1', pairingRevision: 1 },

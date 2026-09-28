@@ -13,6 +13,10 @@ export const OWNER_DEVIATION_ESCALATION_KIND = 'owner-deviation'
 
 export type OwnerDeviationEscalation = EscalationEntry & { escalationKind: 'owner-deviation' }
 
+function isOwnerDeviationEscalation(entry: EscalationEntry): entry is OwnerDeviationEscalation {
+  return entry.escalationKind === 'owner-deviation'
+}
+
 export function ownerDeviationWakeToken(entry: OwnerDeviationEscalation): string {
   const wakeId = decodeReason(entry.reason)?.wakeId
   return wakeId
@@ -99,7 +103,7 @@ export function findOwnerDeviationEscalation(
   const entry = getLatestEscalations(ledger).find(
     (candidate) => candidate.escalationId === escalationId
   )
-  return entry?.escalationKind === 'owner-deviation' ? (entry as OwnerDeviationEscalation) : null
+  return entry && isOwnerDeviationEscalation(entry) ? entry : null
 }
 
 /** The oldest still-open owner-deviation escalation, since the owner processes one turn at a time. */

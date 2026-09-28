@@ -95,7 +95,7 @@ describe('objective node infra/environment redispatch', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -175,7 +175,7 @@ describe('objective node infra/environment redispatch', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
@@ -185,12 +185,14 @@ describe('objective node infra/environment redispatch', () => {
     {
       circumstance: 'an exited-without-completion attempt with no worker_done evidence (Case B)',
       reason: WORKER_EXITED_WITHOUT_COMPLETION,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the outer `as const` would otherwise force this to a readonly empty tuple, which is not assignable to the mutable LedgerEntry[] the destructured test case expects.
       extraEntries: [] as LedgerEntry[]
     },
     {
       circumstance:
         'a cleanly failed worker_done settled indeterminate pending classification (Case A)',
       reason: 'failed',
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the outer `as const` would otherwise infer a readonly literal-object tuple, which is not assignable to the mutable LedgerEntry[] the destructured test case expects.
       extraEntries: [
         {
           kind: 'evidence',
@@ -271,7 +273,7 @@ describe('objective node infra/environment redispatch', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan-repair:revision-1:1',
-      shape: 'repair',
+      plannerMode: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
