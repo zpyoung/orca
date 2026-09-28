@@ -111,6 +111,10 @@ export function bridgeCodexUserInput(
     return false
   }
   const conversion = codexParamsToAskSpec(request.params)
+  // a provider-valid request too large for an ask keeps its normal prompt rather than being refused.
+  if (!conversion.ok && conversion.exceedsAskCapacity) {
+    return false
+  }
   const prompt = conversion.ok ? session.prompts.register(request) : null
   if (!conversion.ok || !prompt) {
     const reason = conversion.ok ? 'the request could not be tracked' : conversion.reason

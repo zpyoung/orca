@@ -141,6 +141,20 @@ describe('bridgeCodexUserInput', () => {
     expect(session.connection.respondWithError).not.toHaveBeenCalled()
   })
 
+  it('leaves a request with more questions than an ask carries to its normal prompt', () => {
+    handoffModule.resolveSessionHandoff.mockReturnValue(HANDOFF)
+    const session = fakeSession()
+    const questions = Array.from({ length: 11 }, (_, index) => ({
+      id: `q${index}`,
+      question: `Question ${index}?`
+    }))
+
+    expect(bridge(session, userInputRequest(questions))).toBe(false)
+
+    expect(session.connection.respondWithError).not.toHaveBeenCalled()
+    expect(handoffModule.runNativeQuestion).not.toHaveBeenCalled()
+  })
+
   it('refuses a secret question with an error reply instead of relaying it', () => {
     handoffModule.resolveSessionHandoff.mockReturnValue(HANDOFF)
     const session = fakeSession()

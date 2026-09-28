@@ -46,10 +46,19 @@ export function wakeHeimdallMailboxRunners(args: {
   }
 }
 
-/** Whether a loaded watcher with an owner supervises this run, so its workers' questions go to that owner. */
+/**
+ * Whether an armed, unpaused watcher with an owner supervises this run, so its workers' questions go
+ * to that owner. A paused or disarmed watcher never ticks, so its owner could not answer in time.
+ */
 export function isOwnedHeimdallRun(runners: Iterable<WatcherRunner>, runId: string): boolean {
   for (const runner of runners) {
-    if (runner.enrollment.orchestrationRunId === runId && runner.enrollment.owner) {
+    const { enrollment } = runner
+    if (
+      enrollment.orchestrationRunId === runId &&
+      enrollment.owner &&
+      enrollment.enabled &&
+      !enrollment.paused
+    ) {
       return true
     }
   }

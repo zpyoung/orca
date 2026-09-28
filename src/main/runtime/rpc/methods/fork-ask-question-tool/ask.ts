@@ -81,7 +81,7 @@ export const ASK_METHODS = [
         return registry.register(
           validation.spec,
           { paneKey: null, worktreeId: attribution.worktreeId, handoff: forced },
-          { requestId: params.requestId }
+          { requestId: params.requestId, timeoutMs: params.timeoutMs }
         )
       }
 
@@ -95,12 +95,10 @@ export const ASK_METHODS = [
 
       const handoff = resolveHandoffDispatch(attribution, runtime)
       if (handoff) {
-        // Why: hand-off blocking uses clampOrchestrationAskTimeoutMs (C7), never the registry's
-        // own --timeout-ms expiry timer, so no timeoutMs is passed through here.
         return registry.register(
           validation.spec,
           { paneKey: null, worktreeId: attribution.worktreeId, handoff },
-          { requestId: params.requestId }
+          { requestId: params.requestId, timeoutMs: params.timeoutMs }
         )
       }
 

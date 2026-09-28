@@ -26,7 +26,7 @@ export type NativeQuestionBinding = {
 
 export type NativeQuestionConversion =
   | { ok: true; spec: AskSpec; bindings: NativeQuestionBinding[] }
-  | { ok: false; reason: string }
+  | { ok: false; reason: string; exceedsAskCapacity?: true }
 
 type NativeOption = { label: string; description?: string }
 
@@ -69,7 +69,11 @@ function convertNativeQuestions(questions: NativeQuestion[]): NativeQuestionConv
     return { ok: false, reason: 'the request carries no questions' }
   }
   if (questions.length > MAX_ASK_QUESTIONS) {
-    return { ok: false, reason: `at most ${MAX_ASK_QUESTIONS} questions can be relayed at once` }
+    return {
+      ok: false,
+      reason: `at most ${MAX_ASK_QUESTIONS} questions can be relayed at once`,
+      exceedsAskCapacity: true
+    }
   }
   const bindings = questions.map((question, index) => ({
     askQuestionId: `q${index + 1}`,

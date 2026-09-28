@@ -1013,6 +1013,22 @@ describe('Heimdall kernel service mailbox wake', () => {
     expect(policy?.isForcedRun('run-unknown')).toBe(false)
   })
 
+  it('does not force questions to a paused owned watcher, whose owner cannot answer', async () => {
+    const { service, enrollmentStore } = await harness()
+    service.registerKind(kind())
+    enrollmentStore.insert({
+      ...liveEnrollmentRow('watcher-paused', {
+        orchestrationRunId: 'run-paused',
+        owner: { agent: 'claude' }
+      }),
+      paused: true
+    })
+
+    await service.list()
+
+    expect(getForcedHandoffPolicy()?.isForcedRun('run-paused')).toBe(false)
+  })
+
   it('clears the forced hand-off policy on shutdown', async () => {
     const { service } = await harness()
     service.registerKind(kind())

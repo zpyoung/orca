@@ -109,6 +109,26 @@ describe('ask.register forced hand-off for owned runs', () => {
     })
   })
 
+  it("keeps the asker's --timeout-ms on a forced hand-off", async () => {
+    const { run } = seedDispatch(h.orchestrationDb)
+    forcedRuns.add(run.id)
+    h.setPaneOwner(WORKER_PANE_KEY, 'term_worker')
+
+    const registered = await h.call('ask.register', {
+      spec: textSpec(),
+      requestId: 'req_timeout',
+      paneKey: WORKER_PANE_KEY,
+      cwd: '/repo',
+      timeoutMs: 60_000
+    })
+    const askId =
+      typeof registered === 'object' && registered !== null && 'askId' in registered
+        ? String(registered.askId)
+        : ''
+
+    expect(h.askDb.getAsk(askId)).toMatchObject({ origin: 'handoff', timeout_ms: 60_000 })
+  })
+
   it('keeps the UI card for a run the policy does not force', async () => {
     seedDispatch(h.orchestrationDb)
 
