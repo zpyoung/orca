@@ -466,6 +466,7 @@ describe('createDraftRelease', () => {
       repo: 'zpyoung/orca',
       tag: 'v1.4.151-rc.1.zy01',
       token: 'token',
+      targetCommitish: 'abc123',
       fetchImpl,
       log: vi.fn(),
       readChangelog: () => '# Changelog\n\n## [1.4.151-rc.1.zy01] - 2026-07-27\n\n- Fork entry.\n'
@@ -487,6 +488,7 @@ describe('createDraftRelease', () => {
       repo: 'zpyoung/orca',
       tag: 'v1.4.151-rc.1.zy01',
       token: 'token',
+      targetCommitish: 'abc123',
       fetchImpl,
       log: vi.fn(),
       readChangelog: () => ''
@@ -509,6 +511,7 @@ describe('createDraftRelease', () => {
       repo: 'zpyoung/orca',
       tag: 'v1.4.151-rc.1.zy01',
       token: 'token',
+      targetCommitish: 'abc123',
       fetchImpl,
       log: vi.fn(),
       readChangelog: () => '# Changelog\n\n## [1.4.151-rc.1.zy01] - 2026-07-27\n\n- Fork entry.\n'
