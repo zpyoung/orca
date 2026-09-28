@@ -24,6 +24,7 @@ import { createWorkspaceSpaceSlice } from './workspace-space'
 import {
   createClaudeUsageSlice,
   createCodexUsageSlice,
+  createMuseUsageSlice,
   createOpenCodeUsageSlice
 } from './usage-provider-slices'
 import { createBrowserSlice } from './browser'
@@ -46,11 +47,13 @@ import { createPinnedTabCloseConfirmSlice } from './pinned-tab-close-confirm'
 import { createRecentlyClosedTabsSlice } from './recently-closed-tabs'
 import { createOrcaProfilesSlice } from './orca-profiles'
 import { createNewIssueDraftSlice } from './new-issue-draft'
+import { createFeedbackDraftSlice } from './feedback-draft'
 import { createTaskCreationDraftsSlice } from './task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-hosts'
 import { createAsksSlice } from './fork-ask-question-tool/asks'
 import { createLedgerSlice } from './ledger'
+import { createHeimdallFleetSlice } from './fork-heimdall/fleet'
 import { translate } from '@/i18n/i18n'
 
 export const TEST_REPO = {
@@ -83,6 +86,7 @@ export function createTestStore() {
     ...createClaudeUsageSlice(...a),
     ...createCodexUsageSlice(...a),
     ...createOpenCodeUsageSlice(...a),
+    ...createMuseUsageSlice(...a),
     ...createBrowserSlice(...a),
     ...createRateLimitSlice(...a),
     ...createSshSlice(...a),
@@ -103,11 +107,13 @@ export function createTestStore() {
     ...createRecentlyClosedTabsSlice(...a),
     ...createOrcaProfilesSlice(...a),
     ...createNewIssueDraftSlice(...a),
+    ...createFeedbackDraftSlice(...a),
     ...createTaskCreationDraftsSlice(...a),
     ...createRemoteServerUpdatesSlice(...a),
     ...createTerminalQuickCommandHostsSlice(...a),
     ...createLedgerSlice(...a),
-    ...createAsksSlice(...a)
+    ...createAsksSlice(...a),
+    ...createHeimdallFleetSlice(...a)
   }))
 }
 

@@ -1,5 +1,6 @@
 import type { RelayDispatcher, RequestContext } from './dispatcher'
 import type { GitHandlerOperationSet } from './git-handler-operation-set'
+import { registerHostedReviewSitterGitHandlers } from './fork-hosted-review-sitter/git-adapter'
 
 export function registerGitHandlers(
   dispatcher: RelayDispatcher,
@@ -54,6 +55,7 @@ export function registerGitHandlers(
   dispatcher.onRequest('git.rebaseFromBase', (p, context) =>
     handlers.sync.rebaseFromBase(p, context)
   )
+  registerHostedReviewSitterGitHandlers(dispatcher, handlers.sync)
   dispatcher.onRequest('git.branchDiff', (p, context) => handlers.objectDiff.branchDiff(p, context))
   dispatcher.onRequest('git.commitDiff', (p, context) => handlers.objectDiff.commitDiff(p, context))
   dispatcher.onRequest('git.listWorktrees', (p, context) =>

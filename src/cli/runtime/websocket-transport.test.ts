@@ -13,6 +13,7 @@ import {
   generateKeyPair,
   publicKeyToBase64
 } from '../../shared/e2ee-crypto'
+import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall/capability'
 import { RuntimeClient } from './client'
 import { launchOrcaApp } from './launch'
 import { addEnvironmentFromPairingCode } from './environments'
@@ -83,7 +84,8 @@ describe('CLI remote WebSocket transport', () => {
           WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
           WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
           WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
-          AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY
+          AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY,
+          ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES
         ]
       })
     )

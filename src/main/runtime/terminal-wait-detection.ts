@@ -5,6 +5,7 @@ import {
   type AgentStatus
 } from '../../shared/agent-detection'
 import type { RuntimeTerminalWaitBlockedReason } from '../../shared/runtime-types'
+import { findAntigravityReadyPromptIndex } from './antigravity-terminal-readiness'
 import {
   isTerminalWaitWhitespace,
   startOfLastLines,
@@ -57,6 +58,18 @@ export function isKnownReadyPromptPreview(preview: string): boolean {
   return true
 }
 
+// Why separate from isKnownReadyPromptPreview: that one settles tier 1 immediately, while
+// a Muse ready screen only proves the TUI is up — the ranking holds it to quiescence.
+export function isMuseReadyPromptPreview(preview: string): boolean {
+  const normalized = preview.toLowerCase()
+  const readyIndex = findMuseReadyPromptIndex(normalized)
+  if (readyIndex === null) {
+    return false
+  }
+  const blockedSignal = findTerminalWaitBlockedSignal(normalized)
+  return blockedSignal === null || blockedSignal.index <= readyIndex
+}
+
 export function detectTerminalWaitBlockedReason(
   preview: string
 ): RuntimeTerminalWaitBlockedReason | null {
@@ -83,7 +96,8 @@ function findDismissedStartupModalIndex(normalized: string): number | null {
   const indexes = [
     findCodexReadyPromptIndex(normalized),
     findAntigravityReadyPromptIndex(normalized),
-    findCursorActivePromptIndex(normalized)
+    findCursorActivePromptIndex(normalized),
+    findMuseReadyPromptIndex(normalized)
   ].filter((index): index is number => index !== null)
   return indexes.length > 0 ? Math.max(...indexes) : null
 }
@@ -92,9 +106,78 @@ function findKnownReadyPromptIndex(normalized: string): number | null {
   const indexes = [
     findCodexReadyPromptIndex(normalized),
     findAntigravityReadyPromptIndex(normalized),
-    findCursorReadyPromptIndex(normalized)
+    findCursorReadyPromptIndex(normalized),
+    findClaudeReadyPromptIndex(normalized)
   ].filter((index): index is number => index !== null)
   return indexes.length > 0 ? Math.max(...indexes) : null
+}
+
+const CLAUDE_PROMPT_GLYPH = '\u276f'
+const CLAUDE_EMPTY_INPUT_PLACEHOLDER = 'try "'
+const CLAUDE_SPINNER_ROW_RE = /^[\u00b7\u2722\u2733\u2736\u273b\u273d] \S/
+// Why not `thought`: a mid-turn thinking row shares the summary's `<verb> for <duration>` shape.
+const CLAUDE_TURN_SUMMARY_RE =
+  /^[\u00b7\u2722\u2733\u2736\u273b\u273d] (?!thought )[\p{L}'-]+ for \d/u
+
+// Why the screen: Claude Code paints no idle OSC title. `Try "…"` fills the empty input box only
+// before the first turn; after one, the proof is a past-tense summary row (`✻ Brewed for 1s`)
+// where the live spinner row (`✶ Flambéing…`) stood. No banner check: SessionStart hook output
+// routinely pushes the banner off the visible screen.
+function findClaudeReadyPromptIndex(normalized: string): number | null {
+  const promptIndex = normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH)
+  if (promptIndex === -1) {
+    return null
+  }
+  let cursor = promptIndex + CLAUDE_PROMPT_GLYPH.length
+  while (
+    cursor < normalized.length &&
+    (isTerminalWaitWhitespace(normalized, cursor) || normalized.charCodeAt(cursor) === 0xa0)
+  ) {
+    cursor += 1
+  }
+  if (normalized.startsWith(CLAUDE_EMPTY_INPUT_PLACEHOLDER, cursor)) {
+    return promptIndex
+  }
+  return isClaudeInputEmpty(normalized, promptIndex) &&
+    endsClaudeTurnWithSummary(normalized, promptIndex)
+    ? promptIndex
+    : null
+}
+
+function isClaudeInputEmpty(normalized: string, promptIndex: number): boolean {
+  const lineEnd = normalized.indexOf('\n', promptIndex)
+  return (
+    normalized
+      .slice(promptIndex + CLAUDE_PROMPT_GLYPH.length, lineEnd === -1 ? undefined : lineEnd)
+      .trim() === ''
+  )
+}
+
+/** Whether the last spinner-glyph row since the last submitted prompt is a finished-turn summary. */
+function endsClaudeTurnWithSummary(normalized: string, promptIndex: number): boolean {
+  const submittedIndex =
+    promptIndex > 0 ? normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH, promptIndex - 1) : -1
+  const spinnerRows = normalized
+    .slice(submittedIndex + 1, promptIndex)
+    .split('\n')
+    .map((line) => line.trimStart())
+    .filter((line) => CLAUDE_SPINNER_ROW_RE.test(line))
+  const lastRow = spinnerRows.at(-1)
+  return lastRow !== undefined && CLAUDE_TURN_SUMMARY_RE.test(lastRow)
+}
+
+/**
+ * Whether a tui-idle wait should read the provider's visible screen.
+ *
+ * Why Claude even with runtime text: it paints with cursor moves, so what reaches the tail is a
+ * few status rows below its prompt box, never the prompt the ready rule needs.
+ */
+export function tuiIdleNeedsVisibleScreenProbe(
+  lastAgentStatus: AgentStatus | null,
+  waitText: string,
+  agent: string | null | undefined
+): boolean {
+  return lastAgentStatus === null && (waitText.length === 0 || agent === 'claude')
 }
 
 // Why: match the banner's last occurrence to skip the trust dialog's own "Cursor Agent" text; "→" is cursor-agent's persistent input prompt.
@@ -117,6 +200,19 @@ function findCursorReadyPromptIndex(normalized: string): number | null {
   return CURSOR_BUSY_SPINNER_RE.test(normalized.slice(activeIndex)) ? null : activeIndex
 }
 
+// Why: Muse titles its OSC with the bare cwd and never updates it, so only the body can
+// prove the TUI is up. The voice-input composer is present even without loaded skills.
+function findMuseReadyPromptIndex(normalized: string): number | null {
+  const headerIndex = normalized.lastIndexOf('muse code')
+  if (headerIndex === -1) {
+    return null
+  }
+  const segment = normalized.slice(headerIndex)
+  return segment.includes('voice') && segment.includes('input') && segment.includes('❯')
+    ? headerIndex
+    : null
+}
+
 function findCodexReadyPromptIndex(normalized: string): number | null {
   const headerIndex = normalized.lastIndexOf('openai codex')
   if (headerIndex === -1) {
@@ -125,46 +221,6 @@ function findCodexReadyPromptIndex(normalized: string): number | null {
   const readySegment = normalized.slice(headerIndex)
   // Why: Codex prints permissions only in YOLO mode; the stable ready header is OpenAI Codex + model + directory.
   return readySegment.includes('model:') && readySegment.includes('directory:') ? headerIndex : null
-}
-
-function findAntigravityReadyPromptIndex(normalized: string): number | null {
-  const headerIndex = normalized.lastIndexOf('antigravity cli')
-  if (headerIndex === -1) {
-    return null
-  }
-  let lineStart = headerIndex
-  let modelIndex: number | null = null
-  let promptIndex: number | null = null
-
-  // Why: ready previews can include echoed paste after the header; scan line bounds directly instead of splitting the whole tail.
-  for (let cursor = headerIndex; cursor <= normalized.length; cursor += 1) {
-    if (cursor < normalized.length && normalized.charCodeAt(cursor) !== 10) {
-      continue
-    }
-    let trimmedStart = lineStart
-    let trimmedEnd = cursor
-    while (trimmedStart < trimmedEnd && isTerminalWaitWhitespace(normalized, trimmedStart)) {
-      trimmedStart += 1
-    }
-    while (trimmedEnd > trimmedStart && isTerminalWaitWhitespace(normalized, trimmedEnd - 1)) {
-      trimmedEnd -= 1
-    }
-    if (lineStart > headerIndex && trimmedStart < trimmedEnd) {
-      if (modelIndex === null && normalized.startsWith('gemini', trimmedStart)) {
-        modelIndex = trimmedStart
-      }
-      if (
-        promptIndex === null &&
-        trimmedEnd - trimmedStart === 1 &&
-        normalized.charCodeAt(trimmedStart) === 62
-      ) {
-        promptIndex = trimmedStart
-      }
-    }
-    lineStart = cursor + 1
-  }
-
-  return modelIndex !== null && promptIndex !== null ? Math.max(modelIndex, promptIndex) : null
 }
 
 export const TERMINAL_WAIT_BLOCKED_SENTINEL_RE =

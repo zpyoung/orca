@@ -145,11 +145,16 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
     agent: TuiAgent,
     prompt: string | undefined,
     launchPreferences?: AgentLaunchPreferences,
-    launchOverrides?: AgentLaunchOverrides
+    launchInputs?: {
+      agentArgs?: string | null
+      launchSource?: string
+      launchOverrides?: AgentLaunchOverrides
+    }
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
     }
+    const launchOverrides = launchInputs?.launchOverrides
     if (launchPreferences && launchOverrides) {
       throw new Error('Launch preferences and launch overrides cannot be combined.')
     }
@@ -158,6 +163,8 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
       agent,
       ...(prompt !== undefined ? { prompt } : {}),
       ...(launchPreferences ? { launchPreferences } : {}),
+      ...(launchInputs?.agentArgs !== undefined ? { agentArgs: launchInputs.agentArgs } : {}),
+      ...(launchInputs?.launchSource ? { launchSource: launchInputs.launchSource } : {}),
       ...(launchOverrides ? { launchOverrides } : {}),
       settings: this.store.getSettings(),
       getLaunchPlatform: () => this.getAgentLaunchPlatformForRepo(repo),

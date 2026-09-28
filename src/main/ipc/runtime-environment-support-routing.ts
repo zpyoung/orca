@@ -7,6 +7,7 @@ import type {
 import type { KnownRuntimeEnvironment } from '../../shared/runtime-environments'
 import { getPreferredPairingOffer } from '../../shared/runtime-environments'
 import { markEnvironmentUsed, resolveEnvironment } from '../../shared/runtime-environment-store'
+import { recordRuntimeEnvironmentUsage } from './runtime-environment-usage-record'
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/protocol-version'
 import {
   subscribeRemoteRuntimeRequest,
@@ -59,6 +60,7 @@ export function shouldRouteSubscriptionBySupport(method: string): boolean {
     method === 'session.tabs.subscribeAll' ||
     method === 'accounts.subscribe' ||
     method === 'notifications.subscribe' ||
+    method === 'heimdall:subscribe' ||
     method === 'files.watch'
   )
 }
@@ -262,7 +264,7 @@ function subscriptionCallbacks(
   return {
     onResponse: (response: RuntimeRpcResponse<unknown>) => {
       if (response.ok && shouldMarkUsed()) {
-        markEnvironmentUsed(args.userDataPath, args.environment.id, {
+        recordRuntimeEnvironmentUsage(args.userDataPath, args.environment.id, {
           runtimeId: response._meta.runtimeId
         })
       }

@@ -1,0 +1,100 @@
+import type { HeimdallDatabase } from './database'
+import type { HeimdallKernelHost } from './kernel-host'
+import { requireLeaseStore } from './kernel-service-dependencies'
+import type { HeimdallKernelService } from './kernel-service-contract'
+import type { LeaseStore } from './lease-store'
+import { settleWithinMs } from '../quit-teardown-deadline'
+import type { WatcherRunnerLoop } from './runner-loop'
+import type { WatcherRunner } from './runner-state'
+
+export type KernelShutdownInput = {
+  loaded: boolean
+  listeners: Set<() => void>
+  drainedListeners: Set<() => void>
+  subscribers: Set<() => void>
+  runners: Iterable<WatcherRunner>
+  runnerLoop: WatcherRunnerLoop | null
+  leaseStore: LeaseStore | null
+  host: HeimdallKernelHost | null
+  unsubscribeLedger: (() => void) | null
+  database: HeimdallDatabase | null
+}
+
+const DEFAULT_DRAIN_MS = 1_500
+
+function notifyShutdownListeners(listeners: Set<() => void>): void {
+  for (const listener of listeners) {
+    try {
+      listener()
+    } catch (error) {
+      console.warn('[heimdall] shutdown listener failed:', error)
+    }
+  }
+  listeners.clear()
+}
+
+export function beginHeimdallShutdown(
+  service: Pick<HeimdallKernelService, 'stopForShutdown'> | null
+): { name: 'heimdall'; promise: Promise<void> } {
+  return {
+    name: 'heimdall',
+    promise: service?.stopForShutdown() ?? Promise.resolve()
+  }
+}
+
+/** Stops new work, gives active ticks a bounded drain, then closes kernel storage. */
+export async function shutdownHeimdallKernel(
+  input: KernelShutdownInput,
+  drainMs = DEFAULT_DRAIN_MS
+): Promise<void> {
+  input.subscribers.clear()
+  notifyShutdownListeners(input.listeners)
+  if (!input.loaded) {
+    notifyShutdownListeners(input.drainedListeners)
+    return
+  }
+
+  try {
+    if (!input.runnerLoop) {
+      throw new Error('Heimdall runner is unavailable')
+    }
+    const runners = [...input.runners]
+    const deadlineAtMs = Date.now() + Math.max(0, drainMs)
+    for (const runner of runners) {
+      input.runnerLoop.stop(runner)
+    }
+    input.host?.detachPowerMonitor()
+    input.unsubscribeLedger?.()
+    await settleWithinMs(
+      Promise.allSettled(runners.map((runner) => runner.operationTail)),
+      Math.max(0, deadlineAtMs - Date.now())
+    )
+
+    const releases: Promise<void>[] = []
+    for (const runner of runners) {
+      const guard = runner.leaseGuard
+      if (!guard) {
+        continue
+      }
+      releases.push(
+        requireLeaseStore(input.leaseStore)
+          .release(runner.enrollment.workspaceKey, guard.holder, guard.epoch)
+          .catch(() => {})
+          .finally(() => {
+            if (runner.leaseGuard === guard) {
+              runner.leaseGuard = null
+            }
+          })
+      )
+    }
+    await settleWithinMs(Promise.allSettled(releases), Math.max(0, deadlineAtMs - Date.now()))
+  } catch (error) {
+    console.warn('[heimdall] shutdown teardown failed:', error)
+  }
+  notifyShutdownListeners(input.drainedListeners)
+  try {
+    input.database?.close()
+  } catch (error) {
+    console.warn('[heimdall] shutdown database close failed:', error)
+  }
+}

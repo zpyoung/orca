@@ -103,8 +103,9 @@ UPSTREAM_TARGET=$(git rev-parse "${STABLE_TAG}^{commit}")
 
 Fetch before resolving, always. `ls-remote` names commits the fork has never downloaded, and any
 `git` command given one of those SHAs — `merge-base --is-ancestor` especially — exits 128 and aborts
-mid-run. Upstream tags are immutable, so a rejected non-fast-forward tag update means something is
-wrong: STOP and report rather than forcing it.
+mid-run. Upstream does not rewrite a tag in place, so a rejected non-fast-forward tag update means
+something is wrong: STOP and report rather than forcing it. It does sometimes **delete** one, which
+is a different failure and is caught in Step 2 rather than here.
 
 Capture these and keep them; every restore path depends on them:
 
@@ -132,6 +133,26 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
 `main` already contains upstream trunk commits absorbed by previous syncs; a plain
 `$UPSTREAM_TARGET..origin/main` range reports those as fork work and inflates N by dozens.
 
+- **Before the ancestry test, check that the target is not *older* than what `main` carries.**
+  Read `upstream_synced` from `CHANGELOG.md`'s YAML frontmatter and compare by version order:
+
+  ```sh
+  SYNCED=$(sed -n 's/^upstream_synced: *//p' CHANGELOG.md | head -1)
+  [ "$STABLE_TAG" = "$SYNCED" ] \
+    || [ "$(printf '%s\n%s\n' "$STABLE_TAG" "$SYNCED" | sort -V | tail -1)" = "$STABLE_TAG" ] \
+    || echo 'target is OLDER than upstream_synced'
+  ```
+
+  Equal is the ordinary quiet day and must fall through to the next bullet, which handles it as a
+  success — only a strictly older target is the finding here, so the equality test comes first and
+  short-circuits.
+
+  If the target is older, upstream has **retracted** a stable tag this fork already absorbed. Record
+  "no new stable release", skip to Step 12, and raise it as a "needs attention" item. Do not merge:
+  Step 6 resets every upstream-owned file to `$UPSTREAM_TARGET`, so merging an older tag rolls the
+  whole fork back a release and breaks any fork commit written against the newer release's API
+  shapes. `merge-base --is-ancestor` cannot catch this on its own — stable tags live on their own
+  release branches, so it fails for an *older* tag exactly as it does for a genuinely new one.
 - If `git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main` succeeds, `main` already contains
   this release. Skip to Step 12 and note "no new stable release (already at $STABLE_TAG)". This is
   the expected outcome on most days and is a success, not a warning.
@@ -141,6 +162,20 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
   (`git reset --hard "$UPSTREAM_TARGET"`) and skip to Step 8. It still lands through a PR; there is
   no direct push to `main` anywhere in this flow.
 - Otherwise continue.
+
+Then check that the **previous** stable tag is still an ancestor:
+
+```sh
+git merge-base --is-ancestor "$PREV_TAG" origin/main
+```
+
+If it fails, the last sync PR was squash-merged. `main` still carries that release's *content*, so
+nothing looks wrong, but the tag commit is gone from the lineage and `git merge` resolves its base a
+release further back — v1.4.205 merged against a v1.4.203-era base and produced 2,536 differing
+paths and 287 conflicted files instead of a one-release step. Proceed with the normal procedure:
+`-X ours` plus Step 6 still resolve it, and `$PREV_TAG` is still the right content baseline for
+every Step 6 audit diff. But say so in the report — it is a violated invariant of this flow, not a
+quirk of the release — and expect the ownership lists to be several times their usual size.
 
 ### An earlier run's PR may already resolve this tag
 
@@ -152,6 +187,17 @@ racing a duplicate PR against the first. Check before Step 3:
 env -u GITHUB_TOKEN gh pr list --repo zpyoung/orca --state open \
   --json number,title,url,headRefName,headRefOid
 ```
+
+**A sync PR for an older tag stops the run here.** If an open PR is titled
+`sync: absorb upstream <tag>` for any tag other than `$STABLE_TAG`, upstream shipped a newer stable
+release while an earlier sync was still unlanded. Neither continuation is safe: stable tags live on
+per-release branches, so the older tag is not an ancestor of the newer one and the adoption checks
+below fail by construction; and merging `$STABLE_TAG` onto a fresh `main` re-derives the older PR's
+resolution and races it. Stop before Step 3 — nothing backed up, merged, or pushed — and report
+"needs attention: sync PR #<n> for <tag> is still open; land or close it before syncing
+`$STABLE_TAG`". Once it lands, the newer tag is an ordinary one-release sync; once it is closed, the
+next run syncs `$STABLE_TAG` fresh. Hit on 2026-09-10 (#48, v1.4.198 vs v1.4.199) and 2026-09-26
+(#92, v1.4.209 vs v1.4.212).
 
 A PR titled `sync: absorb upstream $STABLE_TAG` is this run's work, already done. **Adopt it — do not
 re-merge.** Verify it before you build on it, because its body is its own account and not evidence:
@@ -240,8 +286,11 @@ handed and stop rather than adapting to a workspace that fails any of these:
 - `git symbolic-ref --short HEAD` resolves (HEAD is not detached) and is **not** `main`. Merging on
   `main` would put the resolution on the branch the PR targets.
 - `git status --porcelain` is empty.
-- No rebase/merge/cherry-pick is in progress (no `.git/rebase-merge`, `.git/rebase-apply`,
-  `.git/MERGE_HEAD`).
+- No rebase/merge/cherry-pick is in progress. Resolve each path with `git rev-parse --git-path`
+  (`MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`) and test what it prints. A
+  literal `.git/MERGE_HEAD` test can never fire here: the run always happens in a worktree, where
+  `.git` is a *file* pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
+  reads as absent no matter what is in progress.
 - `git merge-base --is-ancestor HEAD origin/main` succeeds. The branch carries no commits of its
   own, so the reset below destroys nothing. If it fails, the workspace holds someone's work.
 
@@ -259,7 +308,22 @@ before merging, so an install failure is never mistaken for a resolution failure
 pnpm install --frozen-lockfile
 ```
 
-If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
+**One dirty-tree case is not someone's work and must not stop the run.** The worktree setup installs
+with whatever `pnpm` is on `PATH`, and an ambient pnpm 10 rewrites the pnpm-12 lockfile in place —
+`pnpm-lock.yaml` alone modified, its `packageManagerDependencies` block dropped and the rest
+reflowed. Confirm it is only that file and only that shape, then restore it and take the pinned
+toolchain for the whole run, since `package.json`'s `packageManager` is not self-enforcing here:
+
+```sh
+git checkout -- pnpm-lock.yaml
+corepack pnpm -v            # must print the packageManager pin, e.g. 12.0.0
+```
+
+Put a `pnpm` shim that execs `corepack pnpm` at the front of `PATH` for the run — repo scripts
+invoke bare `pnpm` internally, so switching only your own calls is not enough. Anything else dirty
+is a stop.
+
+If any check or the install fails, STOP and go to Step 16 with "needs attention: unusable run
 workspace (<which check failed>) — nothing merged, nothing pushed".
 
 ## Step 5 — Merge with fork priority
@@ -305,7 +369,7 @@ runs on the repaired tree.
 
 Anything else — rename/rename, rename/delete, submodule conflicts, binary files you cannot attribute
 to a side, or more than 25 conflicted paths in total — is out of scope. Do not guess. Run
-`git merge --abort` and go to Step 13 with "needs attention: merge conflicts require manual
+`git merge --abort` and go to Step 16 with "needs attention: merge conflicts require manual
 resolution (<conflict type> at <paths>)".
 
 After any completed merge, verify no conflict markers survived:
@@ -331,7 +395,7 @@ manifest's declared lines.
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
 feature-collision review**. Each can surface a decision the reference routes to a human. Under
-`--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
+`--unattended`, that is a stopping condition: go to Step 16 with "needs attention: <the decision>"
 rather than choosing a side.
 
 **`ours.txt` is the list that loses work silently, so audit it.** An exception wins the whole file,
@@ -353,6 +417,23 @@ cleanly, so the merge costs nothing and is the only thing that actually separate
 owns from the file it happens to live in. Resolve a genuine conflict in the fork's favour only where
 the exception's `reason` is what upstream's side would undo — a fork build artifact, a fork identity
 file, or a record the reason says upstream's copy actively breaks.
+
+**A four-digit removal on an `ours.txt` path is a module split, not lost fork work.** The numstat
+above is the only tell an exception ever gets: `--verify-residuals` reads `seams` alone, so a split
+that lands on an exception-owned file is invisible to every manifest check. v1.4.197 split three at
+once — `src/main/updater.ts` (2,353 lines to a 94-line barrel), `src/main/rate-limits/service.ts`
+(2,182 to 10) and `TerminalPane.tsx` (3,505 to 15) — and the exception would have defended all three
+monoliths while the merge added the new modules beside them. Do not three-way merge one of these;
+re-home it by the recipe in [`references/sync-lessons.md`](./references/sync-lessons.md), which now
+covers the exception case as well as the seam case.
+
+**Before designing the re-home, read the test files that arrived beside the split.** A release that
+dissolves a monolith tends to pin the result, and the pins are exact equalities — a `toHaveLength`,
+a `_SHA256` of a flattened hook or listener order, a `LISTENER_BUDGET` compared with `toBe`. If the
+fork feature that lived in the monolith necessarily adds hooks or store subscriptions inside the
+pinned file set, no re-home satisfies them and re-baselining the constants is the baseline bump the
+fix policy forbids. That is a confirmed feature collision: stop and raise it, rather than spending
+the hour first.
 
 A `reason` that reads like whole-file ownership ("the fork's release-tooling delta", "fork-specific
 thresholds") is exactly where this goes wrong: it is describing a *delta*, and the exception is
@@ -406,6 +487,26 @@ seven were real: two cross-version tests pinning fork release refs, two PR-workf
 that must know `fork_ownership_guard` is ungated, a ratchet inventory counting a fork dialog, an
 import repointed at a forked copy, and a relay test mocking the fork's transport.
 
+**First ask whether the fork's side diverges at all.** An exception is a standing claim, and nothing
+re-checks that the claim is still true, so a path can keep winning long after the fork stopped
+differing from upstream there. Where the fork's side is byte-identical to the previous tag, there is
+no fork content to weigh and no decision to make — take upstream's file wholesale:
+
+```sh
+while read -r p; do
+  [ -z "$p" ] && continue
+  git cat-file -e "${PREV_TAG}:${p}" 2>/dev/null || continue
+  git diff --quiet "$PREV_TAG" "$MERGE_HEAD_PRE" -- "$p" && echo "stale exception: $p"
+done < <out-dir>/ours.txt
+```
+
+Run this before the numstat loop; it removes paths from the decision list rather than adding them.
+
+The same staleness also hides *inside* a path that does diverge, where it reads as deliberate fork
+intent. Before defending a hunk the fork appears to have deleted, check whether a fork commit ever
+touched it — `git log -S'<symbol>' -- <path>` returning only upstream commits means the exception
+discarded upstream's addition at some earlier sync and no one chose anything.
+
 `package.json` is the one that fails loudest and least obviously: `pnpm-lock.yaml` is upstream-owned
 and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
 fail in Step 8 with a lockfile error that names nothing about ownership.
@@ -414,12 +515,33 @@ fail in Step 8 with a lockfile error that names nothing about ownership.
 deletions were decided against the *previous* tag's import graph; a new release can add files that
 import a module the fork deletes. Nothing reports it — `remove.txt` honours the deletion, both
 manifest checks pass, and the ownership guard passes — so it surfaces as `TS2307` against upstream's
-own new files. Sweep right after `remove.txt` is applied:
+own new files. Sweep right after `remove.txt` is applied.
+
+Grep the **merged working tree**, not `$UPSTREAM_TARGET`. The tag is upstream's view, where nothing
+the fork deletes has been deleted and nothing it replaces has been replaced, so every consumer the
+fork owns still carries its upstream import there and the sweep reports it. On v1.4.207 a
+tag-reading form printed three findings against a true answer of zero. The merged tree is also the
+tree `tsc` compiles, so a hit here is the `TS2307` you would otherwise meet in Step 8:
 
 ```sh
-git grep -n "from '\./" "$UPSTREAM_TARGET" -- <dir of each deleted path> \
-  | grep -Ff <(sed 's|.*/||;s|\.[^.]*$||' <out-dir>/remove.txt)
+python3 - <<'SWEEP'
+import json, subprocess
+m = json.load(open('config/fork-ownership.json'))
+gone = {e['path'] for e in m['exceptions'] if e.get('deleted')}
+hit = False
+for p in sorted(gone):
+    mod = p.rsplit('/', 1)[-1].rsplit('.', 1)[0]
+    live = subprocess.run(['git', 'grep', '-lE', f"from '[^']*/{mod}'"],
+                          capture_output=True, text=True).stdout.split()
+    if live:
+        hit = True
+        print(f'{p} still imported by {len(live)}: {live[:3]}')
+print('NONE' if not hit else '^^ withdraw the deletion')
+SWEEP
 ```
+
+Match an import specifier, not a bare occurrence of the module name: a `vi.mock('./mod', () => ...)`
+with a factory never resolves the module, so it is not evidence of anything.
 
 Withdraw the deletion rather than extending it: restore the module and its test from the tag and
 drop the exception. Never delete the new upstream files to match, and never repoint an upstream
@@ -444,7 +566,7 @@ Commit the ownership resolution as a single follow-up commit on top of the merge
 `--no-verify` for the reason in Step 5; Step 7 expects exactly one such extra commit.
 
 If the classifier fails, or `checkout.txt` is empty when the merge was not a no-op, STOP and go to
-Step 13 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
+Step 16 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
 that is the known-broken state.
 
 ## Step 7 — Commit accounting
@@ -454,7 +576,7 @@ makes this check strict and cheap: every SHA in FORK_COMMITS must still be prese
 
 For each SHA recorded in Step 2, `git merge-base --is-ancestor <sha> HEAD` must succeed. If any does
 not, something rewrote history — reset back (`git reset --hard $ORIGIN_MAIN_OLD`) and go to
-Step 13 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
+Step 16 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
 
 Also re-run the Step 2 range against the merged head —
 `git log --oneline --no-merges HEAD --not upstream/main "$UPSTREAM_TARGET"` — and confirm the count
@@ -481,14 +603,22 @@ A fix may:
   changed line on a sync PR, so `static analysis` reports findings upstream's own CI never sees.
   Rewrite upstream's code to satisfy the rule and declare the file `pending-upstream` under the
   existing ledger section — never add it to a suppression list
-- apply mechanical lint/format fixes (`oxlint --fix`, `pnpm format`), committed on their own
+- apply lint and format fixes, committed one commit per rule. A stable tag can enable whole rule
+  families that `--fix` cannot rewrite, and adopting those in fork-owned files **is the run's job** —
+  it is never an escalation on its own. The fix is names and types only, taken from upstream's own
+  adoption commit for that rule; `references/file-ownership.md` § *When upstream tightens the linter*
+  has the method and its limits
 
 Escalate — stop, leave the PR open, report "needs attention" — for:
 
 - any resolution that would cost fork feature functionality: upstream reworked the code a fork
   feature hangs off, and every fix available loses behavior this fork ships
 - the Step 6 human decisions (feature collision, pending-upstream item, unresolvable conflict)
-- an upstream defect the fork would have to work around
+- an upstream defect the fork would have to work around — including a new lint rule that upstream's
+  own release violates in its own file. Retarget to a newer stable tag first if one exists; that
+  usually dissolves it
+- a single lint violation that cannot be cleared without changing what the code does. Adopt every
+  other rule, and escalate that one file alone rather than the run
 
 Never, on either gate:
 
@@ -512,7 +642,32 @@ specifies, including the manifest checks (`--verify-seams`, `--verify-residuals`
 fakes a result if skipped.
 
 Order: `pnpm install --frozen-lockfile` (re-run it here — the merge may have taken upstream's
-`pnpm-lock.yaml`) → manifest checks → `pnpm typecheck` → `pnpm lint`.
+`pnpm-lock.yaml`) → manifest checks → typecheck → `pnpm lint`.
+
+**Never run `pnpm typecheck` here.** `AGENTS.md` forbids it on this machine: it is
+`run-typecheck-projects-in-parallel.mjs`, which spawns a `tsc --noEmit` per project concurrently,
+and with several sync worktrees open that saturates every core. Run the same four projects one
+after another instead — same coverage, no concurrency — clearing the build cache before each, since
+composite projects cache errors across the `git checkout` swaps this step is full of:
+
+```sh
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:node
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:web
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:cli
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && \
+  pnpm exec tsc --noEmit -p config/tsconfig.mobile-web.json
+```
+
+Four separate commands on purpose, not a loop: under the sandboxed shell a command in a `for` body
+can come back "command not found", which inverts the result silently, and a loop's `|| break` would
+swallow the exit code this gate turns on. Read each one's status before running the next. `zsh` has
+no `PIPESTATUS`, so do not pipe these into `tail` and expect `$?` to mean anything — redirect to a
+file instead.
+
+`typecheck:e2e` is **not** one of them, and running it will cost you a diagnosis. It is absent from
+`pnpm typecheck` and from the `typecheck` job in `pr.yml`, so `config/tsconfig.e2e.json` has drifted
+unchecked — 216 errors across 110 files on `main` at v1.4.207, none of them a sync's doing. Do not
+add it to the gate, and do not treat its output as merge damage.
 
 Every step is absolute: stop at the first failure and treat it as a hard fail. The reference's
 rule-tightening carve-out is the one exception, and it is an exception about *how the tree is
@@ -532,8 +687,18 @@ A hard fail here is not the end of the run — work it under the fix policy abov
 gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks lint, and a partial
 re-run is how a broken tree reaches the PR.
 
-If the policy says escalate, or the same failure survives your fixes, restore and bail:
-`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
+If the policy says escalate, or the same failure survives your fixes, **tag the resolution before
+you throw it away**. The reset is mandatory, but a run that escalates has usually produced a
+complete, correct resolution that only a human decision blocks, and the tag lives in the shared
+`.git`, so it survives this worktree being deleted:
+
+```sh
+git tag "sync-resolved/${STABLE_TAG}-<stamp>" HEAD
+```
+
+Name that tag and its SHA in the report, so the rerun after the decision starts from it instead of
+redoing hours of ownership work. Then restore and bail:
+`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 16 with "needs attention: merge resolved but
 <install|manifest|typecheck|lint> failed — manual resolution required; backup at
 origin/<BACKUP_REF>". Include the first ~20 lines of the failure output.
 
@@ -709,7 +874,28 @@ Then confirm and capture the new tip:
 git fetch origin main
 MAIN_NEW=$(git rev-parse origin/main)
 git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main   # must succeed
+git rev-list --parents -n1 "$MAIN_NEW" | wc -w                # must be 3: the commit and two parents
 ```
+
+**Both checks are load-bearing — run them and act on the result.** A squash puts the tag's
+*content* on `main` while leaving its *commit* out of the lineage, so the ancestor check fails and
+the parent count reads 2 instead of 3. Verified on PR #82: after it was squashed,
+`git merge-base --is-ancestor v1.4.204 origin/main` exits 1 while `main`'s tree verifies clean
+against v1.4.204. The parent count is the more direct signal, because it also catches a rebase
+merge, whose single parent still carries the content forward.
+
+Nothing else notices for a long time, and what eventually does is confusing. The fork ownership
+guard picks the newest stable tag *reachable from HEAD*, so it silently falls back a release and
+reports every seam re-baselined since as drift — on **every** PR, including ones that touch nothing.
+#82 left #83 red that way, with ~25 false residual failures and no fault of its own. The next sync
+then merges against a base a release further back: v1.4.205 resolved against a v1.4.203-era base and
+produced 2,536 differing paths and 287 conflicted files for what should have been a one-release step.
+
+If either check fails, `main` has the content but not the lineage. Do not reset or force anything —
+the next sync's own merge commit restores the ancestry. Report "needs attention: $STABLE_TAG was not
+merged as a merge commit — the ownership guard will compare every PR against $PREV_TAG", and name
+the tag the next run will find missing. The repo still allows `allow_squash_merge` and
+`allow_rebase_merge`, so this can recur; turning them off is the repo owner's call, not the run's.
 
 The fork does not delete branches on merge, and this automation opens one a day, so clean up the
 remote branch best-effort: `git push origin --delete "$SYNC_BRANCH"`. A failure here is worth a line

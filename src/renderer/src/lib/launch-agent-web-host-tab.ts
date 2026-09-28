@@ -11,7 +11,7 @@ import type { Tab } from '../../../shared/tab-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentPromptDelivery } from '../../../shared/agent-session-host-authority'
 import { translate } from '@/i18n/i18n'
-import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
+import { toAgentLaunchPreferencesWithOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'
 import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 
@@ -77,7 +77,7 @@ export async function launchAgentInWebHostTab(args: {
         AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY
       ).catch(() => false))
     : false
-  const launchPreferences = toAgentLaunchPreferences(startupPlan.sessionOptions, {
+  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(startupPlan.sessionOptions, {
     includeOptionValues
   })
   const structuredPromptDelivery: AgentPromptDelivery =
@@ -133,7 +133,7 @@ export async function launchAgentInWebHostTab(args: {
       )
       return { delivered: false, failureNotified: true }
     }
-    useAppStore.getState().setActiveTabType('terminal')
+    useAppStore.getState().setActiveTabType('terminal', worktreeId)
     if (hasPrompt && promptDelivered) {
       onPromptDelivered?.()
     }
@@ -146,7 +146,7 @@ export async function launchAgentInWebHostTab(args: {
       agent,
       promptAfterReady: pastePromptAfterReady,
       submitPrompt: submitPastedPrompt,
-      forcePromptPaste: promptDelivery === 'submit-after-ready'
+      forcePromptPaste: true
     }).then(handleCreation)
   }
   if (hasPrompt && promptDelivery === 'draft') {

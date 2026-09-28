@@ -61,7 +61,7 @@ on every seam and feature path, either auto-resolving disjoint hunks or leaving 
 Open each listed path and check it by hand against the manifest's declared `lines` for that path —
 those lines are the protected floor, not the whole file — before continuing.
 
-Upstream owns every key it defines, so the manifest leaves `src/renderer/src/locales/*.json`
+Upstream owns every key it defines, so the manifest leaves `src/renderer/src/i18n/locales/*.json`
 unclaimed and they reset to the tag through `checkout.txt` like any other upstream file. The fork's
 own keys live in per-feature bundles under the feature directories, which a feature glob claims. Keep
 that split: a fork entry duplicating a key upstream defines shadows upstream's real translation with
@@ -74,8 +74,17 @@ now fails `verify:localization-catalog` with
 day before had only en/es/ja/ko/zh. Sweep after resolution:
 
 ```sh
-comm -23 <(ls src/renderer/src/locales/*.json | xargs -n1 basename | sort) \
+comm -23 <(ls src/renderer/src/i18n/locales/*.json | xargs -n1 basename | sort) \
          <(ls <fork bundle dir> | sort)
+```
+
+Resolve the upstream locale directory rather than pasting the path: it has moved once already, and
+a sweep pointed at a directory that no longer exists finds zero locales and reports every fork
+bundle complete. `ls` at least errors; a glob in Python or a `find` returns an empty set silently,
+which reads exactly like a pass. Confirm the set is non-empty before trusting the comparison.
+
+```sh
+dirname "$(git ls-files 'src/renderer/**/locales/en.json' | grep -v fork- )"
 ```
 
 `pnpm sync:localization-catalog` will **not** fix this — `--fix` only repairs catalog registration
@@ -207,37 +216,81 @@ which and why in the commit message. Do **not** backport the missing implementat
 
 ## When upstream tightens the linter
 
-A stable tag can enable new rules in `.oxlintrc.json` (and bump the `oxlint` devDependency). Those
-rules then fire on **fork-only files the merge never touched**, byte-identical to the pre-merge
-baseline. This is not an ownership question — there is no upstream side of a fork-only file to
-resolve to — and it blocked three consecutive syncs (v1.4.183 twice, v1.4.184) before the policy
-below existed.
+A stable tag can enable new rules (and bump the `oxlint` devDependency). Those rules then fire on
+**fork-only files the merge never touched**, byte-identical to the pre-merge baseline. This is not
+an ownership question — there is no upstream side of a fork-only file to resolve to — and it
+blocked three consecutive syncs (v1.4.183 twice, v1.4.184) before the policy below existed.
 
 Diagnose it before treating a lint failure as merge damage:
 
 ```sh
-git diff "$ORIGIN_MAIN_OLD" HEAD -- .oxlintrc.json     # did the merge add rules?
-git diff --quiet "$ORIGIN_MAIN_OLD" -- <violating-file> # is the file identical to baseline?
+git diff "$ORIGIN_MAIN_OLD" HEAD -- .oxlintrc.json 'config/oxlint-*.json'   # new rules anywhere?
+git diff "$ORIGIN_MAIN_OLD" HEAD -- package.json | grep -E '^[-+].*"(lint|audit:|check:)' # new step?
+git diff --quiet "$ORIGIN_MAIN_OLD" -- <violating-file>  # is the file identical to baseline?
 ```
 
-Both true → toolchain tightening. **Adopting the new rule in the fork's own file is in scope**, but
-only mechanically:
+**`.oxlintrc.json` alone is not the question, and answering only it reads as "no new rules" when
+there are eight.** v1.4.205 left that file byte-identical and instead added
+`config/oxlint-anti-slop.json` — a whole plugin, `anti-slop`, with eight rules on — reached through
+a *new* `pnpm lint` sub-step, `audit:anti-slop`. A release can add a config, a step, or both, so
+diff every `config/oxlint-*.json` and the `lint` script together.
+
+That second command matters for a reason beyond discovery: `package.json` is a whole-file fork
+exception, so a new sub-step only reaches the fork's tree if the `ours.txt` audit three-way-merges
+it. Skip that merge and the gate passes locally while PR CI, which runs the step from its own
+workflow, fails.
+
+New rules → toolchain tightening. **Adopting a new rule in the fork's own files is the run's job,
+and it does not stop for a human.** A red lint gate is never a reason to abandon a resolution that
+is otherwise complete.
+
+Try `pnpm exec oxlint --fix <violating-file>` first, because a fixable rule costs nothing. Expect it
+to rewrite nothing: whole rule families are advisory-only. `anti-slop` shipped eight rules in
+v1.4.206 and **not one** is auto-fixable, so a run that treats `--fix` as the boundary has no move at
+all — which is exactly how v1.4.205 stalled with everything else green.
+
+**Write the fix by hand, and take the wording from upstream.** Upstream ran the same rule over its
+own tree in the release that enabled it, so its adoption commit is the reference answer for what the
+rule wants. Find it and read it before renaming anything:
 
 ```sh
-pnpm exec oxlint --fix <violating-file>
+git log --oneline "$PREV_TAG".."$UPSTREAM_TARGET" --grep 'lint' --grep 'anti-slop' -i
+git show <that commit> -- src | grep -E '^[-+]' | grep -vE '^[-+]{3}'
 ```
 
-Commit it separately from the merge and the ownership commit, and name the rule in the message. Then
-re-run the full gate — the fix is only valid if typecheck, lint, and tests all still pass.
+For v1.4.206 that gave the whole vocabulary: `no-shape-in-symbol-names` wants the decision a symbol
+carries, not the structure it inspects (`isSkillsCliAgentKeyShaped` → `isUsableSkillsCliAgentKey`,
+`RootShape` → `RootLayout`, `SourceShape` → `SourceCookieRow`); `no-reflect-get` wants typed
+property access, not a cast. Mirroring that is what keeps a hand-written fix from being an invention.
 
-Hard limits. Violate any of these and it is a human decision, not an automated one:
+Then, per rule:
 
+1. One commit per rule, named for it, separate from the merge and the ownership commit, citing the
+   upstream commit whose idiom it mirrors. That trail is what makes the change reviewable.
+2. Re-run the **whole** gate. A rename reaches callers and tests, and a narrowed parameter type can
+   reject a test's `{}` — both happened on v1.4.206 and both are part of the fix, not a new problem.
+3. Say in the PR body what changed and what did not.
+
+Hard limits. These bound *how* the fix is written; none of them is a reason to stop:
+
+- **Names and types only, never behaviour.** Rename a symbol, name a type that was `object`, narrow a
+  string key to the union it always held. Never change a branch, a message, an assertion or a
+  regex to satisfy a rule. If the only way to clear a rule is to change what the code *does*, that
+  one violation is a human decision — resolve the rest and escalate it alone.
+- Never `--fix-suggestions` or `--fix-dangerously`; both can alter behaviour.
 - Only files byte-identical to `$ORIGIN_MAIN_OLD`. A violation in a file the merge *changed* is
-  `-X ours` damage — resolve it to one real side instead (see the two sections above).
-- Only what `--fix` rewrites on its own. Never hand-write a logic change to satisfy a rule, and never
-  reach for `--fix-suggestions` or `--fix-dangerously`; both can alter behavior.
-- Never edit `.oxlintrc.json` to silence the rule. Upstream owns that file, so the next sync would
-  re-add the rule and re-block.
+  `-X ours` damage, not toolchain tightening — resolve it to one real side instead (see the two
+  sections above) rather than renaming around it.
+- Only files the fork owns. A violation in a file byte-identical to the *tag* is upstream's release
+  failing its own new rule; v1.4.205 shipped `Reflect.get` in `agent-status-legacy-adapter.ts` under
+  its own new `no-reflect-get` and fixed it on the next release branch. Retarget to the newer stable
+  tag if one exists — that is the cheapest fix and it dissolves the finding. Otherwise treat it as an
+  upstream defect and escalate that file alone. Proving it needs no checkout, unlike the vitest case
+  above: if the lint config, the plugin pin in `package.json`, and the violating file are each
+  byte-identical to the tag, the inputs are the tag's and the finding is deterministic. Three
+  `git diff --quiet` calls settle it.
+- Never edit `.oxlintrc.json` or `config/oxlint-*.json` to silence a rule, and never add a
+  suppression entry. Upstream owns those files, so the next sync re-adds the rule and re-blocks.
 
 Only violations that survive into the **merged** tree matter. Running the new config against the
 pre-merge baseline over-reports badly: most flagged files take upstream's already-compliant version
@@ -247,10 +300,15 @@ To get ahead of the next release instead of discovering this mid-sync, run the t
 against the current tree before merging — restore the baseline config afterward:
 
 ```sh
-cp .oxlintrc.json /tmp/oxlintrc.baseline.json
-git show <target-ref>:.oxlintrc.json > .oxlintrc.json
-pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
+git diff <target-ref> -- .oxlintrc.json 'config/oxlint-*.json'
+git diff <target-ref> -- package.json | grep -E '^[-+].*"(lint|audit:|check:)'
 ```
+
+Swapping in the target's `.oxlintrc.json` and re-running `oxlint` is **not** the pre-check, for the
+same reason the diagnostic above is not: a release can put its new rules in a separate config behind
+a separate script, and that rehearsal runs neither. Read the two diffs instead, then rehearse
+whatever they actually name — for v1.4.205 that meant installing the pinned plugin and running
+`audit:anti-slop`, which the old rehearsal would have missed entirely.
 
 ## When upstream ratchets a chokepoint
 
@@ -277,6 +335,31 @@ fork — the fork's direct call skipped a queued mock response and the next cons
 frame. And the fork's own tests mock whatever the fork used to call, so they have to move to the new
 module too.
 
+## When a seam meets an upstream test double
+
+Upstream's own suites drive every seam, and their fixtures are partial doubles built for upstream's
+code — they supply only what upstream's path reads. A seam that dereferences anything the fixture
+does not provide throws inside upstream's test, so one fork line fails suites the fork has no stake
+in, in files it does not own.
+
+v1.4.206 added a pending-close fixture with no `settingsRef`. The terminal-dock seam read
+`deps.settingsRef.current?.experimentalTerminalDock` — optional on `.current`, but not on the ref
+itself — and three pending-close suites threw `Cannot read properties of undefined (reading
+'current')` across three separate shards.
+
+The tell is a `TypeError` whose stack runs from an upstream test, through an upstream fixture, into
+one fork line in an upstream file. That shape is never a merge-resolution question: the seam is
+present and correct, and `--verify-seams` passes. Read the fixture before reading the seam.
+
+Write every seam so it degrades to its feature being off:
+
+- optional-chain the whole access path, not just its last hop
+- treat absent state as the feature disabled, never as a reason to throw
+- open durable state lazily, so merely importing the module in a test does not touch a store
+
+This is not the fixture's bug to fix. Upstream's fixture is upstream-owned and resets to the tag
+every sync, so hardening it there is undone at the next release; the guard belongs in the seam.
+
 ## Verifying
 
 Two manifest checks run against the new release, and the second one is where a sync goes quietly
@@ -297,7 +380,9 @@ absorbed a line the fork was carrying, and the seam should be re-read before the
 Re-baseline by rerunning the recorder and committing the new numbers with the resolution, never as a
 sweep to make the check quiet.
 
-`pnpm typecheck` and `pnpm lint` are absolute: a failure is a failure. Neither is run against a
+Typecheck and `pnpm lint` are absolute: a failure is a failure. Run the typecheck as the four
+per-project commands in `SKILL.md` § Step 8, never as `pnpm typecheck` — `AGENTS.md` forbids the
+parallel form on this machine. Neither is run against a
 baseline for comparison, and there is nothing to compare against — the tree either compiles and
 lints or it does not.
 

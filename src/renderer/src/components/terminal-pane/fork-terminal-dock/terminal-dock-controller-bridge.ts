@@ -1,4 +1,5 @@
 import type { PtyTransportRecoveryState } from '../pty-transport-types'
+import { isTerminalLeafId, makePaneKey } from '../../../../../shared/stable-pane-id'
 
 /**
  * Publishes the dock's controller-facing surface for one terminal tab.
@@ -39,6 +40,16 @@ export function hasTerminalDockControllerBridge(tabId: string): boolean {
 
 export function terminalDockPaneOwnsFocus(tabId: string, paneKey: string): boolean {
   return bridgeByTabId.get(tabId)?.paneDockOwnsFocus(paneKey) ?? false
+}
+
+/** Leaf-keyed form for callers holding a pane, not a pane key. A leaf without a stable id
+ *  (upstream's test doubles use plain names) cannot have a docked composer. */
+export function terminalDockLeafOwnsFocus(tabId: string, leafId: string): boolean {
+  const bridge = bridgeByTabId.get(tabId)
+  if (!bridge || !isTerminalLeafId(leafId)) {
+    return false
+  }
+  return bridge.paneDockOwnsFocus(makePaneKey(tabId, leafId))
 }
 
 export function noteTerminalDockPanePtyBindingChanged(tabId: string): void {

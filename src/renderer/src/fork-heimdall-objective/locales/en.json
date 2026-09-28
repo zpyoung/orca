@@ -1,0 +1,341 @@
+{
+  "fork": {
+    "heimdallObjective": {
+      "value": {
+        "tier": {
+          "express": "Express",
+          "standard": "Standard",
+          "full": "Full"
+        },
+        "bar": {
+          "filesOnDisk": "Files on disk",
+          "committedLocalBranch": "Committed local branch",
+          "pushedRef": "Pushed ref",
+          "hostedReview": "Hosted review",
+          "merged": "Merged"
+        },
+        "capabilityMode": {
+          "off": "Off",
+          "gated": "Approval required",
+          "on": "On"
+        },
+        "capability": {
+          "plan": "Plan",
+          "implement": "Implement",
+          "review": "Review",
+          "check": "Run checks",
+          "land": "Land"
+        },
+        "role": {
+          "planner": "Planner",
+          "implementer": "Implementer",
+          "reviewer": "Reviewer",
+          "integrator": "Integrator"
+        },
+        "sitter": {
+          "updateBranch": "Update branch",
+          "resolveConflicts": "Resolve conflicts",
+          "fixChecks": "Fix checks",
+          "merge": "Merge"
+        },
+        "workspace": {
+          "folder": "Folder",
+          "git": "Git"
+        },
+        "node": {
+          "pending": "Pending",
+          "blockedByDeps": "Blocked by dependencies",
+          "awaitingApproval": "Awaiting approval",
+          "dispatched": "Dispatched",
+          "succeeded": "Succeeded",
+          "failed": "Failed",
+          "replanned": "Replanned"
+        },
+        "train": {
+          "running": "Running",
+          "waitingToApply": "Waiting to apply",
+          "applying": "Applying",
+          "resolvingConflict": "Resolving conflict",
+          "applied": "Applied",
+          "failed": "Failed",
+          "discarded": "Discarded"
+        },
+        "revision": {
+          "draft": "Draft",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "superseded": "Superseded"
+        },
+        "reviewRole": {
+          "reviewer": "Reviewer",
+          "integrator": "Integrator"
+        },
+        "verdict": {
+          "approve": "Approve",
+          "block": "Block"
+        },
+        "criterionReview": {
+          "pass": "Pass",
+          "block": "Block"
+        }
+      },
+      "enrollment": {
+        "newAction": "New objective",
+        "title": "New objective",
+        "description": "Define the contract Heimdall will plan, execute, review, and land.",
+        "workspace": "Workspace",
+        "workspaceHelp": "The selected workspace and its owning host run every worker and check.",
+        "workspacePlaceholder": "Choose a workspace",
+        "noWorkspaces": "No eligible workspace is available.",
+        "objective": "Objective",
+        "objectiveHelp": "State the observable result the workers must deliver.",
+        "execution": "Execution contract",
+        "tier": "Tier",
+        "landingBar": "Landing bar",
+        "maxConcurrency": "Max concurrency",
+        "maxConcurrencyHelp": {
+          "one": "Runs in place without dispatch worktrees.",
+          "three": "Default. Runs up to three independent nodes or lanes."
+        },
+        "maxConcurrencyDescription": "Workers may use up to this many isolated dispatch slots.",
+        "folderConcurrencyHelp": "Folder workspaces cannot create worktrees, so concurrency is limited to 1.",
+        "hostConcurrencyHelp": "This host does not support parallel execution yet; the watcher will run in place.",
+        "lanes": "Keep dependent work in lanes",
+        "lanesHelp": "Reuse one worker session for one-to-one task chains.",
+        "territory": "Write territory",
+        "territoryHelp": "Leave blank to allow the whole workspace. Otherwise enter one workspace-relative glob per line.",
+        "budgets": "Budgets",
+        "activeBudget": "Active work (hours)",
+        "activeBudgetA11y": "{{hours}} hours",
+        "turnBudget": "Worker turn limit",
+        "capabilities": "Capabilities",
+        "roleAgents": "Role agents",
+        "roleAgentsHelp": "Automatic lets the owning host choose. Explicit choices are limited to agents detected there.",
+        "agentAutomatic": "Automatic",
+        "sitterOverrides": "Review watcher overrides",
+        "sitterOverridesHelp": "Applied to the review watcher enrolled when the run reaches its hosted-review rung.",
+        "inherit": "Use landing defaults",
+        "serviceUnavailable": "Heimdall enrollment is not available in this client.",
+        "ownerUnavailable": "The workspace owner is unavailable; no enrollment was sent.",
+        "ownerUnavailableShort": "Owner unavailable",
+        "landingBarRequiresGit": "Folder workspaces support only the files-on-disk landing bar.",
+        "landingBarRequiresWorktree": "Hosted-review and merged landing bars require a git worktree.",
+        "landingBarRequiresSupportedForge": "Hosted-review and merged landing bars require a GitHub or GitLab repository.",
+        "validationTitle": "Fix the contract before starting",
+        "cancel": "Cancel",
+        "submit": "Start objective",
+        "tierHelpLabel": "Tier help",
+        "tierHelpSummary": "Sets the review required before landing.",
+        "tierHelp": {
+          "express": "No reviewer or integrator.",
+          "standard": "Reviewer approval required.",
+          "full": "Reviewer and integrator approval required."
+        },
+        "landingBarHelpLabel": "Landing bar help",
+        "landingBarHelpSummary": "Sets the stopping rung; folders allow only Files on disk.",
+        "landingBarHelp": {
+          "filesOnDisk": "Keep completed edits uncommitted.",
+          "committedLocalBranch": "Commit territory changes locally.",
+          "pushedRef": "Push the commit to its remote branch.",
+          "hostedReview": "Open a review; GitHub/GitLab worktree required.",
+          "merged": "Watcher handoff for gated merge; GitHub/GitLab worktree required."
+        },
+        "maxConcurrencyHelpLabel": "Max concurrency help",
+        "maxConcurrencyHelpSummary": "Limits isolated implementer dispatches for this watcher.",
+        "territoryHelpLabel": "Write territory help",
+        "territoryTooltipSummary": "Limits writes; protected .git and .orca paths are always excluded.",
+        "territoryTooltip": {
+          "allWorkspaceLabel": "Whole workspace (blank / **)",
+          "allWorkspace": "Blank becomes ** and allows every other relative path.",
+          "customGlobsLabel": "Custom globs",
+          "customGlobs": "Up to 64 unique relative globs; one per line, no absolute paths or .."
+        },
+        "capabilityModeHelp": {
+          "off": "Blocks this capability.",
+          "gated": "Pauses each action for approval.",
+          "on": "Runs without approval after safety checks."
+        },
+        "capabilityModesHelpLabel": "Capability values help",
+        "capabilityModesHelpSummary": "Sets how each objective action is authorized.",
+        "capabilityHelpLabel": "{{capability}} capability help",
+        "capabilityHelp": {
+          "plan": "Controls planning, replanning, and activation.",
+          "implement": "Controls task dispatch and report ingestion.",
+          "review": "Controls reviewer and Full-tier integrator verdicts.",
+          "check": "Controls active-plan shell checks.",
+          "land": "Controls record, commit, push, and open-review steps."
+        },
+        "territoryOptional": "Write territory (optional)",
+        "territoryPlaceholder": "Whole workspace (default)",
+        "existingPlanFileTypeError": "Choose a .md, .markdown, .txt, or .json file.",
+        "existingPlanFileSizeError": "Choose a file no larger than 256 KB.",
+        "existingPlanLengthError": "Reduce the existing plan to 65,536 characters or fewer.",
+        "existingPlanReadError": "Orca could not read that file. Choose another file or paste the plan.",
+        "hideExistingPlan": "Hide plan",
+        "editExistingPlan": "Edit plan",
+        "addExistingPlan": "Add existing plan",
+        "existingPlanSource": "Existing plan source",
+        "existingPlanHelp": "Paste or import Markdown, text, or JSON as source. The planner converts it into executable tasks; normal Plan approval rules still apply.",
+        "importExistingPlan": "Import file",
+        "existingPlanPlaceholder": "Paste the plan the planner should normalize…",
+        "existingPlanCharacterCount": "{{current}} / {{maximum}} characters",
+        "removeExistingPlan": "Remove plan",
+        "existingPlanPlanOff": "Plan is Off. New objectives require Plan Gated or On unless this same workspace objective already has a usable approved plan. Existing plan source does not count as approval.",
+        "planOffRequiresApprovedPlan": "Plan can be Off only when this same objective already has a usable approved plan. Set Plan to Gated or On.",
+        "ownerNotSupported": "The remote host does not support enrolling a watcher with an owner yet. Update it, or leave the owning agent off and try again.",
+        "gatesHelpLabel": "Gates help",
+        "gatesHelpSummary": "Named whole-tree commands the kernel runs on the integrated branch after every plan node has merged, before review and landing.",
+        "gatesHelp": {
+          "whenLabel": "When",
+          "when": "After the last plan node merges, before review and landing.",
+          "whatLabel": "What belongs here",
+          "what": "The full test suite and other whole-tree checks, not per-node checks."
+        },
+        "gateName": "Name",
+        "gateNamePlaceholder": "lint",
+        "gateCommand": "Command",
+        "gateTimeout": "Timeout (s)",
+        "removeGate": "Remove gate {{n}}",
+        "gates": "Gates",
+        "gatesHelpLine": "Gates run on the integrated branch after every plan node has merged, before review and landing. Put the full test suite and other whole-tree checks here, not in plan nodes.",
+        "addGate": "Add gate",
+        "gatesUnsupportedHost": "Gates are unavailable on this host's Orca version. Remove any gates below to continue."
+      },
+      "validation": {
+        "workspaceRequired": "Choose a workspace.",
+        "objectiveRequired": "Enter an objective.",
+        "objectiveTooLong": "The objective must be 16,384 characters or fewer.",
+        "landingBarRequiresGit": "Folder workspaces support only the files-on-disk landing bar.",
+        "maxConcurrency": "Max concurrency must be a whole number from 1 to 1,024.",
+        "territoryTooMany": "Write territory supports at most 64 globs.",
+        "territoryDuplicate": "Write-territory globs must be unique.",
+        "territoryInvalid": "Invalid write-territory glob: {{glob}}",
+        "capabilitiesInvalid": "All five objective capabilities must be configured.",
+        "planOffRequiresApprovedPlan": "Set Plan to Gated or On. This form cannot verify a reusable approved plan.",
+        "roleAgentUnknown": "Agent {{agent}} is not available on the selected workspace host.",
+        "activeBudgetInvalid": "Choose a positive active-work budget.",
+        "turnBudgetInvalid": "Worker turns must be a whole number of zero or more.",
+        "existingPlanTooLong": "The existing plan must be 65,536 characters or fewer.",
+        "gateNameInvalid": "Gate name {{name}} must be lowercase letters, digits, or hyphens, starting with a letter or digit, up to 40 characters.",
+        "gateCommandInvalid": "Enter a gate command of up to 8,192 characters.",
+        "gateTimeoutInvalid": "Gate timeout must be a whole number of seconds from 10 to 14,400.",
+        "gateNameDuplicate": "Gate names must be unique.",
+        "gatesTooMany": "Objectives support at most 8 declared gates.",
+        "gatesUnsupportedHost": "Gates are unavailable on this host's Orca version. Remove all gates to continue."
+      },
+      "detail": {
+        "title": "Objective",
+        "unavailable": "Objective detail is not available from this host.",
+        "asOf": "Objective state as of {{time}}",
+        "loading": "Loading objective state…",
+        "refreshing": "Refreshing objective detail",
+        "staleError": "Objective refresh failed; showing the last confirmed state: {{error}}",
+        "loadError": "Objective detail could not be loaded: {{error}}",
+        "contract": "Contract",
+        "objective": "Objective",
+        "watcherId": "Watcher ID",
+        "tier": "Tier",
+        "landingBar": "Landing bar",
+        "workspace": "Workspace",
+        "workspaceGitValue": "{{kind}} · {{repo}} / {{worktree}}",
+        "workspaceFolderValue": "{{kind}} · {{repo}}",
+        "maxConcurrency": "Concurrency",
+        "lanes": "Lanes",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "parallelExecution": "Parallel execution",
+        "runningAgainstCap": "{{running}} of {{cap}} running",
+        "noParallelDispatches": "No isolated dispatches yet.",
+        "trainState": "Train: {{state}}",
+        "lane": "Lane",
+        "node": "Node",
+        "conflicts": "Conflicts: {{paths}}",
+        "territory": "Write territory",
+        "capabilities": "Capabilities",
+        "budget": "Budget",
+        "budgetValue": "{{hours}} active hours · {{turns}} turns",
+        "roleAgents": "Role agents",
+        "automatic": "Automatic",
+        "sitterOverrides": "Landing overrides",
+        "defaults": "Landing defaults",
+        "shellCheck": "Shell check",
+        "reviewCriterion": "Review criterion",
+        "timedOut": "Timed out",
+        "exitCode": "Exit {{code}}",
+        "reviewResult": "Review: {{result}}",
+        "notChecked": "Not checked yet",
+        "noNodes": "No plan nodes in this revision.",
+        "reviewApproval": "Review approval request",
+        "taskId": "Task {{id}}",
+        "dispatchId": "Dispatch {{id}}",
+        "plan": "Plan",
+        "revision": "Revision {{number}}",
+        "revisionMeta": "{{nodes}} nodes · created {{time}} · digest {{digest}}",
+        "revisionApproved": "Approved {{time}}",
+        "noPlan": "No plan revision yet.",
+        "verdicts": "Review verdicts",
+        "landing": "Landing",
+        "target": "Target",
+        "reached": "Reached",
+        "pending": "Pending",
+        "handedOff": "Handed off",
+        "openReview": "Open review",
+        "watchedBySitter": "Watched by sitter",
+        "merged": "Merged",
+        "landingHelp": "Rungs above the reached one are pending; the run stops at its bar.",
+        "verdictSynthesizedByOwner": "Synthesized by owner",
+        "overrunPaths": "Outside territory: {{paths}}",
+        "criticalPathLength": "Critical path: {{length}}",
+        "maxWidth": "Max width: {{width}}",
+        "conflictPairs": "Conflicts: {{pairs}}",
+        "planLevelFinding": "Plan-level",
+        "planReviewRound": "Round {{round}}",
+        "noGateDeclared": "No objective gate declared.",
+        "planQuality": "Plan quality",
+        "lintCode": {
+          "missingTerritory": "Missing territory",
+          "territoryOutsideObjective": "Territory outside objective",
+          "testOnlyNode": "Test-only territory",
+          "fullSuiteCheck": "Full-suite command",
+          "unscopedCheck": "Unscoped command",
+          "nonRelativeCheck": "Non-relative path",
+          "conflictPair": "Territory conflict",
+          "duplicatesGate": "Duplicates a gate",
+          "noGateDeclared": "No gate declared",
+          "missingAssumptions": "Missing assumptions",
+          "branchHistoryCheck": "Reads branch history"
+        },
+        "planReviewVerdict": {
+          "approve": "Approve",
+          "revise": "Revise",
+          "escalate": "Escalate"
+        },
+        "assumptionStatus": {
+          "verified": "Verified",
+          "unverified": "Unverified"
+        },
+        "patchStatus": {
+          "pending": "Pending",
+          "applied": "Applied",
+          "rejected": "Rejected"
+        },
+        "gateResult": {
+          "notRun": "Not run",
+          "timedOut": "Timed out",
+          "pass": "Pass",
+          "failed": "Failed (exit {{code}})"
+        }
+      },
+      "workspacePicker": {
+        "placeholder": "Choose a workspace",
+        "searchLabel": "Search workspaces",
+        "searchPlaceholder": "Search by name, path, branch, or host…",
+        "filterLabel": "Filter workspaces",
+        "filterAll": "All",
+        "filterGit": "Git worktrees",
+        "filterFolders": "Folders",
+        "noMatches": "No eligible workspaces match."
+      }
+    }
+  }
+}

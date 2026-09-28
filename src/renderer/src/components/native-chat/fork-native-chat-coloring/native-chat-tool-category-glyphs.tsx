@@ -58,7 +58,7 @@ export function NativeChatToolName({
           'min-w-0 truncate font-mono text-xs font-semibold transition-colors',
           category
             ? TEXT_CLASS_BY_CATEGORY[category]
-            : 'text-foreground/90 group-hover:text-foreground'
+            : 'text-foreground/90 group-hover/tool-line:text-foreground'
         )}
       >
         {children ?? name}

@@ -1,0 +1,501 @@
+import {
+  ObjectiveEnrollmentPayloadSchema,
+  type ObjectiveEnrollmentPayload
+} from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  objectiveAttemptFailureClass,
+  objectiveAttempts,
+  objectiveNodeRetryCount,
+  OBJECTIVE_INFRA_REDISPATCH_CAP
+} from '../../shared/fork-heimdall-objective/decision-context'
+import { OWNER_SKIP_REVIEW_DISPATCH_PREFIX } from '../../shared/fork-heimdall-objective/objective-actions'
+import {
+  ObjectiveDetailSchema,
+  ObjectiveProjectionSchema,
+  type ObjectiveDetail,
+  type ObjectiveNodeState,
+  type ObjectiveProjection
+} from '../../shared/fork-heimdall-objective/detail-types'
+import { deriveObjectiveLanes } from '../../shared/fork-heimdall-objective/parallel-scheduling'
+import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
+import { WatcherLedgerSchema, type WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { ObjectiveDatabase } from './objective-database'
+import { buildObjectiveDetailPlanQuality } from './objective-detail-plan-quality'
+import { projectGateAttempts } from './objective-store-gate-attempts'
+import {
+  CriteriaResultsSchema,
+  DependenciesSchema,
+  parseLandingPayloadJson,
+  parseJson,
+  type AmendmentRow,
+  type CriterionRow,
+  type LandingRow,
+  type NodeRow,
+  type ProjectionCheckRow,
+  type RevisionRow,
+  type VerdictRow
+} from './objective-store-data'
+import { projectPlanPatches } from './objective-store-plan-patches'
+import { projectPlanReviews } from './objective-store-plan-reviews'
+import { allRows } from './objective-store-queries'
+
+export function projectObjective(
+  database: ObjectiveDatabase,
+  watcherId: string,
+  ledger?: WatcherLedger,
+  contentIdentity?: string
+): ObjectiveProjection {
+  const db = database.connection()
+  const revisions = allRows<RevisionRow>(
+    db.prepare(`SELECT id, revision_number, status, digest, created_by_dispatch_id, created_at_ms, approved_at_ms
+    FROM plan_revision WHERE watcher_id = ? ORDER BY revision_number, id`),
+    watcherId
+  )
+  const nodes = allRows<NodeRow>(
+    db.prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.deps_json, n.ordinal,
+    n.orchestration_task_id, n.dispatch_id FROM plan_node n JOIN plan_revision r ON r.id = n.revision_id
+    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`),
+    watcherId
+  )
+  const criteria = allRows<CriterionRow>(
+    db.prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
+    FROM acceptance_criterion WHERE watcher_id = ? ORDER BY revision_id, task_key, ordinal`),
+    watcherId
+  )
+  const checks =
+    contentIdentity === undefined
+      ? allRows<ProjectionCheckRow>(
+          db.prepare(`SELECT criterion_id, content_identity, exit_code, timed_out, started_at_ms, completed_at_ms
+          FROM check_attempt WHERE watcher_id = ? ORDER BY started_at_ms, id`),
+          watcherId
+        )
+      : allRows<ProjectionCheckRow>(
+          db.prepare(`SELECT criterion_id, content_identity, exit_code, timed_out, started_at_ms, completed_at_ms
+          FROM check_attempt WHERE watcher_id = ? AND content_identity = ? ORDER BY started_at_ms, id`),
+          watcherId,
+          contentIdentity
+        )
+  const verdicts = allRows<VerdictRow>(
+    db.prepare(`SELECT revision_id, dispatch_id, role, content_identity, verdict, criteria_results_json,
+    report_digest, created_at_ms FROM review_verdict WHERE watcher_id = ? ORDER BY created_at_ms, dispatch_id`),
+    watcherId
+  )
+  const landing = allRows<LandingRow>(
+    db.prepare(`SELECT rung, content_identity, payload_json, created_at_ms
+    FROM landing_evidence WHERE watcher_id = ? ORDER BY created_at_ms, rung`),
+    watcherId
+  )
+  const amendments = allRows<AmendmentRow>(
+    db.prepare(`SELECT revision_id, ordinal, digest, amended_at_ms, attestation, touched_task_keys_json
+    FROM revision_amendment WHERE watcher_id = ? ORDER BY revision_id, ordinal`),
+    watcherId
+  )
+  const isolatedDispatchIds = new Set(
+    allRows<{ dispatch_id: string }>(
+      db.prepare(
+        `SELECT dispatch_id FROM objective_dispatch
+          WHERE watcher_id = ? AND dispatch_id IS NOT NULL`
+      ),
+      watcherId
+    ).map((row) => row.dispatch_id)
+  )
+  const appliedDispatchIds = new Set(
+    allRows<{ dispatch_id: string }>(
+      db.prepare(
+        `SELECT dispatch_id FROM objective_dispatch
+          WHERE watcher_id = ? AND state = 'applied' AND dispatch_id IS NOT NULL`
+      ),
+      watcherId
+    ).map((row) => row.dispatch_id)
+  )
+  return ObjectiveProjectionSchema.parse({
+    ...buildProjection(
+      revisions,
+      nodes,
+      criteria,
+      checks,
+      verdicts,
+      landing,
+      amendments,
+      isolatedDispatchIds,
+      appliedDispatchIds,
+      ledger ? WatcherLedgerSchema.parse(ledger) : undefined
+    ),
+    patches: projectPlanPatches(db, watcherId),
+    planReviews: projectPlanReviews(db, watcherId),
+    gateAttempts: projectGateAttempts(db, watcherId)
+  })
+}
+
+export function detailObjective(
+  database: ObjectiveDatabase,
+  now: () => number,
+  watcherId: string,
+  contract: ObjectiveEnrollmentPayload,
+  ledger?: WatcherLedger
+): ObjectiveDetail {
+  const parsedContract = ObjectiveEnrollmentPayloadSchema.parse(contract)
+  const projection = projectObjective(database, watcherId, ledger)
+  const db = database.connection()
+  const nodes = allRows<NodeRow>(
+    db.prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.title, n.deps_json,
+    n.ordinal, n.orchestration_task_id, n.dispatch_id
+    FROM plan_node n JOIN plan_revision r ON r.id = n.revision_id
+    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`),
+    watcherId
+  )
+  const criteria = allRows<CriterionRow>(
+    db.prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
+    FROM acceptance_criterion WHERE watcher_id = ? ORDER BY revision_id, task_key, ordinal`),
+    watcherId
+  )
+  const projectedNodes = new Map(
+    projection.nodes.map((node) => [`${node.revisionId}\0${node.taskKey}`, node])
+  )
+  const laneTaskKeysByNode = new Map<string, string[]>()
+  for (const revision of projection.revisions) {
+    const lanes = deriveObjectiveLanes(
+      projection.nodes.filter((node) => node.revisionId === revision.id),
+      { enabled: parsedContract.lanesEnabled }
+    )
+    for (const lane of lanes) {
+      for (const taskKey of lane.taskKeys) {
+        laneTaskKeysByNode.set(`${revision.id}\0${taskKey}`, lane.taskKeys)
+      }
+    }
+  }
+  const criteriaByNode = new Map<string, CriterionRow[]>()
+  for (const criterion of criteria) {
+    const key = `${criterion.revision_id}\0${criterion.task_key}`
+    criteriaByNode.set(key, [...(criteriaByNode.get(key) ?? []), criterion])
+  }
+  const { nodeDetailByKey, ...planQuality } = buildObjectiveDetailPlanQuality(
+    database,
+    watcherId,
+    parsedContract,
+    projection
+  )
+  return ObjectiveDetailSchema.parse({
+    contract: parsedContract,
+    revisions: projection.revisions.map(
+      ({ id, number, status, digest, createdAtMs, approvedAtMs, amendments }) => ({
+        id,
+        number,
+        status,
+        digest,
+        createdAtMs,
+        approvedAtMs,
+        amendments,
+        nodeCount: nodes.filter((node) => node.revision_id === id).length
+      })
+    ),
+    nodes: nodes.map((node) => {
+      const key = `${node.revision_id}\0${node.task_key}`
+      const projected = projectedNodes.get(key)
+      if (!projected || node.title === undefined) {
+        throw new Error('Objective projection omitted a stored plan node')
+      }
+      const projectedCriteria = new Map(
+        projected.criteria.map((criterion) => [criterion.id, criterion])
+      )
+      const nodeDetail = nodeDetailByKey.get(key)
+      return {
+        taskKey: node.task_key,
+        title: node.title,
+        revisionId: node.revision_id,
+        orchestrationTaskId: node.orchestration_task_id,
+        dispatchId: node.dispatch_id,
+        laneTaskKeys: laneTaskKeysByNode.get(key) ?? [node.task_key],
+        ...(nodeDetail?.territory ? { territory: nodeDetail.territory } : {}),
+        ...(nodeDetail?.overrunPaths ? { overrunPaths: nodeDetail.overrunPaths } : {}),
+        state: projected.state,
+        criteria: (criteriaByNode.get(key) ?? []).map((criterion) => {
+          const value = projectedCriteria.get(criterion.id)
+          if (!value) {
+            throw new Error('Objective projection omitted a stored criterion')
+          }
+          return {
+            id: value.id,
+            body: criterion.body,
+            shellCheckable: value.shellCheckable,
+            lastCheck: value.lastCheck,
+            lastReview: value.lastReview
+          }
+        })
+      }
+    }),
+    verdicts: projection.verdicts.map(
+      ({ dispatchId, role, verdict, contentIdentity, synthesizedByOwner, atMs }) => ({
+        dispatchId,
+        role,
+        verdict,
+        contentIdentity,
+        synthesizedByOwner,
+        atMs
+      })
+    ),
+    landing: projection.landing.map(({ rung, contentIdentity, atMs }) => ({
+      rung,
+      contentIdentity,
+      atMs
+    })),
+    ...planQuality,
+    asOfMs: now()
+  })
+}
+
+function buildProjection(
+  revisions: RevisionRow[],
+  nodes: NodeRow[],
+  criteria: CriterionRow[],
+  checks: ProjectionCheckRow[],
+  verdictRows: VerdictRow[],
+  landingRows: LandingRow[],
+  amendmentRows: AmendmentRow[],
+  isolatedDispatchIds: ReadonlySet<string>,
+  appliedDispatchIds: ReadonlySet<string>,
+  ledger?: WatcherLedger
+) {
+  const amendmentsByRevision = new Map<string, ReturnType<typeof buildAmendmentProjection>[]>()
+  for (const row of amendmentRows) {
+    const list = amendmentsByRevision.get(row.revision_id) ?? []
+    list.push(buildAmendmentProjection(row))
+    amendmentsByRevision.set(row.revision_id, list)
+  }
+  const checkByCriterion = new Map(checks.map((check) => [check.criterion_id, check]))
+  const reviewByCriterion = new Map<string, 'pass' | 'block'>()
+  for (const verdict of verdictRows) {
+    for (const result of parseJson(
+      CriteriaResultsSchema,
+      verdict.criteria_results_json,
+      'criteria results'
+    )) {
+      reviewByCriterion.set(
+        `${verdict.revision_id}\0${result.taskKey}\0${result.criterionIndex}`,
+        result.result
+      )
+    }
+  }
+  const states = nodeStates(nodes, isolatedDispatchIds, appliedDispatchIds, ledger)
+  return {
+    revisions: revisions.map((row) => ({
+      id: row.id,
+      number: row.revision_number,
+      status: row.status,
+      digest: row.digest,
+      createdByDispatchId: row.created_by_dispatch_id,
+      createdAtMs: row.created_at_ms,
+      approvedAtMs: row.approved_at_ms,
+      amendments: amendmentsByRevision.get(row.id) ?? []
+    })),
+    nodes: nodes.map((node) => ({
+      revisionId: node.revision_id,
+      taskKey: node.task_key,
+      deps: parseJson(DependenciesSchema, node.deps_json, 'node dependencies'),
+      orchestrationTaskId: node.orchestration_task_id,
+      dispatchId: node.dispatch_id,
+      state: states.get(`${node.revision_id}\0${node.task_key}`) ?? 'pending',
+      criteria: criteria
+        .filter(
+          (criterion) =>
+            criterion.revision_id === node.revision_id && criterion.task_key === node.task_key
+        )
+        .map((criterion) => {
+          const check = checkByCriterion.get(criterion.id)
+          return {
+            id: criterion.id,
+            ordinal: criterion.ordinal,
+            body: criterion.body,
+            shellCheckable: criterion.shell_checkable === 1,
+            checkCommand: criterion.check_command,
+            lastCheck: check
+              ? {
+                  contentIdentity: check.content_identity,
+                  exitCode: check.exit_code,
+                  timedOut: check.timed_out === 1,
+                  atMs: check.completed_at_ms ?? check.started_at_ms
+                }
+              : null,
+            lastReview:
+              reviewByCriterion.get(
+                `${criterion.revision_id}\0${criterion.task_key}\0${criterion.ordinal}`
+              ) ?? null
+          }
+        })
+    })),
+    verdicts: verdictRows.map((row) => ({
+      dispatchId: row.dispatch_id,
+      revisionId: row.revision_id,
+      role: row.role,
+      verdict: row.verdict,
+      contentIdentity: row.content_identity,
+      reportDigest: row.report_digest,
+      synthesizedByOwner: row.dispatch_id.startsWith(OWNER_SKIP_REVIEW_DISPATCH_PREFIX),
+      atMs: row.created_at_ms
+    })),
+    landing: landingRows.map((row) => {
+      const payload = parseLandingPayloadJson(row.rung, row.payload_json, 'landing payload')
+      const common = {
+        rung: row.rung,
+        revisionId: payload.revisionId,
+        contentIdentity: row.content_identity,
+        atMs: row.created_at_ms
+      }
+      if (row.rung === 'files-on-disk' || !('fromContentIdentity' in payload)) {
+        return common
+      }
+      if (row.rung === 'committed-local-branch' && 'treeOid' in payload) {
+        return {
+          ...common,
+          fromContentIdentity: payload.fromContentIdentity,
+          branch: payload.branch,
+          commitSha: payload.commitSha
+        }
+      }
+      if (row.rung === 'pushed-ref' && 'remote' in payload) {
+        return {
+          ...common,
+          fromContentIdentity: payload.fromContentIdentity,
+          branch: payload.branch,
+          commitSha: payload.commitSha,
+          remote: payload.remote,
+          remoteSha: payload.remoteSha
+        }
+      }
+      if (row.rung === 'hosted-review' && 'provider' in payload) {
+        return {
+          ...common,
+          fromContentIdentity: payload.fromContentIdentity,
+          branch: payload.branch,
+          provider: payload.provider,
+          reviewNumber: payload.reviewNumber,
+          reviewUrl: payload.reviewUrl,
+          headSha: payload.headSha,
+          base: payload.base
+        }
+      }
+      return { ...common, fromContentIdentity: payload.fromContentIdentity }
+    })
+  }
+}
+
+function buildAmendmentProjection(row: AmendmentRow) {
+  return {
+    ordinal: row.ordinal,
+    digest: row.digest,
+    amendedAtMs: row.amended_at_ms,
+    attestation: row.attestation,
+    touchedTaskKeys: parseJson(DependenciesSchema, row.touched_task_keys_json, 'touched task keys')
+  }
+}
+
+function nodeStates(
+  nodes: NodeRow[],
+  isolatedDispatchIds: ReadonlySet<string>,
+  appliedDispatchIds: ReadonlySet<string>,
+  ledger?: WatcherLedger
+): Map<string, ObjectiveNodeState> {
+  const states = new Map<string, ObjectiveNodeState>()
+  const outcomes = new Map<string, ObjectiveNodeState>()
+  const persistedSucceeded = new Set<string>()
+  for (const node of nodes) {
+    if (node.dispatch_id) {
+      const key = `${node.revision_id}\0${node.task_key}`
+      persistedSucceeded.add(key)
+      outcomes.set(key, 'succeeded')
+    }
+  }
+  if (ledger) {
+    const parsedAttempts = objectiveAttempts(ledger)
+    for (const attempt of getLatestAttempts(ledger)) {
+      const action = attempt.action
+      if (typeof action.revisionId !== 'string' || typeof action.taskKey !== 'string') {
+        continue
+      }
+      const key = `${action.revisionId}\0${action.taskKey}`
+      // The store records a node only after its dispatch has actually applied. Historical retry
+      // attempts cannot demote that authoritative success; amendments clear plan_node.dispatch_id,
+      // so obsolete applied work is intentionally not protected here.
+      if (persistedSucceeded.has(key)) {
+        continue
+      }
+      if (action.kind === 'dispatch-node') {
+        if (attempt.state === 'settled' && attempt.effect === 'not-landed') {
+          const failureClass = objectiveAttemptFailureClass(attempt, ledger)
+          const retryCount =
+            failureClass === 'infra' || failureClass === 'environment'
+              ? objectiveNodeRetryCount(parsedAttempts, action.revisionId, action.taskKey)
+              : OBJECTIVE_INFRA_REDISPATCH_CAP
+          if (retryCount >= OBJECTIVE_INFRA_REDISPATCH_CAP) {
+            outcomes.set(key, 'failed')
+          } else {
+            // under the cap: no claim here, so the fallback below re-derives pending/awaiting-approval
+            outcomes.delete(key)
+          }
+        } else if (!outcomes.has(key)) {
+          outcomes.set(key, 'dispatched')
+        }
+      } else if (action.kind === 'ingest-report' && attempt.state === 'settled') {
+        if (
+          attempt.effect === 'not-landed' &&
+          !(typeof action.dispatchId === 'string' && appliedDispatchIds.has(action.dispatchId))
+        ) {
+          outcomes.set(key, 'failed')
+        } else if (
+          attempt.effect === 'landed' &&
+          typeof action.dispatchId === 'string' &&
+          !isolatedDispatchIds.has(action.dispatchId)
+        ) {
+          outcomes.set(key, 'succeeded')
+        }
+      }
+    }
+  }
+  for (const node of nodes) {
+    const key = `${node.revision_id}\0${node.task_key}`
+    const outcome = outcomes.get(key)
+    if (node.revision_status === 'rejected' || node.revision_status === 'superseded') {
+      states.set(key, 'replanned')
+    } else if (outcome !== undefined) {
+      states.set(key, outcome)
+    } else if (node.dispatch_id) {
+      states.set(key, 'succeeded')
+    } else if (ledger && awaitingApproval(ledger, node.revision_id, node.task_key)) {
+      states.set(key, 'awaiting-approval')
+    } else {
+      const deps = parseJson(DependenciesSchema, node.deps_json, 'node dependencies')
+      const allSucceeded = deps.every(
+        (dependency) => outcomes.get(`${node.revision_id}\0${dependency}`) === 'succeeded'
+      )
+      states.set(key, deps.length > 0 && !allSucceeded ? 'blocked-by-deps' : 'pending')
+    }
+  }
+  return states
+}
+
+function awaitingApproval(ledger: WatcherLedger, revisionId: string, taskKey: string): boolean {
+  const evidenceKey = `${revisionId}:${taskKey}`
+  let approvedAt = -1
+  for (const entry of ledger.entries) {
+    if (
+      entry.kind === 'approval' &&
+      entry.scope.actionKind === 'dispatch-node' &&
+      entry.scope.evidenceKey === evidenceKey &&
+      entry.decision === 'approved'
+    ) {
+      approvedAt = entry.atMs
+    }
+  }
+  for (let index = ledger.entries.length - 1; index >= 0; index -= 1) {
+    const entry = ledger.entries[index]
+    if (
+      entry.kind === 'escalation' &&
+      (entry.status === 'open' || entry.status === 'escalated') &&
+      entry.approvalScope?.actionKind === 'dispatch-node' &&
+      entry.approvalScope.evidenceKey === evidenceKey
+    ) {
+      return entry.atMs > approvedAt
+    }
+  }
+  return false
+}

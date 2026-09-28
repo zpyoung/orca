@@ -1,9 +1,12 @@
 import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
 import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'
+import type { HeimdallApi } from '../shared/fork-heimdall/api'
+import type { HostedReviewAgentApi } from '../shared/fork-hosted-review-sitter/api'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
   CodexConfigSyncApi,
+  CursorAccountsApi,
   GrokAccountsApi,
   MinimaxCredentialsApi
 } from './api/agent-account-api'
@@ -13,6 +16,7 @@ import type { AgentAwakeApi, AgentStatusApi, AgentTrustApi } from './api/agent-s
 import type {
   ClaudeUsageApi,
   CodexUsageApi,
+  MuseUsageApi,
   OpenCodeUsageApi,
   RateLimitsApi
 } from './api/agent-usage-api'
@@ -144,6 +148,7 @@ export type PreloadApi = {
   claudeUsage: ClaudeUsageApi
   codexUsage: CodexUsageApi
   openCodeUsage: OpenCodeUsageApi
+  museUsage: MuseUsageApi
   aiVault: AiVaultApi
   nativeChat: NativeChatApi
   fs: FilesystemApi['fs']
@@ -154,6 +159,7 @@ export type PreloadApi = {
   rateLimits: RateLimitsApi
   minimaxCredentials: MinimaxCredentialsApi
   grokAccounts: GrokAccountsApi
+  cursorAccounts: CursorAccountsApi
   ssh: SshApi
   automations: AutomationsApi
   wsl: RuntimeApi['wsl']
@@ -162,11 +168,18 @@ export type PreloadApi = {
   plugins: PluginsApi
   agentStatus: AgentStatusApi
   asks: AskApi
+  heimdall: HeimdallApi
+  hostedReviewAgent: HostedReviewAgentApi
   mobile: MobileApi
   speech: SpeechApi
 }
 
-export type { ClaudeUsageApi, CodexUsageApi, OpenCodeUsageApi } from './api/agent-usage-api'
+export type {
+  ClaudeUsageApi,
+  CodexUsageApi,
+  MuseUsageApi,
+  OpenCodeUsageApi
+} from './api/agent-usage-api'
 export type { AiVaultApi } from './api/ai-vault-api'
 export type { AutomationsApi, ExternalAutomationManagerResult } from './api/automation-api'
 export type { AppApi } from './api/app-api'
@@ -201,6 +214,8 @@ export type {
 } from './api/preflight-api'
 export type {
   PtyManagementApi,
+  PtyManagementDaemonCwdClass,
+  PtyManagementFolderAccessMismatch,
   PtyManagementMacTccAttributionHealth,
   PtyManagementSession
 } from './api/pty-management-api'

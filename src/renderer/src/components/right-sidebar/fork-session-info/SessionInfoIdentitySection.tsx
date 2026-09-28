@@ -75,12 +75,12 @@ export function SessionInfoIdentitySection({
     if (!selection.tabId || !selection.leafId) {
       return
     }
-    useAppStore.getState().setActiveTabType('terminal')
+    useAppStore.getState().setActiveTabType('terminal', identity.worktreeId ?? null)
     activateTabAndFocusPane(selection.tabId, selection.leafId, {
       flashFocusedPane: true,
       scrollToBottomIfOutputSinceLastView: true
     })
-  }, [selection.leafId, selection.tabId])
+  }, [identity.worktreeId, selection.leafId, selection.tabId])
   const localTranscript = selection.isLocalExecution ? identity.transcriptPath : undefined
 
   return (

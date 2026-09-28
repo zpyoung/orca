@@ -245,38 +245,50 @@ export async function validateForkLocalizationCatalogs(root = process.cwd(), opt
   return failed ? 1 : 0
 }
 
-async function runUpstreamVerifierWithForkCatalogs(root, options, verify) {
+async function buildMergedLocaleCatalogText(root, { onlyEnglish = false } = {}) {
   const localesDir = path.join(root, LOCALES_RELATIVE_DIR)
   const bundleDirectories = await discoverForkCatalogs(root)
-  const originals = new Map()
   const localeNames = (await fs.readdir(localesDir))
     .filter((name) => name.endsWith('.json') && !name.startsWith('.'))
     .map((name) => name.slice(0, -'.json'.length))
+    .filter((locale) => !onlyEnglish || locale === 'en')
+  const mergedTextByPath = new Map()
   for (const locale of localeNames) {
-    const filePath = path.join(localesDir, `${locale}.json`)
-    const text = await fs.readFile(filePath, 'utf8')
-    const catalog = JSON.parse(text)
-    originals.set(locale, { text, catalog })
-    const merged = structuredClone(catalog)
+    const filePath = path.resolve(localesDir, `${locale}.json`)
+    const merged = structuredClone(await readJson(filePath))
     for (const bundle of bundleDirectories) {
       const bundlePath = path.join(bundle.localesDir, `${locale}.json`)
       mergeCatalog(merged, await readJson(bundlePath))
     }
-    await fs.writeFile(filePath, `${JSON.stringify(merged, null, 2)}\n`)
+    mergedTextByPath.set(filePath, `${JSON.stringify(merged, null, 2)}\n`)
+  }
+  return mergedTextByPath
+}
+
+function overlaidReadResult(text, readOptions) {
+  const encoding = typeof readOptions === 'string' ? readOptions : readOptions?.encoding
+  return encoding ? text : Buffer.from(text, 'utf8')
+}
+
+/** Run an upstream verifier against tracked locale catalogs merged with fork catalogs.
+ * Reads of the tracked locale files are overlaid in-process with the merged text for the
+ * duration of `verify`; the tracked files themselves are never written. */
+export async function runUpstreamVerifierWithForkCatalogs(root, options, verify, overlayOptions) {
+  const mergedTextByPath = await buildMergedLocaleCatalogText(root, overlayOptions)
+  const originalReadFile = fs.readFile
+  // verify-localization-catalog.mjs and verify-localization-extraction.mjs import the same
+  // node:fs/promises singleton, so patching it here reaches their reads too
+  fs.readFile = async (target, readOptions) => {
+    const resolved = typeof target === 'string' ? path.resolve(target) : target
+    if (typeof resolved === 'string' && mergedTextByPath.has(resolved)) {
+      return overlaidReadResult(mergedTextByPath.get(resolved), readOptions)
+    }
+    return originalReadFile(target, readOptions)
   }
   try {
     return await verify(root, options)
   } finally {
-    for (const locale of localeNames) {
-      const original = originals.get(locale)
-      // a locale merged before an earlier iteration threw was never written; restoring it here
-      // would throw inside `finally` and replace the real error
-      if (!original) {
-        continue
-      }
-      const filePath = path.join(localesDir, `${locale}.json`)
-      await fs.writeFile(filePath, original.text)
-    }
+    fs.readFile = originalReadFile
   }
 }
 
@@ -285,10 +297,15 @@ export async function main(root = process.cwd(), options = parseArgs(process.arg
   if (forkResult !== 0) {
     return forkResult
   }
-  const verify = options.verifyExtraction
-    ? (verificationRoot) => verifyUpstreamLocalizationExtraction(verificationRoot)
-    : verifyUpstreamLocalizationCatalog
-  return runUpstreamVerifierWithForkCatalogs(root, options, verify)
+  if (options.verifyExtraction) {
+    return runUpstreamVerifierWithForkCatalogs(
+      root,
+      options,
+      (verificationRoot) => verifyUpstreamLocalizationExtraction(verificationRoot),
+      { onlyEnglish: true }
+    )
+  }
+  return runUpstreamVerifierWithForkCatalogs(root, options, verifyUpstreamLocalizationCatalog)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

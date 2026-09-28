@@ -7,6 +7,182 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## Claude terminal readiness from the visible screen
+
+**What:** a Claude Code ready-prompt rule in `src/main/runtime/terminal-wait-detection.ts` (the last
+`❯` prompt carries the empty-input `Try "…"` placeholder before the first turn; after one, the input
+is empty and the last spinner-glyph row since the submitted prompt is a finished-turn summary such
+as `✻ Brewed for 1s`, not a live `✶ Flambéing…` or a `Thought for` row), and a `tui-idle`
+visible-screen probe in
+`src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts` that re-arms every second while
+the waiter is pending and the screen is still the only usable evidence; `runtime-terminal-wait.ts`
+starts that probe for a Claude pane even when a short preview exists, because the preview holds
+only the status rows below Claude's prompt box.
+
+**Why upstream, not isolated:** since the tui-idle evidence ranking (#20155), a quiet foreground
+process no longer proves idle for a known agent, so a Claude pane can settle only on an explicit
+`✳` title or ready-prompt body. Claude Code 2.1.28x paints no OSC title at all and draws with
+cursor moves, so the runtime's newline tail stays empty and the body check never sees it; the
+visible-screen probe that covers such panes looked once, before Claude's first frame. Every Claude
+terminal worker start therefore times out at `agent_readiness` (ledger bug-195), and a `tui-idle`
+wait on a pane that has already finished a turn times out too (bug-196). Both halves sit
+in upstream's shared readiness path; a fork copy would have to be replayed every release.
+
+**Evidence:** `src/main/runtime/__fixtures__/claude-code-{ready-cold-start,busy-mid-turn,idle-after-turn}.txt`,
+recorded with `config/scripts/capture-agent-pty-transcript.mjs` against Claude Code 2.1.282.
+
+**Paths:**
+
+- `src/main/runtime/terminal-wait-detection.ts`
+- `src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts`
+- `src/main/runtime/runtime-terminal-wait.ts`
+- `src/main/runtime/claude-readiness-transcripts.test.ts`
+- `src/main/runtime/__fixtures__/claude-code-*.txt` and `.meta.json`
+- `src/main/daemon/serialize-grid-transcript-replay.test.ts`: one registration line adding the
+  cold-start fixture's 8 checkpoints to `KNOWN_PREEXISTING_I2_FAILURES`. Verified with
+  `ORCA_OLD_SERIALIZE_ADDON` built from v1.4.207: all 8 are `both-fail`, with no regression or I1
+  byte diff. Upstream takes this line with the fixture.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Structured preamble waits for admitted settlement
+
+**What:** `sendStructuredWorkerPreamble` in
+`src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts` waits on
+`host.waitForSendSettlement` when the preamble submission comes back `pending`, then judges the
+settled submission. A wait that times out or fails still reports `operation_unknown`.
+
+**Why upstream, not isolated:** since the settle-on-admission change (#19863), a Claude structured
+send returns `admitted` as soon as the frame is written, and the submission stays `pending` until
+the provider echo. The preamble check accepts only `accepted`, so every Claude structured worker
+start settles `outcome_unknown` although the worker is running, and Heimdall's owner turns, which
+use the same function, are never recorded as sent (ledger bug-194). The host already exposes the
+settlement wait for clients that predate admitted pending replies; the preamble sender is one of
+those clients. The defect is in upstream's shared function, so a fork copy would only move it.
+
+**Paths:**
+
+- `src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts`
+- `src/main/runtime/rpc/methods/orchestration-structured-worker-session.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Folder workspace scheduler authority
+
+**What:** exposes the existing execution-host-to-scheduler-owner mapping independently of a
+repository record. Repository-based callers retain their existing behavior.
+
+**Why upstream, not isolated:** canonical folder workspaces have execution-host authority but
+no repository record. They need the same native, WSL, and SSH scheduling policy as repositories,
+not a parallel fork-owned mapping.
+
+**Paths:**
+
+- `src/main/persistence/scheduling-automations/automation-context-migration.ts`
+
+**Excluded when preparing the upstream PR:** Heimdall's folder enrollment and picker changes.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Git exec mutation cache invalidation
+
+**What:** classifies index staging, reset, and cherry-pick as Git mutations and finds the
+subcommand after global Git options. Read-only `remote` operations still preserve cached reads.
+
+**Why upstream, not isolated:** native and SSH providers share this cache-invalidation predicate.
+Ignoring a mutation leaves stale status and diffs for every consumer, not only Heimdall.
+
+**Paths:**
+
+- `src/shared/git-exec-mutation.ts`
+- `src/shared/git-exec-mutation.test.ts`
+
+**Excluded when preparing the upstream PR:** the fork-only relay allowlist and its registration
+seam. This entry covers only the generic mutation classifier.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Federated rejection replay
+
+**What:** preserves a rejected lifecycle verdict when the same federated relay is delivered again.
+Rejected submissions remain durable for cursor acknowledgement but can be suppressed from the
+coordinator inbox. A corrected submission must use a new request; changing report bytes cannot turn
+the original rejected request into a successful completion.
+Accepted federated reports record the same exact dispatch-bound observation as direct reports.
+Legacy peers that cannot correct a report on an active dispatch settle rejected reports as failed,
+with distinct rejected observation authority rather than accepted completion. Rejection wrappers
+retain the original body and validation reason so notification-loss recovery can verify the
+canonical report without trusting terminal status alone.
+
+**Why upstream, not isolated:** lifecycle idempotency and report observations belong to the
+orchestration database settlement/import transaction. Re-evaluating a rejected relay against mutable
+state or losing its original evidence violates settlement independently of the rejecting consumer.
+
+**Paths:**
+
+- `src/main/runtime/orchestration/db/federation/federation-relay-import.ts`
+- `src/main/runtime/orchestration/db/lifecycle-rejection-marker.ts`
+- `src/main/runtime/orchestration/db/lifecycle-rejection-marker.test.ts`
+- `src/main/runtime/orchestration/db/dispatch-context/worker-report-settlement.ts`
+- `src/main/runtime/orchestration/db/messages/message-inbox.ts`
+
+**Excluded when preparing the upstream PR:** Heimdall report validators, forked submission callers,
+and their import swaps. The database change is generic.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Claude host auth fallback selection
+
+**What:** clears both the legacy host account selection and its runtime-map entry when a managed
+account's auth path is unowned or its credentials are missing or invalid. Previously the runtime map
+still selected the unusable account, so structured Claude launches stripped ambient authentication
+even after the auth service had fallen back to the system default. Other WSL selections are preserved.
+
+**Why upstream, not isolated:** this is a shared account-selection consistency bug affecting ordinary
+structured sessions as well as Heimdall owners; a fork-only launch workaround would leave it intact.
+
+**Paths:**
+
+- `src/main/claude-accounts/runtime-auth/runtime-auth-sync.ts`
+- `src/main/claude-accounts/runtime-auth-service-materialization.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Wire compat Rule 1 strict schemas
+
+**What:** corrects Rule 1 of the remote wire-compatibility contract. It claimed every JSON payload
+is parsed with a decoder that ignores unknown keys, citing zod `.strip()` on RPC params. That holds
+only for a default schema. A `.strict()` schema rejects the entire payload on an unknown key, so
+adding an optional field to one is a breaking change, not a safe one.
+
+**Why upstream, not isolated:** the rule is upstream's contract and the defect is upstream's. Two
+independent changes added an optional field to a strict schema on the same day, each believing they
+were complying with Rule 1 as written. A fork-local correction would leave upstream readers acting
+on the false premise.
+
+**Paths:** `docs/reference/remote-wire-compatibility.md`.
+
+**Excluded when preparing the upstream PR:** the worked example cites `EnrollInputSchema`, which is
+fork-only. Replace it with an upstream strict request schema, or state the shape generically.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Warning status tokens
+
+**What:** adds the warning foreground role to the canonical light/dark theme and Tailwind bindings.
+Heimdall uses it for parked and lost-contact states, which must remain distinguishable from errors.
+Upstream landed the warning hue, surface and border roles in v1.4.215, so the fork takes those and
+carries only `--status-warning-foreground` and its `--color-` binding.
+
+**Why upstream, not isolated:** warning is a general design-system role beside success and
+destructive. A feature-local duplicate would contradict the canonical token source.
+
+**Paths:** `src/renderer/src/assets/main.css`.
+
+**Excluded when preparing the upstream PR:** retain the fork's existing
+`@import './fork-native-chat-coloring.css';` locally, but omit it from the upstream patch.
+The exception now owns that import as well; it no longer has a separate seam.
+
 ## POSIX lookup test startup isolation
 
 **What:** runs the zsh lookup case with `-f` so user startup files cannot replace the fixture
@@ -297,6 +473,33 @@ file.
 
 **Status:** pending-upstream. Not yet submitted.
 
+## OMP atomic paste submit
+
+**What:** upstream now sends OMP the bracketed-paste frame and its carriage return in one PTY write
+(`agentPromptSubmitJoinsPasteFrame`), choosing the path from `foregroundAgent ?? launchAgent`. The
+fork adds `launchedAgent` as a last fallback, and `getPtyAgent` reads it too.
+
+**Why upstream, not isolated:** both `foregroundAgent` and `launchAgent` can be absent while OMP is
+running, so upstream's selection still races:
+
+- `retirePtyAgentLaunchAuthority` clears `pty.launchAgent` on the shell's first `command-finished`
+  (OSC 133;D) marker, which races the dispatch preamble write.
+- OMP is spawned through Bun, so the foreground process name is `bun`, which `recognizeAgentProcess`
+  maps to no agent.
+
+`pty.launchedAgent` records which agent Orca launched and is never retired. Authority
+(`launchToken`, `launchIncarnationId`, `launchAgent`) still retires exactly as before. The
+regression bundles and executes the actual writer with OXC and checks the emitted PTY bytes.
+
+**Paths:**
+
+- `src/main/runtime/orca-runtime-write-terminal-agent-prompt.ts`
+- `src/main/runtime/agent-prompt-submission-omp-atomic.test.ts`
+- `src/main/runtime/runtime-terminal-state-records.ts`
+- `src/main/runtime/orca-runtime-create-terminal.ts`
+- `src/main/runtime/orca-runtime-record-pty-worktree.ts`
+- `src/main/runtime/orca-runtime-resolve-authoritative-terminal-wait-permission.ts`
+
 ## bug-2 Relay and SSH environment-dependent failures
 
 **Ledger:** `bug-2`.
@@ -473,3 +676,28 @@ stake in.
 **Paths:** `config/scripts/hourly-build-version.test.mjs`.
 
 **Status:** pending-upstream. Not yet submitted.
+
+## Focused Playwright file selection
+
+**Defect:** Playwright 1.63, which v1.4.215 adopted, reads the `--` that `pnpm run test:e2e --
+<spec>` forwards as the end of file selection. The real-IME workflow's deterministic step therefore
+runs all 841 e2e tests instead of `terminal-ime-exact-byte.spec.ts`, and the job times out at 25
+minutes. The golden-e2e workflow and the native IBus runner have the same shape.
+
+**Fork change:** none of its own. It is upstream's fix, #23270 (`dffb3498e2`), cherry-picked whole:
+drop the forwarded `--` from each focused command and add upstream's contract test for it.
+
+**Why upstream, not isolated:** it already is upstream, on `main`. Neither v1.4.215 nor v1.4.216
+carries it, and without an exception the next sync resets these files to a tag that still has the
+bug.
+
+**Paths:**
+
+- `.github/workflows/terminal-ime-e2e.yml`
+- `.github/workflows/golden-e2e-experiment.yml`
+- `config/scripts/run-terminal-ibus-hangul-e2e.mjs`
+- `config/scripts/terminal-ime-e2e-workflow.test.mjs`
+- `config/scripts/playwright-focused-workflow-selection.test.mjs`
+
+**Status:** merged upstream, awaiting a stable tag. Drop these exceptions at the first sync whose tag
+contains `dffb3498e2`.

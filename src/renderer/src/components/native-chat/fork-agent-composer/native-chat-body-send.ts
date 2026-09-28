@@ -43,14 +43,17 @@ function bestEffortCancelClear(
   settings: RuntimeSettings,
   ptyId: string,
   options: NativeChatSendOptions | undefined,
-  reportOutcome: (outcome: SendOutcome) => void
-): void {
+  reportOutcome: (outcome: SendOutcome) => void,
+  delay: (ms: number, fn: () => void) => void
+): Promise<void> | undefined {
+  let cleared: Promise<void> | undefined
   try {
-    clearUnsubmittedAgentInput(settings, ptyId, options)
+    cleared = clearUnsubmittedAgentInput(settings, ptyId, options, delay)
   } catch {
     // Cleanup only — the outcome report below must still fire.
   }
   reportOutcome('may-not-have-sent')
+  return cleared
 }
 
 /** What a caller may do once its first body write is accepted by the TUI. */
@@ -144,7 +147,8 @@ export function enqueueNativeChatBodySend(args: {
     },
     {
       terminalTabId,
-      onCancelUnsubmitted: () => bestEffortCancelClear(settings, ptyId, options, reportOutcome),
+      onCancelUnsubmitted: (cleanupDelay) =>
+        bestEffortCancelClear(settings, ptyId, options, reportOutcome, cleanupDelay),
       // Quarantine owns the replacement shell: report for draft restoration,
       // but never send the ordinary Ctrl+U cleanup into that new endpoint.
       onInvalidate: () => reportOutcome('may-not-have-sent')

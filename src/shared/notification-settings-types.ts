@@ -49,6 +49,11 @@ export type NotificationDispatchRequest = {
    *  title/body in buildNotificationOptions, which does not read these fields at all. */
   title?: string
   body?: string
+  /**
+   * Which lane raised this, so the click handler knows how to reveal the subject. Absent means the
+   * terminal lane, which is every sender that predates structured chat.
+   */
+  surface?: 'terminal' | 'agent-session'
 }
 
 export type NotificationDispatchResult = {

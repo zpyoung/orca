@@ -62,6 +62,7 @@ export type StatusBarItem =
   | 'kimi'
   | 'minimax'
   | 'grok'
+  | 'cursor'
   | 'ssh'
   | 'resource-usage'
   | 'ports'
@@ -124,3 +125,4 @@ export type TopLevelView =
   | 'artifacts'
   | 'mobile'
   | 'ledger'
+  | 'heimdall'

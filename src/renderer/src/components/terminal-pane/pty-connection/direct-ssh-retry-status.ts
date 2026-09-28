@@ -12,10 +12,13 @@ import {
 } from '../../../../../shared/terminal-mode-reset-profiles'
 import { subscribeToTerminalUserInput } from '../terminal-user-input-signal'
 import {
+  isTerminalUserInputFromKeyboard,
+  primeTerminalUserInputKeyboardGate
+} from '@/lib/fork-worker-takeover-gate/keyboard-input-gate'
+import {
   isLocalNativeWindowsConpty,
   resolveWindowsShellOverride
 } from '@/lib/pane-manager/windows-pty-compatibility'
-import { shouldSuppressCodexAutoApprovalStatus } from '../codex-auto-approval-notification-suppression'
 import { createCommandCodeOutputStatusDetector } from '../../../../../shared/command-code-output-status'
 import { readInFlightCommandCodeTurn } from '../parked-terminal-command-status'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
@@ -153,15 +156,6 @@ export function installDirectSshRetryStatus(session: ConnectPanePtySession): voi
       ? registerRendererOwnedAgentStatusPane(session.cacheKey, session.runtimeEnvironmentId)
       : null
   session.handleRendererOwnedAgentStatus = (payload): void => {
-    if (
-      shouldSuppressCodexAutoApprovalStatus(payload, {
-        paneKey: session.cacheKey,
-        tabId: session.deps.tabId,
-        ...(session.launchToken ? { launchToken: session.launchToken } : {})
-      })
-    ) {
-      return
-    }
     const currentState = useAppStore.getState()
     const routing = session.resolveCurrentAgentStatusRouting()
     if (!routing) {
@@ -276,6 +270,10 @@ export function installDirectSshRetryStatus(session: ConnectPanePtySession): voi
   }
   session.markInteractiveRedrawInput = (): void => {
     session.lastInteractiveRedrawInputAt = performance.now()
+    if (session.synchronizedForegroundOutputActive) {
+      session.synchronizedForegroundFrameInteractive = true
+      session.synchronizedForegroundInteractivePresentPending = true
+    }
     // Why: input must probe a wedged xterm even when the PTY produces no renderer output.
     requestTerminalWritePipelineProbe(session.pane.terminal)
   }
@@ -291,8 +289,11 @@ export function installDirectSshRetryStatus(session: ConnectPanePtySession): voi
   session.recordRealUserTerminalInput = (): void => {
     session.recordTerminalInputForHibernation()
     // Takeover must never fire from the onData fallback below: it mixes in auto-replies.
-    reportWorkerTerminalUserInput(session.cacheKey, session.runtimeEnvironmentId)
+    if (isTerminalUserInputFromKeyboard(session.pane.terminal)) {
+      reportWorkerTerminalUserInput(session.cacheKey, session.runtimeEnvironmentId)
+    }
   }
+  primeTerminalUserInputKeyboardGate(session.pane.terminal)
   session.userInputActivityDisposable = subscribeToTerminalUserInput(
     session.pane.terminal,
     session.recordRealUserTerminalInput

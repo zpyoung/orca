@@ -169,7 +169,7 @@ export class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRuntimeWithC
       opts.agent,
       opts.prompt,
       undefined,
-      opts.launchOverrides
+      opts.launchOverrides ? { launchOverrides: opts.launchOverrides } : undefined
     )
     await this.markWorkspaceTrustedForAgent(opts.agent, resolution.connectionId, worktree.path)
     return await this.createTerminal(`id:${worktree.id}`, {

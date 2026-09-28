@@ -25,6 +25,7 @@ import {
   type ResolveHandoffDeliveryEvidenceArgs
 } from './handoff-delivery-evidence'
 import { enrichSessionLineage, recordSessionLineage } from './session-lineage-actions'
+import { createBrowserUuid } from '@/lib/browser-uuid'
 
 export type LaunchForkSessionHandoffArgs = {
   agent: TuiAgent
@@ -47,7 +48,7 @@ export type LaunchForkSessionHandoffResult =
   | { ok: false; reason: 'agent-unavailable' | 'launch-failed' }
 
 type StoreState = ReturnType<typeof useAppStore.getState>
-type AgentTrustPreset = 'cursor' | 'copilot' | 'codex'
+type AgentTrustPreset = 'cursor' | 'copilot' | 'codex' | 'antigravity'
 
 export type LaunchForkSessionHandoffCollaborators = {
   getState?: () => StoreState
@@ -302,7 +303,7 @@ function resolveCollaborators(
     enrichLineage: overrides.enrichLineage ?? enrichSessionLineage,
     clearDraft: overrides.clearDraft ?? clearHandoffDraft,
     now: overrides.now ?? Date.now,
-    createLineageId: overrides.createLineageId ?? (() => globalThis.crypto.randomUUID())
+    createLineageId: overrides.createLineageId ?? createBrowserUuid
   }
 }
 

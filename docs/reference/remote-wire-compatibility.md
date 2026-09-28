@@ -9,24 +9,48 @@ either side publishes over them.
 `src/shared/protocol-version.ts` says when to bump `RUNTIME_PROTOCOL_VERSION`. This
 page covers the changes that do _not_ bump it and are therefore easy to get wrong.
 
-## Rule 1 — a new optional JSON field on an existing frame is safe
+## Rule 1 — a new optional JSON field on an existing frame is safe, unless the reading schema is `.strict()`
 
-Every JSON payload is parsed with a decoder that ignores unknown keys (zod `.strip()`
-on RPC params, `JSON.parse` on stream frames). An older peer that has never heard of
-the field simply does not read it.
+Stream frames decode with `JSON.parse` and a hand-written reader that only ever looks
+up the keys it knows, so a new key is always inert there. RPC params and published
+response payloads decode with zod, and there the safety of an unknown key depends on
+how that schema was declared:
 
-Safe:
+- the zod default (`z.object({...})`, no `.strict()`) **strips** unknown keys — an
+  older peer that has never heard of the field silently ignores it;
+- `.strict()` **rejects the whole payload** the instant it sees a key the schema does
+  not declare. Adding an optional field to a `.strict()` schema is a new-required-field
+  defect in disguise for whichever side is doing the strict parsing: `EnrollInputSchema`
+  shipped exactly this bug when `owner` and `ownerInterventionCapability` were added to
+  it — an old host's `.strict()` copy of that schema rejects the whole enroll call, not
+  just the two new keys (fixed with `HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY`, gating
+  the send side the same way Rule 2 gates a new opcode).
+
+**Check which you have**: search the schema's own declaration for `.strict()`. For RPC
+params specifically, `dispatcher-request-parsing.ts` calls `.safeParse()` on the method's
+declared schema exactly as written, with no relaxation layer, so a `.strict()` params
+schema really does reject an unrecognized key at the transport boundary — there is
+nothing downstream that saves it. `remoteReaderSchema` (`remote-reader-schemas.ts`) is
+the one place `.strict()` gets relaxed, and it only wraps published RESPONSE schemas for
+the reading side; it is never applied to inbound `params`, so it cannot save a `.strict()`
+request schema either.
+
+Safe, on a non-strict schema:
 
 ```ts
 // host adds a field; older clients ignore it
 encodeTerminalStreamJson({ kind, cols, rows, hiddenOutputReason })
 ```
 
-**The field is safe only for as long as every reader treats it as optional.** The
-moment a newer client _requires_ it, that client is broken against every host that
-predates the field — which is the same defect as removing a field, just discovered
-later. If new behavior depends on the field being present, that is Rule 2: negotiate
-it, or make the reader fall back.
+Not safe on a `.strict()` schema without a capability gate — treat it like Rule 2's new
+opcode: the side that would send the new key must confirm the peer understands it before
+including it, rather than sending it and hoping.
+
+**Even on a non-strict schema, the field is safe only for as long as every reader treats
+it as optional.** The moment a newer client _requires_ it, that client is broken against
+every host that predates the field — which is the same defect as removing a field, just
+discovered later. If new behavior depends on the field being present, that is Rule 2:
+negotiate it, or make the reader fall back.
 
 ## Rule 2 — a new stream opcode is NOT safe; negotiate it
 
@@ -102,7 +126,7 @@ gate, and a conflicted worktree that looks clean is granted a hosted-review crea
 should not have. Withholding an affordance is a degrade; removing the evidence a gate
 reads is not.
 
-A fallback is only ever allowed to shape a *reading*. If the member is sent back to the
+A fallback is only ever allowed to shape a _reading_. If the member is sent back to the
 host — a token the client echoes into a later call's params — pass it through as
 `z.string()` and let the send site keep it verbatim. `hostedReview`'s `provider` is the
 case: the eligibility reply names it and the create call returns it, so an
@@ -181,8 +205,10 @@ hand-written. It covers the three skews that surface can fail on:
 - a new client against the old dispatcher always gets an answer rather than silence,
   and `method_not_found` for every method that release does not register, so the
   absence is visible during negotiation instead of by calling;
-- a cursor survives a host restart: the client's fence is refused as stale with the live
-  one attached, and resuming from the held cursor replays only what it missed.
+- a cursor survives a host restart: a reattach at the client's fence is refused as stale
+  with the live one attached, a write still carrying that fence is delivered (writes are
+  named by their target, and every released client still sends a fence), and resuming from
+  the held cursor replays only what it missed.
 
 Run it with:
 

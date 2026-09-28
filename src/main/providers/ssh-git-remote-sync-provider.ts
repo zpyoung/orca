@@ -1,9 +1,9 @@
 import type { GitForkSyncExpectedUpstream, GitForkSyncResult } from '../../shared/git-fork-sync'
 import type { GitPushTarget } from '../../shared/worktree/types'
 import { REBASE_FROM_BASE_RPC_TIMEOUT_MS } from '../../shared/git-rebase-source'
-import { SshGitWorkingTreeProvider } from './ssh-git-working-tree-provider'
+import { HostedReviewSitterSshGitProvider } from '../fork-hosted-review-sitter/ssh-git-adapter'
 
-export class SshGitRemoteSyncProvider extends SshGitWorkingTreeProvider {
+export class SshGitRemoteSyncProvider extends HostedReviewSitterSshGitProvider {
   async pushBranch(
     worktreePath: string,
     publish = false,

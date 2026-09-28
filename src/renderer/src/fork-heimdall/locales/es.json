@@ -1,0 +1,150 @@
+{
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "Vigilante de objetivos"
+      },
+      "status": {
+        "watching": "Observando",
+        "held": "Retenido",
+        "acting": "Actuando",
+        "escalated": "Escalado",
+        "parked": "Aparcado",
+        "terminal": "Completado",
+        "disabled": "Detenido",
+        "unreachable": "Equipo inaccesible",
+        "lostContact": "Equipo inaccesible · última confirmación hace {{age}}",
+        "phase": "Fase actual"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "Equipo inaccesible · última confirmación hace {{age}}"
+      },
+      "host": {
+        "remote": "Remoto · {{host}}",
+        "local": "Este dispositivo"
+      },
+      "time": {
+        "never": "Nunca",
+        "now": "ahora",
+        "ago": "hace {{age}}"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "{{count}} vigilantes requieren atención"
+      },
+      "page": {
+        "back": "Volver",
+        "title": "Flota de Heimdall",
+        "summary": "{{active}} activos · {{attention}} requieren atención",
+        "refresh": "Actualizar flota",
+        "staleError": "No se pudo actualizar la flota; se muestra la última instantánea confirmada: {{error}}"
+      },
+      "fleet": {
+        "title": "Flota de vigilantes",
+        "emptyTitle": "No hay vigilantes en la flota",
+        "emptyDescription": "Activa un vigilante desde un espacio de trabajo compatible para verlo aquí.",
+        "name": "Vigilante",
+        "status": "Estado",
+        "phase": "Fase",
+        "activeBurn": "Tiempo activo",
+        "turns": "Turnos",
+        "elapsed": "Tiempo transcurrido",
+        "lastTick": "Último ciclo"
+      },
+      "detail": {
+        "back": "Volver a la flota",
+        "refreshing": "Actualizando detalles",
+        "observed": "Estado del propietario observado hace {{age}}",
+        "remote": "Caché remota",
+        "lostContact": "Última confirmación hace {{age}}; no se puede contactar con el propietario en este momento. Es posible que el vigilante aún esté en ejecución.",
+        "readOnly": "Solo lectura.",
+        "staleError": "No se pudieron actualizar los detalles; se muestran los últimos datos confirmados: {{error}}",
+        "loading": "Cargando detalles del propietario…",
+        "unavailable": "Los detalles del propietario no están disponibles.",
+        "selectPrompt": "Selecciona un vigilante para revisar sus decisiones, agentes y controles del propietario."
+      },
+      "controls": {
+        "title": "Controles del propietario",
+        "resume": "Reanudar",
+        "pause": "Pausar",
+        "disarm": "Desactivar",
+        "delete": "Eliminar vigilante",
+        "deleteTitle": "¿Eliminar vigilante?",
+        "deleteDescription": "El vigilante «{{name}}» y su historial guardado se eliminarán permanentemente. Los terminales de los agentes no se detendrán.",
+        "approve": "Aprobar",
+        "budgetResumeWarning": "Este vigilante ha agotado su presupuesto. Aumenta el límite antes de reanudarlo o volverá a quedar aparcado."
+      },
+      "command": {
+        "applied": "Aplicado por el propietario a las {{time}}.",
+        "refused": "El propietario rechazó el comando ({{reason}}): {{detail}}",
+        "indeterminate": "Es posible que el comando se haya aplicado o no. Volviendo a leer el estado del propietario… {{detail}}",
+        "stopAllIndeterminate": "{{count}} comandos de detención pueden haberse aplicado o no. Se está volviendo a leer el estado del propietario.",
+        "stopAllRefused": "{{count}} propietarios rechazaron el comando de detención."
+      },
+      "budget": {
+        "title": "Presupuesto",
+        "activeTime": "Tiempo activo",
+        "unlimited": "Ilimitado",
+        "unlimitedShort": "ilimitado",
+        "turns": "Turnos de agentes",
+        "exhausted": "Agotado: {{kind}}",
+        "minutesLimit": "Límite de minutos activos",
+        "turnLimit": "Límite de turnos de agentes",
+        "apply": "Aplicar presupuesto"
+      },
+      "escalations": {
+        "title": "Escalaciones abiertas"
+      },
+      "workers": {
+        "title": "Agentes activos",
+        "empty": "No hay agentes activos.",
+        "live": "Activo",
+        "unverifiable": "Inalcanzable",
+        "exited": "Finalizado",
+        "noContact": "Sin contacto confirmado",
+        "lastContact": "Último contacto hace {{age}}",
+        "stop": "Detener",
+        "answerPlaceholder": "Responde al agente",
+        "answerLabel": "Responder a la pregunta del agente",
+        "sendAnswer": "Enviar respuesta"
+      },
+      "trace": {
+        "title": "Traza de decisiones",
+        "noDecision": "No hay ninguna decisión registrada",
+        "decidedAction": "Actuar: {{action}}",
+        "empty": "Aún no hay trazas de decisiones.",
+        "tick": "Ciclo {{seq}}",
+        "running": "En ejecución",
+        "saw": "Observado",
+        "noSnapshot": "No hay ninguna instantánea registrada",
+        "decided": "Decisión tomada",
+        "gate": "Puerta",
+        "declined": "Rechazadas",
+        "noneDeclined": "No se rechazó ninguna fase"
+      },
+      "activity": {
+        "title": "Historial de acciones de la flota",
+        "asOf": "Última actualización: {{age}}",
+        "partial": "{{count}} historiales de vigilantes no se pudieron actualizar; se conservan los registros visibles.",
+        "empty": "Aún no hay acciones autónomas registradas."
+      },
+      "ledger": {
+        "title": "Actividad del vigilante",
+        "attemptResolved": "Intento resuelto",
+        "attemptAbandoned": "Intento abandonado",
+        "evidence": "Evidencia",
+        "activeTimeStarted": "Tiempo activo iniciado",
+        "activeTimeChecked": "Punto de control del tiempo activo",
+        "activeTimeStopped": "Tiempo activo detenido",
+        "workerTurn": "Turno del agente",
+        "finished": "Finalizado",
+        "empty": "Aún no hay actividad registrada."
+      },
+      "error": {
+        "unavailable": "El plano de control de Heimdall no está disponible.",
+        "ownerUnavailable": "El entorno de ejecución propietario no está disponible; no se envió ninguna inscripción."
+      }
+    }
+  }
+}

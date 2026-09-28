@@ -1,6 +1,6 @@
 ---
-last_released_commit: a45f3e27a5c8055dc283ac22002a843c094664c8
-upstream_synced: v1.4.207
+last_released_commit: ffe35fc7eb396ab24a5c77fe3aa98e64f1adeb49
+upstream_synced: v1.4.215
 ---
 
 # Changelog
@@ -11,6 +11,38 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.216-rc.0.zy01] - 2026-09-28
+
+Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4.215).
+
+### Added
+- Heimdall watchers. A hosted-review sitter watches a pull request, runs gated fixes, keeps the
+  branch up to date, and merges it once it is green. An objective runner takes a structured plan
+  through to a landed change, tracking each step from files on disk to committed, pushed, reviewed,
+  and merged. Both are durable across restarts, have per-watcher budgets and emergency stop
+  controls in the Heimdall UI, and can be driven over remote connections. `orca heimdall debug`
+  reports a watcher's state from the CLI.
+
+### Fixed
+- Sending a message from the terminal dock into a fresh Claude Code session no longer lands below
+  a wall of blank lines without submitting. Claude Code read the dock's input-clearing keystrokes
+  as a paste; they now go out in small, paced writes, and a cancelled send finishes its cleanup
+  before the next one starts.
+- The terminal dock no longer throws on a pane that has no stable id; it treats that pane as
+  undocked.
+- Heimdall watchers keep working against v1.4.215's stricter orchestration caller checks.
+
+### Changed
+- Adapted the fork's features and tests to upstream v1.4.215's changed signatures, removed helpers,
+  and new test harnesses, with no change in fork behaviour.
+- CI's real-IME end-to-end step runs only its own spec again instead of the full e2e suite, which
+  had made it time out after the Playwright upgrade. This is an upstream fix taken ahead of the
+  stable tag that carries it.
+- The remote test sandbox image builds again after upstream's Electron install step began importing
+  shared code.
+- The upstream sync process now stops when an older tag's sync PR is still open or an upstream tag
+  was retracted, adopts new lint rules automatically, and catches more classes of module split.
 
 ## [1.4.208-rc.0.zy01] - 2026-09-22
 

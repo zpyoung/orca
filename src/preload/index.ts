@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'
 import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
 import { buildForkAskApi } from './fork-ask-question-tool/ask-preload-api'
+import { buildForkHeimdallApi } from './fork-heimdall/heimdall-preload-api'
+import { buildHostedReviewAgentApi } from './fork-hosted-review-sitter/hosted-review-agent-preload-api'
 import type { PreloadApi } from './api-types'
 import {
   installBrowserFindListener,
@@ -74,6 +76,7 @@ import { memoryApi } from './api/memory-bridge'
 import { claudeUsageApi } from './api/claude-usage-bridge'
 import { codexUsageApi } from './api/codex-usage-bridge'
 import { openCodeUsageApi } from './api/open-code-usage-bridge'
+import { museUsageApi } from './api/muse-usage-bridge'
 import { aiVaultApi } from './api/ai-vault-bridge'
 import { nativeChatApi } from './api/native-chat-bridge'
 import { runtimeApi } from './api/runtime-bridge'
@@ -81,6 +84,7 @@ import { runtimeEnvironmentsApi } from './api/runtime-environments-bridge'
 import { rateLimitsApi } from './api/rate-limits-bridge'
 import { minimaxCredentialsApi } from './api/minimax-credentials-bridge'
 import { grokAccountsApi } from './api/grok-accounts-bridge'
+import { cursorAccountsApi } from './api/cursor-accounts-bridge'
 import { sshApi } from './api/ssh-bridge'
 import { automationsApi } from './api/automations-bridge'
 import { e2eApi } from './api/e2e-bridge'
@@ -175,6 +179,7 @@ const api = {
   claudeUsage: claudeUsageApi,
   codexUsage: codexUsageApi,
   openCodeUsage: openCodeUsageApi,
+  museUsage: museUsageApi,
   aiVault: aiVaultApi,
   nativeChat: nativeChatApi,
   runtime: runtimeApi,
@@ -182,12 +187,15 @@ const api = {
   rateLimits: rateLimitsApi,
   minimaxCredentials: minimaxCredentialsApi,
   grokAccounts: grokAccountsApi,
+  cursorAccounts: cursorAccountsApi,
   ssh: sshApi,
   automations: automationsApi,
   e2e: e2eApi,
   mobile: mobileApi,
   agentStatus: agentStatusApi,
   asks: buildForkAskApi(),
+  heimdall: buildForkHeimdallApi(),
+  hostedReviewAgent: buildHostedReviewAgentApi(),
   speech: speechApi
 } satisfies PreloadApi
 

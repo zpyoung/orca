@@ -172,7 +172,7 @@ export class OrcaRuntimeWithCreateTerminal extends OrcaRuntimeWithTerminalCreate
             ...(adoptedBeforeLaunch ? { adoptedStablePane: adoptedBeforeLaunch } : {}),
             ...(launchOpts.sessionId ? { sessionId: launchOpts.sessionId } : {}),
             ...(!adoptedBeforeLaunch && launchOpts.isNewSession ? { isNewSession: true } : {}),
-            persistHostSessionBinding: true
+            ...dependencies.BACKGROUND_TERMINAL_SPAWN_FLAGS
           })
         } finally {
           releaseStablePaneCreate?.()
@@ -180,7 +180,8 @@ export class OrcaRuntimeWithCreateTerminal extends OrcaRuntimeWithTerminalCreate
         if (!result.stablePaneOwner) {
           reportPtySpawnCommitted()
         }
-        const adoptedStablePane = Boolean(result.stablePaneOwner)
+        // Why here: refused before a handle, snapshot or reveal could pose the live PTY as new.
+        const adoptedStablePane = dependencies.admitStablePaneAdoption(result, launchOpts)
         if (result.agentSessionEnsure) {
           const canonicalSurface = result.agentSessionEnsure.owner.surface
           preAllocatedHandle = canonicalSurface.terminalHandle
@@ -211,12 +212,6 @@ export class OrcaRuntimeWithCreateTerminal extends OrcaRuntimeWithTerminalCreate
           terminalHandle: preAllocatedHandle,
           ...(result.incarnationId ? { incarnationId: result.incarnationId } : {})
         })
-        if (launchOpts.structuredAgentSessionId) {
-          dependencies.agentSessionPtyWriteGate.bindPty(
-            result.id,
-            launchOpts.structuredAgentSessionId
-          )
-        }
         const pty = this.getOrCreatePtyWorktreeRecord(result.id)
         if (pty) {
           pty.runtimeSessionOwned = true
@@ -236,6 +231,7 @@ export class OrcaRuntimeWithCreateTerminal extends OrcaRuntimeWithTerminalCreate
             pty.launchToken = launchToken ?? null
             pty.launchIncarnationId = launchToken ? pty.incarnationId : null
             pty.launchAgent = launchOpts.launchAgent ?? null
+            pty.launchedAgent = launchOpts.launchAgent ?? null
           }
           recordPtySurface(pty, tabId, paneKey, spawnSurfaceClaimSequence(this.graphSequence))
         }

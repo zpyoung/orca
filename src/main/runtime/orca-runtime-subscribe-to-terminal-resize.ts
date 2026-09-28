@@ -58,7 +58,8 @@ export class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRuntimeWithApp
     handle: string,
     paneKey: string | null,
     exitCode: number,
-    cause: TerminalExitCause
+    cause: TerminalExitCause,
+    exitTailText: string | null = null
   ): void {
     if (!this._orchestrationDb) {
       return
@@ -123,7 +124,7 @@ export class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRuntimeWithApp
         from: handle,
         to: recipient.to,
         subject: `Agent exited unexpectedly (${errorContext})`,
-        body: `Worker ${handle} stopped while running task ${named}. ${errorContext}.${settled?.status === 'circuit_broken' ? ' This task has now failed too many times, so it will not be retried automatically.' : settled?.status === 'failed' ? ' The task is ready to be dispatched again.' : ''}`,
+        body: `Worker ${handle} stopped while running task ${named}. ${errorContext}.${settled?.status === 'circuit_broken' ? ' This task has now failed too many times, so it will not be retried automatically.' : settled?.status === 'failed' ? ' The task is ready to be dispatched again.' : ''}${exitTailText ?? ''}`,
         type: 'escalation',
         priority: 'high',
         payload: JSON.stringify({

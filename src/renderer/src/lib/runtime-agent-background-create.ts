@@ -6,9 +6,9 @@ import type { SessionOptionValue } from '../../../shared/native-chat-session-opt
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import type { RuntimeTerminalCreate } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import { toAgentLaunchPreferencesWithOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'
 import {
   createAgentSessionCreateOperation,
-  toAgentLaunchPreferences,
   withAgentSessionCreateOperationId
 } from '@/runtime/agent-session-create-operation'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
@@ -37,7 +37,7 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
   const keyboardProtocol = buildDefaultTerminalOptions().vtExtensions?.kittyKeyboard
   const keyboardOptions = createAgentSessionKeyboardOptions(keyboardProtocol)
   const operation = createAgentSessionCreateOperation()
-  const launchPreferences = toAgentLaunchPreferences(args.sessionOptions, {
+  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(args.sessionOptions, {
     includeOptionValues: args.useLaunchOverrides
   })
   return await runRemoteAgentSessionLaunch({

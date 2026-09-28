@@ -79,7 +79,7 @@ describe('NativeChatToolRun coloring', () => {
     expect(code?.className).toContain('text-foreground/90')
   })
 
-  it('gives a tool result block no glyph and no category color', () => {
+  it('folds a tool result into its call row without a glyph of its own', () => {
     const blocks: NativeChatBlock[] = [
       { type: 'tool-call', name: 'Bash', input: '{}' },
       { type: 'tool-result', output: 'done', isError: false }
@@ -89,7 +89,6 @@ describe('NativeChatToolRun coloring', () => {
 
     const glyphs = container.querySelectorAll('[data-tool-category-glyph]')
     expect(glyphs).toHaveLength(1)
-    const resultCode = screen.getByText('Result')
-    expect(resultCode.className).not.toMatch(/text-tool-/)
+    expect(screen.queryByText('Result')).toBeNull()
   })
 })

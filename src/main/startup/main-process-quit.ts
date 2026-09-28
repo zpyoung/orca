@@ -5,6 +5,7 @@ import { stopFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade'
 import { killAllPty } from '../ipc/pty'
 import { disconnectDaemon, shutdownDaemon } from '../daemon/daemon-init'
 import { beginSshShutdown } from '../ipc/ssh-shutdown-drain'
+import { beginHeimdallShutdown } from '../fork-heimdall/kernel-shutdown'
 import { agentHookServer } from '../agent-hooks/server'
 import { wslHookRelayManager } from '../agent-hooks/wsl-hook-relay-manager'
 import { removeManagedAgentHooksAsync } from '../agent-hooks/managed-agent-hook-controls'
@@ -125,6 +126,7 @@ function installWillQuitHandler(): void {
     // Why: an agent still working at quit gets no terminating hook, so stats.flushAsync() closes those sessions out synchronously (only the write is deferred) — otherwise their duration is lost.
     state.starNag?.stop()
     state.automations?.stop()
+    const heimdallShutdown = beginHeimdallShutdown(state.heimdall)
     // Why: plugin hosts are forked children; dispose sends shutdown and
     // escalates to SIGKILL so they cannot outlive the app. The promise joins
     // the teardown barrier below — quitting before it resolves would let
@@ -195,18 +197,32 @@ function installWillQuitHandler(): void {
     browserManager.setBrowserGuestStateChangedListener(null)
     const emulatorShutdown =
       state.runtime?.getEmulatorBridge()?.destroyAllSessions() ?? Promise.resolve()
-    // Why immediately before store.flushAsync() with no await in between: beginSshShutdown() marks every
+    // Why immediately before the final store flush with no await in between: beginSshShutdown() marks every
     // active SSH lease detached in memory synchronously, and that flush is what persists it.
     const sshShutdown = beginSshShutdown()
     killAllPty()
     const watcherShutdown = shutdownWatchersOnce()
-    const storeFlush = state.store?.flushAsync() ?? Promise.resolve()
+    const finalStore = state.store
+    const storeFlush = (async () => {
+      if (!finalStore) {
+        return
+      }
+      try {
+        await finalStore.flushFinalOrThrowAsync({ exportJsonCompatibility: true })
+        await finalStore.freezeWritesAsync()
+        state.profileStateAdmission?.release()
+        state.profileStateAdmission = undefined
+      } catch (error) {
+        console.error('[persistence] Failed to finalize profile state:', error)
+      }
+    })()
     // Why: usage-cache writes are queued off the main thread, so a quit right after setEnabled or a
     // scan completion would drop the final snapshot. Captured before any await; joins the barrier below.
     const usageCacheFlush = Promise.all([
       state.claudeUsage?.flush(),
       state.codexUsage?.flush(),
-      state.openCodeUsage?.flush()
+      state.openCodeUsage?.flush(),
+      state.museUsage?.flush()
     ]).then(() => {})
     const browserClientHostShutdown = shutdownPairedRuntimeBrowserClientHosts()
     const skillUploadShutdown = state.runtime?.disposeSkillUploadSessions() ?? Promise.resolve()
@@ -243,6 +259,7 @@ function installWillQuitHandler(): void {
       { name: 'browser-client-hosts', promise: browserClientHostShutdown },
       { name: 'local-ssh-browser-routes', promise: localSshRouteShutdown },
       { name: 'ssh', promise: sshShutdown },
+      heimdallShutdown,
       { name: 'plugin-hosts', promise: pluginHostShutdown },
       { name: 'skill-uploads', promise: skillUploadShutdown },
       { name: 'grok-hooks', promise: grokHookCleanup },

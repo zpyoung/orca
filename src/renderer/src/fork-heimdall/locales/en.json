@@ -1,0 +1,275 @@
+{
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "Objective watcher",
+        "hostedReview": "Hosted review"
+      },
+      "status": {
+        "watching": "Watching",
+        "held": "Held",
+        "acting": "Acting",
+        "escalated": "Escalated",
+        "parked": "Parked",
+        "terminal": "Complete",
+        "disabled": "Stopped",
+        "unreachable": "Host unreachable",
+        "lostContact": "Host unreachable · last confirmed {{age}}",
+        "phase": "Current phase"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "Host unreachable · last confirmed {{age}}"
+      },
+      "host": {
+        "remote": "Remote · {{host}}",
+        "local": "This device"
+      },
+      "time": {
+        "never": "Never",
+        "now": "now",
+        "ago": "{{age}} ago"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "{{count}} watchers need attention"
+      },
+      "page": {
+        "back": "Back",
+        "title": "Heimdall fleet",
+        "summary": "{{active}} active · {{attention}} need attention",
+        "refresh": "Refresh fleet",
+        "staleError": "Fleet refresh failed; showing the last confirmed snapshot: {{error}}"
+      },
+      "fleet": {
+        "title": "Watcher fleet",
+        "emptyTitle": "No watchers in the fleet",
+        "emptyDescription": "Arm a watcher from a supported workspace to see it here.",
+        "name": "Watcher",
+        "status": "Status",
+        "phase": "Phase",
+        "activeBurn": "Active time",
+        "turns": "Turns",
+        "elapsed": "Elapsed",
+        "lastTick": "Last tick",
+        "workspace": "Workspace",
+        "activity": "Activity"
+      },
+      "detail": {
+        "back": "Back to fleet",
+        "refreshing": "Refreshing detail",
+        "observed": "Owner state observed {{age}}",
+        "remote": "Remote cache",
+        "lostContact": "Last confirmed {{age}}; the owner cannot currently be reached. The watcher may still be running.",
+        "readOnly": "Read-only.",
+        "staleError": "Detail refresh failed; showing the last confirmed data: {{error}}",
+        "loading": "Loading owner detail…",
+        "unavailable": "Owner detail is unavailable.",
+        "selectPrompt": "Select a watcher to inspect its decisions, workers, and owner controls."
+      },
+      "kindDetail": {
+        "handedOffFrom": "Handed off from objective {{id}}"
+      },
+      "controls": {
+        "title": "Owner controls",
+        "resume": "Resume",
+        "pause": "Pause",
+        "disarm": "Disarm",
+        "maxConcurrency": "Max concurrency",
+        "updateConcurrency": "Update cap",
+        "delete": "Delete watcher",
+        "deleteTitle": "Delete watcher?",
+        "deleteDescription": "The watcher “{{name}}” and its saved history will be permanently removed. Worker terminals will not be stopped.",
+        "approve": "Approve",
+        "budgetResumeWarning": "This watcher exhausted its budget. Increase the limit before resuming or it will park again.",
+        "approveAction": "Approve: {{action}}"
+      },
+      "debugReport": {
+        "copy": "Copy debug report",
+        "copied": "Debug report copied",
+        "copyError": "Could not copy the debug report.",
+        "copyErrorWithDetail": "Could not copy the debug report: {{error}}"
+      },
+      "command": {
+        "applied": "Applied by the owner at {{time}}.",
+        "refused": "Owner refused the command ({{reason}}): {{detail}}",
+        "indeterminate": "The command may or may not have applied. Re-reading owner state… {{detail}}",
+        "stopAllIndeterminate": "{{count}} stop commands may or may not have applied. Owner state is being re-read.",
+        "stopAllRefused": "{{count}} owners refused the stop command."
+      },
+      "budget": {
+        "title": "Budget",
+        "activeTime": "Active time",
+        "unlimited": "Unlimited",
+        "unlimitedShort": "unlimited",
+        "turns": "Worker turns",
+        "exhausted": "Exhausted: {{kind}}",
+        "minutesLimit": "Active minutes limit",
+        "turnLimit": "Worker turn limit",
+        "apply": "Apply budget",
+        "edit": "Edit",
+        "cancel": "Cancel"
+      },
+      "escalations": {
+        "title": "Open escalations"
+      },
+      "workers": {
+        "title": "Live workers",
+        "empty": "No live workers.",
+        "live": "Live",
+        "unverifiable": "Unverifiable",
+        "exited": "Exited",
+        "noContact": "No confirmed contact",
+        "lastContact": "Last contact {{age}}",
+        "stop": "Stop",
+        "answerPlaceholder": "Answer the worker",
+        "answerLabel": "Answer worker question",
+        "sendAnswer": "Send answer",
+        "open": "Open",
+        "openUnavailable": "Open unavailable"
+      },
+      "trace": {
+        "title": "Decision trace",
+        "noDecision": "No decision recorded",
+        "decidedAction": "Act: {{action}}",
+        "empty": "No decision traces yet.",
+        "tick": "Tick {{seq}}",
+        "running": "Running",
+        "saw": "Saw",
+        "noSnapshot": "No snapshot recorded",
+        "decided": "Decided",
+        "gate": "Gate",
+        "declined": "Declined",
+        "noneDeclined": "No phase declined",
+        "decidedDeviation": "Deviation: {{kind}}"
+      },
+      "activity": {
+        "title": "Fleet action history",
+        "asOf": "As of {{age}}",
+        "partial": "{{count}} watcher histories could not be refreshed; visible records are retained.",
+        "empty": "No autonomous actions recorded yet.",
+        "lastConfirmed": "Last confirmed {{age}}",
+        "unverifiable": "Contact unverifiable",
+        "unavailable": "Activity unavailable",
+        "waiting": "Waiting for change",
+        "inactive": "No active work",
+        "started": "Started {{age}}",
+        "agentInFlight": "Agent work in flight",
+        "agentsInFlight": "{{count}} agent tasks in flight",
+        "objectiveConcurrencyRunning": "{{count}} of {{cap}} running",
+        "checkRunning": "Check running",
+        "actionRunning": "Action running"
+      },
+      "ledger": {
+        "title": "Watcher activity",
+        "attemptResolved": "Attempt resolved",
+        "attemptAbandoned": "Attempt abandoned",
+        "evidence": "Evidence",
+        "activeTimeStarted": "Active time started",
+        "activeTimeChecked": "Active time checkpoint",
+        "activeTimeStopped": "Active time stopped",
+        "workerTurn": "Worker turn",
+        "finished": "Finished",
+        "empty": "No activity recorded yet."
+      },
+      "error": {
+        "unavailable": "Heimdall control plane is unavailable.",
+        "ownerUnavailable": "The owning runtime is unavailable; no enrollment was sent."
+      },
+      "approval": {
+        "preparedCommit": "Prepared commit",
+        "scopeDetails": "Approval scope",
+        "contentState": "Content state",
+        "evidence": "Evidence",
+        "exactScopeNotice": "Approval applies only to this exact action and content. New or changed actions require separate approval.",
+        "action": {
+          "dispatchPlanner": "Start planner",
+          "ingestPlan": "Read planner result",
+          "activatePlan": "Activate plan",
+          "dispatchNode": "Start implementation task",
+          "ingestReport": "Read implementation report",
+          "runCheck": "Run acceptance check",
+          "dispatchReviewer": "Start review",
+          "dispatchIntegrator": "Start integrator review",
+          "ingestVerdict": "Read review verdict",
+          "recordLanding": "Record completed work",
+          "commitLocalBranch": "Commit local branch",
+          "pushRef": "Push branch",
+          "openHostedReview": "Open hosted review",
+          "runGate": "Run objective gate",
+          "applyPlanPatch": "Apply plan repair",
+          "dispatchPlanReview": "Review the plan",
+          "ingestPlanReview": "Record the plan review"
+        },
+        "explanation": {
+          "dispatchPlanner": "Start the planner for this objective.",
+          "ingestPlan": "Read the planner result into the objective plan.",
+          "activatePlan": "Make the prepared objective plan active.",
+          "dispatchNode": "Start an implementation worker for an objective task.",
+          "ingestReport": "Read an implementation worker report into the objective state.",
+          "runCheck": "Run an acceptance command for the objective.",
+          "dispatchReviewer": "Start an independent review of the objective work.",
+          "dispatchIntegrator": "Start the final integration review of the objective work.",
+          "ingestVerdict": "Read a review verdict into the objective state.",
+          "recordLanding": "Record the completed objective work as landed on disk.",
+          "commitLocalBranch": "Commit the completed objective work to its local branch.",
+          "pushRef": "Push the objective branch to its remote.",
+          "openHostedReview": "Open a hosted review for the objective branch.",
+          "rerunCheck": "Request another run of the failed hosted check.",
+          "prepareFix": "Start a worker to prepare a fix for the failed hosted check.",
+          "publishFix": "Publish the prepared check fix to the hosted review branch.",
+          "prepareConflictResolution": "Start a worker to prepare a merge-conflict resolution.",
+          "publishConflictResolution": "Publish the prepared conflict resolution to the hosted review branch.",
+          "updateBranch": "Update the hosted review branch from its base branch.",
+          "merge": "Merge the hosted review.",
+          "enqueue": "Enter the hosted review in its merge queue.",
+          "unknown": "Approve this exact requested action.",
+          "runGate": "Run a whole-tree command on the integrated branch before review and landing.",
+          "applyPlanPatch": "Apply a planner repair patch to the approved objective plan.",
+          "dispatchPlanReview": "Start the plan critic review of a draft revision or a pending patch.",
+          "ingestPlanReview": "Read a plan review verdict into the objective state."
+        },
+        "detail": {
+          "task": "Task",
+          "revision": "Revision",
+          "criterion": "Criterion",
+          "command": "Command",
+          "branch": "Branch",
+          "remote": "Remote",
+          "baseBranch": "Base branch",
+          "provider": "Provider",
+          "reviewRole": "Review role",
+          "commit": "Commit",
+          "check": "Check",
+          "baseCommit": "Base commit",
+          "mergeMethod": "Merge method",
+          "updateMethod": "Update method",
+          "review": "Review"
+        }
+      },
+      "phase": {
+        "planning": "Planning",
+        "implementing": "Implementing",
+        "checking": "Checking",
+        "reviewing": "Reviewing",
+        "landing": "Landing",
+        "landed": "Landed",
+        "unavailable": "Phase unavailable"
+      },
+      "workspace": {
+        "folder": "Folder",
+        "branchUnavailable": "Branch unavailable"
+      },
+      "owner": {
+        "modelAutomatic": "Automatic",
+        "effortAutomatic": "Automatic",
+        "title": "Owning agent",
+        "help": "Optional. When set, Heimdall wakes this agent on a deviation instead of replanning automatically. Off keeps automatic replan-on-failure.",
+        "harness": "Harness",
+        "harnessUnavailableHelp": "Only Claude has a resumable session Heimdall can wake between turns. Other harnesses cannot own a watcher yet.",
+        "model": "Model",
+        "effort": "Effort"
+      }
+    }
+  }
+}

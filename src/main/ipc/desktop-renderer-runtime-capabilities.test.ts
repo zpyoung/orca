@@ -26,6 +26,7 @@ import {
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
   type RuntimeCapability
 } from '../../shared/protocol-version'
+import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall/capability'
 import { supportsAgentLaunch } from '../runtime/rpc/methods/agent-launch'
 import { DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES } from './desktop-renderer-runtime-capabilities'
 
@@ -47,7 +48,9 @@ const REMOTE_ONLY_BY_DECISION: readonly RuntimeCapability[] = [
   BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
   BROWSER_CLIENT_PAGE_METADATA_RUNTIME_CAPABILITY,
   // Opts into a delta feed in place of the full tab list — a remote-transport concern.
-  SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY
+  SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY,
+  // Heimdall wire-shape gates; the local renderer reads Heimdall over its own IPC, not runtime:call.
+  ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES
 ]
 
 /** Gates the renderer must pass against its own main process. The Electron remote list omits all

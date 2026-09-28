@@ -50,6 +50,7 @@ function renderOverlay({
   paneCount = 2,
   showAlwaysOnHeaders = true,
   showSplitButton = true,
+  isTabPinned = false,
   onClosePane = vi.fn(),
   onRemoveTitle = vi.fn(),
   onRenameSubmit = vi.fn(),
@@ -63,6 +64,7 @@ function renderOverlay({
   paneCount?: number
   showAlwaysOnHeaders?: boolean
   showSplitButton?: boolean
+  isTabPinned?: boolean
   onClosePane?: ReturnType<typeof vi.fn>
   onRemoveTitle?: ReturnType<typeof vi.fn>
   onRenameSubmit?: ReturnType<typeof vi.fn>
@@ -77,7 +79,7 @@ function renderOverlay({
   onRemoveTitle: ReturnType<typeof vi.fn>
   onRenameSubmit: ReturnType<typeof vi.fn>
 } {
-  const panes = [makePane(1), makePane(2)]
+  const panes = [makePane(1), makePane(2)].slice(0, paneCount)
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -89,6 +91,7 @@ function renderOverlay({
         cwd={path.join(path.sep, 'tmp')}
         showAlwaysOnHeaders={showAlwaysOnHeaders}
         showSplitButton={showSplitButton}
+        isTabPinned={isTabPinned}
         paneCount={paneCount}
         activePaneId={1}
         panes={panes}
@@ -154,7 +157,7 @@ afterEach(() => {
 })
 
 describe('TerminalPaneHeaderOverlay', () => {
-  it('keeps the titled-pane close affordance as remove-title while headers are always on', () => {
+  it('keeps the titled split-pane X as remove-title only', () => {
     const { container, onClosePane, onRemoveTitle } = renderOverlay({
       paneTitles: { 1: 'server', 2: '' }
     })
@@ -163,15 +166,34 @@ describe('TerminalPaneHeaderOverlay', () => {
       'button[aria-label="Remove pane title: server"]'
     )
     expect(removeTitle).not.toBeNull()
+    expect(
+      container.querySelector('.pane-title-bar[data-active-pane] button[aria-label="Close Pane"]')
+    ).toBeNull()
 
     act(() => removeTitle?.click())
 
     expect(onRemoveTitle).toHaveBeenCalledWith(1)
-    expect(onClosePane).not.toHaveBeenCalledWith(1)
+    expect(onClosePane).not.toHaveBeenCalled()
+  })
+
+  it('offers close tab beside remove-title for a titled single pane', () => {
+    const { container, onClosePane, onRemoveTitle } = renderOverlay({
+      paneTitles: { 1: 'server' },
+      paneCount: 1
+    })
+
+    expect(container.querySelector('button[aria-label="Remove pane title: server"]')).not.toBeNull()
+    const closeTab = container.querySelector<HTMLButtonElement>('button[aria-label="Close tab"]')
+    expect(closeTab).not.toBeNull()
+
+    act(() => closeTab?.click())
+
+    expect(onClosePane).toHaveBeenCalledWith(1)
+    expect(onRemoveTitle).not.toHaveBeenCalled()
   })
 
   it('keeps split and close-pane controls available for untitled split pane headers', () => {
-    const { container, onClosePane, onRemoveTitle } = renderOverlay({
+    const { container, onClosePane } = renderOverlay({
       paneTitles: { 1: '', 2: '' }
     })
 
@@ -183,7 +205,31 @@ describe('TerminalPaneHeaderOverlay', () => {
     act(() => closePane?.click())
 
     expect(onClosePane).toHaveBeenCalledWith(1)
-    expect(onRemoveTitle).not.toHaveBeenCalled()
+  })
+
+  it('offers close tab for an untitled single pane', () => {
+    const { container, onClosePane } = renderOverlay({ paneTitles: { 1: '' }, paneCount: 1 })
+
+    const closeTab = container.querySelector<HTMLButtonElement>('button[aria-label="Close tab"]')
+    expect(closeTab).not.toBeNull()
+    expect(container.querySelector('button[aria-label="Close Pane"]')).toBeNull()
+
+    act(() => closeTab?.click())
+
+    expect(onClosePane).toHaveBeenCalledWith(1)
+  })
+
+  it.each([
+    { label: 'untitled', title: '' },
+    { label: 'titled', title: 'server' }
+  ])('keeps a pinned $label single-pane tab without a close button', ({ title }) => {
+    const { container } = renderOverlay({
+      paneTitles: { 1: title },
+      paneCount: 1,
+      isTabPinned: true
+    })
+
+    expect(container.querySelector('button[aria-label="Close tab"]')).toBeNull()
   })
 
   it('omits the split control when the header affordance is hidden', () => {
@@ -194,6 +240,7 @@ describe('TerminalPaneHeaderOverlay', () => {
     })
 
     expect(container.querySelector('button[aria-label="Split Terminal Right"]')).toBeNull()
+    expect(container.querySelector('button[aria-label="Close tab"]')).toBeNull()
   })
 
   it('ignores IME composition Enter before submitting a pane title rename', () => {

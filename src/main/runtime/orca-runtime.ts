@@ -2,8 +2,19 @@ import { installRuntimeLinearCommandSurface } from './runtime-linear-command-sur
 import { OrcaRuntimeWithLedger } from './orca-runtime-ledger'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import { askServicesFor, type AskServices } from '../fork-ask-question-tool/ask-services'
+import { registerWorktreeChangeInvalidator } from '../ipc/worktree-change-invalidators'
+import { registerDetectedWorktreeScanInvalidation } from '../ipc/worktrees/listing/register-detected-worktree-scan-invalidation'
 
 class OrcaRuntimeService extends OrcaRuntimeWithLedger {
+  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithLedger>) {
+    super(...args)
+    // Why: the runtime listing re-runs a scan the worktree-change generation overtook and re-lists
+    // through this runtime's scan cache, so a worktree change must reach both. The desktop IPC
+    // module registers the generation bump at load; a headless host never loads it.
+    registerDetectedWorktreeScanInvalidation()
+    registerWorktreeChangeInvalidator((repoId) => this.invalidateWorktreeCatalog(repoId))
+  }
+
   getAskServices(): AskServices {
     return askServicesFor(this, () => Boolean(this.getAvailableAuthoritativeWindow()))
   }

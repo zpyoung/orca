@@ -1,8 +1,4 @@
-import type {
-  AgentLaunchPreferences,
-  RuntimeCreateAgentSessionRequest
-} from '../../../shared/agent-session-host-authority'
-import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
+import type { RuntimeCreateAgentSessionRequest } from '../../../shared/agent-session-host-authority'
 import { createAgentSessionOperationId } from './agent-session-operation-id'
 import { RuntimeRpcCallError } from './runtime-rpc-client'
 
@@ -41,32 +37,6 @@ export function createAgentSessionCreateOperation(): AgentSessionCreateOperation
       throw lastError
     }
   }
-}
-
-export function toAgentLaunchPreferences(
-  sessionOptions: Record<string, SessionOptionValue> | null | undefined,
-  options: { includeOptionValues?: boolean } = {}
-): AgentLaunchPreferences | undefined {
-  if (!sessionOptions) {
-    return options.includeOptionValues ? { optionValues: {} } : undefined
-  }
-  const readString = (key: keyof AgentLaunchPreferences): string | undefined => {
-    const value = sessionOptions[key]
-    return typeof value === 'string' && value.trim() ? value.trim() : undefined
-  }
-  const model = readString('model')
-  const effort = readString('effort')
-  const mode = readString('mode')
-  const optionValues = Object.fromEntries(
-    Object.entries(sessionOptions).filter(([id]) => !['model', 'effort', 'mode'].includes(id))
-  )
-  const preferences: AgentLaunchPreferences = {
-    ...(model ? { model } : {}),
-    ...(effort ? { effort } : {}),
-    ...(mode ? { mode } : {}),
-    ...(options.includeOptionValues ? { optionValues } : {})
-  }
-  return Object.keys(preferences).length > 0 ? preferences : undefined
 }
 
 export function withAgentSessionCreateOperationId(

@@ -28,7 +28,8 @@ with its own module state. Nothing complained: the merge was conflict-free after
 `pnpm typecheck` was clean. This is the third such release (v1.4.186 and v1.4.187 were the others),
 so expect a fourth.
 
-**The tell.** `--verify-residuals` is the only check that sees it, and the drift is not subtle:
+**The tell, for a seam.** `--verify-residuals` is the only check that sees it, and the drift is not
+subtle:
 
 ```
 src/main/ipc/pty.ts: recorded +96/-1, measured +8111/-38
@@ -70,7 +71,25 @@ a residual that drifts by exactly one or two lines is *not* this — that is ord
 damage, where upstream added a parameter or an import the fork's side discarded, and it is repaired
 in place.
 
-**The right move.** Re-home the seam, do not defend the monolith:
+**The tell, for an exception.** There isn't one — not from the manifest. `--verify-residuals` reads
+`seams` only, so a split that lands on an exception-owned path passes every check while the fork
+keeps the whole monolith and the merge adds the new modules beside it. The `ours.txt` audit in
+Step 6 is what catches it, and the signature is a four-digit removal against a file the fork
+supposedly owns:
+
+```
+29    2288  src/main/updater.ts
+8     2180  src/main/rate-limits/service.ts
+7     3497  src/renderer/src/components/terminal-pane/TerminalPane.tsx
+```
+
+v1.4.197 did all three at once, so a release splitting several exception files in one go is normal
+rather than exceptional. Confirm the same way as for a seam — `git show "${UPSTREAM_TARGET}:<path>"
+| wc -l` against the worktree copy — and note that the fork's *own* delta stays small: those three
+were 2/2, 7/6 and 134/14 lines. A small fork delta against a huge upstream removal is the whole
+shape.
+
+**The right move.** Re-home the seam or the exception, do not defend the monolith:
 
 1. Recover the fork's real footprint by diffing the pre-merge fork tip against the **previous** tag
    (`git diff -U6 "$PREV_TAG" "$MERGE_HEAD_PRE" -- <path>`). The recorded residual tells you how
@@ -92,6 +111,41 @@ verify rather than assume they need editing. And `config/max-lines-baseline.txt`
 short inline arrays the repo's formatter keeps on one line, turning a 30-line edit into a
 650-line diff that buries the actual change. Edit the file as text.
 
+## A split that arrives with its own parity ratchets
+
+**What happened.** v1.4.197's `TerminalPane.tsx` split shipped three new test files beside the 74 it
+created — `terminal-pane-hook-order-parity.test.ts`, `terminal-pane-listener-order-parity.test.ts`
+and `terminal-pane-store-subscription-budget.test.tsx`. Each pins the refactor with an exact
+equality: 204 flattened render hooks and a SHA-256 of their order, 24 DOM listeners and a SHA-256 of
+theirs, and `expect(perPane).toBe(17)` for store subscriptions. The fork's `terminal-dock` feature
+had lived inside that monolith as 134 added lines, and its integration adds four `useAppStore`
+subscriptions and roughly thirty hooks *inside the pinned file set*. No re-home satisfies the pins.
+
+**The tell.** The split's new files include tests whose constants are exact rather than upper
+bounds. Grep the new siblings before planning any of the work:
+
+```sh
+comm -13 <(git ls-tree -r --name-only "$PREV_TAG" -- <dir>/ | LC_ALL=C sort) \
+         <(git ls-tree -r --name-only "$UPSTREAM_TARGET" -- <dir>/ | LC_ALL=C sort) \
+  | xargs git grep -lE '_SHA256|_BUDGET|toHaveLength\([0-9]' --
+```
+
+The escape hatch worth checking, because it sometimes works: read each pin's *file pattern*. The
+hook-order pattern here covers `TerminalPane.tsx` and `use-terminal-pane-*.ts` only, so
+`TerminalPaneSurface.tsx` and the runtime portals are outside it, and a fork mount rendered from the
+surface costs nothing. It did not rescue this one, because the budget test mounts
+`useTerminalPaneController` directly and the dock's cross-cutting calls — the
+`notePanePtyBindingChanged()` in the layout-binding callbacks, the `paneDockOwnsFocus()` focus
+guards, the retired-pane ref — have to sit in the controller chain.
+
+**The right move.** Stop and raise it as a confirmed feature collision. Re-baselining a pinned SHA
+or budget so a fork feature fits is the baseline bump the fix policy forbids, and it also hands the
+fork permanent ownership of an upstream performance ratchet — every later upstream refactor of that
+subsystem then re-conflicts, and the fork stops getting the regression protection the ratchet
+exists for. **Do not mistake this for the ordinary re-home above**: the difference is not size, it
+is whether the pins can be satisfied at all. Establish that first, from the test files, before
+touching a line.
+
 ## A later release can invalidate a `deleted: true` exception
 
 **What happened.** The fork deletes 25 upstream paths outright, eleven of them the native-chat
@@ -106,26 +160,40 @@ passes. It surfaces only as `TS2307: Cannot find module` — reported against *u
 directory the fork never edited, which reads at first like merge damage somewhere else entirely.
 
 **The tell.** A typecheck error naming a path the fork does not own, pointing at a relative import
-of a path that is in `remove.txt`. Confirm with a set comparison rather than by reading the error:
+of a path that is in `remove.txt`. Confirm with a set comparison rather than by reading the error.
+
+**Grep the merged working tree, not the tag.** The tag is the wrong tree to ask: it is upstream's
+view, where nothing the fork deletes has been deleted and nothing the fork replaces has been
+replaced. Every consumer the fork owns still carries its upstream import there, so the sweep reports
+it. The tag-reading form printed three findings on v1.4.207 against a true answer of zero —
+`NativeChatComposer.tsx`, `NativeChatView.test.tsx` and three send tests, every one of them a file
+the fork already replaces, whose own copy imports nothing that was deleted. Excluding the paths the
+manifest claims is not enough on its own either; reading the right tree is what fixes it. Match a
+real import specifier too, rather than a bare occurrence of the module name: a
+`vi.mock('./mod', () => ...)` with a factory never resolves the module, so it is not evidence of
+anything.
 
 ```sh
-python3 - "$UPSTREAM_TARGET" <<'PY'
-import json, subprocess, sys
+python3 - <<'SWEEP'
+import json, subprocess
 m = json.load(open('config/fork-ownership.json'))
 gone = {e['path'] for e in m['exceptions'] if e.get('deleted')}
-tag = sys.argv[1]
+hit = False
 for p in sorted(gone):
     mod = p.rsplit('/', 1)[-1].rsplit('.', 1)[0]
-    hits = subprocess.run(['git', 'grep', '-l', f"/{mod}'", tag, '--', p.rsplit('/', 1)[0]],
+    live = subprocess.run(['git', 'grep', '-lE', f"from '[^']*/{mod}'"],
                           capture_output=True, text=True).stdout.split()
-    live = [h.split(':', 1)[1] for h in hits if h.split(':', 1)[1] not in gone]
     if live:
+        hit = True
         print(f'{p} still imported by {len(live)}: {live[:3]}')
-PY
+print('NONE' if not hit else '^^ withdraw the deletion')
+SWEEP
 ```
 
 Run it right after `remove.txt` is applied, not after the typecheck fails — the classifier will
-never raise it, because a deletion the manifest declares is, to the classifier, resolved.
+never raise it, because a deletion the manifest declares is, to the classifier, resolved. Reading
+the merged tree is also what makes the sweep agree with `tsc`: the tree it greps is the tree the
+typecheck compiles, so a hit is a `TS2307` and a clean run means there is nothing to find.
 
 **The right move.** Withdraw the deletion; do not extend it. Restore the module (and its test) from
 the tag, drop the `deleted: true` exception, and leave every fork replacement exactly where it is.
@@ -232,3 +300,59 @@ drift. The two disagree because they are reading different trees.
 the tag against the **working tree**, which is what `--verify-residuals` measures. Either re-measure
 that way, or commit first and keep the explicit `HEAD`. Do not re-baseline from a `HEAD`-form
 measurement taken over uncommitted work.
+
+## Upstream can delete a stable tag the fork has already absorbed
+
+**What happened.** The 2026-09-17 run merged `v1.4.206` (`c464b10149`, "release: v1.4.206",
+2026-09-18) and the fork shipped `v1.4.207-rc.0.zy01` on it. By 2026-09-19 upstream had **deleted**
+`refs/tags/v1.4.206` — no `v1.4.206`, no `v1.4.206-rc.*`, nothing — leaving `v1.4.205` (a day
+*older* than what `main` carries) as the newest strict `vX.Y.Z` tag on the remote. Upstream had
+re-cut `release/v1.4.206-adhoc` at `b10226a7ed`, a commit that does **not** descend from the
+retracted release commit.
+
+Every guard in Step 1 and Step 2 passes this through as an ordinary sync. `ls-remote` exits 0,
+`$STABLE_TAG` matches `^v[0-9]+\.[0-9]+\.[0-9]+$`, the fetch-by-refspec succeeds, and
+`merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main` fails — which reads as "new release to
+take", because stable tags never live on `main` and that check fails for an older tag exactly as it
+does for a newer one. The run would then merge and, at Step 6, `git checkout v1.4.205 --` every
+upstream-owned path: a whole-release rollback, silently breaking the fork commits written against
+the newer release (here `58a42923cb`, "adapt three fork surfaces to v1.4.206 API shapes").
+
+**The tell.** `$STABLE_TAG` sorts *below* `upstream_synced` in `CHANGELOG.md`'s
+frontmatter. Step 2 now checks this first. Confirm the retraction rather than assuming a truncated
+listing — an exact query is unambiguous where a glob plus `tail -1` is not:
+
+```sh
+git ls-remote upstream "refs/tags/${SYNCED}"     # prints nothing: the tag is gone
+git tag -l "$SYNCED"                             # prints it: the fork still has it locally
+```
+
+A local tag with no remote counterpart is the signature. `ls-remote` printing nothing for an exact
+ref is not the truncation failure Step 1 warns about; that one shows up as a non-zero exit or a
+short ref count.
+
+**The right move.** Change nothing. Record "no new stable release (main already carries
+`$SYNCED`; latest remaining upstream stable tag `$STABLE_TAG` is older)", do Steps 12–14 as usual —
+`main` was never touched, so the mirror branch, the backup prune, and the release check all still
+apply — and raise the retraction as "needs attention". Do **not** merge the older tag, do not
+substitute `upstream/main`, and do not delete the local tag to tidy up.
+
+Two consequences a human needs to hear about, neither of which the run can settle:
+
+- **The fork may be shipping a release upstream pulled.** `v1.4.207-rc.0.zy01` is built on a commit
+  upstream has since untagged. Why it was retracted is upstream's information, not the run's.
+- **The local tag is now load-bearing for the release skill.** `release` resolves its anchor with
+  `git describe --tags ... HEAD`, which reads *local* tags. With `v1.4.206` present the anchor is
+  correct; prune it (a fresh clone, or `git fetch --prune-tags`) and the anchor silently falls back
+  to `v1.4.203`, which would compute `1.4.204-rc.0.zyNN` — **below** the already-published
+  `1.4.207-rc.0.zy01`, regressing the series and breaking auto-update ordering. That is the
+  `release` skill's to fix, so report it; do not edit that skill from a sync run.
+
+**Do not mistake this for the Step 2 short-circuit's usual shape.** "Already at `$STABLE_TAG`" means
+`main` contains the tag. Here `main` contains something upstream no longer publishes, and the two
+want the same action for opposite reasons — so say which one happened in the report.
+
+**Do not mistake a re-cut `release/*` branch for a resolution either.** If upstream re-tags
+`v1.4.206` at `b10226a7ed`, the next run sees a tag `main` does not contain and merges it, leaving
+`main` with two distinct "release: v1.4.206" commits. That merge is legitimate — the tag would be a
+real new release — but the duplicate is worth expecting rather than diagnosing from scratch.
