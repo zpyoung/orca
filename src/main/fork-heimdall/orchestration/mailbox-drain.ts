@@ -47,6 +47,7 @@ export async function drainHeimdallMailbox(input: {
     db,
     handle: identity.handle,
     paneKey: identity.paneKey,
+    callerSession: undefined,
     typeFilter: undefined,
     signal: undefined,
     legacyCoordinatorRunId: undefined,
