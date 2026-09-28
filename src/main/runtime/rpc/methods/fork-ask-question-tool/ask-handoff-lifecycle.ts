@@ -19,6 +19,7 @@ import {
   mapCoordinatorReply
 } from '../../../../fork-ask-question-tool/ask-handoff-flatten'
 import { buildTimeoutResult } from '../../../../fork-ask-question-tool/ask-registry-timeout-answers'
+import { getForcedHandoffPolicy } from '../../../../fork-ask-question-tool/forced-handoff-policy'
 import type { OrchestrationDb } from '../../../orchestration/db'
 import { OrchestrationError } from '../../../orchestration/orchestration-error'
 import type { DispatchContextRow } from '../../../orchestration/types'
@@ -81,20 +82,19 @@ function findActiveDispatchForWorktree(
   return newest ? db.getDispatchContextById(newest.dispatch_id) : undefined
 }
 
-/** Active-run lookup for the no-UI path (tech.md C3/C7): the identity `register` persists and the first `waitChunk` hands off to. */
-export function resolveHandoffDispatch(
-  attribution: AskAttribution,
-  runtime: OrcaRuntimeService
+function resolveIdentityDispatch(
+  db: OrchestrationDb,
+  handle: string,
+  paneKey: string | null
+): DispatchContextRow | undefined {
+  return db.getActiveDispatchForIdentity(handle, paneKey ?? undefined)
+}
+
+function handoffOriginFor(
+  db: OrchestrationDb,
+  dispatch: DispatchContextRow,
+  handle: string
 ): AskHandoffOrigin | null {
-  const db = runtime.getOrchestrationDb()
-  const dispatch =
-    db.getActiveDispatchForIdentity(
-      attribution.dispatchLookupHandle,
-      attribution.paneKey ?? undefined
-    ) ?? findActiveDispatchForWorktree(db, attribution.worktreeId)
-  if (!dispatch) {
-    return null
-  }
   const run = db.getRun(dispatch.run_id)
   if (!run || run.legacy === 1) {
     return null
@@ -102,7 +102,45 @@ export function resolveHandoffDispatch(
   return {
     runId: run.id,
     dispatchId: dispatch.id,
-    askerHandle: attribution.dispatchLookupHandle || dispatch.assignee_handle || 'unknown'
+    askerHandle: handle || dispatch.assignee_handle || 'unknown'
+  }
+}
+
+/** Active-run lookup for the no-UI path (tech.md C3/C7): the identity `register` persists and the first `waitChunk` hands off to. */
+export function resolveHandoffDispatch(
+  attribution: AskAttribution,
+  runtime: OrcaRuntimeService
+): AskHandoffOrigin | null {
+  const db = runtime.getOrchestrationDb()
+  const dispatch =
+    resolveIdentityDispatch(db, attribution.dispatchLookupHandle, attribution.paneKey) ??
+    findActiveDispatchForWorktree(db, attribution.worktreeId)
+  return dispatch ? handoffOriginFor(db, dispatch, attribution.dispatchLookupHandle) : null
+}
+
+/**
+ * The hand-off an ask must take regardless of any attached UI: its asker holds an active dispatch
+ * on a run the installed policy forces. Only a validated pane identity qualifies — a worktree-scope
+ * match cannot prove which process asked, so it never overrides a card.
+ */
+export function resolveForcedHandoff(
+  runtime: OrcaRuntimeService,
+  identity: { handle: string; paneKey: string | null }
+): AskHandoffOrigin | null {
+  const policy = getForcedHandoffPolicy()
+  if (!policy || !identity.paneKey) {
+    return null
+  }
+  try {
+    const db = runtime.getOrchestrationDb()
+    const dispatch = resolveIdentityDispatch(db, identity.handle, identity.paneKey)
+    if (!dispatch || !policy.isForcedRun(dispatch.run_id)) {
+      return null
+    }
+    return handoffOriginFor(db, dispatch, identity.handle)
+  } catch {
+    // an unreadable orchestration store cannot take a hand-off, so the ask keeps its normal route.
+    return null
   }
 }
 

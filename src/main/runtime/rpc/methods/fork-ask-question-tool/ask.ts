@@ -14,6 +14,7 @@ import {
   cancelHandoff,
   commitHandoffAnswer,
   onHandoffAskChanged,
+  resolveForcedHandoff,
   resolveHandoffDispatch,
   updatePartialHandoff,
   waitHandoffChunk
@@ -72,6 +73,18 @@ export const ASK_METHODS = [
       const attribution = await resolveAskAttribution(params, runtime)
       const { registry, roster } = runtime.getAskServices()
 
+      const forced = resolveForcedHandoff(runtime, {
+        handle: attribution.dispatchLookupHandle,
+        paneKey: attribution.paneKey
+      })
+      if (forced) {
+        return registry.register(
+          validation.spec,
+          { paneKey: null, worktreeId: attribution.worktreeId, handoff: forced },
+          { requestId: params.requestId, timeoutMs: params.timeoutMs }
+        )
+      }
+
       if (attribution.paneKey && roster.hasCapableOwner(attribution.paneKey)) {
         return registry.register(
           validation.spec,
@@ -82,12 +95,10 @@ export const ASK_METHODS = [
 
       const handoff = resolveHandoffDispatch(attribution, runtime)
       if (handoff) {
-        // Why: hand-off blocking uses clampOrchestrationAskTimeoutMs (C7), never the registry's
-        // own --timeout-ms expiry timer, so no timeoutMs is passed through here.
         return registry.register(
           validation.spec,
           { paneKey: null, worktreeId: attribution.worktreeId, handoff },
-          { requestId: params.requestId }
+          { requestId: params.requestId, timeoutMs: params.timeoutMs }
         )
       }
 
