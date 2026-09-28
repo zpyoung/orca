@@ -1,5 +1,6 @@
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import type { LaunchAgentInNewTabArgs } from '@/lib/launch-agent-in-new-tab'
+import { HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE } from '../fork-hosted-review-sitter/fix-checks-agent-launch-caller-profile'
 
 /**
  * One profile per production call site of the shared agent-launch funnel.
@@ -271,7 +272,8 @@ export const AGENT_LAUNCH_CALLER_PROFILES: readonly AgentLaunchCallerProfile[] =
     passesLaunchPlan: false,
     passesOnPromptDelivered: false,
     readsBack: ['surface-tab-id']
-  }
+  },
+  HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE
 ]
 
 /** The profile table shaped for `it.each`, so every test title names the call site it covers. */
