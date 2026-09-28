@@ -84,7 +84,13 @@ beforeEach(() => {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Download handlers never access the store; unrelated handlers are not registered.
   const store = {} as Store
   const cancellations = { begin: () => null, finish: () => {}, cancel: () => {} }
-  context = createFilesystemHandlerContext(store, undefined, cancellations, cancellations)
+  context = createFilesystemHandlerContext(
+    store,
+    undefined,
+    cancellations,
+    cancellations,
+    cancellations
+  )
   registerFilesystemDownloadHandlers(context)
 })
 

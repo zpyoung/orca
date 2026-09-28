@@ -4207,6 +4207,12 @@
       "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
     },
     {
+      "path": "src/main/ipc/filesystem-download-lifetime.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    cancellations,", "    cancellations"]
+    },
+    {
       "path": "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -5687,7 +5693,7 @@
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write-input.ts": {
-      "added": 90,
+      "added": 82,
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write.ts": {
@@ -6999,8 +7005,8 @@
       "removed": 0
     },
     "src/main/persistence-ui-state.test.ts": {
-      "added": 12,
-      "removed": 0
+      "added": 13,
+      "removed": 1
     },
     "src/main/persistence/loading-store/store.ts": {
       "added": 4,
@@ -7209,6 +7215,10 @@
     "src/shared/workspace-scope.ts": {
       "added": 20,
       "removed": 0
+    },
+    "src/main/ipc/filesystem-download-lifetime.test.ts": {
+      "added": 7,
+      "removed": 1
     },
     "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts": {
       "added": 1,
