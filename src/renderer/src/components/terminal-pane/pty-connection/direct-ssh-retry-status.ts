@@ -12,6 +12,10 @@ import {
 } from '../../../../../shared/terminal-mode-reset-profiles'
 import { subscribeToTerminalUserInput } from '../terminal-user-input-signal'
 import {
+  isTerminalUserInputFromKeyboard,
+  primeTerminalUserInputKeyboardGate
+} from '@/lib/fork-worker-takeover-gate/keyboard-input-gate'
+import {
   isLocalNativeWindowsConpty,
   resolveWindowsShellOverride
 } from '@/lib/pane-manager/windows-pty-compatibility'
@@ -291,8 +295,11 @@ export function installDirectSshRetryStatus(session: ConnectPanePtySession): voi
   session.recordRealUserTerminalInput = (): void => {
     session.recordTerminalInputForHibernation()
     // Takeover must never fire from the onData fallback below: it mixes in auto-replies.
-    reportWorkerTerminalUserInput(session.cacheKey, session.runtimeEnvironmentId)
+    if (isTerminalUserInputFromKeyboard(session.pane.terminal)) {
+      reportWorkerTerminalUserInput(session.cacheKey, session.runtimeEnvironmentId)
+    }
   }
+  primeTerminalUserInputKeyboardGate(session.pane.terminal)
   session.userInputActivityDisposable = subscribeToTerminalUserInput(
     session.pane.terminal,
     session.recordRealUserTerminalInput

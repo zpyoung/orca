@@ -1,0 +1,150 @@
+{
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "목표 감시자"
+      },
+      "status": {
+        "watching": "감시 중",
+        "held": "보류됨",
+        "acting": "작업 중",
+        "escalated": "에스컬레이션됨",
+        "parked": "대기 중",
+        "terminal": "완료",
+        "disabled": "중지됨",
+        "unreachable": "호스트에 연결할 수 없음",
+        "lostContact": "호스트에 연결할 수 없음 · 마지막 확인 {{age}}",
+        "phase": "현재 단계"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "호스트에 연결할 수 없음 · 마지막 확인 {{age}}"
+      },
+      "host": {
+        "remote": "원격 · {{host}}",
+        "local": "이 기기"
+      },
+      "time": {
+        "never": "없음",
+        "now": "지금",
+        "ago": "{{age}} 전"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "확인이 필요한 감시자 {{count}}개"
+      },
+      "page": {
+        "back": "뒤로",
+        "title": "Heimdall 플릿",
+        "summary": "활성 {{active}}개 · 확인 필요 {{attention}}개",
+        "refresh": "플릿 새로 고침",
+        "staleError": "플릿 새로 고침에 실패하여 마지막으로 확인된 스냅샷을 표시합니다: {{error}}"
+      },
+      "fleet": {
+        "title": "감시자 플릿",
+        "emptyTitle": "플릿에 감시자가 없습니다",
+        "emptyDescription": "지원되는 작업 공간에서 감시자를 활성화하면 여기에 표시됩니다.",
+        "name": "감시자",
+        "status": "상태",
+        "phase": "단계",
+        "activeBurn": "활성 시간",
+        "turns": "턴 수",
+        "elapsed": "경과 시간",
+        "lastTick": "마지막 틱"
+      },
+      "detail": {
+        "back": "플릿으로 돌아가기",
+        "refreshing": "세부 정보 새로 고침 중",
+        "observed": "소유자 상태 확인됨: {{age}}",
+        "remote": "원격 캐시",
+        "lostContact": "마지막 확인 {{age}}; 현재 소유자에 연결할 수 없습니다. 감시자는 계속 실행 중일 수 있습니다.",
+        "readOnly": "읽기 전용입니다.",
+        "staleError": "세부 정보 새로 고침에 실패하여 마지막으로 확인된 데이터를 표시합니다: {{error}}",
+        "loading": "소유자 세부 정보 로드 중…",
+        "unavailable": "소유자 세부 정보를 사용할 수 없습니다.",
+        "selectPrompt": "감시자를 선택해 의사 결정, 워커 및 소유자 제어 기능을 확인하세요."
+      },
+      "controls": {
+        "title": "소유자 제어",
+        "resume": "재개",
+        "pause": "일시 중지",
+        "disarm": "해제",
+        "delete": "감시자 삭제",
+        "deleteTitle": "감시자를 삭제하시겠습니까?",
+        "deleteDescription": "감시자 “{{name}}” 및 저장된 기록이 영구적으로 삭제됩니다. 워커 터미널은 중지되지 않습니다.",
+        "approve": "승인",
+        "budgetResumeWarning": "이 감시자는 예산을 모두 사용했습니다. 재개하기 전에 한도를 늘리지 않으면 다시 대기 상태가 됩니다."
+      },
+      "command": {
+        "applied": "소유자가 {{time}}에 적용했습니다.",
+        "refused": "소유자가 명령을 거부했습니다 ({{reason}}): {{detail}}",
+        "indeterminate": "명령이 적용되었는지 확실하지 않습니다. 소유자 상태를 다시 읽는 중입니다… {{detail}}",
+        "stopAllIndeterminate": "중지 명령 {{count}}개가 적용되었는지 확실하지 않습니다. 소유자 상태를 다시 읽는 중입니다.",
+        "stopAllRefused": "소유자 {{count}}명이 중지 명령을 거부했습니다."
+      },
+      "budget": {
+        "title": "예산",
+        "activeTime": "활성 시간",
+        "unlimited": "무제한",
+        "unlimitedShort": "무제한",
+        "turns": "워커 턴",
+        "exhausted": "소진됨: {{kind}}",
+        "minutesLimit": "활성 시간 한도(분)",
+        "turnLimit": "워커 턴 한도",
+        "apply": "예산 적용"
+      },
+      "escalations": {
+        "title": "미처리 에스컬레이션"
+      },
+      "workers": {
+        "title": "실행 중인 워커",
+        "empty": "실행 중인 워커가 없습니다.",
+        "live": "실행 중",
+        "unverifiable": "연결 불가",
+        "exited": "종료됨",
+        "noContact": "확인된 연결 없음",
+        "lastContact": "마지막 연결 {{age}}",
+        "stop": "중지",
+        "answerPlaceholder": "워커에게 답변",
+        "answerLabel": "워커 질문에 답변",
+        "sendAnswer": "답변 보내기"
+      },
+      "trace": {
+        "title": "결정 추적",
+        "noDecision": "기록된 결정 없음",
+        "decidedAction": "실행: {{action}}",
+        "empty": "아직 결정 추적이 없습니다.",
+        "tick": "틱 {{seq}}",
+        "running": "실행 중",
+        "saw": "관찰",
+        "noSnapshot": "기록된 스냅샷 없음",
+        "decided": "결정됨",
+        "gate": "게이트",
+        "declined": "거부됨",
+        "noneDeclined": "거부된 단계 없음"
+      },
+      "activity": {
+        "title": "플릿 작업 기록",
+        "asOf": "{{age}} 기준",
+        "partial": "{{count}}개 감시자의 기록을 새로 고치지 못했습니다. 표시되는 기록은 유지됩니다.",
+        "empty": "아직 자율 작업이 기록되지 않았습니다."
+      },
+      "ledger": {
+        "title": "감시자 활동",
+        "attemptResolved": "시도 해결됨",
+        "attemptAbandoned": "시도 중단됨",
+        "evidence": "근거",
+        "activeTimeStarted": "활성 시간 시작",
+        "activeTimeChecked": "활성 시간 체크포인트",
+        "activeTimeStopped": "활성 시간 중지",
+        "workerTurn": "워커 턴",
+        "finished": "완료",
+        "empty": "아직 활동이 기록되지 않았습니다."
+      },
+      "error": {
+        "unavailable": "Heimdall 제어 플레인을 사용할 수 없습니다.",
+        "ownerUnavailable": "소유자 런타임을 사용할 수 없어 등록을 전송하지 않았습니다."
+      }
+    }
+  }
+}

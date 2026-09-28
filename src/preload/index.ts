@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'
 import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
 import { buildForkAskApi } from './fork-ask-question-tool/ask-preload-api'
+import { buildForkHeimdallApi } from './fork-heimdall/heimdall-preload-api'
+import { buildHostedReviewAgentApi } from './fork-hosted-review-sitter/hosted-review-agent-preload-api'
 import type { PreloadApi } from './api-types'
 import {
   installBrowserFindListener,
@@ -188,6 +190,8 @@ const api = {
   mobile: mobileApi,
   agentStatus: agentStatusApi,
   asks: buildForkAskApi(),
+  heimdall: buildForkHeimdallApi(),
+  hostedReviewAgent: buildHostedReviewAgentApi(),
   speech: speechApi
 } satisfies PreloadApi
 

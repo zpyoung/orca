@@ -1,7 +1,8 @@
 export function addLifecycleRejectionMarker(
   payload: string | null,
   code: string,
-  reason: string
+  reason: string,
+  details?: { originalReason?: string; originalBody?: string }
 ): string {
   let parsed: Record<string, unknown> = {}
   try {
@@ -14,25 +15,35 @@ export function addLifecycleRejectionMarker(
   }
   return JSON.stringify({
     ...parsed,
-    _orcaLifecycleRejection: { code, reason }
+    _orcaLifecycleRejection: {
+      code,
+      reason,
+      ...(details?.originalReason === undefined ? {} : { originalReason: details.originalReason }),
+      ...(details?.originalBody === undefined ? {} : { originalBody: details.originalBody })
+    }
   })
 }
 
-export function hasLifecycleRejectionMarker(payload: string | null): boolean {
+export function readLifecycleRejectionMarker(
+  payload: string | null
+): { code: string; reason: string } | null {
   try {
     const value: unknown = JSON.parse(payload ?? 'null')
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return false
+      return null
     }
-    const marker = (value as Record<string, unknown>)._orcaLifecycleRejection
-    return Boolean(
-      marker &&
-      typeof marker === 'object' &&
-      !Array.isArray(marker) &&
-      typeof (marker as Record<string, unknown>).code === 'string' &&
-      typeof (marker as Record<string, unknown>).reason === 'string'
-    )
+    const marker = '_orcaLifecycleRejection' in value ? value._orcaLifecycleRejection : null
+    if (!marker || typeof marker !== 'object' || Array.isArray(marker)) {
+      return null
+    }
+    const code = 'code' in marker ? marker.code : undefined
+    const reason = 'reason' in marker ? marker.reason : undefined
+    return typeof code === 'string' && typeof reason === 'string' ? { code, reason } : null
   } catch {
-    return false
+    return null
   }
+}
+
+export function hasLifecycleRejectionMarker(payload: string | null): boolean {
+  return readLifecycleRejectionMarker(payload) !== null
 }

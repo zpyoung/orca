@@ -39,8 +39,9 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
     // OMP treats a large bracketed paste as a menu unless submit arrives in the same PTY write.
     // Once a foreground agent is known, it is the process that will consume the bytes;
     // launchAgent is only the fallback during startup before process detection settles.
+    // launchedAgent covers OMP under Bun, whose foreground name is unrecognized after launch authority retires.
     const submitWithPaste = agentPromptSubmitJoinsPasteFrame(
-      pty?.foregroundAgent ?? pty?.launchAgent
+      pty?.foregroundAgent ?? pty?.launchAgent ?? pty?.launchedAgent
     )
     const pasteByteLength = Buffer.byteLength(pastePayload, 'utf8')
     const pasteIngestMs = getTerminalPasteIngestMs(writeHostPlatform, pasteByteLength)

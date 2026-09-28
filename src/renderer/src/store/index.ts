@@ -47,6 +47,7 @@ import { createRemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
 import { createAsksSlice } from './slices/fork-ask-question-tool/asks'
 import { createLedgerSlice } from './slices/ledger'
+import { createHeimdallFleetSlice } from './slices/fork-heimdall/fleet'
 import { e2eConfig } from '@/lib/e2e-config'
 import type { createWebRuntimeSessionTerminal } from '@/runtime/web-runtime-session'
 import {
@@ -120,7 +121,8 @@ export const useAppStore = create<AppState>()(
         ...createRemoteServerUpdatesSlice(...a),
         ...createTerminalQuickCommandHostsSlice(...a),
         ...createLedgerSlice(...a),
-        ...createAsksSlice(...a)
+        ...createAsksSlice(...a),
+        ...createHeimdallFleetSlice(...a)
       }
     })
   )

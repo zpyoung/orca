@@ -124,3 +124,4 @@ export type TopLevelView =
   | 'artifacts'
   | 'mobile'
   | 'ledger'
+  | 'heimdall'

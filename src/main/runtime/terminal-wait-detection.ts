@@ -92,9 +92,78 @@ function findKnownReadyPromptIndex(normalized: string): number | null {
   const indexes = [
     findCodexReadyPromptIndex(normalized),
     findAntigravityReadyPromptIndex(normalized),
-    findCursorReadyPromptIndex(normalized)
+    findCursorReadyPromptIndex(normalized),
+    findClaudeReadyPromptIndex(normalized)
   ].filter((index): index is number => index !== null)
   return indexes.length > 0 ? Math.max(...indexes) : null
+}
+
+const CLAUDE_PROMPT_GLYPH = '\u276f'
+const CLAUDE_EMPTY_INPUT_PLACEHOLDER = 'try "'
+const CLAUDE_SPINNER_ROW_RE = /^[\u00b7\u2722\u2733\u2736\u273b\u273d] \S/
+// Why not `thought`: a mid-turn thinking row shares the summary's `<verb> for <duration>` shape.
+const CLAUDE_TURN_SUMMARY_RE =
+  /^[\u00b7\u2722\u2733\u2736\u273b\u273d] (?!thought )[\p{L}'-]+ for \d/u
+
+// Why the screen: Claude Code paints no idle OSC title. `Try "…"` fills the empty input box only
+// before the first turn; after one, the proof is a past-tense summary row (`✻ Brewed for 1s`)
+// where the live spinner row (`✶ Flambéing…`) stood. No banner check: SessionStart hook output
+// routinely pushes the banner off the visible screen.
+function findClaudeReadyPromptIndex(normalized: string): number | null {
+  const promptIndex = normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH)
+  if (promptIndex === -1) {
+    return null
+  }
+  let cursor = promptIndex + CLAUDE_PROMPT_GLYPH.length
+  while (
+    cursor < normalized.length &&
+    (isTerminalWaitWhitespace(normalized, cursor) || normalized.charCodeAt(cursor) === 0xa0)
+  ) {
+    cursor += 1
+  }
+  if (normalized.startsWith(CLAUDE_EMPTY_INPUT_PLACEHOLDER, cursor)) {
+    return promptIndex
+  }
+  return isClaudeInputEmpty(normalized, promptIndex) &&
+    endsClaudeTurnWithSummary(normalized, promptIndex)
+    ? promptIndex
+    : null
+}
+
+function isClaudeInputEmpty(normalized: string, promptIndex: number): boolean {
+  const lineEnd = normalized.indexOf('\n', promptIndex)
+  return (
+    normalized
+      .slice(promptIndex + CLAUDE_PROMPT_GLYPH.length, lineEnd === -1 ? undefined : lineEnd)
+      .trim() === ''
+  )
+}
+
+/** Whether the last spinner-glyph row since the last submitted prompt is a finished-turn summary. */
+function endsClaudeTurnWithSummary(normalized: string, promptIndex: number): boolean {
+  const submittedIndex =
+    promptIndex > 0 ? normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH, promptIndex - 1) : -1
+  const spinnerRows = normalized
+    .slice(submittedIndex + 1, promptIndex)
+    .split('\n')
+    .map((line) => line.trimStart())
+    .filter((line) => CLAUDE_SPINNER_ROW_RE.test(line))
+  const lastRow = spinnerRows.at(-1)
+  return lastRow !== undefined && CLAUDE_TURN_SUMMARY_RE.test(lastRow)
+}
+
+/**
+ * Whether a tui-idle wait should read the provider's visible screen.
+ *
+ * Why Claude even with runtime text: it paints with cursor moves, so what reaches the tail is a
+ * few status rows below its prompt box, never the prompt the ready rule needs.
+ */
+export function tuiIdleNeedsVisibleScreenProbe(
+  lastAgentStatus: AgentStatus | null,
+  waitText: string,
+  agent: string | null | undefined
+): boolean {
+  return lastAgentStatus === null && (waitText.length === 0 || agent === 'claude')
 }
 
 // Why: match the banner's last occurrence to skip the trust dialog's own "Cursor Agent" text; "→" is cursor-agent's persistent input prompt.

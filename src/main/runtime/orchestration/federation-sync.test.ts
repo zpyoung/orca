@@ -11,7 +11,8 @@ import {
   type FederationAckIdentity
 } from './federation-ack-checkpoints'
 import { createIdleSyncHarness } from './federation-sync-test-harness'
-import { parseRelayedMessage, syncFederatedDispatch } from './federation-sync'
+import { parseRelayedMessage } from './federation-sync-message'
+import { syncFederatedDispatch } from '../../fork-heimdall/orchestration/federation-sync'
 import { getOrchestrationPeerCapabilityCache } from './orchestration-peer-capability-cache'
 
 describe('federation relay parsing', () => {

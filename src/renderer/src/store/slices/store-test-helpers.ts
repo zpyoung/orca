@@ -51,6 +51,7 @@ import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-hosts'
 import { createAsksSlice } from './fork-ask-question-tool/asks'
 import { createLedgerSlice } from './ledger'
+import { createHeimdallFleetSlice } from './fork-heimdall/fleet'
 import { translate } from '@/i18n/i18n'
 
 export const TEST_REPO = {
@@ -107,7 +108,8 @@ export function createTestStore() {
     ...createRemoteServerUpdatesSlice(...a),
     ...createTerminalQuickCommandHostsSlice(...a),
     ...createLedgerSlice(...a),
-    ...createAsksSlice(...a)
+    ...createAsksSlice(...a),
+    ...createHeimdallFleetSlice(...a)
   }))
 }
 

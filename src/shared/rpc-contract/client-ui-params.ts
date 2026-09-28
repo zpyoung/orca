@@ -121,6 +121,7 @@ export const TopLevelViewSchema = z.enum([
   'skills',
   'artifacts',
   'mobile',
+  'heimdall',
   'ledger'
 ])
 

@@ -4,6 +4,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
 import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
 import type { RuntimeLeafRecord, RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
 import { DISCONNECTED_PTY_RECORD_MAX } from './orca-runtime-postlude'
+import { notifyHeimdallMailboxArrival } from '../fork-heimdall/mailbox-wake-registry'
 
 export class OrcaRuntimeWithRefreshFloatingWorkspacePtyLiveness extends OrcaRuntimeWithRefreshPtyWorktreeRecordsWithControllerInventory {
   protected refreshFloatingWorkspacePtyLiveness(): Set<string> | null {
@@ -197,5 +198,6 @@ export class OrcaRuntimeWithRefreshFloatingWorkspacePtyLiveness extends OrcaRunt
       this.mailPointerRepointScheduler.schedule(handle)
     }
     this.orchestrationMailboxNotifications.notifyMessageArrived(handle, messageType)
+    notifyHeimdallMailboxArrival(handle, messageType)
   }
 }

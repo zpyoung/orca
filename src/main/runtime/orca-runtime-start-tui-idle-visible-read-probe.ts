@@ -11,7 +11,8 @@ import {
 import { withTimeout } from './runtime-async-boundaries'
 import {
   detectTerminalWaitBlockedReason,
-  isKnownReadyPromptPreview
+  isKnownReadyPromptPreview,
+  tuiIdleNeedsVisibleScreenProbe
 } from './terminal-wait-detection'
 import type {
   RuntimeTerminalWait,
@@ -24,6 +25,11 @@ import {
   buildTerminalWaitResult
 } from './terminal-wait-results'
 import { createSetupCompletionScanner } from './orchestration/setup-completion-signal'
+import { buildTerminalWaitText } from './terminal-wait-tail-state'
+
+// Why re-probe: a TUI that paints with cursor moves (Claude Code) never reaches the newline tail the
+// poll reads, and its first frame lands after the wait starts, so a single look sees a blank screen.
+const TUI_IDLE_VISIBLE_PROBE_RETRY_MS = 1_000
 
 export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWithCreateAgentPromptRenderGate {
   /** One bounded look at the provider's screen for an adopted PTY whose retained
@@ -31,7 +37,11 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
    *  screen already showing a settled prompt", and the poll above owns every
    *  later transition. A provider screen that is still working when this fires
    *  resolves through the poll, not here. */
-  protected startTuiIdleVisibleReadProbe(waiter: TerminalWaiter, waiterTimeoutMs: number): void {
+  protected startTuiIdleVisibleReadProbe(
+    waiter: TerminalWaiter,
+    waiterTimeoutMs: number,
+    deadlineMs = Date.now() + waiterTimeoutMs
+  ): void {
     const settleMarginMs = Math.min(
       TUI_IDLE_VISIBLE_PROBE_SETTLE_MARGIN_MS,
       Math.max(1, Math.floor(waiterTimeoutMs / 3))
@@ -59,16 +69,19 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
       null
     )
       .then((projection) => {
-        if (
-          !projection ||
-          projection.source !== 'screen' ||
-          !this.terminalWaiters.get(waiter.handle)?.has(waiter)
-        ) {
+        if (!this.terminalWaiters.get(waiter.handle)?.has(waiter)) {
+          return
+        }
+        // Why re-arm on a missing screen too: a fresh pane's first snapshot can time out or come
+        // back before the provider holds a screen, and that says nothing about readiness.
+        if (!projection || projection.source !== 'screen') {
+          this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
           return
         }
         const snapshotText = projection.tail.join('\n')
         const blockedReason = detectTerminalWaitBlockedReason(snapshotText)
         if (!blockedReason && !isKnownReadyPromptPreview(snapshotText)) {
+          this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
           return
         }
         const result = this.buildTuiIdleProbeResult(waiter.handle, blockedReason)
@@ -77,7 +90,40 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
         }
         this.terminalWaiters.resolve(waiter, result)
       })
-      .catch(() => {})
+      .catch(() => {
+        this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
+      })
+  }
+
+  /** Looks again only while the screen is still the only usable evidence and the waiter has time left. */
+  protected rearmTuiIdleVisibleReadProbe(waiter: TerminalWaiter, deadlineMs: number): void {
+    const remainingMs = deadlineMs - Date.now() - TUI_IDLE_VISIBLE_PROBE_RETRY_MS
+    if (remainingMs <= 0) {
+      return
+    }
+    setTimeout(() => {
+      if (!this.terminalWaiters.get(waiter.handle)?.has(waiter)) {
+        return
+      }
+      // Why try: the handle can go stale between looks; the waiter's own timeout then settles it.
+      try {
+        const record =
+          this.getLivePtyForHandle(waiter.handle)?.pty ??
+          this.getLiveLeafForHandle(waiter.handle).leaf
+        if (
+          !tuiIdleNeedsVisibleScreenProbe(
+            record.lastAgentStatus,
+            buildTerminalWaitText(record.tailBuffer, record.tailPartialLine, record.preview),
+            this.getPaneAgentForTuiIdle(record.ptyId)
+          )
+        ) {
+          return
+        }
+        this.startTuiIdleVisibleReadProbe(waiter, deadlineMs - Date.now(), deadlineMs)
+      } catch {
+        // Stale handle; nothing left to probe.
+      }
+    }, TUI_IDLE_VISIBLE_PROBE_RETRY_MS).unref?.()
   }
 
   protected buildTuiIdleProbeResult(

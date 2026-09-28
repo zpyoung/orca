@@ -51,6 +51,7 @@ import { ARTIFACT_PASSWORD_METHODS } from './fork-artifact-passwords/artifact-pa
 import { AGENT_HOOK_METHODS } from './agent-hooks'
 import { AGENT_LAUNCH_METHODS } from './agent-launch'
 import { ASK_METHODS } from './fork-ask-question-tool/ask'
+import { HEIMDALL_METHODS } from './fork-heimdall/heimdall'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -63,6 +64,7 @@ export const ALL_RPC_METHODS = [
   ...LEDGER_METHODS,
   ...ARTIFACT_PASSWORD_METHODS,
   ...ASK_METHODS,
+  ...HEIMDALL_METHODS,
   ...AUTOMATION_METHODS,
   ...REPO_METHODS,
   ...WORKTREE_METHODS,

@@ -15,7 +15,11 @@ import {
   buildTaskSourceContextFromRepo,
   buildWorkspaceRunContext
 } from '../../../shared/task-source-context'
-import { getRepoExecutionHostId, parseExecutionHostId } from '../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 
 export function normalizeAutomationRunWorkspaceDisplayName(value: string | null): string | null {
@@ -160,11 +164,10 @@ export function getAutomationContextsForRepo(
   }
 }
 
-export function getAutomationSchedulerOwner(repo: Repo | undefined): AutomationSchedulerOwner {
-  if (!repo) {
-    return 'local_host_service'
-  }
-  const host = parseExecutionHostId(getRepoExecutionHostId(repo))
+export function getAutomationSchedulerOwnerForExecutionHost(
+  executionHostId: ExecutionHostId
+): AutomationSchedulerOwner {
+  const host = parseExecutionHostId(executionHostId)
   if (host?.kind === 'ssh') {
     return 'ssh_bridge'
   }
@@ -172,6 +175,10 @@ export function getAutomationSchedulerOwner(repo: Repo | undefined): AutomationS
     return 'remote_host_service'
   }
   return 'local_host_service'
+}
+
+export function getAutomationSchedulerOwner(repo: Repo | undefined): AutomationSchedulerOwner {
+  return getAutomationSchedulerOwnerForExecutionHost(repo ? getRepoExecutionHostId(repo) : 'local')
 }
 
 export function backfillLegacyAutomationContexts(

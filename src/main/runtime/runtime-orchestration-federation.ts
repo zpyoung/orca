@@ -18,7 +18,7 @@ import {
   clearFederationAckCheckpoints,
   releaseFederationAckCheckpoint
 } from './orchestration/federation-ack-checkpoints'
-import { syncFederatedDispatch } from './orchestration/federation-sync'
+import { syncFederatedDispatch } from '../fork-heimdall/orchestration/federation-sync'
 import type { OrchestrationDb } from './orchestration/db'
 import type { OrcaRuntimeService } from './orca-runtime'
 

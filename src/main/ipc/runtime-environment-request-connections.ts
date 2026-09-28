@@ -17,7 +17,7 @@ import type {
 } from '../../shared/remote-runtime-shared-control-types'
 import { isRuntimeEnvironmentCapabilityPaused } from './runtime-environment-capability-evidence'
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-manual-disconnect'
-import { publishRuntimeEnvironmentDiagnostics } from './runtime-environment-diagnostics-broadcast'
+import { publishRuntimeEnvironmentDiagnostics } from '../fork-heimdall/runtime-environment-diagnostics-port'
 import {
   advanceRuntimeEnvironmentTransportGeneration,
   getRuntimeEnvironmentTransportGeneration

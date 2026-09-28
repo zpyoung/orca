@@ -19,6 +19,12 @@ import {
 } from '../browser-client-host-protocol'
 import { BrowserClientPageMetadataParams } from '../browser-client-page-metadata-protocol'
 import {
+  EmptyHeimdallRequestSchema,
+  HeimdallUnsubscribeRequestSchema,
+  WatcherCommandRequestSchema,
+  WatcherTargetSchema
+} from '../fork-heimdall/api'
+import {
   PairingGetEndpointsParamsSchema,
   PairingProvisionRelayParamsSchema
 } from '../mobile-relay-credential-contract'
@@ -885,6 +891,12 @@ export const RPC_PARAMS_BY_METHOD = {
   'gitlab.updateMRState': UpdateMrState,
   'gitlab.workItemByPath': WorkItemByPath,
   'gitlab.workItemDetails': WorkItemDetails,
+  'heimdall:command': WatcherCommandRequestSchema,
+  'heimdall:detail': WatcherTargetSchema,
+  'heimdall:fleet': EmptyHeimdallRequestSchema,
+  'heimdall:objectiveDetail': WatcherTargetSchema,
+  'heimdall:subscribe': EmptyHeimdallRequestSchema,
+  'heimdall:unsubscribe': HeimdallUnsubscribeRequestSchema,
   'host.gitBash.isAvailable': null,
   'host.platform': null,
   'host.pwsh.isAvailable': null,
@@ -1189,6 +1201,13 @@ export const RPC_METHODS_WITHOUT_SHARED_PARAMS: readonly string[] = [
   'ask.updatePartial',
   'ask.wait',
   'emulator.install',
+  'heimdall:approve',
+  'heimdall:debugReport',
+  'heimdall:disarm',
+  'heimdall:disarmAll',
+  'heimdall:enroll',
+  'heimdall:ledger',
+  'heimdall:list',
   'ledger.request',
   'ledger.ui',
   'orchestration.send',

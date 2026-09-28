@@ -16,7 +16,7 @@ import {
 } from '../../../orchestration-mutation-executor'
 import { replayMutationNudge } from './mutation-replay-nudge'
 import { sendRemoteMessage } from './send-remote'
-import { sendPointToPointMessage } from './send-point-to-point'
+import { sendPointToPointMessage } from '../../../../../fork-heimdall/orchestration/send-point-to-point'
 import { sendGroupMessage } from './send-group'
 import { sendFederatedControlMail } from './send-control-mail'
 

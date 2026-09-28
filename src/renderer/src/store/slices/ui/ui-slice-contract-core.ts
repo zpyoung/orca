@@ -117,6 +117,7 @@ export type UiViewHistory =
   | 'artifacts'
   | 'mobile'
   | 'ledger'
+  | 'heimdall'
 
 export type UISliceCore = {
   sidebarOpen: boolean

@@ -10,7 +10,7 @@ type WorkerReportObservation = {
   id: string
   authorityId: string
   homeReceivedAt: number
-}
+} & ({ status?: 'accepted' } | { status: 'rejected'; reason: string })
 
 type WorkerReportSettlementParams = {
   taskId: string
@@ -22,7 +22,7 @@ type WorkerReportSettlementParams = {
 
 const WORKER_REPORT_TRANSACTION_SAVEPOINT = 'worker_report_transaction'
 
-function recordAcceptedReportFact(db: OrchestrationDb, params: WorkerReportSettlementParams): void {
+function recordWorkerReportFact(db: OrchestrationDb, params: WorkerReportSettlementParams): void {
   if (!params.observation) {
     return
   }
@@ -45,7 +45,14 @@ function recordAcceptedReportFact(db: OrchestrationDb, params: WorkerReportSettl
     authorityId: params.observation.authorityId,
     authorityClock: 'home',
     facet: 'worker_report',
-    payload: { status: 'accepted', outcome: params.outcome, reportId: params.observation.id },
+    payload:
+      params.observation.status === 'rejected'
+        ? {
+            status: 'rejected',
+            reason: params.observation.reason,
+            reportId: params.observation.id
+          }
+        : { status: 'accepted', outcome: params.outcome, reportId: params.observation.id },
     sourceObservedAt: null,
     executionReceivedAt: null,
     homeReceivedAt: params.observation.homeReceivedAt
@@ -102,7 +109,7 @@ export function settleWorkerReportInTransaction(
     dispatch.status === expectedDispatchStatus &&
     task.status === expectedTaskStatus
   ) {
-    recordAcceptedReportFact(this, params)
+    recordWorkerReportFact(this, params)
     return { action: 'settled', outcome: params.outcome, duplicate: true }
   }
   const reconnectingStart =
@@ -275,7 +282,7 @@ export function settleWorkerReportInTransaction(
   if (params.outcome === 'succeeded') {
     this.promoteReadyTasks(params.taskId)
   }
-  recordAcceptedReportFact(this, params)
+  recordWorkerReportFact(this, params)
   this.db.exec('RELEASE settle_worker_report')
   return { action: 'settled', outcome: params.outcome, duplicate: false }
 }

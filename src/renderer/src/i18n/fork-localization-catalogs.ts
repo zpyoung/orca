@@ -79,8 +79,11 @@ import askQuestionToolES from '../components/fork-ask-question-tool/locales/es.j
 import askQuestionToolJA from '../components/fork-ask-question-tool/locales/ja.json'
 import askQuestionToolKO from '../components/fork-ask-question-tool/locales/ko.json'
 import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.json'
+import { heimdallCatalogs } from '@/fork-heimdall/localization-catalog'
+import { hostedReviewSitterCatalogs } from '@/fork-hosted-review-sitter/localization-catalog'
+import { heimdallObjectiveCatalogs } from '@/fork-heimdall-objective/localization-catalog'
 
-type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
+type ForkLocale = 'en' | 'es' | 'fr' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
 type ForkCatalogRegistrar = {
   addResourceBundle: (
@@ -113,6 +116,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsEN,
     activityWindowEN,
     reviewFiltersEN,
+    heimdallCatalogs.en,
+    hostedReviewSitterCatalogs.en,
+    heimdallObjectiveCatalogs.en,
     askQuestionToolEN
   ],
   es: [
@@ -131,8 +137,12 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsES,
     activityWindowES,
     reviewFiltersES,
+    heimdallCatalogs.es,
+    hostedReviewSitterCatalogs.es,
+    heimdallObjectiveCatalogs.es,
     askQuestionToolES
   ],
+  fr: [heimdallCatalogs.fr, heimdallObjectiveCatalogs.fr],
   ja: [
     relayJA,
     ja,
@@ -149,6 +159,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsJA,
     activityWindowJA,
     reviewFiltersJA,
+    heimdallCatalogs.ja,
+    hostedReviewSitterCatalogs.ja,
+    heimdallObjectiveCatalogs.ja,
     askQuestionToolJA
   ],
   ko: [
@@ -167,6 +180,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsKO,
     activityWindowKO,
     reviewFiltersKO,
+    heimdallCatalogs.ko,
+    hostedReviewSitterCatalogs.ko,
+    heimdallObjectiveCatalogs.ko,
     askQuestionToolKO
   ],
   zh: [
@@ -185,6 +201,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsZH,
     activityWindowZH,
     reviewFiltersZH,
+    heimdallCatalogs.zh,
+    hostedReviewSitterCatalogs.zh,
+    heimdallObjectiveCatalogs.zh,
     askQuestionToolZH
   ]
 }
