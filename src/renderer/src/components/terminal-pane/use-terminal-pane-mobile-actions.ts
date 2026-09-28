@@ -19,8 +19,7 @@ import { formatTerminalPasteExecutionError } from './terminal-paste-errors'
 import { recordTerminalUserInputForLeaf } from './terminal-input-activity'
 import { splitTerminalPaneWithInheritedCwd } from './terminal-pane-split-with-inherited-cwd'
 import type { TerminalPaneContextController } from './use-terminal-pane-context-actions'
-import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'
-import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { terminalDockLeafOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'
 
 // Why: mirrors xterm's SelectionService.shouldForceSelection — a shifted click
 // (Option-click on Mac, via macOptionClickForcesSelection) is never forwarded
@@ -66,7 +65,7 @@ export function useTerminalPaneMobileActions(controller: TerminalPaneContextCont
         scheduleRestoredTerminalRefit()
         // Why: after the overlay unmounts, refocus the reclaimed terminal instead of the removed
         // button/body — unless the composer owns focus for this pane, which it keeps.
-        if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, pane.leafId))) {
+        if (!terminalDockLeafOwnsFocus(tabId, pane.leafId)) {
           pane.terminal.focus()
         }
       }
@@ -82,7 +81,7 @@ export function useTerminalPaneMobileActions(controller: TerminalPaneContextCont
       )
       if (restored) {
         scheduleRestoredTerminalRefit()
-        if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, focusPane.leafId))) {
+        if (!terminalDockLeafOwnsFocus(tabId, focusPane.leafId)) {
           focusPane.terminal.focus()
         }
       }
@@ -157,7 +156,7 @@ export function useTerminalPaneMobileActions(controller: TerminalPaneContextCont
       // Why: middle-click paste writes through the transport below, not via xterm's own
       // paste handling, so this focus call is only about UX — skip it when the composer
       // owns focus rather than yanking it away for a paste the user didn't aim at it.
-      if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, clickedPane.leafId))) {
+      if (!terminalDockLeafOwnsFocus(tabId, clickedPane.leafId)) {
         clickedPane.terminal.focus()
       }
       void readPrimarySelectionText().then(async (text) => {
