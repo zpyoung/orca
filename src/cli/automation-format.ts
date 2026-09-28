@@ -14,6 +14,7 @@ import type { AutomationOwnerPrecondition } from '../shared/automation-owner-pre
 import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { formatAutomationPrecheckTimeout } from '../shared/automation-precheck'
 import { formatAutomationSchedule } from '../shared/automation-schedules'
+import { formatAutomationLaunchOverrides } from './fork-automation-launch-settings/automation-launch-format'
 
 export type AutomationListPayload = {
   automations: Automation[]
@@ -62,6 +63,7 @@ export function formatAutomationList(result: AutomationListPayload): string {
 export function formatAutomationShow(result: AutomationShowPayload): string {
   const automation = result.automation
   const runContext = automation.runContext ?? null
+  const launch = formatAutomationLaunchOverrides(automation)
   const projectLines = runContext
     ? [
         `runProjectId: ${runContext.projectId}`,
@@ -76,6 +78,7 @@ export function formatAutomationShow(result: AutomationShowPayload): string {
     `id: ${automation.id}`,
     `name: ${automation.name}`,
     `provider: ${automation.agentId}`,
+    ...(launch ? [`Launch: ${launch}`] : []),
     `enabled: ${automation.enabled}`,
     `schedule: ${formatAutomationSchedule(automation.rrule)}`,
     `rrule: ${automation.rrule}`,

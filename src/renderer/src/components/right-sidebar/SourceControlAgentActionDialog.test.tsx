@@ -209,7 +209,8 @@ describe('SourceControlAgentActionDialog', () => {
     expect(mocks.onStart).toHaveBeenCalledWith({
       agent: 'codex',
       commandInput: 'Resolve conflicts.',
-      agentArgs: ''
+      agentArgs: '',
+      launchOptions: {}
     })
     expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
     expect(mocks.onSaveAgentDefault).not.toHaveBeenCalled()
@@ -256,7 +257,8 @@ describe('SourceControlAgentActionDialog', () => {
     expect(mocks.onStart).toHaveBeenCalledWith({
       agent: 'codex',
       commandInput: 'Resolve conflicts.',
-      agentArgs: '--model saved'
+      agentArgs: '--model saved',
+      launchOptions: {}
     })
   })
   it('omits saved arguments from a structured local launch', async () => {
@@ -282,7 +284,8 @@ describe('SourceControlAgentActionDialog', () => {
     expect(mocks.onStart).toHaveBeenCalledWith({
       agent: 'codex',
       commandInput: 'Resolve conflicts.',
-      agentArgs: undefined
+      agentArgs: undefined,
+      launchOptions: {}
     })
   })
   it('renders the form and does not auto-start when the saved launch recipe mismatches', async () => {

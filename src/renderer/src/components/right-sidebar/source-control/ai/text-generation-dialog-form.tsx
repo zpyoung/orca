@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react'
 import { RefreshCw, Save, Sparkles, Terminal, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogFooter } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { AgentLaunchOverridesFields } from '@/components/fork-automation-launch-settings/AgentLaunchOverridesFields'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
 import { planSourceControlTextGeneration } from '@/lib/source-control-generation-plan'
+import type { AgentLaunchOverrides } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import {
   CUSTOM_AGENT_ID,
   isCustomAgentId,
@@ -25,6 +26,10 @@ import type { SourceControlAiWriteTarget } from '../../../../../../shared/source
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../../../shared/tui-agent'
+import {
+  getTuiAgentDefaultArgs,
+  resolveTuiAgentLaunchArgs
+} from '../../../../../../shared/tui-agent-launch-defaults'
 import { toast } from 'sonner'
 import { SourceControlActionVariableChips } from '../../../source-control/SourceControlActionVariableChips'
 import { sourceControlTextGenerationDefaultsMatchTarget } from './text-generation-defaults'
@@ -101,7 +106,12 @@ export function SourceControlTextGenerationDialogForm({
   const [commandTemplate, setCommandTemplate] = useState(
     baseParams?.commandInputTemplate ?? '{basePrompt}'
   )
-  const [agentArgs, setAgentArgs] = useState(baseParams?.agentArgs ?? '')
+  const [launchOverrides, setLaunchOverrides] = useState<AgentLaunchOverrides>({
+    ...baseParams?.launchOptions,
+    ...(baseParams?.agentArgs ? { agentArgs: baseParams.agentArgs } : {})
+  })
+  const agentArgs = launchOverrides.agentArgs ?? ''
+  const selectedTuiAgent = agentId && !isCustomAgentId(agentId) ? agentId : null
   const [generationError, setGenerationError] = useState<string | null>(null)
   const [savingTargetKey, setSavingTargetKey] = useState<string | null>(null)
   const defaultSaveTargetKey = getDefaultSourceControlTextGenerationSaveTargetKey(saveTargets)
@@ -116,6 +126,10 @@ export function SourceControlTextGenerationDialogForm({
     agentId,
     commandTemplate,
     agentArgs,
+    launchOptions: {
+      ...(launchOverrides.model ? { model: launchOverrides.model } : {}),
+      ...(launchOverrides.optionValues ? { optionValues: launchOverrides.optionValues } : {})
+    },
     baseParams,
     settings,
     customAgentCommand: baseParams?.customAgentCommand
@@ -227,6 +241,9 @@ export function SourceControlTextGenerationDialogForm({
                 return
               }
               setAgentId(value === CUSTOM_AGENT_ID ? CUSTOM_AGENT_ID : (value as TuiAgent))
+              setLaunchOverrides((current) =>
+                current.agentArgs ? { agentArgs: current.agentArgs } : {}
+              )
               setGenerationError(null)
             }}
           >
@@ -262,28 +279,23 @@ export function SourceControlTextGenerationDialogForm({
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor={`source-control-${actionId}-cli-args`} className="text-xs">
-            {translate(
-              'auto.components.right.sidebar.SourceControlTextGenerationDialogForm.4eab815004',
-              'CLI arguments'
-            )}
-          </Label>
-          <Input
-            id={`source-control-${actionId}-cli-args`}
-            value={agentArgs}
-            spellCheck={false}
-            placeholder={translate(
-              'auto.components.right.sidebar.SourceControlTextGenerationDialogForm.551ffd111b',
-              '--model sonnet'
-            )}
-            onChange={(event) => {
-              setAgentArgs(event.target.value)
-              setGenerationError(null)
-            }}
-            className="h-8 font-mono text-xs"
-          />
-        </div>
+        <AgentLaunchOverridesFields
+          agent={selectedTuiAgent}
+          value={launchOverrides}
+          onChange={(updater) => {
+            setLaunchOverrides(updater)
+            setGenerationError(null)
+          }}
+          agentArgsPlaceholder={
+            selectedTuiAgent ? getTuiAgentDefaultArgs(selectedTuiAgent) : undefined
+          }
+          inheritedAgentArgs={
+            selectedTuiAgent
+              ? resolveTuiAgentLaunchArgs(selectedTuiAgent, settings?.agentDefaultArgs)
+              : null
+          }
+          idPrefix={`source-control-${actionId}`}
+        />
 
         <div className="space-y-2">
           <Label htmlFor={commandTemplateId} className="text-xs">

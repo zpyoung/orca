@@ -3,7 +3,10 @@ import {
   getCommitMessageAgentCapability,
   isCustomAgentId
 } from '../../../../../../shared/commit-message-agent-spec'
+import type { AgentLaunchOptionSelection } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { normalizeAgentLaunchOverrides } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { ResolvedSourceControlAiGenerationParams } from '../../../../../../shared/source-control-ai'
+import { resolveSourceControlTextLaunchAgentArgs } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 
 export type CommitMessageGenerationAgentChoice =
@@ -14,6 +17,7 @@ export function buildCommitMessageGenerationParams(args: {
   agentId: CommitMessageGenerationAgentChoice
   commandTemplate: string
   agentArgs?: string
+  launchOptions?: AgentLaunchOptionSelection
   baseParams: ResolvedSourceControlAiGenerationParams | null
   settings: Pick<GlobalSettings, 'agentCmdOverrides'> | null | undefined
   customAgentCommand?: string
@@ -27,7 +31,9 @@ export function buildCommitMessageGenerationParams(args: {
       model: '',
       customPrompt: args.baseParams?.customPrompt,
       commandInputTemplate: args.commandTemplate,
-      ...(args.agentArgs !== undefined ? { agentArgs: args.agentArgs } : {}),
+      ...(args.agentArgs !== undefined
+        ? { agentArgs: args.agentArgs, recipeAgentArgs: args.agentArgs }
+        : {}),
       customAgentCommand: args.baseParams?.customAgentCommand ?? args.customAgentCommand ?? ''
     }
   }
@@ -35,25 +41,38 @@ export function buildCommitMessageGenerationParams(args: {
   if (!capability) {
     return null
   }
+  const launchOptions = normalizeAgentLaunchOverrides(args.launchOptions)
   const sameResolvedAgent = args.baseParams?.agentId === args.agentId
+  const recipeModel = launchOptions?.model
   const modelId =
-    sameResolvedAgent && args.baseParams?.model
+    recipeModel ??
+    (sameResolvedAgent && args.baseParams?.model
       ? args.baseParams.model
       : (capability.models.find((model) => model.id === capability.defaultModelId)?.id ??
-        capability.defaultModelId)
+        capability.defaultModelId))
   const model = capability.models.find((candidate) => candidate.id === modelId)
+  const recipeEffort = recipeModel ? launchOptions?.optionValues?.effort : undefined
   const thinkingLevel =
-    sameResolvedAgent && args.baseParams?.thinkingLevel
-      ? args.baseParams.thinkingLevel
-      : model?.defaultThinkingLevel
+    typeof recipeEffort === 'string'
+      ? recipeEffort
+      : sameResolvedAgent && args.baseParams?.thinkingLevel
+        ? args.baseParams.thinkingLevel
+        : model?.defaultThinkingLevel
   const agentCommandOverride = args.settings?.agentCmdOverrides?.[args.agentId]?.trim()
   const customAgentCommand = args.baseParams?.customAgentCommand ?? args.customAgentCommand
+  const effectiveAgentArgs = resolveSourceControlTextLaunchAgentArgs({
+    agentId: args.agentId,
+    launchOptions,
+    agentArgs: args.agentArgs
+  })
   return {
     agentId: args.agentId,
     model: modelId,
     ...(thinkingLevel ? { thinkingLevel } : {}),
     commandInputTemplate: args.commandTemplate,
-    ...(args.agentArgs !== undefined ? { agentArgs: args.agentArgs } : {}),
+    ...(effectiveAgentArgs !== undefined ? { agentArgs: effectiveAgentArgs } : {}),
+    recipeAgentArgs: args.agentArgs ?? '',
+    ...(launchOptions ? { launchOptions } : {}),
     ...(customAgentCommand ? { customAgentCommand } : {}),
     ...(agentCommandOverride ? { agentCommandOverride } : {})
   }

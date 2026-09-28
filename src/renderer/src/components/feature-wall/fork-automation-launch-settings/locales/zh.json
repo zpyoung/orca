@@ -1,0 +1,14 @@
+{
+  "auto": {
+    "components": {
+      "feature": {
+        "wall": {
+          "AiCommitPrSettingsFields": {
+            "a8a91aa917": "由操作配方设置。",
+            "b66be73624": "对于 {{value0}}，由其操作配方覆盖。"
+          }
+        }
+      }
+    }
+  }
+}

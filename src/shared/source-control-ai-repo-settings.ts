@@ -169,6 +169,9 @@ export function normalizeRepoSourceControlAiOverrides(
       if (item.agentArgs === null) {
         recipe.agentArgs = null
       }
+      if (item.launchOptions === null) {
+        recipe.launchOptions = null
+      }
       return Object.keys(recipe).length > 0 ? recipe : undefined
     }
   )
