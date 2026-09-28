@@ -58,7 +58,7 @@ describe('buildPlannerPromptPolicySection', () => {
     )
   })
 
-  it('tells the planner a worker worktree has no machine-local untracked files', () => {
+  it('tells the planner a worker worktree may lack machine-local untracked files', () => {
     const section = buildPlannerPromptPolicySection({
       effectiveMaxConcurrency: 1,
       lanesEnabled: false,
@@ -66,6 +66,7 @@ describe('buildPlannerPromptPolicySection', () => {
     })
 
     expect(section).toContain('.claude/settings.local.json')
+    expect(section).toContain('not guaranteed to be present')
     expect(section).toContain('process environment')
   })
 

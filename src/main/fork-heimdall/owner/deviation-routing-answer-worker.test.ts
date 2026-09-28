@@ -23,6 +23,7 @@ import {
   type TestRoutingDependencies
 } from './deviation-routing-test-harness'
 import type { OwnerReportReadResult } from './owner-report-io'
+import { OWNER_STALL_THRESHOLD_MS } from './stall-detector'
 
 const { sendOwnerTurn, readOwnerReport } = vi.hoisted(() => ({
   sendOwnerTurn: vi.fn(async (_input: { session: unknown; turnText: string }) => {}),
@@ -222,6 +223,45 @@ describe('driveOwnerDeviation: answer-worker delivery', () => {
     expect(deps.answerWorkerQuestion).not.toHaveBeenCalled()
     expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
     expect(requireOpenOwnerDeviation(ledgerStore).foldCount).toBe(1)
+  })
+
+  it('hands the deviation to a human once the question stays unreadable for a stall window, and the queue advances', async () => {
+    const ledgerStore = memoryLedgerStore()
+    recordDeviation({ ledgerStore, now: () => 1, createId: () => 'e1' }, 'watcher-1', question)
+    recordDeviation({ ledgerStore, now: () => 2, createId: () => 'e2' }, 'watcher-1', escalation)
+    const deps = baseDeps(ledgerStore)
+    deps.readWorkerQuestion.mockResolvedValue({ status: 'unverifiable', reason: 'seat offline' })
+    const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
+
+    await driveOwnerDeviation(deps, runner, snapshot)
+    appendAcceptedOwnerReady(ledgerStore, requireOpenOwnerDeviation(ledgerStore))
+    readOwnerReport.mockResolvedValue({
+      ok: true,
+      path: '/report/path.json',
+      report: answerWorker('msg-question')
+    })
+    await driveOwnerDeviation(deps, runner, snapshot)
+    expect(decodeOwnerDeviation(requireOpenOwnerDeviation(ledgerStore))?.kind).toBe(
+      'worker-question'
+    )
+
+    // the harness stamps the owner's ready at 10_000+, so this is one full stall window past it
+    deps.ledgerRecord = { ...deps.ledgerRecord, now: () => 20_000 + OWNER_STALL_THRESHOLD_MS }
+    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('handled')
+
+    const handedOff = getLatestEscalations(ledgerStore.read('watcher-1'))
+      .filter(
+        (entry): entry is OwnerDeviationEscalation => entry.escalationKind === 'owner-deviation'
+      )
+      .find((entry) => decodeOwnerDeviation(entry)?.kind === 'worker-question')
+    expect(handedOff?.status).toBe('escalated')
+    expect(handedOff?.reason).toContain('seat offline')
+    expect(runner.ownerBudgetInterval).toBeNull()
+    expect(deps.answerWorkerQuestion).not.toHaveBeenCalled()
+    expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
+    expect(decodeOwnerDeviation(requireOpenOwnerDeviation(ledgerStore))?.kind).toBe(
+      'worker-escalation'
+    )
   })
 
   it('still propagates a lost coordinator seat', async () => {

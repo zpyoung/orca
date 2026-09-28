@@ -26,7 +26,7 @@ import {
   escalateDeviationToHuman,
   findOldestOpenOwnerDeviation,
   markOwnerTurnSent,
-  ownerInterventionSubmissionSubject,
+  ownerInterventionAcceptedAtMs,
   ownerDeviationWakeToken,
   ownerTurnAwaitingSend,
   recordDeviation,
@@ -92,10 +92,6 @@ type CachedOwnerSubmissionRejection = {
 }
 
 const rejectedOwnerSubmissions = new WeakMap<WatcherRunner, CachedOwnerSubmissionRejection>()
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
 
 /** Keeps a rejected, non-durable preflight diagnostic for this escalation's next applicable prompt. */
 export function rememberOwnerSubmissionRejection(
@@ -175,13 +171,14 @@ export async function driveOwnerDeviation(
       location
     )
     if (failure) {
-      return handleOwnerBriefFailure(deps, runner, ledger, deviation, pending, failure)
+      return handOwnerDeviationToHuman(deps, runner, ledger, deviation, pending, failure)
     }
     openOwnerInterval(deps.budgetClock, runner)
     markOwnerTurnSent(deps.ledgerRecord, enrollment.watcherId, pending)
     return 'handled'
   }
-  if (!hasAcceptedOwnerInterventionSubmission(ledger, enrollment.watcherId, pending)) {
+  const acceptedAtMs = ownerInterventionAcceptedAtMs(ledger, enrollment.watcherId, pending)
+  if (acceptedAtMs === null) {
     return handleUnreachable(deps, runner, snapshot, ledger, deviation, pending, location)
   }
 
@@ -206,6 +203,8 @@ export async function driveOwnerDeviation(
       const delivery = await deliverOwnerAnswer({
         deviation,
         move,
+        acceptedAtMs,
+        nowMs: deps.ledgerRecord.now(),
         readQuestion: deps.readWorkerQuestion,
         answerQuestion: deps.answerWorkerQuestion
       })
@@ -220,6 +219,9 @@ export async function driveOwnerDeviation(
           location,
           delivery.reason
         )
+      }
+      if (delivery.status === 'undeliverable') {
+        return handOwnerDeviationToHuman(deps, runner, ledger, deviation, pending, delivery.reason)
       }
       if (delivery.status === 'delivered') {
         closeOwnerInterval(deps.budgetClock, runner)
@@ -285,23 +287,6 @@ function recordStallIfAny(
   return recorded?.status === 'open' ? recorded : null
 }
 
-function hasAcceptedOwnerInterventionSubmission(
-  ledger: WatcherLedger,
-  watcherId: string,
-  pending: OwnerDeviationEscalation
-): boolean {
-  const subject = ownerInterventionSubmissionSubject(watcherId, pending)
-  return ledger.entries.some((entry) => {
-    if (entry.kind !== 'evidence' || entry.evidenceKind !== 'orchestration-mailbox') {
-      return false
-    }
-    const fact = entry.payload
-    return (
-      isRecord(fact) && fact.type === 'status' && fact.subject === subject && fact.body === 'ready'
-    )
-  })
-}
-
 async function handleUnreachable(
   deps: DeviationRoutingDependencies,
   runner: WatcherRunner,
@@ -337,7 +322,7 @@ async function handleUnreachable(
       location
     )
     if (failure) {
-      return handleOwnerBriefFailure(deps, runner, ledger, deviation, rewoken, failure)
+      return handOwnerDeviationToHuman(deps, runner, ledger, deviation, rewoken, failure)
     }
     markOwnerTurnSent(deps.ledgerRecord, enrollment.watcherId, rewoken)
     return 'handled'
@@ -416,13 +401,13 @@ async function handleRejection(
     reason
   )
   if (failure) {
-    return handleOwnerBriefFailure(deps, runner, ledger, deviation, rewoken, failure)
+    return handOwnerDeviationToHuman(deps, runner, ledger, deviation, rewoken, failure)
   }
   markOwnerTurnSent(deps.ledgerRecord, enrollment.watcherId, rewoken)
   return 'handled'
 }
 
-function handleOwnerBriefFailure(
+function handOwnerDeviationToHuman(
   deps: DeviationRoutingDependencies,
   runner: WatcherRunner,
   ledger: WatcherLedger,

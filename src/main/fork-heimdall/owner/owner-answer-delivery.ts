@@ -3,6 +3,7 @@ import type { AnswerWorkerIntervention } from '../../../shared/fork-heimdall/own
 import { getErrorCode } from '../../git/worktree-operation-options'
 import type { WatcherQuestionState } from '../orchestration/orchestration-contract'
 import { classifyOwnerAnswerTarget, type OwnerAnswerTarget } from '../question-resolution'
+import { OWNER_STALL_THRESHOLD_MS } from './stall-detector'
 
 const REFUSED_ANSWER_CODES: ReadonlySet<string> = new Set([
   'question-already-answered',
@@ -17,15 +18,20 @@ const ESCALATION_ANSWER_REFUSAL =
 
 export type OwnerAnswerDelivery =
   | { status: 'delivered' }
+  | { status: 'undeliverable'; reason: string }
   | Exclude<OwnerAnswerTarget, { status: 'deliver' }>
 
 /**
  * Delivers an owner's answer-worker move, turning every deterministic orchestration refusal into a
- * `refuse` the owner can correct. Only errors that say nothing about the answer itself propagate.
+ * `refuse` the owner can correct. A question thread that cannot be read defers for one stall window
+ * from `acceptedAtMs`, then is `undeliverable`: the owner cannot restore contact, and an open
+ * deviation blocks every later one. Only errors that say nothing about the answer itself propagate.
  */
 export async function deliverOwnerAnswer(args: {
   deviation: Deviation
   move: AnswerWorkerIntervention
+  acceptedAtMs: number
+  nowMs: number
   readQuestion(messageId: string): Promise<WatcherQuestionState>
   answerQuestion(messageId: string, answer: string): Promise<void>
 }): Promise<OwnerAnswerDelivery> {
@@ -36,6 +42,14 @@ export async function deliverOwnerAnswer(args: {
     args.move.messageId,
     await args.readQuestion(args.move.messageId)
   )
+  if (target.status === 'defer' && args.nowMs - args.acceptedAtMs >= OWNER_STALL_THRESHOLD_MS) {
+    return {
+      status: 'undeliverable',
+      reason:
+        `answer-worker was not delivered within ${OWNER_STALL_THRESHOLD_MS}ms because question` +
+        ` ${args.move.messageId} could not be read: ${target.reason}`
+    }
+  }
   if (target.status !== 'deliver') {
     return target
   }

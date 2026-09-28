@@ -183,7 +183,7 @@ export async function voidUnanswerableQuestion(
 
 export type OwnerAnswerTarget =
   | { status: 'deliver' }
-  | { status: 'defer' }
+  | { status: 'defer'; reason: string }
   | { status: 'refuse'; reason: string }
 
 /**
@@ -200,7 +200,7 @@ export function classifyOwnerAnswerTarget(
     case 'answered':
       return { status: 'deliver' }
     case 'unverifiable':
-      return { status: 'defer' }
+      return { status: 'defer', reason: state.reason }
     case 'absent':
       return {
         status: 'refuse',
