@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { readFileSync, rmSync, mkdtempSync, existsSync } from 'node:fs'
+import { rmSync, mkdtempSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { PersistedState } from '../shared/persisted-state-types'
@@ -272,7 +272,7 @@ describe('Store', () => {
     store.updateUI({ rightSidebarTab: 'ledger' })
     store.flush()
 
-    const persisted = JSON.parse(readFileSync(dataFile(), 'utf-8')) as PersistedState
+    const persisted = JSON.parse(readPersistedStateJson(dataFile())) as PersistedState
     expect(persisted.ui.rightSidebarTab).toBe('ledger')
 
     const restoredStore = await createStore()
