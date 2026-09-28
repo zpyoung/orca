@@ -1,7 +1,8 @@
 import type { HeimdallPillTone } from './heimdall-tone-pill'
 import { translate } from '@/i18n/i18n'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
-import type { WatcherKindId, WatcherStatusState } from '../../../shared/fork-heimdall/watcher-types'
+import { isWatcherTickErrorStatus } from '../../../shared/fork-heimdall/watcher-tick-error'
+import type { WatcherKindId, WatcherStatus } from '../../../shared/fork-heimdall/watcher-types'
 import { isHeimdallAttentionRow } from './fleet-selectors'
 
 export function watcherKindLabel(kind: WatcherKindId): string {
@@ -10,8 +11,11 @@ export function watcherKindLabel(kind: WatcherKindId): string {
     : translate('fork.heimdall.kind.objective', 'Objective watcher')
 }
 
-export function watcherStatusLabel(state: WatcherStatusState): string {
-  const labels: Record<WatcherStatusState, string> = {
+export function watcherStatusLabel(status: Pick<WatcherStatus, 'state' | 'phase'>): string {
+  if (isWatcherTickErrorStatus(status)) {
+    return translate('fork.heimdall.status.tickError', 'Error · retrying')
+  }
+  const labels: Record<WatcherStatus['state'], string> = {
     watching: translate('fork.heimdall.status.watching', 'Watching'),
     held: translate('fork.heimdall.status.held', 'Held'),
     acting: translate('fork.heimdall.status.acting', 'Acting'),
@@ -21,7 +25,7 @@ export function watcherStatusLabel(state: WatcherStatusState): string {
     disabled: translate('fork.heimdall.status.disabled', 'Stopped'),
     unreachable: translate('fork.heimdall.status.unreachable', 'Host unreachable')
   }
-  return labels[state]
+  return labels[status.state]
 }
 
 export function watcherHostLabel(row: WatcherFleetEntry): string {
@@ -33,7 +37,11 @@ export function watcherHostLabel(row: WatcherFleetEntry): string {
 }
 
 export function watcherStatusTone(row: WatcherFleetEntry): HeimdallPillTone {
-  if (row.contact === 'unverifiable' || row.entry.status.state === 'unreachable') {
+  if (
+    row.contact === 'unverifiable' ||
+    row.entry.status.state === 'unreachable' ||
+    isWatcherTickErrorStatus(row.entry.status)
+  ) {
     return 'warning'
   }
   if (isHeimdallAttentionRow(row)) {

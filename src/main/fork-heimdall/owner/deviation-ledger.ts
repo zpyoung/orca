@@ -33,6 +33,29 @@ export function ownerInterventionSubmissionSubject(
   return `heimdall-owner-intervention:${watcherId}:${ownerDeviationWakeToken(entry)}`
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** When the owner's ready submission for this wake was first accepted, or null if it hasn't been. */
+export function ownerInterventionAcceptedAtMs(
+  ledger: WatcherLedger,
+  watcherId: string,
+  pending: OwnerDeviationEscalation
+): number | null {
+  const subject = ownerInterventionSubmissionSubject(watcherId, pending)
+  const accepted = ledger.entries.find((entry) => {
+    if (entry.kind !== 'evidence' || entry.evidenceKind !== 'orchestration-mailbox') {
+      return false
+    }
+    const fact = entry.payload
+    return (
+      isRecord(fact) && fact.type === 'status' && fact.subject === subject && fact.body === 'ready'
+    )
+  })
+  return accepted?.atMs ?? null
+}
+
 // `EscalationEntry.reason` is a free-form string; encoding the deviation into it round-trips the
 // structured value through the same durable, dedupe-by-id mechanism a worker escalation already
 // uses, without a new ledger entry kind. `wakeId` was added compatibly: legacy records omit it and

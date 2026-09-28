@@ -13,6 +13,7 @@
         "terminal": "Terminé",
         "disabled": "Arrêté",
         "unreachable": "Hôte injoignable",
+        "tickError": "Erreur · nouvelle tentative",
         "lostContact": "Hôte injoignable · dernière confirmation {{age}}",
         "phase": "Phase actuelle"
       },

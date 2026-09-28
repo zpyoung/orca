@@ -13,6 +13,7 @@
         "terminal": "Completado",
         "disabled": "Detenido",
         "unreachable": "Equipo inaccesible",
+        "tickError": "Error · reintentando",
         "lostContact": "Equipo inaccesible · última confirmación hace {{age}}",
         "phase": "Fase actual"
       },

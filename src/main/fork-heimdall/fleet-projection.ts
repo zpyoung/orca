@@ -4,6 +4,7 @@ import type {
   WatcherDetail,
   WatcherFleetEntry
 } from '../../shared/fork-heimdall/fleet-types'
+import { isWatcherTickErrorStatus } from '../../shared/fork-heimdall/watcher-tick-error'
 import type { FleetEnvironmentIdentity } from './fleet-environment-transport'
 
 export type HeimdallCommandSupport = 'supported' | 'unsupported' | 'unknown'
@@ -83,7 +84,11 @@ export function routeRemoteDetail(
 }
 
 function attentionRank(entry: WatcherFleetEntry): number {
-  if (entry.contact === 'unverifiable' || entry.entry.status.state === 'unreachable') {
+  if (
+    entry.contact === 'unverifiable' ||
+    entry.entry.status.state === 'unreachable' ||
+    isWatcherTickErrorStatus(entry.entry.status)
+  ) {
     return 0
   }
   if (entry.entry.status.state === 'escalated') {

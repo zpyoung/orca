@@ -14,6 +14,7 @@
         "terminal": "Complete",
         "disabled": "Stopped",
         "unreachable": "Host unreachable",
+        "tickError": "Error · retrying",
         "lostContact": "Host unreachable · last confirmed {{age}}",
         "phase": "Current phase"
       },
