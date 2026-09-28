@@ -81,7 +81,12 @@ function syncWorktreeWatcherIndex(): void {
 }
 
 function ensureWorktreeWatcherIndex(): void {
-  if (worktreeWatcherIndexSubscribed) {
+  // Why the method checks: upstream card suites mock useAppStore as a bare selector hook.
+  if (
+    worktreeWatcherIndexSubscribed ||
+    typeof useAppStore.getState !== 'function' ||
+    typeof useAppStore.subscribe !== 'function'
+  ) {
     return
   }
   worktreeWatcherIndexSubscribed = true
