@@ -4,7 +4,11 @@ import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import { dormantWatcherStatus } from './debug-report'
 import { isMalformedKindPayloadEnrollment } from './enrollment-store'
 import { enrollmentInput, harness, kind, runningDispatch } from './kernel-service-test-harness'
-import { voidUnanswerableQuestion, type QuestionLedgerAccess } from './question-resolution'
+import {
+  classifyOwnerAnswerTarget,
+  voidUnanswerableQuestion,
+  type QuestionLedgerAccess
+} from './question-resolution'
 
 vi.mock('electron', () => ({}))
 
@@ -318,5 +322,28 @@ describe('voidUnanswerableQuestion', () => {
     )
 
     expect(entries).toHaveLength(before)
+  })
+})
+
+describe('classifyOwnerAnswerTarget', () => {
+  it.each([
+    [{ status: 'pending' as const }, 'deliver'],
+    // orchestration replays an identical answer idempotently and refuses a different one itself
+    [{ status: 'answered' as const }, 'deliver'],
+    [{ status: 'unverifiable' as const, reason: 'seat offline' }, 'defer']
+  ])('reads %o as %s', (state, expected) => {
+    expect(classifyOwnerAnswerTarget('msg-1', state).status).toBe(expected)
+  })
+
+  it('refuses a messageId with no question thread in this Run and names it', () => {
+    const target = classifyOwnerAnswerTarget('msg-escalation', { status: 'absent' })
+    expect(target).toMatchObject({ status: 'refuse' })
+    expect(target.status === 'refuse' && target.reason).toContain('msg-escalation')
+    expect(target.status === 'refuse' && target.reason).toContain('not an open worker question')
+  })
+
+  it('refuses a question closed with its dispatch', () => {
+    const target = classifyOwnerAnswerTarget('msg-1', { status: 'closed' })
+    expect(target.status === 'refuse' && target.reason).toContain('closed')
   })
 })

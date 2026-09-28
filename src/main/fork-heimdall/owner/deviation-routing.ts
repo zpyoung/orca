@@ -16,9 +16,10 @@ import type { WatcherCommandResult } from '../../../shared/fork-heimdall/fleet-t
 import {
   buildOwnerBrief,
   buildOwnerPromptText,
-  KIND_AGNOSTIC_INTERVENTION_VOCABULARY,
+  ownerInterventionVocabulary,
   OWNER_BRIEF_MAX_STATE_BYTES
 } from './owner-brief'
+import { deliverOwnerAnswer } from './owner-answer-delivery'
 import {
   decodeOwnerDeviation,
   deviationRetriesExhausted,
@@ -44,6 +45,7 @@ import { resolveOwnerReportLocation, type OwnerReportLocation } from './owner-re
 import { ensureOwnerSession, sendOwnerTurn } from './owner-session'
 import { detectStall } from './stall-detector'
 import { workspaceRuntimeId } from '../orchestration/orchestration-adapter'
+import type { WatcherQuestionState } from '../orchestration/orchestration-contract'
 import type { BudgetClock } from '../budget-clock'
 import type { LeaseWorkspaceTarget } from '../lease-store'
 import type { WatcherRunner } from '../runner-state'
@@ -77,6 +79,7 @@ export type DeviationRoutingDependencies = {
   budgetClock: OwnerBudgetClock
   ledgerRecord: DeviationRecordDependencies
   answerWorkerQuestion(messageId: string, answer: string): Promise<void>
+  readWorkerQuestion(messageId: string): Promise<WatcherQuestionState>
   stopWorker(dispatchId: string): Promise<WatcherCommandResult>
   park(reason: WatcherParkReason): void
 }
@@ -197,12 +200,39 @@ export async function driveOwnerDeviation(
     return handleRejection(deps, runner, snapshot, ledger, deviation, pending, location, reason)
   }
 
-  closeOwnerInterval(deps.budgetClock, runner)
-
   if (outcome.status === 'agnostic') {
-    await applyAgnosticMove(deps, runner, pending, outcome.move)
+    const move = outcome.move
+    if (move.kind === 'answer-worker') {
+      const delivery = await deliverOwnerAnswer({
+        deviation,
+        move,
+        readQuestion: deps.readWorkerQuestion,
+        answerQuestion: deps.answerWorkerQuestion
+      })
+      if (delivery.status === 'refuse') {
+        return handleRejection(
+          deps,
+          runner,
+          snapshot,
+          ledger,
+          deviation,
+          pending,
+          location,
+          delivery.reason
+        )
+      }
+      if (delivery.status === 'delivered') {
+        closeOwnerInterval(deps.budgetClock, runner)
+        resolveDeviation(deps.ledgerRecord, enrollment.watcherId, pending)
+      }
+      return 'handled'
+    }
+    closeOwnerInterval(deps.budgetClock, runner)
+    await applyAgnosticMove(deps, runner, pending, move)
     return 'handled'
   }
+
+  closeOwnerInterval(deps.budgetClock, runner)
 
   // An owner intervention needs both the adapter action's native permission and owner authority.
   // Gate the untouched adapter action first so owner-intervention:on cannot bypass e.g. plan:off.
@@ -452,7 +482,7 @@ async function sendOwnerBrief(
     watcherId: enrollment.watcherId,
     wakeToken,
     runId,
-    interventionVocabulary: `${KIND_AGNOSTIC_INTERVENTION_VOCABULARY}\n${owner.describeInterventions()}`,
+    interventionVocabulary: ownerInterventionVocabulary(deviation, owner),
     reportPath,
     brief
   })
@@ -474,7 +504,7 @@ async function applyAgnosticMove(
   deps: DeviationRoutingDependencies,
   runner: WatcherRunner,
   pending: OwnerDeviationEscalation,
-  move: KindAgnosticIntervention
+  move: Exclude<KindAgnosticIntervention, { kind: 'answer-worker' }>
 ): Promise<void> {
   const enrollment = runner.enrollment
   if (move.kind === 'stop-worker') {
@@ -492,11 +522,6 @@ async function applyAgnosticMove(
     return
   }
   if (move.kind === 'continue') {
-    resolveDeviation(deps.ledgerRecord, enrollment.watcherId, pending)
-    return
-  }
-  if (move.kind === 'answer-worker') {
-    await deps.answerWorkerQuestion(move.messageId, move.answer)
     resolveDeviation(deps.ledgerRecord, enrollment.watcherId, pending)
     return
   }

@@ -180,3 +180,40 @@ export async function voidUnanswerableQuestion(
     }
   }
 }
+
+export type OwnerAnswerTarget =
+  | { status: 'deliver' }
+  | { status: 'defer' }
+  | { status: 'refuse'; reason: string }
+
+/**
+ * Whether an owner answer-worker aimed at `messageId` can be delivered. Only a question thread in
+ * this Run can take an answer, so anything else is refused with a reason the owner can act on;
+ * `unverifiable` defers, because lost contact says nothing about the thread.
+ */
+export function classifyOwnerAnswerTarget(
+  messageId: string,
+  state: WatcherQuestionState
+): OwnerAnswerTarget {
+  switch (state.status) {
+    case 'pending':
+    case 'answered':
+      return { status: 'deliver' }
+    case 'unverifiable':
+      return { status: 'defer' }
+    case 'absent':
+      return {
+        status: 'refuse',
+        reason:
+          `answer-worker: ${messageId} is not an open worker question in this Run. Only a` +
+          ' worker-question messageId can be answered; a worker escalation has no question thread.'
+      }
+    case 'closed':
+      return {
+        status: 'refuse',
+        reason:
+          `answer-worker: question ${messageId} is closed because the dispatch that asked it is` +
+          ' no longer active, so no answer can reach it.'
+      }
+  }
+}
