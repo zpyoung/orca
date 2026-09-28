@@ -134,14 +134,13 @@ export function createPtyWriteInput(deps: {
   const writePtyProviderInputAcknowledged = (
     provider: IPtyProvider,
     id: string,
-    data: string,
-    admitted: AgentSessionPtyWriteAdmittance
+    data: string
   ): boolean | Promise<boolean> => {
     const settlementWrite = (
       provider as { writeAcknowledged?: (ptyId: string, chunk: string) => Promise<boolean> }
     ).writeAcknowledged
     if (!settlementWrite) {
-      return writePtyProviderInput(provider, id, data, admitted)
+      return writePtyProviderInput(provider, id, data)
     }
     try {
       const tooLarge = isTerminalInputTooLargeWithDeferredMeasurement(data)
@@ -234,10 +233,6 @@ export function createPtyWriteInput(deps: {
     if (runtime?.getDriver(args.id).kind === 'mobile') {
       return false
     }
-    const admitted = admitAgentSessionPtyWrite(args.id)
-    if (!admitted) {
-      return false
-    }
     const provider = ptyOwnership.has(args.id) ? tryGetProviderForPty(args.id) : undefined
     if (!provider) {
       return false
@@ -246,10 +241,7 @@ export function createPtyWriteInput(deps: {
       const now = performance.now()
       lastInputAtByPty.set(args.id, now)
       interactiveOutputCharsByPty.set(args.id, 0)
-      if (visibleRendererPtys.has(args.id)) {
-        clearHiddenRendererResizeOutput(args.id)
-      }
-      return writePtyProviderInputAcknowledged(provider, args.id, args.data, admitted)
+      return writePtyProviderInputAcknowledged(provider, args.id, args.data)
     } catch {
       return false
     }

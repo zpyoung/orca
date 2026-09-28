@@ -44,7 +44,7 @@ export function installPtyWriteIpcHandlers(deps: {
   // gone, mobile lease) for local/direct-SSH writes; writeAccepted above answers
   // a narrower "reached the local PTY" question and reports SSH as always false.
   ipcMain.handle('pty:writeInputAccepted', (event, args: unknown): boolean | Promise<boolean> => {
-    if (!isPtyWriteEventFromMainWindow(event, mainWindow.webContents) || !isPtyWritePayload(args)) {
+    if (!isPtyWriteEventFromMainWindow(event) || !isPtyWritePayload(args)) {
       return false
     }
     const claimTail = hostViewportClaimTails.get(args.id)
