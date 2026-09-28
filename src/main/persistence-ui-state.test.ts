@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { rmSync, mkdtempSync, existsSync } from 'node:fs'
+import { readFileSync, rmSync, mkdtempSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { PersistedState } from '../shared/persisted-state-types'

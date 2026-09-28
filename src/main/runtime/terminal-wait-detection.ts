@@ -6,7 +6,11 @@ import {
 } from '../../shared/agent-detection'
 import type { RuntimeTerminalWaitBlockedReason } from '../../shared/runtime-types'
 import { findAntigravityReadyPromptIndex } from './antigravity-terminal-readiness'
-import { startOfLastLines, startOfLastNonBlankLines } from './terminal-wait-tail-window'
+import {
+  isTerminalWaitWhitespace,
+  startOfLastLines,
+  startOfLastNonBlankLines
+} from './terminal-wait-tail-window'
 
 const EXPLICIT_IDLE_TITLE_RE = /(^|\s)(ready|idle|done)(\s|$|[.!?])/i
 const CLAUDE_IDLE_PREFIX = '\u2733'
