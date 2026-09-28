@@ -377,8 +377,8 @@ describe('registerFilesystemHandlers', () => {
     getSshGitProviderMock.mockReturnValue(sshProvider)
     registerFilesystemHandlers(store as never)
 
-    const firstEvent = { sender: { id: 7 } }
-    const secondEvent = { sender: { id: 8 } }
+    const firstEvent = { sender: Object.assign(new EventEmitter(), { id: 7 }) }
+    const secondEvent = { sender: Object.assign(new EventEmitter(), { id: 8 }) }
     const firstRequest = Promise.resolve(
       handlers.get('git:diff')!(firstEvent, {
         worktreePath: WORKTREE_FEATURE_PATH,
@@ -429,7 +429,7 @@ describe('registerFilesystemHandlers', () => {
       }
     )
     registerFilesystemHandlers(store as never)
-    const event = { sender: { id: 7 } }
+    const event = { sender: Object.assign(new EventEmitter(), { id: 7 }) }
 
     await handlers.get('git:diff')!(event, {
       worktreePath: WORKTREE_FEATURE_PATH,
