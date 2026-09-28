@@ -47,7 +47,7 @@ export type LaunchForkSessionHandoffResult =
   | { ok: false; reason: 'agent-unavailable' | 'launch-failed' }
 
 type StoreState = ReturnType<typeof useAppStore.getState>
-type AgentTrustPreset = 'cursor' | 'copilot' | 'codex'
+type AgentTrustPreset = 'cursor' | 'copilot' | 'codex' | 'antigravity'
 
 export type LaunchForkSessionHandoffCollaborators = {
   getState?: () => StoreState
