@@ -31,7 +31,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}}件のウォッチャーに対応が必要です"
+        "attention": "{{count}}件のウォッチャーに対応が必要です",
+        "bucket": {
+          "attention": "対応が必要",
+          "lostContact": "接続を確認できません",
+          "active": "稼働中"
+        }
       },
       "page": {
         "back": "戻る",

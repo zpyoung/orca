@@ -1,4 +1,16 @@
 import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherStatusState } from '../../../shared/fork-heimdall/watcher-types'
+
+/** Classifies each watcher by the fleet indicator it contributes to. */
+export type HeimdallFleetBucket = 'attention' | 'lostContact' | 'active' | 'inactive'
+
+/** Orders the fleet indicators by urgency. */
+export const HEIMDALL_FLEET_BUCKET_ORDER: readonly HeimdallFleetBucket[] = [
+  'attention',
+  'lostContact',
+  'active',
+  'inactive'
+]
 
 const STATE_RANK: Record<WatcherFleetEntry['entry']['status']['state'], number> = {
   escalated: 0,
@@ -29,6 +41,56 @@ function attentionRank(row: WatcherFleetEntry): number {
     return 2
   }
   return STATE_RANK[row.entry.status.state]
+}
+
+function bucketForWatcherState(state: WatcherStatusState): HeimdallFleetBucket {
+  switch (state) {
+    case 'watching':
+    case 'acting':
+    case 'held':
+      return 'active'
+    case 'terminal':
+    case 'disabled':
+      return 'inactive'
+    case 'escalated':
+    case 'parked':
+      return 'attention'
+    case 'unreachable':
+      return 'lostContact'
+  }
+  return state satisfies never
+}
+
+/** Assigns exactly one bucket to a watcher, preserving urgent signals above inactivity. */
+export function heimdallFleetBucket(row: WatcherFleetEntry): HeimdallFleetBucket {
+  if (isHeimdallAttentionRow(row)) {
+    return 'attention'
+  }
+  const status = row.entry.status
+  if (row.contact === 'unverifiable' || status.state === 'unreachable') {
+    return 'lostContact'
+  }
+  if (row.paused || !status.enabled || (status.state === 'held' && status.reason === 'paused')) {
+    return 'inactive'
+  }
+
+  return bucketForWatcherState(status.state)
+}
+
+/** Counts each watcher once, including buckets with no watchers. */
+export function countHeimdallFleetBuckets(
+  entries: readonly WatcherFleetEntry[]
+): Record<HeimdallFleetBucket, number> {
+  const counts: Record<HeimdallFleetBucket, number> = {
+    attention: 0,
+    lostContact: 0,
+    active: 0,
+    inactive: 0
+  }
+  for (const row of entries) {
+    counts[heimdallFleetBucket(row)] += 1
+  }
+  return counts
 }
 
 export function sortHeimdallFleetRows(entries: readonly WatcherFleetEntry[]): WatcherFleetEntry[] {
