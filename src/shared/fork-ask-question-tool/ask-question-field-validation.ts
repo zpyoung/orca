@@ -264,6 +264,14 @@ function validatePreview(raw: unknown, path: string, errors: AskValidationError[
   }
 }
 
+function readPreview(raw: unknown): AskPreview | undefined {
+  return isPlainObject(raw) &&
+    (raw.format === 'markdown' || raw.format === 'html') &&
+    isString(raw.content)
+    ? { format: raw.format, content: raw.content }
+    : undefined
+}
+
 function validateOption(raw: unknown, path: string, errors: AskValidationError[]): AskOption {
   if (!isPlainObject(raw)) {
     errors.push({ path, message: 'option must be an object' })
@@ -295,8 +303,8 @@ function validateOption(raw: unknown, path: string, errors: AskValidationError[]
   return {
     value: typeof value === 'string' ? value : '',
     label: typeof label === 'string' ? label : '',
-    description: raw.description as string | undefined,
-    preview: raw.preview as AskPreview | undefined
+    description: isString(raw.description) ? raw.description : undefined,
+    preview: readPreview(raw.preview)
   }
 }
 
@@ -334,9 +342,14 @@ export function validateOptionsQuestion(
         : 'default must be an array of option values'
     errors.push({ path: `${path}.default`, message })
   }
-  return { ...common, type, options, default: defaultValue } as
-    | AskSelectQuestion
-    | AskMultiselectQuestion
+  return type === 'select'
+    ? { ...common, type, options, default: isString(defaultValue) ? defaultValue : undefined }
+    : {
+        ...common,
+        type,
+        options,
+        default: Array.isArray(defaultValue) ? defaultValue.filter(isString) : undefined
+      }
 }
 
 export function validateTextQuestion(
@@ -405,10 +418,10 @@ export function validateTextQuestion(
   return {
     ...common,
     type: 'text',
-    multiline: raw.multiline as boolean | undefined,
-    pattern: raw.pattern as string | undefined,
-    format: format as 'email' | 'url' | undefined,
-    default: defaultValue as string | undefined
+    multiline: isBoolean(raw.multiline) ? raw.multiline : undefined,
+    pattern: isString(raw.pattern) ? raw.pattern : undefined,
+    format: format === 'email' || format === 'url' ? format : undefined,
+    default: isString(defaultValue) ? defaultValue : undefined
   }
 }
 
@@ -440,10 +453,10 @@ export function validateNumberQuestion(
   return {
     ...common,
     type: 'number',
-    integer: raw.integer as boolean | undefined,
+    integer: isBoolean(raw.integer) ? raw.integer : undefined,
     min,
     max,
-    default: defaultValue as number | undefined
+    default: isFiniteNumber(defaultValue) ? defaultValue : undefined
   }
 }
 
