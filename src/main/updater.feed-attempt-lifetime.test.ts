@@ -109,7 +109,7 @@ describe('updater feed preflight ownership', () => {
     },
     {
       result: { tags: [], state: 'no-newer' },
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
+      url: 'https://github.com/zpyoung/orca/releases/latest/download'
     }
   ])('keeps the active $result.state feed choice', async ({ result, url }) => {
     fetchNewerReleaseTagsMock.mockResolvedValueOnce(result)
