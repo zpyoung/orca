@@ -31,7 +31,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}} observateurs nécessitent votre attention"
+        "attention": "{{count}} observateurs nécessitent votre attention",
+        "bucket": {
+          "attention": "Votre attention requise",
+          "lostContact": "Contact perdu",
+          "active": "Actif"
+        }
       },
       "page": {
         "back": "Retour",

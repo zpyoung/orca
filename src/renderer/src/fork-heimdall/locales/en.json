@@ -32,7 +32,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}} watchers need attention"
+        "attention": "{{count}} watchers need attention",
+        "bucket": {
+          "attention": "Needs you",
+          "lostContact": "Lost contact",
+          "active": "Active"
+        }
       },
       "page": {
         "back": "Back",
