@@ -200,7 +200,11 @@
         "gatesHelpLine": "Gates run on the integrated branch after every plan node has merged, before review and landing. Put the full test suite and other whole-tree checks here, not in plan nodes.",
         "addGate": "Add gate",
         "gatesUnsupportedHost": "Gates are unavailable on this host's Orca version. Remove any gates below to continue.",
-        "newWorktreeInRepo": "New worktree in {{repo}}"
+        "newWorktreeInRepo": "New worktree in {{repo}}",
+        "newWorktreeName": "New worktree name",
+        "newWorktreeNameHelp": "Suggested from the objective. Edit it to choose another name.",
+        "newWorktreeBase": "Base branch",
+        "newWorktreeBaseHelp": "Project default is used unless you choose another branch."
       },
       "validation": {
         "workspaceRequired": "Choose a workspace.",
@@ -222,7 +226,8 @@
         "gateTimeoutInvalid": "Gate timeout must be a whole number of seconds from 10 to 14,400.",
         "gateNameDuplicate": "Gate names must be unique.",
         "gatesTooMany": "Objectives support at most 8 declared gates.",
-        "gatesUnsupportedHost": "Gates are unavailable on this host's Orca version. Remove all gates to continue."
+        "gatesUnsupportedHost": "Gates are unavailable on this host's Orca version. Remove all gates to continue.",
+        "newWorktreeNameRequired": "Enter a name for the new worktree."
       },
       "detail": {
         "title": "Objective",

@@ -32,6 +32,9 @@ const DEFAULT_TURN_BUDGET = '40'
 function newDraft(): ObjectiveEnrollmentDraft {
   return {
     objectiveText: '',
+    newWorktreeName: '',
+    newWorktreeNameEdited: false,
+    newWorktreeBaseBranch: undefined,
     existingPlanText: '',
     tier: 'standard',
     landingBar: 'files-on-disk',
@@ -59,6 +62,11 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
   switch (error.code) {
     case 'workspace-required':
       return translate('fork.heimdallObjective.validation.workspaceRequired', 'Choose a workspace.')
+    case 'new-worktree-name-required':
+      return translate(
+        'fork.heimdallObjective.validation.newWorktreeNameRequired',
+        'Enter a name for the new worktree.'
+      )
     case 'objective-required':
       return translate('fork.heimdallObjective.validation.objectiveRequired', 'Enter an objective.')
     case 'objective-too-long':
@@ -260,6 +268,7 @@ export function ObjectiveEnrollmentSheet({
   const landingAvailability: ObjectiveLandingBarAvailability = {
     workspaceKind: selectedWorkspace?.workspaceKind ?? null,
     worktreeId: selectedWorkspace?.worktreeId ?? null,
+    createsWorktree: selectedWorkspace?.createsWorktree,
     parallelUnsupported: selectedWorkspace?.parallelExecutionSupported === false
   }
   const validationErrors = validateObjectiveEnrollmentDraft(draft, landingAvailability)
@@ -288,7 +297,9 @@ export function ObjectiveEnrollmentSheet({
     const highLandingBar = draft.landingBar === 'hosted-review' || draft.landingBar === 'merged'
     const resetLandingBar =
       (selectedWorkspace.workspaceKind === 'folder' && draft.landingBar !== 'files-on-disk') ||
-      (selectedWorkspace.worktreeId === null && highLandingBar)
+      (selectedWorkspace.worktreeId === null &&
+        !selectedWorkspace.createsWorktree &&
+        highLandingBar)
     if (
       draft.workspaceKind !== selectedWorkspace.workspaceKind ||
       unavailableRole ||
@@ -300,6 +311,7 @@ export function ObjectiveEnrollmentSheet({
           selectedWorkspace.workspaceKind === 'folder'
             ? 'files-on-disk'
             : selectedWorkspace.worktreeId === null &&
+                !selectedWorkspace.createsWorktree &&
                 (current.landingBar === 'hosted-review' || current.landingBar === 'merged')
               ? 'pushed-ref'
               : current.landingBar
@@ -336,7 +348,7 @@ export function ObjectiveEnrollmentSheet({
       const landingBar =
         !workspace || workspace.workspaceKind === 'folder'
           ? 'files-on-disk'
-          : workspace.worktreeId === null && highLandingBar
+          : workspace.worktreeId === null && !workspace.createsWorktree && highLandingBar
             ? 'pushed-ref'
             : current.landingBar
       return {
@@ -384,6 +396,9 @@ export function ObjectiveEnrollmentSheet({
     setSubmitting(true)
     try {
       await api.enroll(submission.input, submission.owner)
+      if (selectedWorkspace.createsWorktree) {
+        void fetchAllWorktrees()
+      }
       await hydrateFleet()
       setDraft(newDraft())
       setSelectedWorkspaceKey('')
