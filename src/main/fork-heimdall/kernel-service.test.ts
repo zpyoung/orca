@@ -1004,7 +1004,8 @@ describe('Heimdall kernel service mailbox wake', () => {
       workspaceKey: 'local::/workspace/review-2'
     })
 
-    service.start()
+    // The desktop app never calls start(); loading the kernel through any read must arm the policy.
+    await service.list()
     const policy = getForcedHandoffPolicy()
 
     expect(policy?.isForcedRun('run-owned')).toBe(true)

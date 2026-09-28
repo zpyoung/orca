@@ -261,11 +261,6 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     }
     this.ensureLoaded()
     setHeimdallMailboxWake((address) => this.wakeRunnersForMailbox(address))
-    installForcedHandoffPolicy({
-      runtime: this.dependencies.runtime,
-      isForcedRun: (runId) => isOwnedHeimdallRun(this.runners.values(), runId)
-    })
-    sweepOrphanedNativeAsks(this.dependencies.runtime)
   }
 
   private wakeRunnersForMailbox(address: string): void {
@@ -371,6 +366,12 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       }
       this.restoreRunner(record, kind, writable)
     }
+    // desktop never calls start(), so the ask routing must arm wherever the kernel loads.
+    installForcedHandoffPolicy({
+      runtime: this.dependencies.runtime,
+      isForcedRun: (runId) => isOwnedHeimdallRun(this.runners.values(), runId)
+    })
+    sweepOrphanedNativeAsks(this.dependencies.runtime)
   }
 
   private restoreRunner(
