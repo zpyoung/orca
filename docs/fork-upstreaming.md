@@ -671,3 +671,22 @@ stake in.
 **Paths:** `config/scripts/hourly-build-version.test.mjs`.
 
 **Status:** pending-upstream. Not yet submitted.
+
+## Typecheck projects OOM the CI runner
+
+**Defect:** `pnpm run typecheck` starts the node, cli, web, and mobile-web `tsc` projects at once.
+On a 4-CPU Linux container, node peaks at about 10.3 GB and web at about 9.5 GB, both measured
+separately on upstream-equivalent `main`. Run together, the kernel OOM-kills `tsc
+tsconfig.node.json` at about 17.7 GB. On the 16 GB `ubuntu-latest` runner, that shows up as
+`The runner has received a shutdown signal` with no type errors in the log. Smaller trees survive
+some of the time, so the job fails intermittently and passes on re-run.
+
+**Fork change:** run the projects in two waves. Node, cli, and mobile-web run first, then web, so
+the two ~10 GB projects never overlap. The single-core serial path is unchanged.
+
+**Why upstream, not isolated:** the script is upstream's typecheck entry point, and upstream's own
+tree is already over the runner's memory. The fix is a scheduling change to that one file.
+
+**Paths:** `config/scripts/run-typecheck-projects-in-parallel.mjs`.
+
+**Status:** pending-upstream. Not yet submitted.

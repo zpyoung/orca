@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url'
 
 // These projects overlap heavily in src/shared but have no build dependency on
 // each other, so tsc can check them concurrently instead of in a `&&` chain.
-const projects = [
-  'tsconfig.node.json',
-  'tsconfig.tc.cli.json',
-  'tsconfig.tc.web.json',
-  'tsconfig.mobile-web.json'
+// Why node and web sit in separate waves: each peaks near 10 GB, and together they
+// get the 16 GB ubuntu-latest runner OOM-killed mid-check.
+const waves = [
+  ['tsconfig.node.json', 'tsconfig.tc.cli.json', 'tsconfig.mobile-web.json'],
+  ['tsconfig.tc.web.json']
 ]
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 const tsc = fileURLToPath(new URL('../../node_modules/typescript/bin/tsc', import.meta.url))
@@ -36,12 +36,16 @@ function checkProject(project) {
   })
 }
 
-let failures = []
+const failures = []
 if (concurrent) {
-  const results = await Promise.allSettled(projects.map(checkProject))
-  failures = results.filter((result) => result.status === 'rejected').map((result) => result.reason)
+  for (const wave of waves) {
+    const results = await Promise.allSettled(wave.map(checkProject))
+    failures.push(
+      ...results.filter((result) => result.status === 'rejected').map((result) => result.reason)
+    )
+  }
 } else {
-  for (const project of projects) {
+  for (const project of waves.flat()) {
     try {
       await checkProject(project)
     } catch (error) {

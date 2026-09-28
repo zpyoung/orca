@@ -5059,6 +5059,12 @@
       "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
     },
     {
+      "path": "config/scripts/run-typecheck-projects-in-parallel.mjs",
+      "reason": "Keeps the node and web tsc projects out of the same wave; together they peak near 20 GB and get the 16 GB ubuntu-latest typecheck runner OOM-killed.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#typecheck-projects-oom-the-ci-runner"
+    },
+    {
       "path": "config/scripts/ci-dependency-download-cache.test.mjs",
       "reason": "Contracts for the fork-owned PR job graph. Upstream asserts its Windows lane still carries the addon checks; this fork removed the Windows PR lanes, so the case asserts the removal instead.",
       "status": "permanent"
