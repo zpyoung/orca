@@ -9,8 +9,8 @@ export type PlannerPromptPolicyInput = {
 
 /**
  * States the shaping rules a planner must follow so its nodes fit the run's parallel dispatch
- * model: sizing, concurrency, the dependency-merge start rule, warm-session lanes, check scope, and
- * where objective gates and the PR sit outside the node graph.
+ * model: sizing, concurrency, the dependency-merge start rule, warm-session lanes, check scope, what a
+ * fresh worker worktree lacks, and where objective gates and the PR sit outside the node graph.
  */
 export function buildPlannerPromptPolicySection(input: PlannerPromptPolicyInput): string {
   const gateNames = (input.gates ?? []).map((gate) => gate.name)
@@ -23,6 +23,7 @@ export function buildPlannerPromptPolicySection(input: PlannerPromptPolicyInput)
     'A fresh session spends about 30% of a node orienting.',
     `Node checks must be scoped to the task, finish within ${OBJECTIVE_CHECK_TIMEOUT_SECONDS} seconds, and run from any worktree using workspace-relative paths.`,
     'Node checks judge file contents or run scoped tests, never commit ranges, because checks run after every node lands.',
+    'Implementers work in fresh worktrees holding only tracked files: machine-local untracked files such as .claude/settings.local.json are absent, so never tell a worker to read configuration from one — settings like environment variables reach the worker through its process environment.',
     gateNames.length > 0
       ? `OBJECTIVE GATES: ${gateNames.join(', ')}`
       : 'OBJECTIVE GATES: none declared',
