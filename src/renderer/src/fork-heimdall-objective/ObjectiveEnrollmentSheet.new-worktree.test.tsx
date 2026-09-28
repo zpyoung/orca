@@ -108,6 +108,31 @@ describe('new worktree objective enrollment', () => {
     await waitFor(() => expect(fetchAllWorktrees).toHaveBeenCalledTimes(2))
   })
 
+  it('drops a chosen base branch when the new worktree moves to another repository', async () => {
+    useAppStore.setState({
+      repos: [repo, { ...repo, id: 'other-repo', path: '/repos/other', displayName: 'Other' }]
+    })
+    renderSheet()
+    selectNewWorktree()
+    fireEvent.click(screen.getByRole('button', { name: 'Project default' }))
+    expect(screen.getByRole('button', { name: 'release' })).toBeVisible()
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Workspace' }))
+    fireEvent.click(screen.getByText('New worktree in Other'))
+    expect(screen.getByRole('button', { name: 'Project default' })).toBeVisible()
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Objective' }), {
+      target: { value: 'Ship it' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
+    await waitFor(() => expect(enroll).toHaveBeenCalledTimes(1))
+    expect(enroll.mock.calls[0]?.[0]).toMatchObject({
+      repoId: 'other-repo',
+      kindPayload: { newWorktree: { name: 'ship-it' } }
+    })
+    expect(enroll.mock.calls[0]?.[0].kindPayload.newWorktree).not.toHaveProperty('baseBranch')
+  })
+
   it('requires a nonblank edited name before sending an enrollment', () => {
     renderSheet()
     selectNewWorktree()

@@ -354,6 +354,10 @@ export function ObjectiveEnrollmentSheet({
       return {
         ...current,
         workspaceKind: workspace?.workspaceKind ?? null,
+        newWorktreeBaseBranch:
+          workspace?.repoId === selectedWorkspace?.repoId
+            ? current.newWorktreeBaseBranch
+            : undefined,
         landingBar,
         capabilities:
           landingBar === 'files-on-disk'

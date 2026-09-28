@@ -293,8 +293,8 @@ export function createObjectiveKind(args: {
     id: 'objective',
     displayName: 'Objective',
     enrollmentPayloadSchema: ObjectiveEnrollmentRequestSchema,
-    authorizeEnrollment: (input) =>
-      authorizeObjectiveEnrollment(args.runtime, args.store, input, storageAuthority, forge),
+    authorizeEnrollment: (input, scope) =>
+      authorizeObjectiveEnrollment(args.runtime, args.store, input, storageAuthority, forge, scope),
     validateEnrollment(candidate, existing) {
       assertObjectiveEnrollmentHasUsablePlan(
         candidate,

@@ -50,6 +50,14 @@ function runtime() {
     worktree: { id: 'created-1', path: '/workspace/new-feature' }
   }))
   const removeManagedWorktree = vi.fn(async () => ({}))
+  const listManagedWorktrees = vi.fn(
+    async (): Promise<{
+      worktrees: { id: string; displayName: string }[]
+      totalCount: number
+      truncated: boolean
+    }> => ({ worktrees: [], totalCount: 0, truncated: false })
+  )
+  const invalidateWorktreeCatalog = vi.fn()
   const resolveRuntimeGitTarget = vi.fn(async () => ({
     executionHostId: 'local' as const,
     worktree: {
@@ -59,13 +67,22 @@ function runtime() {
       git: { isBare: false, prunable: false }
     }
   }))
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrcaRuntimeService has private fields; these three methods are the authorization surface exercised.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrcaRuntimeService has private fields; these methods are the authorization surface exercised.
   const service = {
     createManagedWorktree,
     removeManagedWorktree,
+    listManagedWorktrees,
+    invalidateWorktreeCatalog,
     resolveRuntimeGitTarget
   } as unknown as OrcaRuntimeService
-  return { service, createManagedWorktree, removeManagedWorktree, resolveRuntimeGitTarget }
+  return {
+    service,
+    createManagedWorktree,
+    removeManagedWorktree,
+    listManagedWorktrees,
+    invalidateWorktreeCatalog,
+    resolveRuntimeGitTarget
+  }
 }
 
 function forge(
@@ -191,6 +208,91 @@ describe('objective enrollment on a new worktree', () => {
     } finally {
       warning.mockRestore()
     }
+  })
+
+  it('removes a checkout stranded by a failing create but keeps a same-named older one', async () => {
+    const target = runtime()
+    const older = { id: 'older-feature', displayName: 'feature' }
+    target.listManagedWorktrees
+      .mockResolvedValueOnce({ worktrees: [older], totalCount: 1, truncated: false })
+      .mockResolvedValueOnce({
+        worktrees: [
+          older,
+          { id: 'stranded-1', displayName: 'feature' },
+          { id: 'unrelated', displayName: 'other' }
+        ],
+        totalCount: 3,
+        truncated: false
+      })
+    const failure = new Error('terminal startup failed')
+    target.createManagedWorktree.mockRejectedValueOnce(failure)
+
+    await expect(
+      authorizeObjectiveEnrollment(target.service, repository(), enrollment(), 'desktop', forge())
+    ).rejects.toBe(failure)
+    expect(target.invalidateWorktreeCatalog).toHaveBeenCalledWith('repo-1')
+    expect(target.removeManagedWorktree).toHaveBeenCalledOnce()
+    expect(target.removeManagedWorktree).toHaveBeenCalledWith('id:stranded-1', {
+      force: true,
+      hostId: 'local'
+    })
+  })
+
+  it('hands the kernel a rollback that removes the created worktree at most once', async () => {
+    const target = runtime()
+    const undos: (() => Promise<void>)[] = []
+    const scope = {
+      onAbandoned: (undo: () => Promise<void>) => {
+        undos.push(undo)
+      }
+    }
+
+    await authorizeObjectiveEnrollment(
+      target.service,
+      repository(),
+      enrollment(),
+      'desktop',
+      forge(),
+      scope
+    )
+    expect(undos).toHaveLength(1)
+    expect(target.removeManagedWorktree).not.toHaveBeenCalled()
+
+    await undos[0]?.()
+    await undos[0]?.()
+    expect(target.removeManagedWorktree).toHaveBeenCalledOnce()
+    expect(target.removeManagedWorktree).toHaveBeenCalledWith('id:created-1', {
+      force: true,
+      hostId: 'local'
+    })
+  })
+
+  it('does not remove twice when authorization fails and the kernel also abandons', async () => {
+    const target = runtime()
+    const undos: (() => Promise<void>)[] = []
+    const scope = {
+      onAbandoned: (undo: () => Promise<void>) => {
+        undos.push(undo)
+      }
+    }
+    const failure = new Error('forge unavailable')
+
+    await expect(
+      authorizeObjectiveEnrollment(
+        target.service,
+        repository(),
+        enrollment(),
+        'desktop',
+        forge(
+          vi.fn(async () => {
+            throw failure
+          })
+        ),
+        scope
+      )
+    ).rejects.toBe(failure)
+    await undos[0]?.()
+    expect(target.removeManagedWorktree).toHaveBeenCalledOnce()
   })
 
   it.each([

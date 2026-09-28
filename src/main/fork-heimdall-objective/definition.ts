@@ -10,6 +10,7 @@ import {
   type ObjectiveEnrollmentPayload
 } from '../../shared/fork-heimdall-objective/contract-types'
 import { OBJECTIVE_LANDING_LADDER } from '../../shared/fork-heimdall-objective/landing-ladder'
+import type { EnrollmentAuthorizationScope } from '../../shared/fork-heimdall/kind-contract'
 import type {
   AuthorizedEnrollment,
   EnrollInput,
@@ -24,7 +25,7 @@ import { getAutomationSchedulerOwnerForExecutionHost } from '../persistence/sche
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {
   createObjectiveEnrollmentWorktree,
-  rollbackObjectiveEnrollmentWorktree
+  objectiveEnrollmentWorktreeRollback
 } from './enrollment-worktree'
 import {
   defaultObjectiveForgeAccess,
@@ -196,7 +197,8 @@ export async function authorizeObjectiveEnrollment(
   store: Store,
   input: EnrollInput,
   storageAuthority: 'desktop' | 'runtime' = 'desktop',
-  forge: ObjectiveForgeAccess = defaultObjectiveForgeAccess
+  forge: ObjectiveForgeAccess = defaultObjectiveForgeAccess,
+  scope?: EnrollmentAuthorizationScope
 ): Promise<AuthorizedEnrollment> {
   if (input.kind !== 'objective') {
     throw new Error('Objective enrollment requires the objective kind')
@@ -230,7 +232,7 @@ export async function authorizeObjectiveEnrollment(
     schedulerOwnerFor(getRepoExecutionHostId(repo), storageAuthority)
   }
 
-  let createdWorktree: { id: string; hostId: ExecutionHostId } | null = null
+  let rollbackCreatedWorktree: (() => Promise<void>) | null = null
   try {
     let workspace:
       | Awaited<ReturnType<typeof resolveGitWorkspace>>
@@ -260,7 +262,12 @@ export async function authorizeObjectiveEnrollment(
       if (newWorktree) {
         const created = await createObjectiveEnrollmentWorktree(runtime, repo, newWorktree)
         worktreeId = created.worktree.id
-        createdWorktree = { id: worktreeId, hostId: getRepoExecutionHostId(repo) }
+        rollbackCreatedWorktree = objectiveEnrollmentWorktreeRollback(
+          runtime,
+          worktreeId,
+          getRepoExecutionHostId(repo)
+        )
+        scope?.onAbandoned(rollbackCreatedWorktree)
       }
       if (!worktreeId) {
         throw new Error('Git objective enrollment requires an explicit worktree')
@@ -319,17 +326,7 @@ export async function authorizeObjectiveEnrollment(
       kindPayload: contract
     }
   } catch (error) {
-    if (createdWorktree) {
-      try {
-        await rollbackObjectiveEnrollmentWorktree(
-          runtime,
-          createdWorktree.id,
-          createdWorktree.hostId
-        )
-      } catch (rollbackError) {
-        console.warn('Objective enrollment worktree rollback failed', rollbackError)
-      }
-    }
+    await rollbackCreatedWorktree?.()
     throw error
   }
 }
