@@ -8,21 +8,14 @@ import {
   STALL_CAUSE_REQUEST_ID,
   stallCauseQuestionRequest
 } from '../../../shared/fork-heimdall/judgment/stall-cause-question'
-import {
-  JudgmentAnswerSchema,
-  JudgmentModelSchema,
-  type JudgmentProvider
-} from '../../../shared/fork-heimdall/judgment/types'
+import type { JudgmentProvider } from '../../../shared/fork-heimdall/judgment/types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import type { StallCauseInput, StallCauseJudgePort } from '../stall-scan'
 import { readJudgmentAccess } from './access-store'
-import { createJudgmentClient, JudgmentClientFailure } from './client'
-import {
-  evaluationFailureReason,
-  type JudgmentAccess,
-  type JudgmentClientPort,
-  type JudgmentQuestionPolicy
-} from './service'
+import { createJudgmentClient } from './client'
+import { evaluationFailureReason } from './failure-reason'
+import { partialResponseReason, validateClientResponse } from './response-validation'
+import type { JudgmentAccess, JudgmentClientPort, JudgmentQuestionPolicy } from './service'
 import { stableJson } from './state-projection'
 import { JudgmentAnswerStore, type JudgmentIdentity, type JudgmentPersistencePort } from './store'
 
@@ -127,21 +120,12 @@ export class StallCauseJudge implements StallCauseJudgePort {
           { agentStatus: input.activity, lastMessage: input.lastMessage },
           { [STALL_CAUSE_REQUEST_ID]: request.question }
         )
-      const answer = JudgmentAnswerSchema.safeParse(response.answers[STALL_CAUSE_REQUEST_ID])
-      if (!answer.success || !JudgmentModelSchema.safeParse(response.model).success) {
-        throw new JudgmentClientFailure('Judgment response is invalid', {
-          code: 'malformed-response'
-        })
+      const validated = validateClientResponse(response, [request])
+      const answer = validated.answers.get(STALL_CAUSE_REQUEST_ID)
+      if (answer === undefined) {
+        return recordOnce('unavailable', partialResponseReason(0, 1, validated.unavailable))
       }
-      store.recordAnswer(
-        watcherId,
-        identity,
-        request,
-        policy,
-        provider,
-        response.model,
-        answer.data
-      )
+      store.recordAnswer(watcherId, identity, request, policy, provider, validated.model, answer)
       store.recordOutcome(watcherId, identity, 'answered')
       return 'answered'
     } catch (error) {
