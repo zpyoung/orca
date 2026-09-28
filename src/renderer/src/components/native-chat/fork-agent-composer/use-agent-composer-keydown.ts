@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
+// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
 import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'
@@ -45,6 +45,10 @@ export function useAgentComposerKeyDown({
         if (event.key === 'Enter') {
           event.preventDefault()
         }
+        return
+      }
+      // An open layer that keeps focus here, like the context card, already spent this Escape closing itself.
+      if (event.key === 'Escape' && event.defaultPrevented) {
         return
       }
 

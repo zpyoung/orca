@@ -190,10 +190,12 @@
   --status-success: #15803d;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
   --status-success-border: color-mix(in srgb, var(--status-success) 25%, transparent);
-  --status-warning: #a16207;
-  --status-warning-background: #fef3c7;
+  /* Needs-attention state that is not an error: a resume that did not carry on, an update that
+     failed. Yellow, so it stays apart from destructive red and from the orange working state. */
+  --status-warning: #ca8a04;
+  --status-warning-background: color-mix(in srgb, var(--status-warning) 10%, transparent);
   --status-warning-foreground: #78350f;
-  --status-warning-border: #f59e0b;
+  --status-warning-border: color-mix(in srgb, var(--status-warning) 25%, transparent);
   /* Workspace PR-state tones: same hue in both themes so a status keeps its
      identity when the theme flips. */
   --workspace-status-done: #c7a594;
@@ -308,10 +310,10 @@
   --status-success: #86efac;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
   --status-success-border: color-mix(in srgb, var(--status-success) 25%, transparent);
-  --status-warning: #facc15;
-  --status-warning-background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+  --status-warning: #eab308;
+  --status-warning-background: color-mix(in srgb, var(--status-warning) 10%, transparent);
   --status-warning-foreground: #fde68a;
-  --status-warning-border: color-mix(in srgb, var(--status-warning) 35%, transparent);
+  --status-warning-border: color-mix(in srgb, var(--status-warning) 25%, transparent);
   --workspace-status-done: #c7a594;
   --workspace-status-review: #16a34a;
   --workspace-status-progress: #d4a300;

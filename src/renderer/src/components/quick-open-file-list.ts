@@ -139,6 +139,7 @@ export function useRuntimeFileListForWorktree({
   const [listing, setListing] = useState(NO_LISTING)
   const [loadingRequest, setLoadingRequest] = useState({ requestKey: '', loading: false })
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [cappedLocalListing, setCappedLocalListing] = useState<CappedLocalListing | null>(null)
   const [listedOperationOwner, setListedOperationOwner] = useState<FileExplorerOperationOwner>({
     kind: 'unresolved'
   })
@@ -182,18 +183,17 @@ export function useRuntimeFileListForWorktree({
     (runtimeEnvironmentId !== null || connectionId !== undefined) && query !== undefined
   const remoteQuery = usesRuntimePathSearch ? query.trim() : ''
   const remoteQueryTooLarge = usesRuntimePathSearch && isQuickOpenRemoteQueryTooLarge(remoteQuery)
-  const requestKey = useMemo(
-    () =>
-      `${worktreePath ?? ''}\n${operationOwnerKey}\n${excludeRequest.key}\n${activeTargetStatus ?? ''}${usesRuntimePathSearch ? `\n${remoteQuery}` : ''}`,
-    [
-      activeTargetStatus,
-      excludeRequest.key,
-      operationOwnerKey,
-      remoteQuery,
-      usesRuntimePathSearch,
-      worktreePath
-    ]
-  )
+  const listingKey = `${worktreePath ?? ''}\n${operationOwnerKey}\n${excludeRequest.key}\n${activeTargetStatus ?? ''}`
+  // Why: a capped listing can omit matches, so only then pay for a host scan per query.
+  const hostNameFilter =
+    hostFilterWhenCapped &&
+    runtimeEnvironmentId === null &&
+    connectionId === undefined &&
+    cappedLocalListing?.key === listingKey &&
+    !cappedLocalListing.hostFilterFailed
+      ? splitFileNameFilterTokens(query ?? '').join(' ')
+      : ''
+  const requestKey = `${listingKey}${usesRuntimePathSearch ? `\n${remoteQuery}` : ''}${hostNameFilter ? `\nname-filter\n${hostNameFilter}` : ''}`
   // Why: the render between a request change and the effect that starts the next request must
   // not show the previous listing, so a listing is only visible for the request that produced it.
   const currentListing = listing.requestKey === requestKey ? listing : NO_LISTING
@@ -208,6 +208,7 @@ export function useRuntimeFileListForWorktree({
 
   useEffect(() => {
     if (!enabled) {
+      setCappedLocalListing(null)
       setLoadingRequest({ requestKey, loading: false })
       setListedOperationOwner({ kind: 'unresolved' })
       return
@@ -288,7 +289,10 @@ export function useRuntimeFileListForWorktree({
         }
       })
       .catch((error) => {
-        if (!cancelled) {
+        if (!cancelled && hostNameFilter) {
+          // Why: a failed host scan falls back to filtering the capped listing, not an error.
+          setCappedLocalListing((current) => current && { ...current, hostFilterFailed: true })
+        } else if (!cancelled) {
           setListing(NO_LISTING)
           setLoadError(cleanRuntimeFileListError(error))
         }

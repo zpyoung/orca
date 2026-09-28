@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
+// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
 import { ArrowUp, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -9,6 +9,9 @@ import type {
   SessionOptionsSurface
 } from '../../../../../shared/native-chat-session-options'
 import { NativeChatSessionOptionPickers } from '../NativeChatSessionOptionPickers'
+import { NativeChatComposerGoalChip } from '../NativeChatComposerGoalChip'
+import { NativeChatContextUsageRing } from '../NativeChatContextUsageRing'
+import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 
 export type AgentComposerActionsProps = {
@@ -27,6 +30,10 @@ export type AgentComposerActionsProps = {
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
   sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
+  /** Present while the composer is in goal mode; the chip calls it to leave. */
+  onExitGoalMode?: () => void
+  /** Absent until the session has reported or the transcript can estimate. */
+  contextUsage?: NativeChatContextUsageSummary | null
 }
 
 export function AgentComposerActions({
@@ -44,7 +51,9 @@ export function AgentComposerActions({
   onStop,
   sessionOptionsSurface,
   sessionOptionsSnapshot,
-  sessionOptionsPickerRequest
+  sessionOptionsPickerRequest,
+  onExitGoalMode,
+  contextUsage
 }: AgentComposerActionsProps): React.JSX.Element {
   const dictationLabel = isDictating
     ? translate('components.native-chat.composer.stopDictation', 'Stop dictation')
@@ -70,16 +79,18 @@ export function AgentComposerActions({
             {translate('components.native-chat.composer.attach', 'Attach file')}
           </TooltipContent>
         </Tooltip>
+        {onExitGoalMode ? <NativeChatComposerGoalChip onExit={onExitGoalMode} /> : null}
       </div>
       <div className="ml-auto flex items-center gap-1.5">
         {/* Why: keep session controls beside the actions they affect; the
-        model trigger is ordered last so it sits directly next to dictation. */}
+        model trigger is ordered last so only the context ring separates it from dictation. */}
         <NativeChatSessionOptionPickers
           surface={sessionOptionsSurface}
           snapshot={sessionOptionsSnapshot}
           isWorking={isWorking}
           pickerRequest={sessionOptionsPickerRequest}
         />
+        {contextUsage ? <NativeChatContextUsageRing usage={contextUsage} /> : null}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

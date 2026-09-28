@@ -479,6 +479,19 @@ describe('per-job path classification', () => {
 })
 
 describe('PR Checks skip wiring', () => {
+  it('runs the candidate daemon shutdown Docker oracle in the existing Linux package job', () => {
+    const steps = prWorkflow.jobs.package.steps
+    const install = steps.findIndex(
+      (step) => step.uses === './.github/actions/install-node-dependencies'
+    )
+    const oracle = steps.findIndex(
+      (step) => step.name === 'Verify Linux daemon shutdown descendant cleanup'
+    )
+    expect(install).toBeGreaterThan(-1)
+    expect(oracle).toBeGreaterThan(install)
+    expect(steps[oracle].run).toBe('node config/scripts/run-daemon-shutdown-descendants-docker.mjs')
+    expect(steps[oracle].env.ORCA_BACKGROUND_LAUNCH).toBe('1')
+  })
   it('gives static analysis the mobile types its type-aware pass resolves', () => {
     expect(prWorkflow.jobs.code_paths.outputs.mobile_dependencies).toBe(
       '${{ steps.filter.outputs.mobile_dependencies }}'
@@ -535,13 +548,9 @@ describe('PR Checks skip wiring', () => {
     expect(verifyStep.run).toContain('expected skipped')
     expect(verifyStep.run).toContain('expected success')
     for (const job of prWorkflow.jobs.verify.needs) {
-      // fork_ownership_guard is ungated like root_directory_guard: it runs on every PR,
-      // so it is checked unconditionally rather than through the SHOULD_RUN loop.
-      if (
-        job === 'code_paths' ||
-        job === 'root_directory_guard' ||
-        job === 'fork_ownership_guard'
-      ) {
+      // fork_ownership_guard is ungated: it runs on every PR, so it is checked
+      // unconditionally rather than through the SHOULD_RUN loop.
+      if (job === 'code_paths' || job === 'fork_ownership_guard') {
         continue
       }
       const envVar = `${job.replaceAll('-', '_').toUpperCase()}_SHOULD_RUN`

@@ -146,6 +146,14 @@ export function useTerminalPaneMobileActions(controller: TerminalPaneContextCont
       // withhold the report, in which case nobody else will paste.
       event.preventDefault()
       armPrimarySelectionNativePasteSuppression()
+      if (
+        targetPane.terminal.modes.mouseTrackingMode !== 'none' &&
+        !terminalForcesSelectionForClick(event)
+      ) {
+        return
+      }
+      const clickedPane = targetPane
+      event.stopPropagation()
       // Why: middle-click paste writes through the transport below, not via xterm's own
       // paste handling, so this focus call is only about UX — skip it when the composer
       // owns focus rather than yanking it away for a paste the user didn't aim at it.

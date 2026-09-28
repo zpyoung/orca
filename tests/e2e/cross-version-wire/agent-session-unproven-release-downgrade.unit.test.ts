@@ -7,7 +7,7 @@ import { AgentSessionRecordStore } from '../../../src/main/runtime/agent-session
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
 // The last release before recovery released an owner it could not prove gone.
-const BASELINE_REF = 'v1.4.211'
+const BASELINE_REF = 'v1.4.208-rc.0.zy01'
 const SESSION = 'session-unproven'
 const NOW = 1_800_000_000_000
 const LOCATION = {

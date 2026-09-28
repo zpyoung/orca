@@ -2,6 +2,7 @@ import { normalizeExecutionHostId } from './execution-host'
 import { breakProjectGroupParentCycles } from './fork-worktree-groups/project-group-parent-cycles'
 import type { Repo } from './repo-types'
 import type { ProjectGroup, ProjectGroupCreatedFrom } from './project-group-types'
+import { createNonSecureContextUuid } from './non-secure-context-uuid'
 
 export const UNGROUPED_PROJECT_GROUP_KEY = 'project-group:ungrouped'
 

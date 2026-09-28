@@ -165,9 +165,10 @@ fork-only. Replace it with an upstream strict request schema, or state the shape
 
 ## Warning status tokens
 
-**What:** adds the warning hue, surface, foreground and border roles to the canonical light/dark
-theme and Tailwind bindings. Heimdall uses them for parked and lost-contact states, which must
-remain distinguishable from errors.
+**What:** adds the warning foreground role to the canonical light/dark theme and Tailwind bindings.
+Heimdall uses it for parked and lost-contact states, which must remain distinguishable from errors.
+Upstream landed the warning hue, surface and border roles in v1.4.215, so the fork takes those and
+carries only `--status-warning-foreground` and its `--color-` binding.
 
 **Why upstream, not isolated:** warning is a general design-system role beside success and
 destructive. A feature-local duplicate would contradict the canonical token source.
@@ -669,24 +670,5 @@ repair of its fixture. A fork copy would have to be replayed every sync for a fi
 stake in.
 
 **Paths:** `config/scripts/hourly-build-version.test.mjs`.
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Typecheck projects OOM the CI runner
-
-**Defect:** `pnpm run typecheck` starts the node, cli, web, and mobile-web `tsc` projects at once.
-On a 4-CPU Linux container, node peaks at about 10.3 GB and web at about 9.5 GB, both measured
-separately on upstream-equivalent `main`. Run together, the kernel OOM-kills `tsc
-tsconfig.node.json` at about 17.7 GB. On the 16 GB `ubuntu-latest` runner, that shows up as
-`The runner has received a shutdown signal` with no type errors in the log. Smaller trees survive
-some of the time, so the job fails intermittently and passes on re-run.
-
-**Fork change:** run the projects in two waves. Node, cli, and mobile-web run first, then web, so
-the two ~10 GB projects never overlap. The single-core serial path is unchanged.
-
-**Why upstream, not isolated:** the script is upstream's typecheck entry point, and upstream's own
-tree is already over the runner's memory. The fix is a scheduling change to that one file.
-
-**Paths:** `config/scripts/run-typecheck-projects-in-parallel.mjs`.
 
 **Status:** pending-upstream. Not yet submitted.

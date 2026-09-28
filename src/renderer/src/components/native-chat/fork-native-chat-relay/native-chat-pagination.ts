@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-pagination.ts
-// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
+// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
 // Pure pagination math for the native-chat read window. The renderer reads the
 // transcript tail with a `limit`; when the user scrolls to the top it raises the
 // limit by a page to load older history. Kept pure (no React/IO) so the limit
@@ -9,6 +9,15 @@
 // initial paint matches the prior behavior; each load-earlier grows by a page.
 export const NATIVE_CHAT_INITIAL_LIMIT = 300
 export const NATIVE_CHAT_PAGE = 200
+
+/** How one older-page request ended. Only 'applied' moved the loaded window older;
+ *  'superseded' means a newer read generation (a re-attach or source swap) owns it now. */
+export type NativeChatOlderPageResult =
+  | 'applied'
+  | 'exhausted'
+  | 'unchanged'
+  | 'failed'
+  | 'superseded'
 
 /** The limit to request for the next older page. */
 export function nextNativeChatLimit(currentLimit: number): number {

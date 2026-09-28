@@ -34,6 +34,7 @@ import {
   LIST_TABLE_ROW_DIVIDER_CLASS,
   LIST_TABLE_ROW_SELECTED_CLASS
 } from '@/lib/list-table-layout'
+import { ArtifactNameWithProtection } from './fork-artifact-passwords/artifact-protection-display'
 
 type ArtifactRowAction = {
   key: string
@@ -127,9 +128,7 @@ export function ArtifactListRow({
             isSelected && LIST_TABLE_ROW_SELECTED_CLASS
           )}
         >
-          <span className="min-w-0 truncate font-medium" title={name}>
-            {name}
-          </span>
+          <ArtifactNameWithProtection item={item} name={name} />
           <span className="min-w-0 truncate text-muted-foreground" title={typeLabel}>
             {typeLabel}
           </span>

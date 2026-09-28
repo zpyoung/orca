@@ -2,13 +2,16 @@ import { spawn } from 'node:child_process'
 import { availableParallelism, totalmem } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-// These projects overlap heavily in src/shared but have no build dependency on
-// each other, so tsc can check them concurrently instead of in a `&&` chain.
-// Why node and web sit in separate waves: each peaks near 10 GB, and together they
-// get the 16 GB ubuntu-latest runner OOM-killed mid-check.
-const waves = [
-  ['tsconfig.node.json', 'tsconfig.tc.cli.json', 'tsconfig.mobile-web.json'],
-  ['tsconfig.tc.web.json']
+const BYTES_PER_GIB = 1024 ** 3
+
+// Peak heap per project, read from `tsc --extendedDiagnostics` and rounded up. node and
+// web are the expensive pair: run together they exceed a 16 GB CI runner, and an
+// out-of-memory runner is killed mid-check, so the job reports a lost runner instead of a
+// type error. Admission is therefore by memory, not by core count alone.
+export const TYPECHECK_PROJECTS = [
+  { config: 'tsconfig.node.json', heapGib: 7 },
+  { config: 'tsconfig.tc.web.json', heapGib: 6 },
+  { config: 'tsconfig.tc.cli.json', heapGib: 2 }
 ]
 
 // The OS, node itself, and the runner agent need their share; the rest is what tsc may hold.
@@ -72,20 +75,20 @@ function checkProject(project) {
   })
 }
 
-const failures = []
-if (concurrent) {
-  for (const wave of waves) {
-    const results = await Promise.allSettled(wave.map(checkProject))
-    failures.push(
-      ...results.filter((result) => result.status === 'rejected').map((result) => result.reason)
-    )
-  }
-} else {
-  for (const project of waves.flat()) {
-    try {
-      await checkProject(project)
-    } catch (error) {
-      failures.push(error)
+async function runTypecheckProjects() {
+  const batches = planTypecheckBatches(TYPECHECK_PROJECTS, {
+    budgetGib: admissibleHeapGib(totalmem()),
+    parallelism: availableParallelism()
+  })
+
+  // Every batch runs even after one fails, so a single broken project still reports the rest.
+  const failures = []
+  for (const batch of batches) {
+    const results = await Promise.allSettled(batch.map((project) => checkProject(project.config)))
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        failures.push(result.reason)
+      }
     }
   }
 

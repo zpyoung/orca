@@ -239,6 +239,9 @@ module.exports = {
     'out/main/grok/**',
     'out/main/hermes/**',
     'out/main/win32-utils.js',
+    'out/main/orca-profiles/profile-index-store.js',
+    'out/main/persistence/profile-state/**',
+    'out/main/startup/http1-compatibility-marker.js',
     'out/main/daemon-entry.js',
     'out/main/session-scanner-service-entry.js',
     'out/main/wsl-transcript-fs-process-entry.js',
@@ -607,7 +610,11 @@ module.exports = {
     provider: 'github',
     owner: 'zpyoung',
     repo: 'orca',
-    releaseType: 'release'
+    // Why draft on the main repo: `--publish always` otherwise creates a
+    // public GitHub release as soon as the first platform uploads, and
+    // /releases/latest serves a missing Windows exe. release-cut undrafts
+    // only after every required asset exists.
+    releaseType: 'draft'
   }
 }
 

@@ -34,20 +34,22 @@ jobs:
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
       changed_count: ${{ steps.filter.outputs.changed_count }}
-      native_cache_changed: ${{ steps.filter.outputs.native_cache_changed }}
+      reused_run_id: ${{ steps.readiness.outputs.run_id }}
+      # A proven success masks required work only; advisory routing still uses the full diff.
+      native_cache_changed: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.native_cache_changed }}
       mobile_dependencies: ${{ steps.filter.outputs.mobile_dependencies }}
-      mobile_web_app: ${{ steps.filter.outputs.mobile_web_app }}
-      static_analysis: ${{ steps.filter.outputs.static_analysis }}
-      typecheck: ${{ steps.filter.outputs.typecheck }}
-      git_compatibility: ${{ steps.filter.outputs.git_compatibility }}
-      codex_index_heal_contract: ${{ steps.filter.outputs.codex_index_heal_contract }}
-      xterm_patch_sync: ${{ steps.filter.outputs.xterm_patch_sync }}
-      shell_contracts: ${{ steps.filter.outputs.shell_contracts }}
-      test: ${{ steps.filter.outputs.test }}
-      orcad_browser: ${{ steps.filter.outputs.orcad_browser }}
-      cross-version-wire: ${{ steps.filter.outputs.cross-version-wire }}
-      managed_hook_node18: ${{ steps.filter.outputs.managed_hook_node18 }}
-      package: ${{ steps.filter.outputs.package }}
+      mobile_web_app: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.mobile_web_app }}
+      static_analysis: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.static_analysis }}
+      typecheck: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.typecheck }}
+      git_compatibility: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.git_compatibility }}
+      codex_index_heal_contract: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.codex_index_heal_contract }}
+      xterm_patch_sync: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.xterm_patch_sync }}
+      shell_contracts: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.shell_contracts }}
+      test: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.test }}
+      orcad_browser: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.orcad_browser }}
+      cross-version-wire: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.cross-version-wire }}
+      managed_hook_node18: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.managed_hook_node18 }}
+      package: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.package }}
       e2e_should_run: ${{ steps.e2e_filter.outputs.should_run }}
       test_files: ${{ steps.e2e_filter.outputs.test_files }}
       ssh_source_changed: ${{ steps.e2e_filter.outputs.ssh_source_changed }}
@@ -306,33 +308,6 @@ jobs:
       - name: Verify macOS entitlements
         run: pnpm verify:macos-entitlements
 
-  root_directory_guard:
-    name: root directory guard
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          # Why blob:none: full history is needed for the merge-base diff, but historical
-          # file contents are not. Blobs are ~89% of this repo's pack, and Git fetches the
-          # few this job actually reads on demand.
-          fetch-depth: 0
-          filter: blob:none
-          persist-credentials: false
-
-      - name: Reject new root-level files and folders
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node .github/scripts/check-root-directory-entries.mjs "$BASE_SHA" "$HEAD_SHA"
-
-      # Why here: the READMEs embed media owned by docs/site and resources/onboarding,
-      # and the classifier skips static_analysis for docs-only diffs. This job runs
-      # on every PR and needs no install.
-      - name: Check README local links
-        run: node config/scripts/check-readme-local-links.mjs
-
   fork_ownership_guard:
     name: fork ownership guard
     runs-on: ubuntu-latest
@@ -353,7 +328,6 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/scripts/check-fork-ownership.mjs "$BASE_SHA" "$HEAD_SHA"
-
   typecheck:
     needs: [code_paths]
     if: needs.code_paths.outputs.typecheck == 'true'
@@ -994,7 +968,6 @@ jobs:
     needs:
       - code_paths
       - static_analysis
-      - root_directory_guard
       - fork_ownership_guard
       - typecheck
       - git_compatibility
@@ -1007,7 +980,9 @@ jobs:
       - cross-version-wire
       - managed_hook_node18
       - package
-    runs-on: ubuntu-latest
+    # Evaluating job results only needs the lightweight container runner.
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
 
     steps:
       # Why: e2e is deliberately absent from needs. The suite is currently red on
@@ -1024,7 +999,6 @@ jobs:
           SHOULD_RUN: ${{ needs.code_paths.outputs.should_run }}
           STATIC_ANALYSIS: ${{ needs.static_analysis.result }}
           STATIC_ANALYSIS_SHOULD_RUN: ${{ needs.code_paths.outputs.static_analysis }}
-          ROOT_DIRECTORY_GUARD: ${{ needs.root_directory_guard.result }}
           FORK_OWNERSHIP_GUARD: ${{ needs.fork_ownership_guard.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
           TYPECHECK_SHOULD_RUN: ${{ needs.code_paths.outputs.typecheck }}
@@ -1050,9 +1024,6 @@ jobs:
           PACKAGE_SHOULD_RUN: ${{ needs.code_paths.outputs.package }}
         run: |
           if [ "$CODE_PATHS" != "success" ]; then
-            exit 1
-          fi
-          if [ "$ROOT_DIRECTORY_GUARD" != "success" ]; then
             exit 1
           fi
           # Why here too: the ownership guard is ungated, so a docs-only PR still

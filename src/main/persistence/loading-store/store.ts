@@ -155,15 +155,25 @@ export class Store {
     return dirname(this.runtime.dataFile)
   }
 
-  getDataFile(): string {
-    return this.runtime.dataFile
-  }
-
-  freezeWrites(): void {
-    this.runtime.writesFrozen = true
-    if (this.runtime.writeTimer) {
-      clearTimeout(this.runtime.writeTimer)
-      this.runtime.writeTimer = null
+  /**
+   * Prepare a storage-form export for a database importer.
+   *
+   * Secret retention is committed only after the caller durably accepts the
+   * export. This keeps a failed migration from discarding the prior sealed
+   * value from the in-memory fallback store.
+   */
+  prepareProfileStateExport(): PreparedProfileStateExport {
+    const built = this.domains.serialization.buildStateToSave()
+    let committed = false
+    return {
+      json: built.payload.toString('utf8'),
+      commit: () => {
+        if (committed) {
+          return
+        }
+        this.runtime.protectedSecrets.commitRetentionUpdates(built.protectedSecretUpdates)
+        committed = true
+      }
     }
   }
 
@@ -267,6 +277,10 @@ export class Store {
       throw new Error('SQLite profile-state quarantine is unavailable')
     }
     return authority.quarantineDatabase(quarantineRoot, reason)
+  }
+
+  getDataFile(): string {
+    return this.runtime.dataFile
   }
 
   freezeWrites(): void {

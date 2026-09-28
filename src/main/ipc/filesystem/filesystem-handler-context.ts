@@ -64,7 +64,6 @@ export function createFilesystemHandlerContext(
     listFilesCancellations,
     gitStatusCancellations,
     gitDiffCancellations,
-    closeDownloadSession,
-    cleanupDownloadSessionsForSender
+    closeDownloadSession
   }
 }

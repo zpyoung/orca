@@ -38,9 +38,8 @@ import { NativeChatTaskList } from './NativeChatTaskList'
 import { buildNativeChatTaskListRows } from './native-chat-task-list-history'
 import { NativeChatBackgroundTaskRun } from './NativeChatBackgroundTaskRun'
 import { NativeChatSubagentRun } from './NativeChatSubagentRun'
-import { NativeChatToolIcon, NativeChatToolRunIcon } from './NativeChatToolIcon'
+import { NativeChatToolRunIcon } from './NativeChatToolIcon'
 import { NativeChatToolCategoryDots } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
-import { nativeChatToolActivityLabel } from './native-chat-tool-activity-label'
 
 /** Stable empty default: a fresh array literal per render breaks memoization. */
 const NO_SUBAGENT_GROUPS: NativeChatSubagentGroupBlock[] = []
@@ -237,8 +236,19 @@ export function NativeChatToolRun({
             <NativeChatToolRunIcon iconName={settledHeaderIcon} className="text-muted-foreground" />
           ) : null}
           <NativeChatToolCategoryDots blocks={blocks} />
-          <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-foreground/80">
-            {callCount}×
+          {/* The run in words, in the transcript's own type. Present tense while
+              live, past once settled; the text changes in place and nothing
+              around it moves. While live it keeps its width and the preview
+              beside it is what gives way. */}
+          <span
+            className={cn(
+              'truncate text-sm leading-relaxed transition-colors',
+              live
+                ? 'max-w-[72%] shrink-0 animate-pulse text-foreground/85 motion-reduce:animate-none'
+                : 'min-w-0 text-muted-foreground group-hover/tool-run:text-foreground/80'
+            )}
+          >
+            {runSentence ?? fallbackLabel}
           </span>
           {failedCallCount > 0 ? (
             /* Outside the truncating member list, so the one thing the reader

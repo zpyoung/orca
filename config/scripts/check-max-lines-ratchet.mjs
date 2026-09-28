@@ -24,7 +24,7 @@ const SELF_FILES = new Set([
 
 // Default max-lines budgets from .oxlintrc.json (counted lines).
 export function defaultLimitForPath(p) {
-  if (/\.(test|spec)\.(ts|tsx)$/.test(p)) {
+  if (/\.(test|spec)\.(ts|tsx|mts|cts)$/.test(p)) {
     return 1000
   }
   if (p.endsWith('.tsx')) {

@@ -133,6 +133,7 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
     workspaceActivity,
     workspaceReview,
     worktreeIdsWithLiveAgent,
+    worktreeIdsWithStructuredChat,
     worktreesByRepo,
     repoMap
   ])

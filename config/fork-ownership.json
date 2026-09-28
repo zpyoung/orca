@@ -2505,12 +2505,12 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/artifacts/ArtifactListRows.tsx",
+      "path": "src/renderer/src/components/artifacts/ArtifactListRow.tsx",
       "feature": "artifact-passwords",
       "kind": "registration",
       "lines": [
         "import { ArtifactNameWithProtection } from './fork-artifact-passwords/artifact-protection-display'",
-        "                <ArtifactNameWithProtection item={item} name={name} />"
+        "          <ArtifactNameWithProtection item={item} name={name} />"
       ]
     },
     {
@@ -3397,8 +3397,18 @@
         "  all = filterWorktreesByActivity(all, opts.workspaceActivity, opts.repoMap)",
         "  workspaceReview?: WorkspaceReviewFilterContext",
         "  all = filterWorktreesByReview(all, opts.workspaceReview, opts.repoMap)",
-        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'",
-        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktree-options-from-state.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'",
+        "import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/use-workspace-review-filter'",
+        "    workspaceActivity: getWorkspaceActivityFilterContext(state),",
+        "    workspaceReview: getWorkspaceReviewFilterContext(state),"
       ]
     },
     {
@@ -4197,6 +4207,12 @@
       "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
     },
     {
+      "path": "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const BASELINE_REF = 'v1.4.208-rc.0.zy01'"]
+    },
+    {
       "path": "src/renderer/src/components/cmd-j/palette-live-status.tsx",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -4455,7 +4471,7 @@
     },
     {
       "path": "src/renderer/src/assets/main.css",
-      "reason": "Adds canonical light/dark warning surface and foreground tokens for non-error attention states; the design-system extension belongs upstream rather than in feature-local CSS.",
+      "reason": "Adds the canonical light/dark warning foreground token beside upstream's warning hue, surface and border roles; the design-system extension belongs upstream rather than in feature-local CSS.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#warning-status-tokens"
     },
@@ -5057,12 +5073,6 @@
       "reason": "Resolves the unpublished-release base explicitly instead of through getHourlyBuildIdentity, which reads this repo's package.json and pins the case to a tree at or below 1.4.203 — upstream's own v1.4.206 tag fails it too.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
-    },
-    {
-      "path": "config/scripts/run-typecheck-projects-in-parallel.mjs",
-      "reason": "Keeps the node and web tsc projects out of the same wave; together they peak near 20 GB and get the 16 GB ubuntu-latest typecheck runner OOM-killed.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#typecheck-projects-oom-the-ci-runner"
     },
     {
       "path": "config/scripts/ci-dependency-download-cache.test.mjs",
@@ -5825,8 +5835,8 @@
       "removed": 2
     },
     "src/main/runtime/orca-runtime.ts": {
-      "added": 7,
-      "removed": 2
+      "added": 8,
+      "removed": 3
     },
     "src/main/runtime/rpc/methods/artifacts.ts": {
       "added": 3,
@@ -6016,7 +6026,7 @@
       "added": 3,
       "removed": 13
     },
-    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": {
+    "src/renderer/src/components/artifacts/ArtifactListRow.tsx": {
       "added": 2,
       "removed": 3
     },
@@ -6284,9 +6294,13 @@
       "added": 7,
       "removed": 2
     },
+    "src/renderer/src/components/sidebar/visible-worktree-options-from-state.ts": {
+      "added": 4,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/visible-worktrees.ts": {
-      "added": 19,
-      "removed": 1
+      "added": 14,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
       "added": 18,
@@ -7005,8 +7019,8 @@
       "removed": 0
     },
     "src/main/runtime/rpc/dispatcher.ts": {
-      "added": 2,
-      "removed": 1
+      "added": 1,
+      "removed": 0
     },
     "src/main/runtime/rpc/errors.ts": {
       "added": 9,
@@ -7195,6 +7209,10 @@
     "src/shared/workspace-scope.ts": {
       "added": 20,
       "removed": 0
+    },
+    "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts": {
+      "added": 1,
+      "removed": 1
     },
     "tests/e2e/cross-version-wire/cross-version-session-tabs-retirement-proof.unit.test.ts": {
       "added": 1,

@@ -8,6 +8,8 @@ import {
   getPairedDeviceIdsByEnvironment
 } from './workspace-creator-visibility'
 import type { VisibleWorktreeOptions } from './visible-worktrees'
+import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'
+import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/use-workspace-review-filter'
 
 /**
  * Read the store into the filter inputs `computeVisibleWorktrees` decides from.
@@ -45,6 +47,8 @@ export function buildVisibleWorktreeOptionsFromState(
       : EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
     alwaysShowDefaultBranchWorkspace: state.alwaysShowDefaultBranchWorkspace,
     repoMap,
+    workspaceActivity: getWorkspaceActivityFilterContext(state),
+    workspaceReview: getWorkspaceReviewFilterContext(state),
     workspaceHostScope: state.workspaceHostScope,
     visibleWorkspaceHostIds: state.visibleWorkspaceHostIds,
     defaultHostId: getSettingsFocusedExecutionHostId(state.settings),

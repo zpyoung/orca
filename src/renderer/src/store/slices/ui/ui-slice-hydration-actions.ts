@@ -36,7 +36,6 @@ import { normalizeStatusBarUsageMode } from '../../../../../shared/status-bar-us
 import { normalizeBrowserPageZoomLevel } from '../../../../../shared/browser-page-zoom'
 import { normalizeKagiSessionLink } from '../../../../../shared/browser-url'
 import { isReleaseChannel } from '../../../../../shared/release-channel'
-import type { StatusBarItem } from '../../../../../shared/ui-chrome-types'
 import { hydrateWorkspaceActivityWindow } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'
 import { hydrateWorkspaceReviewFilters } from '../../../../../shared/fork-workspace-review-filters/workspace-review-filters'
 import {

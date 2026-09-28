@@ -4,9 +4,9 @@
     {
       "name": "computer-use",
       "sourcePath": "skills/computer-use",
-      "releaseRevision": 4,
-      "packageDigest": "ff60c0d0fcb142047fbb83477b829459cfb57d9e6f7fb715644e2b13aa441bf1",
-      "gitTreeSha": "335986bf5b78557d5d6973eea183eeb2dc527eba",
+      "releaseRevision": 5,
+      "packageDigest": "425634e3ebf27690cc613eaf17b6337b36769153ec6bca85dc4ebf65d4d6b8b4",
+      "gitTreeSha": "b59f27370a41225c22127e91da0c91cd2519f217",
       "files": [
         {
           "path": "SKILL.md",
@@ -22,9 +22,9 @@
     {
       "name": "linear-tickets",
       "sourcePath": "skills/linear-tickets",
-      "releaseRevision": 2,
-      "packageDigest": "2c8a0bae253341fd3147e3fc0b41ab1a298df31f6768be46eee31b7da9a4b059",
-      "gitTreeSha": "01b3a89c1c3209f8b2de1ae05014937b0cfc58b2",
+      "releaseRevision": 3,
+      "packageDigest": "1eab442d048b79ab0b836adf57663ac384988dd79172ec5f14193eb05e037715",
+      "gitTreeSha": "30d9b40144d4a9a07ce12f0d1a9261fd9cf9649b",
       "files": [
         {
           "path": "SKILL.md",
@@ -40,27 +40,27 @@
     {
       "name": "orca-ask",
       "sourcePath": "skills/orca-ask",
-      "releaseRevision": 1,
-      "packageDigest": "077d3ebec8860f9557282b6abb5ffa9f197933fc165f3ef2242c3344550baac0",
-      "gitTreeSha": "dfc8dcb2fbb9ba204c77a3bd0e8a80d414152fef",
+      "releaseRevision": 2,
+      "packageDigest": "61d3162df91b21d14c77d3ed1452a522c9d9b38f7119dd53538bd9af66aadbd3",
+      "gitTreeSha": "c8196ea1610e31449addb63914b3ff7cd2fbdc6e",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3497,
+          "size": 3658,
           "executable": false,
           "classification": "text",
-          "exactSha256": "1539e71fceafbb06881e5d61d5806dc69390d462318edbd477137fcabfc086de",
-          "textNormalizedSha256": "1539e71fceafbb06881e5d61d5806dc69390d462318edbd477137fcabfc086de",
-          "identitySha256": "1539e71fceafbb06881e5d61d5806dc69390d462318edbd477137fcabfc086de"
+          "exactSha256": "74fa11d3c4a0323206887672b2a6f8cd04909a962da9fbb711b411e5d328af91",
+          "textNormalizedSha256": "74fa11d3c4a0323206887672b2a6f8cd04909a962da9fbb711b411e5d328af91",
+          "identitySha256": "74fa11d3c4a0323206887672b2a6f8cd04909a962da9fbb711b411e5d328af91"
         }
       ]
     },
     {
       "name": "orca-cli",
       "sourcePath": "skills/orca-cli",
-      "releaseRevision": 6,
-      "packageDigest": "15b5fd49198b080322a55545932acfb2e8351c88746fac468df73ea999693260",
-      "gitTreeSha": "ae1a86f92d7bf38f4dc161cc0c57e15a74f54832",
+      "releaseRevision": 7,
+      "packageDigest": "0736bcbbb69ed18f9a36a58ad2eda47b6db55b30509953cf5ba5f0032058c535",
+      "gitTreeSha": "572f7952ac451a30a9c2451b472a639b125ee584",
       "files": [
         {
           "path": "SKILL.md",
@@ -76,9 +76,9 @@
     {
       "name": "orca-emulator",
       "sourcePath": "skills/orca-emulator",
-      "releaseRevision": 2,
-      "packageDigest": "54a3b8e534d3e9cb63fab11bfd3690908b21385398da06c618b6fd63851317c5",
-      "gitTreeSha": "bd23a74f2c55b393fe288f9e2806d0ebc028a513",
+      "releaseRevision": 3,
+      "packageDigest": "1dc42e5addc613abd85eba639d4ac36d9c7b3bc6f7186f0a2d54d10dae3f06d3",
+      "gitTreeSha": "110f6ab59bd73428d7de28bd4761d1fc332efa20",
       "files": [
         {
           "path": "SKILL.md",
@@ -94,9 +94,9 @@
     {
       "name": "orca-emulator-android",
       "sourcePath": "skills/orca-emulator-android",
-      "releaseRevision": 2,
-      "packageDigest": "bf670be58d2650274943b32b1abcdc58b135b0ad81f96aaee491f47af32fe2f5",
-      "gitTreeSha": "2dd0b64d4e5ef4748b5fb30fb7bdf0aa13f51084",
+      "releaseRevision": 3,
+      "packageDigest": "c348091d953427fc9800a1d49d94054866348008766879b24ef742cb613dc3d9",
+      "gitTreeSha": "437ed5e35698ee6421386a5a08fe7f8c7cf1a2a7",
       "files": [
         {
           "path": "SKILL.md",
@@ -112,27 +112,27 @@
     {
       "name": "orca-ledger",
       "sourcePath": "skills/orca-ledger",
-      "releaseRevision": 1,
-      "packageDigest": "c5dd4cda2c3463d3f3af9633c5faaf63b9c7b62340612deb0cb0215b5cc35ea6",
-      "gitTreeSha": "c36a4e8681a136746c00e7aed3dab7779da5f1bc",
+      "releaseRevision": 2,
+      "packageDigest": "867d1bce20ec5b674bbd9921611cffc2bb59985209da788219743cfae4e3a185",
+      "gitTreeSha": "8164ad9a69cad5e8dc8ca158ae1e48875e46ace8",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3179,
+          "size": 3340,
           "executable": false,
           "classification": "text",
-          "exactSha256": "c419852107ef8be2d9d9322f4049c29f1237b9963b89b24c4e112b3bb954373c",
-          "textNormalizedSha256": "c419852107ef8be2d9d9322f4049c29f1237b9963b89b24c4e112b3bb954373c",
-          "identitySha256": "c419852107ef8be2d9d9322f4049c29f1237b9963b89b24c4e112b3bb954373c"
+          "exactSha256": "a4e9b4dbe95cca8512f546fc8fb3b7d1467425db94328fe3ba977a1fda22056e",
+          "textNormalizedSha256": "a4e9b4dbe95cca8512f546fc8fb3b7d1467425db94328fe3ba977a1fda22056e",
+          "identitySha256": "a4e9b4dbe95cca8512f546fc8fb3b7d1467425db94328fe3ba977a1fda22056e"
         }
       ]
     },
     {
       "name": "orca-linear",
       "sourcePath": "skills/orca-linear",
-      "releaseRevision": 2,
-      "packageDigest": "86c7e2b1d2712cea280ceac45b2cefcb98591cb25fa46539cc9e159338caa1bb",
-      "gitTreeSha": "2b0b3b3d422f0d9cdb88574e955c345ed4370ea8",
+      "releaseRevision": 3,
+      "packageDigest": "95f52429823e887317046f23b671d05408a947c296e5b2e44e9173dfc1d5aa4e",
+      "gitTreeSha": "8e747165847651926ca54804b012689ebcbd9432",
       "files": [
         {
           "path": "SKILL.md",
@@ -148,9 +148,9 @@
     {
       "name": "orca-per-workspace-env",
       "sourcePath": "skills/orca-per-workspace-env",
-      "releaseRevision": 2,
-      "packageDigest": "b41563e217d38af2ded7d88ea099a9f996a5280f3333e771a2867a0e3f680055",
-      "gitTreeSha": "49103d96472ad790758f14cfc3ed5c69434a6f1b",
+      "releaseRevision": 3,
+      "packageDigest": "103f0671da111c9ad3def6c46da8d432e656878b840e6cc742219f4a3a4dbceb",
+      "gitTreeSha": "58dfb5dc3ad287a6a42625f9d15c7c0c3dfd02ec",
       "files": [
         {
           "path": "SKILL.md",
@@ -166,9 +166,9 @@
     {
       "name": "orchestration",
       "sourcePath": "skills/orchestration",
-      "releaseRevision": 4,
-      "packageDigest": "00d30c68d91693b6210e43c1fca9ba8b8711e31b4d76d1fcbeaa6257209d569f",
-      "gitTreeSha": "23bc2ff6bb9f6e7d17f41734709ac951dbe3ee80",
+      "releaseRevision": 5,
+      "packageDigest": "195f26431ecfb6df41b941b22958a2330b110bac7b7e97004e0b35fe586e41d9",
+      "gitTreeSha": "b0cd1d58b0c317cf7c3726fef7e6b1197c405246",
       "files": [
         {
           "path": "SKILL.md",
