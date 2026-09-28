@@ -1,6 +1,7 @@
 import type { ZodError, ZodIssue } from 'zod'
 import type { KernelAction, OwnerAdapter } from '../../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
+import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
 import {
   KindAgnosticInterventionSchema,
   type Intervention,
@@ -83,6 +84,8 @@ export function evaluateOwnerIntervention<TWorld, TAction extends KernelAction>(
   snapshot: Snapshot<TWorld>
   ledger: WatcherLedger
   enrollment: WatcherEnrollment
+  /** The deviation this reply answers; a message-worker move must target its stalled dispatch. */
+  deviation?: Deviation
 }): OwnerInterventionOutcome<TAction> {
   if (!args.read.ok) {
     return {
@@ -99,6 +102,16 @@ export function evaluateOwnerIntervention<TWorld, TAction extends KernelAction>(
   }
   const intervention = parsed.data
   if (isAgnostic(intervention)) {
+    const deviation = args.deviation
+    if (
+      intervention.kind === 'message-worker' &&
+      (deviation?.kind !== 'stall' || deviation.dispatchId !== intervention.dispatchId)
+    ) {
+      return {
+        status: 'malformed',
+        reason: `message-worker dispatchId ${intervention.dispatchId} does not match the open stall deviation; message-worker only answers a stalled worker.`
+      }
+    }
     return { status: 'agnostic', move: intervention }
   }
   const rejection = args.owner.rejectIntervention(

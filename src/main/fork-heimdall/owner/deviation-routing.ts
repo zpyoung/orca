@@ -37,6 +37,7 @@ import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
 import { deviationIsDispatchScoped } from './deviation-scope'
 import { evaluateOwnerReachability } from './owner-failure'
 import { evaluateOwnerIntervention } from './owner-intervention'
+import { applyOwnerWorkerMessage } from './owner-worker-message'
 import { applyOwnerWorkerStop } from './owner-worker-stop'
 import { issueOwnerReportPath, ownerReportPathForWake, readOwnerReport } from './owner-report-io'
 import { resolveOwnerReportLocation, type OwnerReportLocation } from './owner-report-location'
@@ -76,6 +77,8 @@ export type DeviationRoutingDependencies = {
   ledgerRecord: DeviationRecordDependencies
   answerWorkerQuestion(messageId: string, answer: string): Promise<void>
   stopWorker(dispatchId: string): Promise<WatcherCommandResult>
+  /** Throws `WorkerPromptUndeliverableError` when the worker cannot safely receive it. */
+  messageWorker(dispatchId: string, message: string): Promise<void>
   park(reason: WatcherParkReason): void
 }
 
@@ -185,7 +188,14 @@ export async function driveOwnerDeviation(
     return handleUnreachable(deps, runner, snapshot, ledger, deviation, pending, location)
   }
 
-  const outcome = evaluateOwnerIntervention({ read, owner, snapshot, ledger, enrollment })
+  const outcome = evaluateOwnerIntervention({
+    read,
+    owner,
+    snapshot,
+    ledger,
+    enrollment,
+    deviation
+  })
 
   if (outcome.status === 'malformed' || outcome.status === 'rejected') {
     const reason =
@@ -485,7 +495,16 @@ async function applyAgnosticMove(
     resolveDeviation(deps.ledgerRecord, enrollment.watcherId, pending)
     return
   }
-  const reason = move.kind === 'ask-human' ? move.question : move.rationale
+  let reason: string
+  if (move.kind === 'message-worker') {
+    const refusal = await applyOwnerWorkerMessage(deps, enrollment.watcherId, pending, move)
+    if (refusal === null) {
+      return
+    }
+    reason = refusal
+  } else {
+    reason = move.kind === 'ask-human' ? move.question : move.rationale
+  }
   escalateDeviationToHuman(deps.ledgerRecord, enrollment.watcherId, pending, reason)
   const deviation = decodeOwnerDeviation(pending)
   const ledger = deps.ledgerRecord.ledgerStore.read(enrollment.watcherId)
