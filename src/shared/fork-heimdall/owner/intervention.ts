@@ -52,14 +52,25 @@ export const StopWorkerInterventionSchema = z
   .strict()
 export type StopWorkerIntervention = z.infer<typeof StopWorkerInterventionSchema>
 
+/** Types a reply into a stalled worker's own prompt; valid only for the open stall's dispatch. */
+export const MessageWorkerInterventionSchema = z
+  .object({
+    kind: z.literal('message-worker'),
+    dispatchId: IdSchema,
+    message: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+  })
+  .strict()
+export type MessageWorkerIntervention = z.infer<typeof MessageWorkerInterventionSchema>
+
 export const KindAgnosticInterventionSchema = z.discriminatedUnion('kind', [
   ContinueInterventionSchema,
   AskHumanInterventionSchema,
   AbandonInterventionSchema,
   AnswerWorkerInterventionSchema,
-  StopWorkerInterventionSchema
+  StopWorkerInterventionSchema,
+  MessageWorkerInterventionSchema
 ])
-/** The five moves every kind's owner can make, regardless of what the kind adds. */
+/** The moves every kind's owner can make, regardless of what the kind adds. */
 export type KindAgnosticIntervention = z.infer<typeof KindAgnosticInterventionSchema>
 
 /**

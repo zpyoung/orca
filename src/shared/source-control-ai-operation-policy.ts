@@ -18,8 +18,6 @@ import type {
   SourceControlAiPrCreationDefaults,
   SourceControlAiSettings
 } from './source-control-ai-types'
-import type { CustomAgentId } from './commit-message-agent-spec'
-import type { TuiAgent } from './tui-agent'
 
 function readRepoInstructionOverride(
   instructions: RepoSourceControlAiOverrides['instructionsByOperation'],
@@ -106,7 +104,7 @@ export function resolveActionRecipeForTextOperation(
   source: SourceControlAiSettings,
   repoOverrides: RepoSourceControlAiOverrides | null | undefined,
   operation: SourceControlAiOperation
-): { agentId?: TuiAgent | CustomAgentId | null; commandInputTemplate: string; agentArgs?: string } {
+): SourceControlActionRecipe & { commandInputTemplate: string } {
   const globalRecipe = readSourceControlActionDefault(source.actions, operation)
   const repoRecipe = repoOverrides?.actionOverrides?.[operation]
   const repoInstruction = readRepoInstructionOverride(
@@ -133,6 +131,13 @@ export function resolveActionRecipeForTextOperation(
       : globalRecipe.agentId !== undefined
         ? { agentId: globalRecipe.agentId }
         : {}),
+    ...(repoRecipe?.launchOptions === null
+      ? {}
+      : repoRecipe?.launchOptions
+        ? { launchOptions: repoRecipe.launchOptions }
+        : globalRecipe.launchOptions
+          ? { launchOptions: globalRecipe.launchOptions }
+          : {}),
     ...(repoAgentArgs !== undefined
       ? { agentArgs: repoAgentArgs }
       : globalRecipe.agentArgs !== undefined
@@ -192,19 +197,25 @@ export function resolveSourceControlActionRecipe(input: {
     source.actions,
     input.actionId
   )
-  return repoRecipe
-    ? {
-        ...globalRecipe,
-        commandInputTemplate,
-        ...(repoRecipe.agentId !== undefined ? { agentId: repoRecipe.agentId } : {}),
-        ...(typeof repoRecipe.commandInputTemplate === 'string'
-          ? { commandInputTemplate: repoRecipe.commandInputTemplate.trim() }
-          : {}),
-        ...(typeof repoRecipe.agentArgs === 'string'
-          ? { agentArgs: repoRecipe.agentArgs.trim() }
-          : repoRecipe.agentArgs === null
-            ? { agentArgs: '' }
-            : {})
-      }
-    : { ...globalRecipe, commandInputTemplate }
+  if (!repoRecipe) {
+    return { ...globalRecipe, commandInputTemplate }
+  }
+  const resolved: SourceControlActionRecipe = {
+    ...globalRecipe,
+    commandInputTemplate,
+    ...(repoRecipe.agentId !== undefined ? { agentId: repoRecipe.agentId } : {}),
+    ...(typeof repoRecipe.commandInputTemplate === 'string'
+      ? { commandInputTemplate: repoRecipe.commandInputTemplate.trim() }
+      : {}),
+    ...(typeof repoRecipe.agentArgs === 'string'
+      ? { agentArgs: repoRecipe.agentArgs.trim() }
+      : repoRecipe.agentArgs === null
+        ? { agentArgs: '' }
+        : {}),
+    ...(repoRecipe.launchOptions ? { launchOptions: repoRecipe.launchOptions } : {})
+  }
+  if (repoRecipe.launchOptions === null) {
+    delete resolved.launchOptions
+  }
+  return resolved
 }

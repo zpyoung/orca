@@ -11,6 +11,7 @@ import {
 import AgentCombobox from '@/components/agent/AgentCombobox'
 import { Button } from '@/components/ui/button'
 import { DialogFooter } from '@/components/ui/dialog'
+import { SourceControlAgentLaunchOverridesFields } from './fork-automation-launch-settings/SourceControlAgentLaunchOverridesFields'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -21,12 +22,15 @@ import {
 } from '@/components/ui/select'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
+import type {
+  AgentLaunchOptionSelection,
+  AgentLaunchOverrides
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { SourceControlLaunchActionId } from '../../../../shared/source-control-ai-actions'
 import type { SourceControlAiWriteTarget } from '../../../../shared/source-control-ai-recipe-save'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import { SourceControlAgentCliArgsField } from './SourceControlAgentCliArgsField'
 import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
 import { sourceControlActionRecipeMatchesTarget } from './source-control-action-recipe-match'
 import type { SourceControlAgentScopeNote } from './source-control-agent-action-dialog-result'
@@ -49,6 +53,7 @@ type SourceControlAgentActionDialogFormProps = {
   agentArgs: string
   /** False when the launch would be structured native chat; the field is then absent, not disabled. */
   agentArgsApply: boolean
+  launchOptions: AgentLaunchOptionSelection
   commandTemplate: string
   savedCommandInputTemplate?: string | null
   saveLaunchRecipe: boolean
@@ -62,7 +67,9 @@ type SourceControlAgentActionDialogFormProps = {
   isStarting: boolean
   startLabel: string
   onSelectedAgentChange: (agent: TuiAgent | null) => void
-  onAgentArgsChange: (value: string) => void
+  onLaunchOverridesChange: (
+    updater: (current: AgentLaunchOverrides) => AgentLaunchOverrides
+  ) => void
   onCommandTemplateChange: (value: string) => void
   onSaveLaunchRecipeChange: (value: boolean) => void
   onSaveAgentDefaultChange: (value: string) => void
@@ -95,6 +102,7 @@ export function SourceControlAgentActionDialogForm({
   statusCopy,
   agentArgs,
   agentArgsApply,
+  launchOptions,
   commandTemplate,
   savedCommandInputTemplate,
   saveLaunchRecipe,
@@ -108,7 +116,7 @@ export function SourceControlAgentActionDialogForm({
   isStarting,
   startLabel,
   onSelectedAgentChange,
-  onAgentArgsChange,
+  onLaunchOverridesChange,
   onCommandTemplateChange,
   onSaveLaunchRecipeChange,
   onSaveAgentDefaultChange,
@@ -122,7 +130,8 @@ export function SourceControlAgentActionDialogForm({
     ? {
         agentId: selectedAgent,
         commandInputTemplate: commandTemplate,
-        agentArgs
+        agentArgs,
+        ...(Object.keys(launchOptions).length > 0 ? { launchOptions } : {})
       }
     : null
   const selectedSaveTarget = sourceControlLaunchSaveTargetFromValue(saveTargetValue, repo)
@@ -199,10 +208,13 @@ export function SourceControlAgentActionDialogForm({
           ) : null}
         </div>
 
-        <SourceControlAgentCliArgsField
-          applies={agentArgsApply}
-          value={agentArgs}
-          onChange={onAgentArgsChange}
+        <SourceControlAgentLaunchOverridesFields
+          agent={selectedAgent}
+          agentArgs={agentArgs}
+          agentArgsApply={agentArgsApply}
+          launchOptions={launchOptions}
+          settings={settings}
+          onChange={onLaunchOverridesChange}
         />
 
         <div className="space-y-2">

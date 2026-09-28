@@ -44,6 +44,8 @@ export async function runOwnerDeviationTick(args: {
       readWorkerQuestion: (messageId) =>
         deps.orchestration.readQuestion(args.runner.enrollment, messageId),
       stopWorker: (dispatchId) => deps.orchestration.stopWorker(args.runner.enrollment, dispatchId),
+      messageWorker: (dispatchId, message) =>
+        deps.orchestration.sendWorkerPrompt(args.runner.enrollment, dispatchId, message),
       park: (reason) => args.statusLifecycle.park(args.runner, reason)
     },
     args.runner,

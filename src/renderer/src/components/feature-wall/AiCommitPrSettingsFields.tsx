@@ -7,6 +7,7 @@ import {
   type CommitMessageAgentCapability,
   type CommitMessageModelCapability
 } from '../../../../shared/commit-message-agent-spec'
+import { SOURCE_CONTROL_TEXT_ACTION_IDS } from '../../../../shared/source-control-ai-actions'
 import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
@@ -15,6 +16,13 @@ import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { translate } from '@/i18n/i18n'
 import { commitMessageAgentLabel } from './ai-commit-pr-settings-helpers'
+import type { TextGenerationRecipeOverrides } from './fork-automation-launch-settings/text-generation-recipe-overrides'
+import { RecipeOverrideNote } from './fork-automation-launch-settings/RecipeOverrideNote'
+
+const EMPTY_RECIPE_OVERRIDES: TextGenerationRecipeOverrides = {
+  modelOverriddenBy: [],
+  thinkingOverriddenBy: []
+}
 
 type AiCommitPrSettingsFieldsProps = {
   config: CommitMessageAiSettings
@@ -25,6 +33,7 @@ type AiCommitPrSettingsFieldsProps = {
   activeThinking: string | undefined
   isCustom: boolean
   unsupportedAgentLabel: string | null
+  recipeOverrides?: TextGenerationRecipeOverrides
   onAgentChange: (newAgentId: string) => void
   onModelChange: (newModelId: string) => void
   onThinkingChange: (newLevelId: string) => void
@@ -40,6 +49,7 @@ export function AiCommitPrSettingsFields({
   activeThinking,
   isCustom,
   unsupportedAgentLabel,
+  recipeOverrides = EMPTY_RECIPE_OVERRIDES,
   onAgentChange,
   onModelChange,
   onThinkingChange,
@@ -130,18 +140,27 @@ export function AiCommitPrSettingsFields({
           <Label className="text-xs">
             {translate('auto.components.feature.wall.AiCommitPrSettingsCard.be8917699e', 'Model')}
           </Label>
-          <Select value={activeModel.id} onValueChange={onModelChange}>
-            <SelectTrigger size="sm" className="h-8 w-full text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
-              {activeCapability.models.map((model) => (
-                <SelectItem key={model.id} value={model.id} className="cursor-pointer">
-                  {model.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            <Select
+              value={activeModel.id}
+              onValueChange={onModelChange}
+              disabled={
+                recipeOverrides.modelOverriddenBy.length === SOURCE_CONTROL_TEXT_ACTION_IDS.length
+              }
+            >
+              <SelectTrigger size="sm" className="h-8 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
+                {activeCapability.models.map((model) => (
+                  <SelectItem key={model.id} value={model.id} className="cursor-pointer">
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <RecipeOverrideNote actionIds={recipeOverrides.modelOverriddenBy} />
+          </div>
         </div>
       ) : null}
 
@@ -153,18 +172,28 @@ export function AiCommitPrSettingsFields({
               'Thinking effort'
             )}
           </Label>
-          <Select value={activeThinking} onValueChange={onThinkingChange}>
-            <SelectTrigger size="sm" className="h-8 w-full text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
-              {activeModel.thinkingLevels.map((level) => (
-                <SelectItem key={level.id} value={level.id} className="cursor-pointer">
-                  {level.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            <Select
+              value={activeThinking}
+              onValueChange={onThinkingChange}
+              disabled={
+                recipeOverrides.thinkingOverriddenBy.length ===
+                SOURCE_CONTROL_TEXT_ACTION_IDS.length
+              }
+            >
+              <SelectTrigger size="sm" className="h-8 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
+                {activeModel.thinkingLevels.map((level) => (
+                  <SelectItem key={level.id} value={level.id} className="cursor-pointer">
+                    {level.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <RecipeOverrideNote actionIds={recipeOverrides.thinkingOverriddenBy} />
+          </div>
         </div>
       ) : null}
 

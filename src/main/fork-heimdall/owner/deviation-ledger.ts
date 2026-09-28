@@ -13,7 +13,9 @@ export const OWNER_DEVIATION_ESCALATION_KIND = 'owner-deviation'
 
 export type OwnerDeviationEscalation = EscalationEntry & { escalationKind: 'owner-deviation' }
 
-function isOwnerDeviationEscalation(entry: EscalationEntry): entry is OwnerDeviationEscalation {
+export function isOwnerDeviationEscalation(
+  entry: EscalationEntry
+): entry is OwnerDeviationEscalation {
   return entry.escalationKind === 'owner-deviation'
 }
 

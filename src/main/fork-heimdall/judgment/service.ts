@@ -127,7 +127,7 @@ function withStateNotices(reason: string, notices: readonly string[]): string {
 
 const GENERIC_EVALUATION_FAILURE_REASON = 'judgment unavailable: evaluation failed'
 
-function evaluationFailureReason(error: unknown): string {
+export function evaluationFailureReason(error: unknown): string {
   if (!(error instanceof JudgmentClientFailure)) {
     return GENERIC_EVALUATION_FAILURE_REASON
   }

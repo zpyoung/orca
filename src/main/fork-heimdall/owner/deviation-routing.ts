@@ -29,7 +29,6 @@ import {
   ownerInterventionAcceptedAtMs,
   ownerDeviationWakeToken,
   ownerTurnAwaitingSend,
-  recordDeviation,
   reRaiseDeviation,
   resolveDeviation,
   type DeviationRecordDependencies,
@@ -39,11 +38,11 @@ import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
 import { deviationIsDispatchScoped } from './deviation-scope'
 import { evaluateOwnerReachability } from './owner-failure'
 import { evaluateOwnerIntervention } from './owner-intervention'
+import { applyOwnerWorkerMessage } from './owner-worker-message'
 import { applyOwnerWorkerStop } from './owner-worker-stop'
 import { issueOwnerReportPath, ownerReportPathForWake, readOwnerReport } from './owner-report-io'
 import { resolveOwnerReportLocation, type OwnerReportLocation } from './owner-report-location'
 import { ensureOwnerSession, sendOwnerTurn } from './owner-session'
-import { detectStall } from './stall-detector'
 import { workspaceRuntimeId } from '../orchestration/orchestration-adapter'
 import type { WatcherQuestionState } from '../orchestration/orchestration-contract'
 import type { BudgetClock } from '../budget-clock'
@@ -81,6 +80,8 @@ export type DeviationRoutingDependencies = {
   answerWorkerQuestion(messageId: string, answer: string): Promise<void>
   readWorkerQuestion(messageId: string): Promise<WatcherQuestionState>
   stopWorker(dispatchId: string): Promise<WatcherCommandResult>
+  /** Throws `WorkerPromptUndeliverableError` when the worker cannot safely receive it. */
+  messageWorker(dispatchId: string, message: string): Promise<void>
   park(reason: WatcherParkReason): void
 }
 
@@ -135,9 +136,7 @@ export async function driveOwnerDeviation(
     return 'idle'
   }
   const ledger = deps.ledgerRecord.ledgerStore.read(enrollment.watcherId)
-  const pending =
-    findOldestOpenOwnerDeviation(ledger) ??
-    recordStallIfAny(deps.ledgerRecord, enrollment.watcherId, ledger)
+  const pending = findOldestOpenOwnerDeviation(ledger)
   if (!pending) {
     return 'idle'
   }
@@ -189,7 +188,14 @@ export async function driveOwnerDeviation(
     return handleUnreachable(deps, runner, snapshot, ledger, deviation, pending, location)
   }
 
-  const outcome = evaluateOwnerIntervention({ read, owner, snapshot, ledger, enrollment })
+  const outcome = evaluateOwnerIntervention({
+    read,
+    owner,
+    snapshot,
+    ledger,
+    enrollment,
+    deviation
+  })
 
   if (outcome.status === 'malformed' || outcome.status === 'rejected') {
     const reason =
@@ -274,17 +280,6 @@ export async function driveOwnerDeviation(
     resolveDeviation(deps.ledgerRecord, enrollment.watcherId, pending)
   }
   return 'handled'
-}
-
-/** Records a stalled in-flight dispatch as a deviation, since nothing else ever notices one. */
-function recordStallIfAny(
-  ledgerRecord: DeviationRecordDependencies,
-  watcherId: string,
-  ledger: WatcherLedger
-): OwnerDeviationEscalation | null {
-  const stall = detectStall(ledger, ledgerRecord.now())
-  const recorded = stall ? recordDeviation(ledgerRecord, watcherId, stall) : null
-  return recorded?.status === 'open' ? recorded : null
 }
 
 async function handleUnreachable(
@@ -510,7 +505,16 @@ async function applyAgnosticMove(
     resolveDeviation(deps.ledgerRecord, enrollment.watcherId, pending)
     return
   }
-  const reason = move.kind === 'ask-human' ? move.question : move.rationale
+  let reason: string
+  if (move.kind === 'message-worker') {
+    const refusal = await applyOwnerWorkerMessage(deps, enrollment.watcherId, pending, move)
+    if (refusal === null) {
+      return
+    }
+    reason = refusal
+  } else {
+    reason = move.kind === 'ask-human' ? move.question : move.rationale
+  }
   escalateDeviationToHuman(deps.ledgerRecord, enrollment.watcherId, pending, reason)
   const deviation = decodeOwnerDeviation(pending)
   const ledger = deps.ledgerRecord.ledgerStore.read(enrollment.watcherId)

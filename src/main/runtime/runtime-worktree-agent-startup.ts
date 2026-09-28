@@ -1,4 +1,8 @@
 import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import {
+  agentLaunchOverridesToSessionOptionValues,
+  type AgentLaunchOverrides
+} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { tuiAgentToAgentKind } from '../../shared/agent-kind'
 import type { Repo } from '../../shared/repo-types'
 import type { TuiAgent } from '../../shared/tui-agent'
@@ -124,24 +128,32 @@ export function buildWorktreeStartupForAgent(
     agent: TuiAgent
     prompt?: string
     launchPreferences?: AgentLaunchPreferences
+    launchOverrides?: AgentLaunchOverrides
     toSessionOptions: (
       preferences?: AgentLaunchPreferences
     ) => Parameters<typeof buildAgentStartupPlan>[0]['sessionOptions'] | undefined
   }
 ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
-  const { agent, repo, settings } = environment
+  const { agent, repo, settings, launchOverrides } = environment
   if (!isTuiAgentEnabled(agent, settings.disabledTuiAgents)) {
     throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
   }
+  const overrideAgentArgs = launchOverrides?.agentArgs?.trim()
+    ? launchOverrides.agentArgs
+    : undefined
+  const agentArgs = overrideAgentArgs ?? environment.agentArgs
   const startupPlan = buildAgentStartupPlan({
     ...resolveAgentStartupPlanInputs({
       agent,
       settings,
       platform: environment.getLaunchPlatform(),
       isRemote: repoIsRemote(repo),
-      ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {}),
-      sessionOptions: environment.toSessionOptions(environment.launchPreferences)
+      ...(agentArgs !== undefined ? { agentArgs } : {}),
+      sessionOptions: launchOverrides
+        ? agentLaunchOverridesToSessionOptionValues(launchOverrides)
+        : environment.toSessionOptions(environment.launchPreferences)
     }),
+    includeSessionOptionCatalogDefaults: launchOverrides ? false : undefined,
     prompt: environment.prompt ?? '',
     allowEmptyPromptLaunch: true
   })

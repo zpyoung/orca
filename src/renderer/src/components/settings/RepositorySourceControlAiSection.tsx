@@ -23,8 +23,8 @@ type RepositorySourceControlAiSectionProps = {
 
 /**
  * Per-repo Source Control AI settings — save UX matches global Git / Source Control AI:
- * selects and simple controls persist immediately; each action recipe drafts CLI args +
- * command template until that row's Save (same as global action recipes).
+ * selects and simple controls persist immediately; each action recipe drafts launch options,
+ * CLI args, and its command template until that row's Save.
  */
 export function RepositorySourceControlAiSection({
   repo,
@@ -52,6 +52,7 @@ export function RepositorySourceControlAiSection({
     updateActionAgent,
     updateActionTemplate,
     updateActionAgentArgs,
+    updateActionLaunchOptions,
     appendVariable,
     saveActionRecipeText,
     discardActionRecipeText,
@@ -103,6 +104,7 @@ export function RepositorySourceControlAiSection({
         onActionAgentChange={updateActionAgent}
         onActionTemplateChange={updateActionTemplate}
         onActionAgentArgsChange={updateActionAgentArgs}
+        onActionLaunchOptionsChange={updateActionLaunchOptions}
         onAppendVariable={appendVariable}
         onActionDiscard={discardActionRecipeText}
         onActionSave={(actionId) => void saveActionRecipeText(actionId)}

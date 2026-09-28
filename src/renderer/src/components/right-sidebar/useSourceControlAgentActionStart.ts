@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import type {
   SourceControlActionRecipe,
@@ -20,6 +21,7 @@ type UseSourceControlAgentActionStartArgs = {
   agentArgs: string
   /** False when the launch would be structured native chat, which reads no CLI arguments. */
   agentArgsApply: boolean
+  launchOptions?: AgentLaunchOptionSelection
   commandTemplate: string
   saveLaunchRecipe: boolean
   saveTargetValue: string
@@ -42,6 +44,7 @@ type UseSourceControlAgentActionStartArgs = {
     commandInput: string
     /** Omitted when CLI arguments do not apply, so the launch resolves the global setting. */
     agentArgs?: string
+    launchOptions: AgentLaunchOptionSelection
   }) => boolean | Promise<boolean>
   onSaveAgentDefault?: (
     target: SourceControlAiWriteTarget,
@@ -75,6 +78,7 @@ export function useSourceControlAgentActionStart({
   trimmedCommandInput,
   agentArgs,
   agentArgsApply,
+  launchOptions = {},
   commandTemplate,
   saveLaunchRecipe,
   saveTargetValue,
@@ -112,6 +116,7 @@ export function useSourceControlAgentActionStart({
         commandInput,
         // Why: the previewed command must show what the launch will really apply.
         agentArgs: agentArgsApply ? agentArgs : undefined,
+        launchOptions,
         promptDelivery,
         detectedAgents: currentDetectedAgents,
         connectionUnavailable,
@@ -122,6 +127,7 @@ export function useSourceControlAgentActionStart({
     [
       agentArgs,
       agentArgsApply,
+      launchOptions,
       commandInput,
       connectionUnavailable,
       promptDelivery,
@@ -158,6 +164,7 @@ export function useSourceControlAgentActionStart({
           trimmedCommandInput,
           agentArgs,
           agentArgsApply,
+          launchOptions,
           commandTemplate,
           saveTargetValue: saveLaunchRecipe ? (saveTargetValueOverride ?? saveTargetValue) : 'none',
           actionId,
@@ -188,6 +195,7 @@ export function useSourceControlAgentActionStart({
       actionId,
       agentArgs,
       agentArgsApply,
+      launchOptions,
       buildPlan,
       commandTemplate,
       connectionUnavailable,

@@ -31,6 +31,7 @@ import type { WatcherRunner, WatcherRunnerDependencies } from './runner-state'
 import { WatcherRunnerWorkerLifecycle } from './runner-worker-lifecycle'
 import { releaseEligibleSettledWorkers, workerReleaseConfirmed } from './runner-worker-release'
 import { runOwnerDeviationTick } from './owner/deviation-tick'
+import { runStallScan } from './stall-scan'
 
 export class WatcherRunnerLoop {
   readonly dispatchLifecycle: WatcherLedgerLifecycle
@@ -348,6 +349,7 @@ export class WatcherRunnerLoop {
       // worker-escalation deviation already disabled the watcher earlier this tick (via `park`),
       // so gating this on `enabled` would make its own deviation unreachable the same way a park
       // predicate's used to be. `driveOwnerDeviation` excludes paused watchers itself.
+      await this.scanForStalls(runner)
       if (await this.driveOwner(runner, snapshot)) {
         trace.exitPath = 'gate-held'
         this.publishStatus(runner)
@@ -458,6 +460,22 @@ export class WatcherRunnerLoop {
     if (runner.leaseGuard === guard) {
       runner.leaseGuard = null
     }
+  }
+
+  private scanForStalls(runner: WatcherRunner): Promise<void> {
+    return runStallScan(
+      {
+        ledgerStore: this.dependencies.ledgerStore,
+        orchestration: this.dependencies.orchestration,
+        dispatchLifecycle: this.dispatchLifecycle,
+        statusLifecycle: this.statusLifecycle,
+        schedule: (activeRunner, delayMs) => this.schedule(activeRunner, delayMs),
+        now: () => this.now(),
+        createId: () => this.createId(),
+        ...(this.dependencies.stallCause ? { stallCause: this.dependencies.stallCause } : {})
+      },
+      runner
+    )
   }
 
   private driveOwner(runner: WatcherRunner, snapshot: Snapshot<unknown>): Promise<boolean> {

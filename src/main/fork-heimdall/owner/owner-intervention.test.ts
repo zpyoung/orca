@@ -121,4 +121,43 @@ describe('evaluateOwnerIntervention', () => {
     )
     expect(outcome.reason).not.toContain('too_big')
   })
+
+  it.each([
+    ['another dispatch', { kind: 'stall', dispatchId: 'dispatch-2' }],
+    ['a non-stall deviation', { kind: 'worker-exited', dispatchId: 'dispatch-1', exitTail: null }],
+    ['no deviation', undefined]
+  ] as const)('rejects a message-worker move aimed at %s', (_label, partial) => {
+    const deviation =
+      partial?.kind === 'stall'
+        ? { ...partial, what: 'dispatch-node', inFlightSinceMs: 0, thresholdMs: 1 }
+        : partial
+    const outcome = evaluateOwnerIntervention({
+      read: readOk({ kind: 'message-worker', dispatchId: 'dispatch-1', message: 'Keep both.' }),
+      owner: fakeOwner(null),
+      snapshot,
+      ledger,
+      enrollment,
+      ...(deviation ? { deviation } : {})
+    })
+    expect(outcome.status).toBe('malformed')
+  })
+
+  it('routes a message-worker move for the stalled dispatch', () => {
+    const move = { kind: 'message-worker', dispatchId: 'dispatch-1', message: 'Keep both.' }
+    const outcome = evaluateOwnerIntervention({
+      read: readOk(move),
+      owner: fakeOwner(null),
+      snapshot,
+      ledger,
+      enrollment,
+      deviation: {
+        kind: 'stall',
+        what: 'dispatch-node',
+        dispatchId: 'dispatch-1',
+        inFlightSinceMs: 0,
+        thresholdMs: 1
+      }
+    })
+    expect(outcome).toEqual({ status: 'agnostic', move })
+  })
 })

@@ -32,7 +32,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "有 {{count}} 个监视器需要关注"
+        "attention": "有 {{count}} 个监视器需要关注",
+        "bucket": {
+          "attention": "需要关注",
+          "lostContact": "失去联系",
+          "active": "活跃"
+        }
       },
       "page": {
         "back": "返回",

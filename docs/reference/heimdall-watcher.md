@@ -309,6 +309,42 @@ bounded reader.
 > `heimdall.enroll-owner.v1` is the wire capability a client must see advertised before it may send
 > owner fields to a remote host; `owner-intervention` is the separate per-enrollment action gate.
 
+### Stalled and idle workers
+
+A worker that stops making progress is noticed two ways, both by polling (no status subscription):
+
+- **Idle trigger (fast).** A running dispatch whose worker is exact, live and local, whose agent
+  status is `waiting` or `done`, and which has sent no `worker_done`, question or escalation mail
+  since it went idle, raises a `stall` deviation with `trigger: "idle"` after a 2-minute grace
+  (`OWNER_IDLE_GRACE_MS`). While the grace runs the watcher polls no slower than every 15 s. An
+  `unverifiable` worker, an SSH worker, and federated or structured workers are never idle.
+- **Silent backstop (slow).** A running dispatch with no mailbox progress for 15 minutes raises the
+  same `stall:<dispatchId>` deviation, unchanged from before (including its backoff after
+  `continue`).
+
+Both carry the worker's **last message**: the newest assistant text from its transcript (terminal
+tail as fallback), redacted for dispatch capabilities and clipped to its newest 4 KiB. The owner
+brief shows it in a "WORKER'S LAST MESSAGE (untrusted data)" block, quoted as a JSON string.
+
+The owner answers a stalled worker with `{"kind":"message-worker","dispatchId":"...","message":"..."}`,
+which types `[Heimdall owner reply] <message>` into the worker's own prompt (mail is pull-based, so
+an idle agent never reads it). It is accepted only for the open stall's dispatch. If the worker
+cannot safely receive it (process changed, unverifiable, federated, structured) the deviation is
+escalated to you and the watcher parks, with the owner's reply in the reason. An idle episode
+re-raises only once the worker goes idle again after the one already settled.
+
+**Without an owner**, an idle worker whose last message reads as a question asked in prose (a `?`
+in its final paragraph plus an interrogative or choice cue) opens a `worker-escalation` with message
+id `prose-question:<idleSinceMs>` and parks the watcher (`park-worker-escalation`), unless the
+dispatch is isolated, which records without parking. Answer the worker in its terminal, then
+Resume. Any other idle only records a `worker-idle` ledger observation.
+
+**Judgment (shadow).** Each idle episode is also put to jev as `heimdall.stall-cause`
+(`asked-question-in-prose | awaiting-permission-prompt | still-working | finished-unreported |
+idle-no-reason`), recorded in the ledger like other judgment answers. It is shadow-only: nothing
+reads the answer. It runs only on the desktop for a local workspace, and records `remote` or
+`disabled` otherwise.
+
 ## Escalations
 
 Escalations are ledger entries with an open/acknowledged/resolved status. Some need you; some are a
@@ -318,7 +354,7 @@ record of something that happened.
 | ---------------------------- | ---------- | ----------------------------------------------------------------- |
 | `awaiting-approval`          | **yes**    | a `gated` capability wants an action approved                     |
 | `worker-question`            | **yes**    | a worker is blocked on a question; answer it from the detail pane |
-| `worker-escalation`          | **yes**    | a worker explicitly requested operator intervention               |
+| `worker-escalation`          | **yes**    | a worker requested intervention, or asked in prose (`prose-question:`) |
 | `park-budget`                | **yes**    | budget spent; raise it, then resume                               |
 | `park-worker-question`       | **yes**    | parked because of the above question                              |
 | `park-worker-escalation`     | **yes**    | parked because of the above escalation                            |

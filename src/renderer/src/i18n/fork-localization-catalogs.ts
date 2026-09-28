@@ -82,6 +82,21 @@ import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.j
 import { heimdallCatalogs } from '@/fork-heimdall/localization-catalog'
 import { hostedReviewSitterCatalogs } from '@/fork-hosted-review-sitter/localization-catalog'
 import { heimdallObjectiveCatalogs } from '@/fork-heimdall-objective/localization-catalog'
+import launchFieldsEN from '../components/fork-automation-launch-settings/locales/en.json'
+import launchFieldsES from '../components/fork-automation-launch-settings/locales/es.json'
+import launchFieldsJA from '../components/fork-automation-launch-settings/locales/ja.json'
+import launchFieldsKO from '../components/fork-automation-launch-settings/locales/ko.json'
+import launchFieldsZH from '../components/fork-automation-launch-settings/locales/zh.json'
+import automationLaunchEN from '../components/automations/fork-automation-launch-settings/locales/en.json'
+import automationLaunchES from '../components/automations/fork-automation-launch-settings/locales/es.json'
+import automationLaunchJA from '../components/automations/fork-automation-launch-settings/locales/ja.json'
+import automationLaunchKO from '../components/automations/fork-automation-launch-settings/locales/ko.json'
+import automationLaunchZH from '../components/automations/fork-automation-launch-settings/locales/zh.json'
+import recipeOverridesEN from '../components/feature-wall/fork-automation-launch-settings/locales/en.json'
+import recipeOverridesES from '../components/feature-wall/fork-automation-launch-settings/locales/es.json'
+import recipeOverridesJA from '../components/feature-wall/fork-automation-launch-settings/locales/ja.json'
+import recipeOverridesKO from '../components/feature-wall/fork-automation-launch-settings/locales/ko.json'
+import recipeOverridesZH from '../components/feature-wall/fork-automation-launch-settings/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'fr' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -119,7 +134,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.en,
     hostedReviewSitterCatalogs.en,
     heimdallObjectiveCatalogs.en,
-    askQuestionToolEN
+    askQuestionToolEN,
+    launchFieldsEN,
+    automationLaunchEN,
+    recipeOverridesEN
   ],
   es: [
     relayES,
@@ -140,7 +158,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.es,
     hostedReviewSitterCatalogs.es,
     heimdallObjectiveCatalogs.es,
-    askQuestionToolES
+    askQuestionToolES,
+    launchFieldsES,
+    automationLaunchES,
+    recipeOverridesES
   ],
   fr: [heimdallCatalogs.fr, heimdallObjectiveCatalogs.fr],
   ja: [
@@ -162,7 +183,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.ja,
     hostedReviewSitterCatalogs.ja,
     heimdallObjectiveCatalogs.ja,
-    askQuestionToolJA
+    askQuestionToolJA,
+    launchFieldsJA,
+    automationLaunchJA,
+    recipeOverridesJA
   ],
   ko: [
     relayKO,
@@ -183,7 +207,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.ko,
     hostedReviewSitterCatalogs.ko,
     heimdallObjectiveCatalogs.ko,
-    askQuestionToolKO
+    askQuestionToolKO,
+    launchFieldsKO,
+    automationLaunchKO,
+    recipeOverridesKO
   ],
   zh: [
     relayZH,
@@ -204,7 +231,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.zh,
     hostedReviewSitterCatalogs.zh,
     heimdallObjectiveCatalogs.zh,
-    askQuestionToolZH
+    askQuestionToolZH,
+    launchFieldsZH,
+    automationLaunchZH,
+    recipeOverridesZH
   ]
 }
 

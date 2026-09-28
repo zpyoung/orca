@@ -12,6 +12,7 @@ import {
   markDirectWorkItemAgentTrusted,
   resolveDirectWorkItemAgent
 } from '@/lib/launch-work-item-direct-agent-routing'
+import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 
 export type DirectWorkItemAgentLaunchPreparation = {
   launchConnectionId: string | null
@@ -31,6 +32,7 @@ export async function prepareDirectWorkItemAgentLaunch(args: {
   repoId: string
   agentOverride?: TuiAgent
   agentArgs?: string | null
+  launchOptions?: AgentLaunchOptionSelection | null
   repoConnectionId: string | null
   detectedAgentsPromise: Promise<string[]> | null
   latestStore: AppState
@@ -74,6 +76,7 @@ export async function prepareDirectWorkItemAgentLaunch(args: {
   const { startupPlan, draftLaunchedNatively, startupPlanFailed } = buildDirectWorkItemStartup({
     agent: effectiveAgent,
     agentArgs: args.agentArgs,
+    launchOptions: args.launchOptions,
     draftContent: args.draftContent,
     promptDelivery: args.promptDelivery,
     settings: args.settings,

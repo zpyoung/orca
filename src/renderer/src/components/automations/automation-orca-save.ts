@@ -16,6 +16,10 @@ import {
 } from './automation-row-action-dispatch'
 import { buildDraftPrecheck } from './automation-draft-model'
 import { buildAutomationRunContextForRepo } from './automation-run-context'
+import {
+  buildAutomationLaunchOverridesCreateFields,
+  buildAutomationLaunchOverridesUpdateFields
+} from './fork-automation-launch-settings/automation-launch-overrides-save'
 import { resolveAutomationSetupDecisionForSave } from './automation-setup-decision'
 import {
   createAutomationOnDestination,
@@ -30,7 +34,8 @@ export async function saveOrcaAutomation(
   context: AutomationSaveContext,
   time: { hour: number; minute: number; now: number }
 ): Promise<void> {
-  const { store, local, setup, destination, destinationForm, pageRefresh } = context
+  const { store, local, setup, destination, destinationForm, pageRefresh, launchOverridesGate } =
+    context
   const { repos, projectHostSetups } = store
   const {
     draft,
@@ -80,6 +85,14 @@ export async function saveOrcaAutomation(
   const rawGrace = Number(draft.missedRunGraceMinutes)
   const missedRunGraceMinutes = Number.isFinite(rawGrace) ? Math.max(0, rawGrace) : 720
   const precheck = buildDraftPrecheck(draft)
+  const launchOverridesCreateFields = buildAutomationLaunchOverridesCreateFields(
+    draft.launchOverrides,
+    launchOverridesGate
+  )
+  const launchOverridesUpdateFields = buildAutomationLaunchOverridesUpdateFields(
+    draft.launchOverrides,
+    launchOverridesGate
+  )
   const reposForDraft = editingAutomationId !== null ? dialogRepos : repos
   const setupResolution =
     editingAutomationId !== null
@@ -159,6 +172,7 @@ export async function saveOrcaAutomation(
     prompt: draft.prompt,
     precheck,
     agentId: draft.agentId,
+    ...launchOverridesUpdateFields,
     runContext,
     projectId: draft.projectId,
     workspaceMode: draft.workspaceMode,
@@ -178,6 +192,7 @@ export async function saveOrcaAutomation(
     prompt: draft.prompt,
     precheck,
     agentId: draft.agentId,
+    ...launchOverridesCreateFields,
     runContext,
     projectId: draft.projectId,
     workspaceMode: draft.workspaceMode,

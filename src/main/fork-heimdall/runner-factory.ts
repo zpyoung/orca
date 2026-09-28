@@ -36,6 +36,7 @@ export function createWatcherRunner(
     traces,
     leaseGuard: null,
     leaseRenewal: null,
-    ownerBudgetInterval: null
+    ownerBudgetInterval: null,
+    idleRecheckAtMs: null
   }
 }

@@ -113,7 +113,8 @@ describe('CommitMessageAiPane', () => {
           customAgentCommand: '',
           actions: {
             fixChecks: {
-              agentId: 'codex'
+              agentId: 'codex',
+              agentArgs: '--verbose'
             }
           },
           prCreationDefaults: {},
@@ -139,7 +140,7 @@ describe('CommitMessageAiPane', () => {
           selectedThinkingByModel: {},
           instructionsByOperation: {},
           customAgentCommand: '',
-          actions: {},
+          actions: { fixChecks: { agentArgs: '--verbose' } },
           prCreationDefaults: {},
           launchActionDefaults: {}
         }
@@ -179,7 +180,7 @@ describe('CommitMessageAiPane', () => {
           selectedThinkingByModel: {},
           instructionsByOperation: {},
           customAgentCommand: '',
-          actions: {},
+          actions: { fixChecks: { agentArgs: '--verbose' } },
           prCreationDefaults: {},
           launchActionDefaults: {}
         }

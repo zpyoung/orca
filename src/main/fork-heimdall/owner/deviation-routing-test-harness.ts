@@ -188,6 +188,7 @@ export function baseDeps(ledgerStore: MemoryLedgerStore): TestRoutingDependencie
       status: 'pending'
     })),
     stopWorker: vi.fn(async () => ({ status: 'applied' as const, appliedAtMs: ++clock })),
+    messageWorker: vi.fn(async () => {}),
     park: vi.fn(),
     notifyApproval
   }

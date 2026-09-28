@@ -32,7 +32,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "확인이 필요한 감시자 {{count}}개"
+        "attention": "확인이 필요한 감시자 {{count}}개",
+        "bucket": {
+          "attention": "확인 필요",
+          "lostContact": "연락 두절",
+          "active": "활성"
+        }
       },
       "page": {
         "back": "뒤로",

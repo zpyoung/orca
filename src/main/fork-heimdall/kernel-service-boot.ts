@@ -23,6 +23,8 @@ import { mintCoordinatorIdentity } from './orchestration/coordinator-identity'
 import { RuntimeHeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { RegisteredWatcherKind, WatcherKindRegistry } from './registry'
 import { WatcherRunnerLoop } from './runner-loop'
+import { createStallCauseJudge } from './judgment/stall-cause-judge'
+import type { JudgmentPersistencePort } from './judgment/store'
 import type { RunnerBudgetClock, WatcherRunner } from './runner-state'
 
 export type HeimdallKernelServiceBootContext = {
@@ -36,6 +38,7 @@ export type HeimdallKernelServiceBootContext = {
   onResume: () => void
   activateHandoff: (sitter: WatcherEnrollment, kind: RegisteredWatcherKind) => void
   listEntry: (record: EnrollmentRecord) => WatcherListEntry
+  judgmentPersistence: () => JudgmentPersistencePort
 }
 
 export type HeimdallKernelServiceBoot = {
@@ -145,6 +148,7 @@ export function bootHeimdallKernelService(
       resolveWorkspaceTarget: (key) => host.resolveLeaseTarget(key),
       ensureRun: (enrollment) => orchestration.ensureRun(enrollment)
     },
+    stallCause: createStallCauseJudge(context.judgmentPersistence(), context.storageAuthority),
     onStatus: () => context.publishChanged(),
     persistEnabled: (enrollment, enabled) => {
       const updated = enrollments.setEnabled(enrollment.watcherId, enabled)
