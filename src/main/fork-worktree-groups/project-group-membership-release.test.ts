@@ -16,14 +16,17 @@ vi.mock('electron', () => ({
 
 async function createStore() {
   const { Store } = await import('../persistence')
-  return new Store({ dataFile: join(dataDir, 'orca-data.json') })
+  const { createSqliteTestStore } = await import('../persistence-test-harness')
+  return createSqliteTestStore(Store, { dataFile: join(dataDir, 'orca-data.json') })
 }
 
 beforeEach(() => {
   dataDir = mkdtempSync(join(tmpdir(), 'orca-project-groups-'))
 })
 
-afterEach(() => {
+afterEach(async () => {
+  const { closeTestStores } = await import('../persistence-test-harness')
+  await closeTestStores()
   rmSync(dataDir, { recursive: true, force: true })
 })
 
