@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import { posix, win32 } from 'node:path'
 import { getSshTargetIdForExecutionHost, type ExecutionHostId } from '../../shared/execution-host'
 import type { DirEntry } from '../../shared/filesystem-entry-types'
@@ -7,7 +7,7 @@ import { getRegisteredSshState } from '../ssh/ssh-target-registry'
 
 export type LeaseHostFilesystem = Pick<
   IFilesystemProvider,
-  'readDir' | 'readFile' | 'writeFile' | 'stat' | 'createDir' | 'createDirNoClobber'
+  'readDir' | 'readFile' | 'writeFile' | 'rename' | 'stat' | 'createDir' | 'createDirNoClobber'
 >
 
 export type LeasePathFlavor = typeof posix | typeof win32
@@ -45,6 +45,9 @@ export function createLocalLeaseFilesystem(): LeaseHostFilesystem {
     },
     async writeFile(path, content) {
       await writeFile(path, content, { encoding: 'utf8', mode: 0o600 })
+    },
+    async rename(oldPath, newPath) {
+      await rename(oldPath, newPath)
     },
     async stat(path) {
       const value = await stat(path)

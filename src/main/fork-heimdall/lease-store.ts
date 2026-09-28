@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
 import type { DirEntry } from '../../shared/filesystem-entry-types'
@@ -263,7 +264,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
       if (current.holder !== holder) {
         throw new LeaseLostError(`Lease epoch ${epoch} is not held by ${holder}`)
       }
-      await location.fs.writeFile(holderPath, JSON.stringify({ ...current, released: true }))
+      await this.publishHolderRecord(location, epoch, { ...current, released: true })
       const currentEpochAfterRelease = highestEpoch(
         await location.fs.readDir(location.leaseDirectory)
       )
@@ -354,7 +355,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
         `Lease epoch ${epoch} was fenced before its holder record could be published`
       )
     }
-    await location.fs.writeFile(this.holderPath(location, epoch), JSON.stringify(record))
+    await this.publishHolderRecord(location, epoch, record)
     const currentEpochAfterPublish = highestEpoch(
       await location.fs.readDir(location.leaseDirectory)
     )
@@ -412,10 +413,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
       const renewalDue =
         lastRenewedAtMs === undefined || ownerNow - lastRenewedAtMs >= Math.floor(ttlMs / 3)
       if (renew && renewalDue) {
-        await location.fs.writeFile(
-          holderPath,
-          JSON.stringify({ ...current, ttlMs, released: false })
-        )
+        await this.publishHolderRecord(location, epoch, { ...current, ttlMs, released: false })
         this.renewedAtMs.set(renewalKey, ownerNow)
       }
       const currentEpochAfterVerification = highestEpoch(
@@ -427,6 +425,21 @@ export class HostRoutedLeaseStore implements LeaseStore {
         )
       }
     })
+  }
+
+  // Why rename: an in-place write truncates first, and a competing reader must never parse a
+  // half-written record as incomplete while the lease is live.
+  private async publishHolderRecord(
+    location: ResolvedLeaseLocation,
+    epoch: number,
+    record: LeaseHolderRecord
+  ): Promise<void> {
+    const stagingPath = location.pathFlavor.join(
+      this.epochPath(location, epoch),
+      `holder.${randomUUID()}.tmp`
+    )
+    await location.fs.writeFile(stagingPath, JSON.stringify(record))
+    await location.fs.rename(stagingPath, this.holderPath(location, epoch))
   }
 
   private async isExpiredByHostClock(

@@ -10,7 +10,10 @@ the invariant this enforces.
 ## Claude terminal readiness from the visible screen
 
 **What:** a Claude Code ready-prompt rule in `src/main/runtime/terminal-wait-detection.ts` (the last
-`❯` prompt carries the empty-input `Try "…"` placeholder), and a `tui-idle` visible-screen probe in
+`❯` prompt carries the empty-input `Try "…"` placeholder before the first turn; after one, the input
+is empty and the last spinner-glyph row since the submitted prompt is a finished-turn summary such
+as `✻ Brewed for 1s`, not a live `✶ Flambéing…` or a `Thought for` row), and a `tui-idle`
+visible-screen probe in
 `src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts` that re-arms every second while
 the waiter is pending and the screen is still the only usable evidence; `runtime-terminal-wait.ts`
 starts that probe for a Claude pane even when a short preview exists, because the preview holds
@@ -21,7 +24,8 @@ process no longer proves idle for a known agent, so a Claude pane can settle onl
 `✳` title or ready-prompt body. Claude Code 2.1.28x paints no OSC title at all and draws with
 cursor moves, so the runtime's newline tail stays empty and the body check never sees it; the
 visible-screen probe that covers such panes looked once, before Claude's first frame. Every Claude
-terminal worker start therefore times out at `agent_readiness` (ledger bug-195). Both halves sit
+terminal worker start therefore times out at `agent_readiness` (ledger bug-195), and a `tui-idle`
+wait on a pane that has already finished a turn times out too (bug-196). Both halves sit
 in upstream's shared readiness path; a fork copy would have to be replayed every release.
 
 **Evidence:** `src/main/runtime/__fixtures__/claude-code-{ready-cold-start,busy-mid-turn,idle-after-turn}.txt`,

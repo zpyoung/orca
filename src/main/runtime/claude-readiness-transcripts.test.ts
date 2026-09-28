@@ -45,8 +45,7 @@ describe('Claude Code ready prompt, decided by captured transcripts', () => {
   const cases = [
     { name: 'claude-code-ready-cold-start', ready: true },
     { name: 'claude-code-busy-mid-turn', ready: false },
-    // Idle, but with no placeholder and no title there is no positive evidence to settle on.
-    { name: 'claude-code-idle-after-turn', ready: false }
+    { name: 'claude-code-idle-after-turn', ready: true }
   ] as const
 
   for (const transcript of cases) {
@@ -72,6 +71,51 @@ describe('Claude Code ready prompt on a worker screen', () => {
       '  \u23f5\u23f5 bypass permissions on (shift+tab to cycle) \u00b7 \u2190 for agents'
     ]
     expect(isKnownReadyPromptPreview(screen.join('\n'))).toBe(true)
+  })
+})
+
+describe('Claude Code ready prompt after a turn', () => {
+  const rule = '\u2500'.repeat(120)
+  const screenAfter = (rows: string[], input = '\u276f ') =>
+    ['\u276f Reply with the single word done.', '', ...rows, '', rule, input, rule].join('\n')
+
+  it('is ready once the turn summary replaces the spinner row', () => {
+    expect(
+      isKnownReadyPromptPreview(screenAfter(['\u23fa done', '', '\u273b Brewed for 1s']))
+    ).toBe(true)
+  })
+
+  it('stays busy while the last spinner row is live or a thinking row', () => {
+    expect(
+      isKnownReadyPromptPreview(
+        screenAfter([
+          '\u273b Brewed for 1s',
+          '\u2736 Flamb\u00e9ing\u2026 (12s \u00b7 \u2193 115 tokens)'
+        ])
+      )
+    ).toBe(false)
+    expect(isKnownReadyPromptPreview(screenAfter(['\u273b Thought for 3s']))).toBe(false)
+  })
+
+  it("does not reuse the previous turn's summary for a newly submitted prompt", () => {
+    const screen = [
+      '\u273b Brewed for 1s',
+      '',
+      '\u276f Now reply with ok.',
+      '',
+      rule,
+      '\u276f ',
+      rule
+    ].join('\n')
+    expect(isKnownReadyPromptPreview(screen)).toBe(false)
+  })
+
+  it('is not ready while text sits in the input box', () => {
+    expect(
+      isKnownReadyPromptPreview(
+        screenAfter(['\u273b Brewed for 1s'], '\u276f half-typed follow-up')
+      )
+    ).toBe(false)
   })
 })
 

@@ -141,13 +141,6 @@ export class RuntimeTerminalWait {
             this.waiters.resolve(waiter, buildPtyTerminalWaitResult(handle, condition, live.pty))
           } else {
             this.polls.startPty(waiter, live.pty)
-            console.warn(
-              '[DBG-wait-pty]',
-              handle,
-              live.pty.lastAgentStatus,
-              this.deps.getPaneAgent(live.pty.ptyId),
-              livePtyWaitText.length
-            )
             if (
               tuiIdleNeedsVisibleScreenProbe(
                 live.pty.lastAgentStatus,
@@ -246,13 +239,6 @@ export class RuntimeTerminalWait {
             // while the last OSC title is still "working"; keep polling the
             // preview/title until the waiter resolves or hits its timeout.
             this.polls.startLeaf(waiter, live.leaf)
-            console.warn(
-              '[DBG-wait-leaf]',
-              handle,
-              live.leaf.lastAgentStatus,
-              this.deps.getPaneAgent(live.leaf.ptyId),
-              liveLeafWaitText.length
-            )
             if (
               tuiIdleNeedsVisibleScreenProbe(
                 live.leaf.lastAgentStatus,

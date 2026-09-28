@@ -4320,7 +4320,7 @@
     },
     {
       "path": "src/main/runtime/terminal-wait-detection.ts",
-      "reason": "Recognize Claude Code's cold-start input box as a ready prompt, since Claude paints no idle title.",
+      "reason": "Recognize Claude Code's cold-start input box and finished-turn summary as a ready prompt, since Claude paints no idle title.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
     },

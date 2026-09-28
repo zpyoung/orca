@@ -100,10 +100,15 @@ function findKnownReadyPromptIndex(normalized: string): number | null {
 
 const CLAUDE_PROMPT_GLYPH = '\u276f'
 const CLAUDE_EMPTY_INPUT_PLACEHOLDER = 'try "'
+const CLAUDE_SPINNER_ROW_RE = /^[\u00b7\u2722\u2733\u2736\u273b\u273d] \S/
+// Why not `thought`: a mid-turn thinking row shares the summary's `<verb> for <duration>` shape.
+const CLAUDE_TURN_SUMMARY_RE =
+  /^[\u00b7\u2722\u2733\u2736\u273b\u273d] (?!thought )[\p{L}'-]+ for \d/u
 
-// Why the placeholder: Claude Code paints no idle OSC title, and it draws `Try "…"` only in the
-// empty input box of a session with no turns, so the last prompt carrying it proves a cold start.
-// No banner check: SessionStart hook output routinely pushes the banner off the visible screen.
+// Why the screen: Claude Code paints no idle OSC title. `Try "…"` fills the empty input box only
+// before the first turn; after one, the proof is a past-tense summary row (`✻ Brewed for 1s`)
+// where the live spinner row (`✶ Flambéing…`) stood. No banner check: SessionStart hook output
+// routinely pushes the banner off the visible screen.
 function findClaudeReadyPromptIndex(normalized: string): number | null {
   const promptIndex = normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH)
   if (promptIndex === -1) {
@@ -116,7 +121,35 @@ function findClaudeReadyPromptIndex(normalized: string): number | null {
   ) {
     cursor += 1
   }
-  return normalized.startsWith(CLAUDE_EMPTY_INPUT_PLACEHOLDER, cursor) ? promptIndex : null
+  if (normalized.startsWith(CLAUDE_EMPTY_INPUT_PLACEHOLDER, cursor)) {
+    return promptIndex
+  }
+  return isClaudeInputEmpty(normalized, promptIndex) &&
+    endsClaudeTurnWithSummary(normalized, promptIndex)
+    ? promptIndex
+    : null
+}
+
+function isClaudeInputEmpty(normalized: string, promptIndex: number): boolean {
+  const lineEnd = normalized.indexOf('\n', promptIndex)
+  return (
+    normalized
+      .slice(promptIndex + CLAUDE_PROMPT_GLYPH.length, lineEnd === -1 ? undefined : lineEnd)
+      .trim() === ''
+  )
+}
+
+/** Whether the last spinner-glyph row since the last submitted prompt is a finished-turn summary. */
+function endsClaudeTurnWithSummary(normalized: string, promptIndex: number): boolean {
+  const submittedIndex =
+    promptIndex > 0 ? normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH, promptIndex - 1) : -1
+  const spinnerRows = normalized
+    .slice(submittedIndex + 1, promptIndex)
+    .split('\n')
+    .map((line) => line.trimStart())
+    .filter((line) => CLAUDE_SPINNER_ROW_RE.test(line))
+  const lastRow = spinnerRows.at(-1)
+  return lastRow !== undefined && CLAUDE_TURN_SUMMARY_RE.test(lastRow)
 }
 
 /**

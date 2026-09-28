@@ -99,6 +99,15 @@ describe('related and files selection modes', () => {
     expect(() => parseSelectMode({ select: 'related' })).toThrow('--files-from')
     expect(() => parseSelectMode({ 'files-from': 'list.txt' })).toThrow('--select')
     expect(parseSelectMode({})).toEqual({ select: null, filesFrom: null })
+    for (const lane of ['shell', 'e2e']) {
+      expect(() => parseSelectMode({ lane, select: 'related', 'files-from': 'list.txt' })).toThrow(
+        'unit lane'
+      )
+    }
+    expect(parseSelectMode({ lane: 'unit', select: 'related', 'files-from': 'list.txt' })).toEqual({
+      select: 'related',
+      filesFrom: 'list.txt'
+    })
     expect(parseSelectMode({ select: 'files', 'files-from': 'list.txt' })).toEqual({
       select: 'files',
       filesFrom: 'list.txt'

@@ -18,7 +18,7 @@ class MemoryFilesystem {
   readonly files = new Map<string, { content: string; mtime: number }>()
   now = 1_000
   fail = false
-  beforeWriteFile: ((path: string, content: string) => Promise<void>) | null = null
+  beforePublish: ((path: string, content: string) => Promise<void>) | null = null
   beforeStat: ((path: string) => Promise<void>) | null = null
 
   private check(): void {
@@ -54,8 +54,24 @@ class MemoryFilesystem {
 
   async writeFile(path: string, content: string): Promise<void> {
     this.check()
-    await this.beforeWriteFile?.(path, content)
+    // Real writes truncate before they write, so a concurrent reader can see an empty file.
+    const existing = this.files.get(path)
+    if (existing) {
+      existing.content = ''
+    }
+    await this.beforePublish?.(path, content)
     this.files.set(path, { content, mtime: this.now })
+  }
+
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    this.check()
+    const file = this.files.get(oldPath)
+    if (!file) {
+      throw Object.assign(new Error('not found'), { code: 'ENOENT' })
+    }
+    await this.beforePublish?.(newPath, file.content)
+    this.files.delete(oldPath)
+    this.files.set(newPath, file)
   }
 
   async stat(path: string): Promise<{ size: number; type: 'file' | 'directory'; mtime: number }> {
@@ -257,6 +273,34 @@ describe('host-routed epoch lease', () => {
     }
   )
 
+  it('keeps the live holder record readable while a renewal publishes', async () => {
+    const fs = new MemoryFilesystem()
+    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const firstStore = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const secondStore = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    await firstStore.acquireOrRenew(key, 'owner-a', 90_000)
+    const barrier = createOperationBarrier()
+    const holderPath = '/workspace/.orca/heimdall/lease/epoch-1/holder.json'
+    fs.beforePublish = async (path) => {
+      if (path === holderPath) {
+        await barrier.wait()
+      }
+    }
+
+    const renewing = firstStore.acquireOrRenew(key, 'owner-a', 90_000)
+    await barrier.reached
+    await expect(secondStore.acquireOrRenew(key, 'owner-b', 90_000)).resolves.toMatchObject({
+      status: 'refused',
+      reason: 'held-by-other',
+      holder: 'owner-a',
+      epoch: 1
+    })
+    barrier.release()
+
+    await expect(renewing).resolves.toMatchObject({ status: 'held', epoch: 1 })
+    expect([...fs.files.keys()].filter((path) => path.endsWith('.tmp'))).toEqual([])
+  })
+
   it('rechecks the highest epoch after publishing a holder record', async () => {
     const fs = new MemoryFilesystem()
     const key = makeWorkspaceKey('ssh:host-a', '/workspace')
@@ -268,7 +312,7 @@ describe('host-routed epoch lease', () => {
     })
     const barrier = createOperationBarrier()
     const holderPath = '/workspace/.orca/heimdall/lease/epoch-1/holder.json'
-    fs.beforeWriteFile = async (path) => {
+    fs.beforePublish = async (path) => {
       if (path === holderPath) {
         await barrier.wait()
       }
@@ -321,7 +365,7 @@ describe('host-routed epoch lease', () => {
       const holderPath = '/workspace/.orca/heimdall/lease/epoch-1/holder.json'
       const barrier = createOperationBarrier()
       let renewalBlocked = false
-      fs.beforeWriteFile = async (path, content) => {
+      fs.beforePublish = async (path, content) => {
         if (path === holderPath && !renewalBlocked && releasedState(content) === false) {
           renewalBlocked = true
           await barrier.wait()
@@ -370,7 +414,7 @@ describe('host-routed epoch lease', () => {
     const barrier = createOperationBarrier()
     const holderPath = '/workspace/.orca/heimdall/lease/epoch-1/holder.json'
     let renewalBlocked = false
-    fs.beforeWriteFile = async (path, content) => {
+    fs.beforePublish = async (path, content) => {
       if (path === holderPath && !renewalBlocked && releasedState(content) === false) {
         renewalBlocked = true
         await barrier.wait()
@@ -443,7 +487,7 @@ describe('host-routed epoch lease', () => {
     const barrier = createOperationBarrier()
     const holderPath = '/workspace/.orca/heimdall/lease/epoch-1/holder.json'
     let releaseBlocked = false
-    fs.beforeWriteFile = async (path, content) => {
+    fs.beforePublish = async (path, content) => {
       if (path === holderPath && !releaseBlocked && releasedState(content) === true) {
         releaseBlocked = true
         await barrier.wait()

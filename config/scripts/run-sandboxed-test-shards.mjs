@@ -222,6 +222,9 @@ export function parseSelectMode(values) {
   if (filesFrom === undefined) {
     throw new Error('--select requires --files-from')
   }
+  if (values.lane !== undefined && values.lane !== 'unit') {
+    throw new Error(`--select applies only to the unit lane, not --lane=${values.lane}`)
+  }
   return { select: rawSelect, filesFrom }
 }
 

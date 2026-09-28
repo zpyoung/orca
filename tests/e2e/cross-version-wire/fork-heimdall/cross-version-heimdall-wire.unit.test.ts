@@ -362,11 +362,7 @@ describe('Heimdall cross-version wire registration', () => {
   })
 })
 
-// No release tag carries fork-heimdall yet (the whole feature is unreleased), so there is no real
-// prior build to check out for this one. A reader is rebuilt instead: the current WatcherParkReason
-// union narrowed to the four kinds that predate this capability, run through the same
-// remoteReaderSchema relaxation a real old client would compile. Adding a member later without
-// gating it makes this ratchet fail, the same way it would have caught worker-escalation.
+// Why simulated: no release tag carries fork-heimdall, so there is no older build to read with.
 const BASELINE_PARK_REASON_KINDS = new Set([
   'budget',
   'stop-predicate',
