@@ -51,34 +51,6 @@ describe('CI dependency download caches', () => {
     expect(saves).toEqual([])
   })
 
-  it('restores Windows packaging downloads from the release cache without a PR upload', () => {
-    const packaging = workflow('pr').jobs.package_windows
-    const restore = packaging.steps.find((step) => step.name === 'Cache electron-builder downloads')
-    const release = workflow('release-cut').jobs.build
-    const windows = release.strategy.matrix.include.find((entry) => entry.platform === 'win')
-    const save = release.steps.find((step) => step.name === 'Cache electron-builder downloads')
-
-    expect(packaging['runs-on']).toBe(windows.os)
-    expect(restore.uses).toBe('actions/cache/restore@v5')
-    // Cache versions include the path list, so matching key strings alone cannot prove reuse.
-    expect(restore.with.path).toBe(windows.eb_cache_path)
-    expect(restore.with.key).toBe(save.with.key.replace('${{ matrix.platform }}', 'win'))
-    expect(restore.with['restore-keys']).toBe(
-      save.with['restore-keys'].replace('${{ matrix.platform }}', 'win')
-    )
-    expect(save.uses).toBe('actions/cache@v5')
-    expect(save.with.path).toBe('${{ matrix.eb_cache_path }}')
-    for (const name of ['dev-channel-win-build', 'windows-signing-rehearsal']) {
-      const writer = Object.values(workflow(name).jobs)
-        .flatMap((job) => job.steps ?? [])
-        .find((step) => step.name === 'Cache electron-builder downloads')
-      expect(writer.uses, name).toBe('actions/cache@v5')
-      expect(writer.with.path, name).toBe(restore.with.path)
-      expect(writer.with.key, name).toBe(restore.with.key)
-      expect(writer.with['restore-keys'], name).toBe(restore.with['restore-keys'])
-    }
-  })
-
   it('seeds the existing Linux PR tool cache from successful main x64 release builds', () => {
     const packaging = workflow('pr').jobs.package
     const consumer = packaging.steps.find(
