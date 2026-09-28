@@ -1,4 +1,5 @@
 import type { CanUseTool, OnUserDialog, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
+import { bridgeClaudeAsk } from '../fork-ask-question-tool/native-bridge/claude-native-ask-bridge'
 import type { ClaudePromptRegistry } from './claude-structured-prompt-replies'
 import type { ClaudeStructuredSessionEvent } from './claude-structured-session-state'
 import {
@@ -97,5 +98,5 @@ export function buildClaudePermissionCallbacks(deps: ClaudePermissionCallbackDep
 
   const onUserDialog: OnUserDialog = () => Promise.resolve({ behavior: 'cancelled' })
 
-  return { canUseTool, onUserDialog }
+  return { canUseTool: bridgeClaudeAsk(deps.sessionId, canUseTool), onUserDialog }
 }

@@ -14,6 +14,7 @@ import {
   cancelHandoff,
   commitHandoffAnswer,
   onHandoffAskChanged,
+  resolveForcedHandoff,
   resolveHandoffDispatch,
   updatePartialHandoff,
   waitHandoffChunk
@@ -71,6 +72,18 @@ export const ASK_METHODS = [
       }
       const attribution = await resolveAskAttribution(params, runtime)
       const { registry, roster } = runtime.getAskServices()
+
+      const forced = resolveForcedHandoff(runtime, {
+        handle: attribution.dispatchLookupHandle,
+        paneKey: attribution.paneKey
+      })
+      if (forced) {
+        return registry.register(
+          validation.spec,
+          { paneKey: null, worktreeId: attribution.worktreeId, handoff: forced },
+          { requestId: params.requestId }
+        )
+      }
 
       if (attribution.paneKey && roster.hasCapableOwner(attribution.paneKey)) {
         return registry.register(

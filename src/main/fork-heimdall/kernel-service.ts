@@ -42,10 +42,19 @@ import {
   runnerLedgerStore,
   type HeimdallKernelServiceDependencies
 } from './kernel-service-dependencies'
-import { hasKernelStorage, wakeHeimdallMailboxRunners } from './kernel-runtime-lifecycle'
+import {
+  hasKernelStorage,
+  isOwnedHeimdallRun,
+  wakeHeimdallMailboxRunners
+} from './kernel-runtime-lifecycle'
 import { bootHeimdallKernelService } from './kernel-service-boot'
 import { shutdownHeimdallKernel } from './kernel-shutdown'
 import { setHeimdallMailboxWake } from './mailbox-wake-registry'
+import {
+  clearForcedHandoffPolicy,
+  installForcedHandoffPolicy
+} from '../fork-ask-question-tool/forced-handoff-policy'
+import { sweepOrphanedNativeAsks } from '../fork-ask-question-tool/native-bridge/native-question-handoff'
 import type { KernelTerminalTransition } from './kernel-terminal-transition'
 import type { KernelReadModel } from './kernel-read-model'
 import type { HeimdallLedgerStore } from './ledger-store'
@@ -252,6 +261,11 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     }
     this.ensureLoaded()
     setHeimdallMailboxWake((address) => this.wakeRunnersForMailbox(address))
+    installForcedHandoffPolicy({
+      runtime: this.dependencies.runtime,
+      isForcedRun: (runId) => isOwnedHeimdallRun(this.runners.values(), runId)
+    })
+    sweepOrphanedNativeAsks(this.dependencies.runtime)
   }
 
   private wakeRunnersForMailbox(address: string): void {
@@ -275,6 +289,7 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     }
     this.stopped = true
     setHeimdallMailboxWake(null)
+    clearForcedHandoffPolicy()
     this.shutdownPromise = shutdownHeimdallKernel({
       loaded: this.loaded,
       listeners: this.shutdownListeners,

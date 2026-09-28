@@ -11,13 +11,14 @@ import type {
   AskValidationError
 } from './ask-question-schema'
 
-const MAX_OPTIONS = 12
+export const MAX_ASK_OPTIONS = 12
 const MAX_PATTERN_LENGTH = 200
 export const MAX_PATTERN_TEST_LENGTH = 200
 
 // `secret key` joins `api key` and `private key` as a named credential term, not just `secret`
 // plus an unrelated word.
-const CREDENTIAL_TRIGGER = '(pass(word|phrase)?|secret\\s?key|secret|token|api\\s?key|credential|private\\s?key)'
+const CREDENTIAL_TRIGGER =
+  '(pass(word|phrase)?|secret\\s?key|secret|token|api\\s?key|credential|private\\s?key)'
 const CREDENTIAL_PATTERN = new RegExp(`\\b${CREDENTIAL_TRIGGER}\\b`, 'i')
 const CREDENTIAL_SUBSTRING_PATTERN = new RegExp(CREDENTIAL_TRIGGER, 'i')
 
@@ -51,7 +52,9 @@ function mentionsCredential(value: string): boolean {
     }
     // an unbroken capital run (MYSECRET) has no internal boundary for \b to land
     // on and reads as one opaque token; fall back to a plain substring match.
-    return normalized.split(' ').some((word) => /^[A-Z0-9]+$/.test(word) && CREDENTIAL_SUBSTRING_PATTERN.test(word))
+    return normalized
+      .split(' ')
+      .some((word) => /^[A-Z0-9]+$/.test(word) && CREDENTIAL_SUBSTRING_PATTERN.test(word))
   })
 }
 
@@ -164,7 +167,11 @@ function hasNestedQuantifier(pattern: string): boolean {
       if (compounds && bodyHadQuantifier) {
         return true
       }
-      if (compounds && start !== undefined && hasIdenticalAlternationBranch(pattern.slice(start + 1, i))) {
+      if (
+        compounds &&
+        start !== undefined &&
+        hasIdenticalAlternationBranch(pattern.slice(start + 1, i))
+      ) {
         return true
       }
       if (groupHasQuantifier.length > 0 && (bodyHadQuantifier || compounds)) {
@@ -189,7 +196,13 @@ export const isBoolean = (value: unknown): value is boolean => typeof value === 
 export const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
 
-export function checkOptional<T>(raw: unknown, isValid: (value: unknown) => value is T, path: string, message: string, errors: AskValidationError[]): T | undefined {
+export function checkOptional<T>(
+  raw: unknown,
+  isValid: (value: unknown) => value is T,
+  path: string,
+  message: string,
+  errors: AskValidationError[]
+): T | undefined {
   if (raw === undefined) {
     return undefined
   }
@@ -200,7 +213,12 @@ export function checkOptional<T>(raw: unknown, isValid: (value: unknown) => valu
   return raw
 }
 
-export function validateId(raw: unknown, path: string, errors: AskValidationError[], seenIds: Set<string>): string {
+export function validateId(
+  raw: unknown,
+  path: string,
+  errors: AskValidationError[],
+  seenIds: Set<string>
+): string {
   if (typeof raw !== 'string' || raw.length === 0) {
     errors.push({ path: `${path}.id`, message: 'id is required and must be a non-empty string' })
     return ''
@@ -215,13 +233,20 @@ export function validateId(raw: unknown, path: string, errors: AskValidationErro
   return raw
 }
 
-export function validateQuestionText(raw: unknown, path: string, errors: AskValidationError[]): string {
+export function validateQuestionText(
+  raw: unknown,
+  path: string,
+  errors: AskValidationError[]
+): string {
   if (typeof raw !== 'string' || raw.length === 0) {
     errors.push({ path: `${path}.question`, message: 'question text is required' })
     return ''
   }
   if (mentionsCredential(raw)) {
-    errors.push({ path: `${path}.question`, message: 'credential-shaped question text is not permitted' })
+    errors.push({
+      path: `${path}.question`,
+      message: 'credential-shaped question text is not permitted'
+    })
   }
   return raw
 }
@@ -248,25 +273,45 @@ function validateOption(raw: unknown, path: string, errors: AskValidationError[]
   if (typeof value !== 'string' || value.length === 0) {
     errors.push({ path: `${path}.value`, message: 'option value is required' })
   } else if (mentionsCredential(value)) {
-    errors.push({ path: `${path}.value`, message: 'credential-shaped option value is not permitted' })
+    errors.push({
+      path: `${path}.value`,
+      message: 'credential-shaped option value is not permitted'
+    })
   }
   const label = raw.label
   if (typeof label !== 'string' || label.length === 0) {
     errors.push({ path: `${path}.label`, message: 'option label is required' })
   }
-  checkOptional(raw.description, isString, `${path}.description`, 'description must be a string', errors)
+  checkOptional(
+    raw.description,
+    isString,
+    `${path}.description`,
+    'description must be a string',
+    errors
+  )
   if (raw.preview !== undefined) {
     validatePreview(raw.preview, `${path}.preview`, errors)
   }
-  return { value: typeof value === 'string' ? value : '', label: typeof label === 'string' ? label : '', description: raw.description as string | undefined, preview: raw.preview as AskPreview | undefined }
+  return {
+    value: typeof value === 'string' ? value : '',
+    label: typeof label === 'string' ? label : '',
+    description: raw.description as string | undefined,
+    preview: raw.preview as AskPreview | undefined
+  }
 }
 
-export function validateOptionsQuestion(raw: Record<string, unknown>, path: string, type: 'select' | 'multiselect', common: AskQuestionCommon, errors: AskValidationError[]): AskSelectQuestion | AskMultiselectQuestion {
+export function validateOptionsQuestion(
+  raw: Record<string, unknown>,
+  path: string,
+  type: 'select' | 'multiselect',
+  common: AskQuestionCommon,
+  errors: AskValidationError[]
+): AskSelectQuestion | AskMultiselectQuestion {
   const optionsRaw = Array.isArray(raw.options) ? raw.options : []
   if (!Array.isArray(raw.options) || raw.options.length === 0) {
     errors.push({ path: `${path}.options`, message: 'options must be a non-empty array' })
-  } else if (raw.options.length > MAX_OPTIONS) {
-    errors.push({ path: `${path}.options`, message: `at most ${MAX_OPTIONS} options allowed` })
+  } else if (raw.options.length > MAX_ASK_OPTIONS) {
+    errors.push({ path: `${path}.options`, message: `at most ${MAX_ASK_OPTIONS} options allowed` })
   }
 
   const values = new Set<string>()
@@ -280,29 +325,55 @@ export function validateOptionsQuestion(raw: Record<string, unknown>, path: stri
   const validDefault =
     type === 'select'
       ? typeof defaultValue === 'string' && values.has(defaultValue)
-      : Array.isArray(defaultValue) && defaultValue.every((value) => typeof value === 'string' && values.has(value))
+      : Array.isArray(defaultValue) &&
+        defaultValue.every((value) => typeof value === 'string' && values.has(value))
   if (defaultValue !== undefined && !validDefault) {
-    const message = type === 'select' ? 'default must match one option value' : 'default must be an array of option values'
+    const message =
+      type === 'select'
+        ? 'default must match one option value'
+        : 'default must be an array of option values'
     errors.push({ path: `${path}.default`, message })
   }
-  return { ...common, type, options, default: defaultValue } as AskSelectQuestion | AskMultiselectQuestion
+  return { ...common, type, options, default: defaultValue } as
+    | AskSelectQuestion
+    | AskMultiselectQuestion
 }
 
-export function validateTextQuestion(raw: Record<string, unknown>, path: string, common: AskQuestionCommon, errors: AskValidationError[]): AskTextQuestion {
-  checkOptional(raw.multiline, isBoolean, `${path}.multiline`, 'multiline must be a boolean', errors)
+export function validateTextQuestion(
+  raw: Record<string, unknown>,
+  path: string,
+  common: AskQuestionCommon,
+  errors: AskValidationError[]
+): AskTextQuestion {
+  checkOptional(
+    raw.multiline,
+    isBoolean,
+    `${path}.multiline`,
+    'multiline must be a boolean',
+    errors
+  )
   let patternRegex: RegExp | undefined
   if (raw.pattern !== undefined) {
     if (typeof raw.pattern !== 'string') {
       errors.push({ path: `${path}.pattern`, message: 'pattern must be a string' })
     } else if (raw.pattern.length > MAX_PATTERN_LENGTH) {
-      errors.push({ path: `${path}.pattern`, message: `pattern must be at most ${MAX_PATTERN_LENGTH} characters` })
+      errors.push({
+        path: `${path}.pattern`,
+        message: `pattern must be at most ${MAX_PATTERN_LENGTH} characters`
+      })
     } else if (hasNestedQuantifier(raw.pattern)) {
-      errors.push({ path: `${path}.pattern`, message: 'pattern must not nest repetition (e.g. (a+)+); it can hang the regex engine' })
+      errors.push({
+        path: `${path}.pattern`,
+        message: 'pattern must not nest repetition (e.g. (a+)+); it can hang the regex engine'
+      })
     } else {
       try {
         patternRegex = new RegExp(raw.pattern)
       } catch {
-        errors.push({ path: `${path}.pattern`, message: 'pattern must be a valid regular expression' })
+        errors.push({
+          path: `${path}.pattern`,
+          message: 'pattern must be a valid regular expression'
+        })
       }
     }
   }
@@ -318,7 +389,10 @@ export function validateTextQuestion(raw: Record<string, unknown>, path: string,
     } else {
       if (patternRegex) {
         if (defaultValue.length > MAX_PATTERN_TEST_LENGTH) {
-          errors.push({ path: `${path}.default`, message: `default must be at most ${MAX_PATTERN_TEST_LENGTH} characters when pattern is set` })
+          errors.push({
+            path: `${path}.default`,
+            message: `default must be at most ${MAX_PATTERN_TEST_LENGTH} characters when pattern is set`
+          })
         } else if (!patternRegex.test(defaultValue)) {
           errors.push({ path: `${path}.default`, message: 'default does not match pattern' })
         }
@@ -328,10 +402,22 @@ export function validateTextQuestion(raw: Record<string, unknown>, path: string,
       }
     }
   }
-  return { ...common, type: 'text', multiline: raw.multiline as boolean | undefined, pattern: raw.pattern as string | undefined, format: format as 'email' | 'url' | undefined, default: defaultValue as string | undefined }
+  return {
+    ...common,
+    type: 'text',
+    multiline: raw.multiline as boolean | undefined,
+    pattern: raw.pattern as string | undefined,
+    format: format as 'email' | 'url' | undefined,
+    default: defaultValue as string | undefined
+  }
 }
 
-export function validateNumberQuestion(raw: Record<string, unknown>, path: string, common: AskQuestionCommon, errors: AskValidationError[]): AskNumberQuestion {
+export function validateNumberQuestion(
+  raw: Record<string, unknown>,
+  path: string,
+  common: AskQuestionCommon,
+  errors: AskValidationError[]
+): AskNumberQuestion {
   checkOptional(raw.integer, isBoolean, `${path}.integer`, 'integer must be a boolean', errors)
   const min = checkOptional(raw.min, isFiniteNumber, `${path}.min`, 'min must be a number', errors)
   const max = checkOptional(raw.max, isFiniteNumber, `${path}.max`, 'max must be a number', errors)
@@ -351,15 +437,33 @@ export function validateNumberQuestion(raw: Record<string, unknown>, path: strin
       errors.push({ path: `${path}.default`, message })
     }
   }
-  return { ...common, type: 'number', integer: raw.integer as boolean | undefined, min, max, default: defaultValue as number | undefined }
+  return {
+    ...common,
+    type: 'number',
+    integer: raw.integer as boolean | undefined,
+    min,
+    max,
+    default: defaultValue as number | undefined
+  }
 }
 
-export function validateDateOrConfirmQuestion(type: 'date' | 'confirm', raw: Record<string, unknown>, path: string, common: AskQuestionCommon, errors: AskValidationError[]): AskDateQuestion | AskConfirmQuestion {
+export function validateDateOrConfirmQuestion(
+  type: 'date' | 'confirm',
+  raw: Record<string, unknown>,
+  path: string,
+  common: AskQuestionCommon,
+  errors: AskValidationError[]
+): AskDateQuestion | AskConfirmQuestion {
   const defaultValue = raw.default
   const isValidDefault =
-    type === 'date' ? typeof defaultValue === 'string' && isValidIsoDate(defaultValue) : isBoolean(defaultValue)
+    type === 'date'
+      ? typeof defaultValue === 'string' && isValidIsoDate(defaultValue)
+      : isBoolean(defaultValue)
   if (defaultValue !== undefined && !isValidDefault) {
-    const message = type === 'date' ? 'default must be an ISO 8601 date (YYYY-MM-DD)' : 'default must be a boolean'
+    const message =
+      type === 'date'
+        ? 'default must be an ISO 8601 date (YYYY-MM-DD)'
+        : 'default must be a boolean'
     errors.push({ path: `${path}.default`, message })
   }
   return { ...common, type, default: defaultValue } as AskDateQuestion | AskConfirmQuestion
