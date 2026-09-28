@@ -319,7 +319,8 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       onSuspend: this.onSuspend,
       onResume: this.onResume,
       activateHandoff: (sitter, kind) => this.activateHandoff(sitter, kind),
-      listEntry: (record) => this.listEntry(record)
+      listEntry: (record) => this.listEntry(record),
+      judgmentPersistence: () => this.judgmentPersistence()
     })
     this.database = boot.database
     this.enrollments = boot.enrollments
