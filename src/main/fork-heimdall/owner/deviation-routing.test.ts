@@ -31,6 +31,7 @@ import {
 import { deviationIsDispatchScoped } from './deviation-scope'
 import type { OwnerReportReadResult } from './owner-report-io'
 import { OWNER_STALL_THRESHOLD_MS } from './stall-detector'
+import { runStallScan } from '../stall-scan'
 
 const { ensureOwnerSession, sendOwnerTurn, readOwnerReport, issueOwnerReportPath } = vi.hoisted(
   () => ({
@@ -737,7 +738,25 @@ describe('driveOwnerDeviation: an over-cap reply parks with a readable reason', 
   })
 })
 
-describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other deviation source', () => {
+/** Stall detection runs in the runner loop's scan, just before the owner is driven. */
+async function scanThenDrive(deps: DeviationRoutingDependencies, runner: WatcherRunner) {
+  await runStallScan(
+    {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the scan only reads and appends ledger entries, which MemoryLedgerStore implements.
+      ledgerStore: deps.ledgerRecord.ledgerStore as never,
+      orchestration: { observeWorkerIdle: async () => ({ status: 'active' }) },
+      dispatchLifecycle: { pauseWorker: vi.fn() },
+      statusLifecycle: { parkForWorkerEscalation: vi.fn() },
+      schedule: vi.fn(),
+      now: deps.ledgerRecord.now,
+      createId: deps.ledgerRecord.createId
+    },
+    runner
+  )
+  return driveOwnerDeviation(deps, runner, snapshot)
+}
+
+describe('stall scan then driveOwnerDeviation: a stalled dispatch wakes the owner with no other deviation source', () => {
   it('records a stall deviation and sends the brief when nothing else is pending', async () => {
     const ledgerStore = memoryLedgerStore()
     const thresholdMs = 15 * 60_000
@@ -764,7 +783,7 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
     const deps = baseDeps(ledgerStore)
     deps.ledgerRecord.now = () => thresholdMs + 1
 
-    const outcome = await driveOwnerDeviation(deps, runner, snapshot)
+    const outcome = await scanThenDrive(deps, runner)
     expect(outcome).toBe('handled')
     expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
     const pending = findOldestOpenOwnerDeviation(ledgerStore.read('watcher-1'))
@@ -798,7 +817,7 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
     const deps = baseDeps(ledgerStore)
     deps.ledgerRecord.now = () => nowMs
 
-    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('handled')
+    await expect(scanThenDrive(deps, runner)).resolves.toBe('handled')
     const pending = requireOpenOwnerDeviation(ledgerStore)
     appendAcceptedOwnerReady(ledgerStore, pending)
     readOwnerReport.mockResolvedValue({
@@ -806,7 +825,7 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
       path: '/report/path.json',
       report: { kind: 'continue' }
     })
-    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('handled')
+    await expect(scanThenDrive(deps, runner)).resolves.toBe('handled')
     expect(findOldestOpenOwnerDeviation(ledgerStore.read('watcher-1'))).toBeNull()
 
     const resolved = getLatestEscalations(ledgerStore.read('watcher-1')).find(
@@ -817,11 +836,11 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
     }
 
     nowMs = resolved.atMs + 1
-    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('idle')
+    await expect(scanThenDrive(deps, runner)).resolves.toBe('idle')
     expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
 
     nowMs = resolved.atMs + 2 * thresholdMs + 1
-    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('handled')
+    await expect(scanThenDrive(deps, runner)).resolves.toBe('handled')
     expect(sendOwnerTurn).toHaveBeenCalledTimes(2)
   })
 
@@ -850,14 +869,14 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
     const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
     const deps = baseDeps(ledgerStore)
     deps.ledgerRecord.now = () => thresholdMs + 1
-    await driveOwnerDeviation(deps, runner, snapshot)
+    await scanThenDrive(deps, runner)
     const pending = findOldestOpenOwnerDeviation(ledgerStore.read('watcher-1'))
     if (!pending) {
       throw new Error('Expected open stall deviation')
     }
     escalateDeviationToHuman(deps.ledgerRecord, 'watcher-1', pending, 'operator required')
 
-    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('idle')
+    await expect(scanThenDrive(deps, runner)).resolves.toBe('idle')
     expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
   })
 
@@ -886,7 +905,7 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
     const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
     const deps = baseDeps(ledgerStore)
     deps.ledgerRecord.now = () => thresholdMs + 1
-    await driveOwnerDeviation(deps, runner, snapshot)
+    await scanThenDrive(deps, runner)
     const pendingA = requireOpenOwnerDeviation(ledgerStore)
     escalateDeviationToHuman(deps.ledgerRecord, 'watcher-1', pendingA, 'operator required')
 
@@ -910,7 +929,7 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
       dispatchId: 'dispatch-b'
     })
 
-    const outcome = await driveOwnerDeviation(deps, runner, snapshot)
+    const outcome = await scanThenDrive(deps, runner)
     expect(outcome).toBe('handled')
     const pendingB = requireOpenOwnerDeviation(ledgerStore)
     expect(pendingB.escalationId).toContain('dispatch-b')

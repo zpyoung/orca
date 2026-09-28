@@ -23,6 +23,7 @@ import {
 import type { WatcherRunnerStatusLifecycle } from './runner-status'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 import { releaseSettledWorker } from './runner-worker-release'
+import { appendWorkerEscalation } from './worker-escalation-record'
 import {
   parkedForWorkerQuestion,
   parseWorkerEscalationId,
@@ -425,29 +426,7 @@ export class WatcherRunnerWorkerLifecycle {
     runner: WatcherRunner,
     input: { messageId: string; dispatchId?: string; reason: string }
   ): void {
-    const escalationId = `worker-escalation:${encodeURIComponent(
-      input.dispatchId ?? 'unknown'
-    )}:${encodeURIComponent(input.messageId)}`
-    if (
-      getLatestEscalations(this.dependencies.ledgerStore.read(runner.enrollment.watcherId)).some(
-        (entry) => entry.escalationId === escalationId
-      )
-    ) {
-      return
-    }
-    this.append(runner, {
-      eventId: this.dependencies.createId(),
-      watcherId: runner.enrollment.watcherId,
-      atMs: this.dependencies.now(),
-      origin: 'owner',
-      class: 'fact',
-      kind: 'escalation',
-      escalationId,
-      escalationKind: 'worker-escalation',
-      status: 'open',
-      foldCount: 1,
-      reason: input.reason
-    })
+    appendWorkerEscalation(this.dependencies, runner.enrollment.watcherId, input)
   }
 
   private resolveWorkerEscalations(runner: WatcherRunner, dispatchId: string): void {

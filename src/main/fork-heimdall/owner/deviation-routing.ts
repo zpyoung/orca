@@ -28,7 +28,6 @@ import {
   ownerInterventionSubmissionSubject,
   ownerDeviationWakeToken,
   ownerTurnAwaitingSend,
-  recordDeviation,
   reRaiseDeviation,
   resolveDeviation,
   type DeviationRecordDependencies,
@@ -42,7 +41,6 @@ import { applyOwnerWorkerStop } from './owner-worker-stop'
 import { issueOwnerReportPath, ownerReportPathForWake, readOwnerReport } from './owner-report-io'
 import { resolveOwnerReportLocation, type OwnerReportLocation } from './owner-report-location'
 import { ensureOwnerSession, sendOwnerTurn } from './owner-session'
-import { detectStall } from './stall-detector'
 import { workspaceRuntimeId } from '../orchestration/orchestration-adapter'
 import type { BudgetClock } from '../budget-clock'
 import type { LeaseWorkspaceTarget } from '../lease-store'
@@ -136,9 +134,7 @@ export async function driveOwnerDeviation(
     return 'idle'
   }
   const ledger = deps.ledgerRecord.ledgerStore.read(enrollment.watcherId)
-  const pending =
-    findOldestOpenOwnerDeviation(ledger) ??
-    recordStallIfAny(deps.ledgerRecord, enrollment.watcherId, ledger)
+  const pending = findOldestOpenOwnerDeviation(ledger)
   if (!pending) {
     return 'idle'
   }
@@ -242,17 +238,6 @@ export async function driveOwnerDeviation(
     resolveDeviation(deps.ledgerRecord, enrollment.watcherId, pending)
   }
   return 'handled'
-}
-
-/** Records a stalled in-flight dispatch as a deviation, since nothing else ever notices one. */
-function recordStallIfAny(
-  ledgerRecord: DeviationRecordDependencies,
-  watcherId: string,
-  ledger: WatcherLedger
-): OwnerDeviationEscalation | null {
-  const stall = detectStall(ledger, ledgerRecord.now())
-  const recorded = stall ? recordDeviation(ledgerRecord, watcherId, stall) : null
-  return recorded?.status === 'open' ? recorded : null
 }
 
 function hasAcceptedOwnerInterventionSubmission(

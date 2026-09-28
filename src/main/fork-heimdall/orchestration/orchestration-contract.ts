@@ -20,6 +20,23 @@ export type DispatchObservation =
 
 export type RecoverDispatchResult = DispatchResult | { status: 'absent' }
 
+/** The worker's most recent assistant text, redacted and clipped to its newest bytes. */
+export type WorkerLastMessage = { text: string; truncated: boolean }
+
+/**
+ * Whether a supervised worker has gone quiet at its prompt. Only an exact, live, local terminal
+ * worker can be `idle`; SSH, federated, structured or unproven workers are `unavailable`, never idle.
+ */
+export type WorkerIdleObservation =
+  | {
+      status: 'idle'
+      activity: 'waiting' | 'done'
+      idleSinceMs: number
+      lastMessage: WorkerLastMessage | null
+    }
+  | { status: 'active' }
+  | { status: 'unavailable'; reason: string }
+
 /**
  * Whether a worker question can still receive an answer. `answered`, `closed` and `absent` are all
  * unanswerable: orchestration refuses `answerQuestion` on each, so an escalation still demanding one
@@ -62,6 +79,12 @@ export type HeimdallOrchestrationAdapter = {
   drainMailbox(input: MailboxDrainInput): Promise<LedgerEntry[]>
   answerQuestion(enrollment: WatcherEnrollment, messageId: string, body: string): Promise<void>
   readQuestion(enrollment: WatcherEnrollment, messageId: string): Promise<WatcherQuestionState>
+  observeWorkerIdle(
+    enrollment: WatcherEnrollment,
+    dispatchId: string
+  ): Promise<WorkerIdleObservation>
+  /** Types `text` into the worker's own agent prompt; throws {@link WorkerPromptUndeliverableError}. */
+  sendWorkerPrompt(enrollment: WatcherEnrollment, dispatchId: string, text: string): Promise<void>
 }
 
 export class CoordinatorSeatLostError extends Error {
@@ -83,5 +106,15 @@ export class QuestionAlreadyAnsweredError extends Error {
     const detail = cause instanceof Error ? `: ${cause.message}` : ''
     super(`Question ${messageId} was already answered${detail}`)
     this.name = 'QuestionAlreadyAnsweredError'
+  }
+}
+
+/** The worker cannot safely receive a typed prompt: its process changed, or it is not a local PTY. */
+export class WorkerPromptUndeliverableError extends Error {
+  readonly code = 'worker-prompt-undeliverable'
+
+  constructor(dispatchId: string, reason: string) {
+    super(`Worker ${dispatchId} cannot receive a prompt: ${reason}`)
+    this.name = 'WorkerPromptUndeliverableError'
   }
 }

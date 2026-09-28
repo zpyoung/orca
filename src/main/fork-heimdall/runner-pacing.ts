@@ -1,5 +1,5 @@
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
-import { derivePacing } from '../../shared/fork-heimdall/pacing'
+import { derivePacing, HEIMDALL_RAPID_POLL_MS } from '../../shared/fork-heimdall/pacing'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
 import type { WatcherRunner } from './runner-state'
@@ -19,5 +19,12 @@ export function runnerPacingDelay(
     evaluatedAtMs: nowMs
   })
   trace.pacing = pacing
-  return pacing.delayMs === null ? null : Math.min(pacing.delayMs, pacing.nextFullResyncInMs)
+  if (pacing.delayMs === null) {
+    return null
+  }
+  const delayMs = Math.min(pacing.delayMs, pacing.nextFullResyncInMs)
+  const idleRecheckAtMs = runner.idleRecheckAtMs ?? null
+  return idleRecheckAtMs === null
+    ? delayMs
+    : Math.min(delayMs, HEIMDALL_RAPID_POLL_MS, Math.max(0, idleRecheckAtMs - nowMs))
 }

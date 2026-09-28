@@ -11,6 +11,7 @@ import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration
 import type { LeaseGuard, LeaseStore } from './lease-store'
 import type { OwnerRuntimeDependencies } from './owner/deviation-routing'
 import type { RegisteredWatcherKind } from './registry'
+import type { StallCauseJudgePort } from './stall-scan'
 import type {
   DispatchIntervalHandle,
   DispatchLifecycleBudgetClock,
@@ -52,6 +53,8 @@ export type WatcherRunner = {
   leaseGuard: LeaseGuard | null
   leaseRenewal: { dispose(): void } | null
   ownerBudgetInterval: DispatchIntervalHandle | null
+  /** When an idle worker's grace window ends; pacing wakes no later so the idle trigger fires on time. */
+  idleRecheckAtMs?: number | null
 }
 
 export type WatcherRunnerDependencies = {
@@ -73,4 +76,6 @@ export type WatcherRunnerDependencies = {
   notifyApproval?(enrollment: WatcherEnrollment, action: KernelAction): void
   /** Absent means no owner support is wired at all; every deviation branch stays inert. */
   owner?: OwnerRuntimeDependencies
+  /** Absent means idle workers are never judged; the stall scan itself still runs. */
+  stallCause?: StallCauseJudgePort
 }
