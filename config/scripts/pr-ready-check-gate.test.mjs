@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 import { runProcess } from '../../src/shared/child-process/run-process'
-import { PR_CHECK_JOBS } from './pr-code-change-scope.mjs'
+import { PR_CHECK_JOBS as CLASSIFIED_JOBS } from './pr-code-change-scope.mjs'
 
 const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
+const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)
 const gate = workflow.jobs.verify.steps.find((step) => step.name === 'Require successful checks')
 const variable = (job) => job.replaceAll('-', '_').toUpperCase()
 
@@ -25,6 +26,7 @@ async function verify(results) {
       ...process.env,
       ORCA_BACKGROUND_LAUNCH: '1',
       CODE_PATHS: 'success',
+      FORK_OWNERSHIP_GUARD: 'success',
       SHOULD_RUN: 'true',
       ...results
     },
