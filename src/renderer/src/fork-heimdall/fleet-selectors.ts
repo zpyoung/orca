@@ -1,3 +1,4 @@
+import { isWatcherTickErrorStatus } from '../../../shared/fork-heimdall/watcher-tick-error'
 import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
 
 const STATE_RANK: Record<WatcherFleetEntry['entry']['status']['state'], number> = {
@@ -25,8 +26,8 @@ function attentionRank(row: WatcherFleetEntry): number {
   if (isHeimdallAttentionRow(row)) {
     return STATE_RANK[row.entry.status.state]
   }
-  if (row.contact === 'unverifiable') {
-    return 2
+  if (row.contact === 'unverifiable' || isWatcherTickErrorStatus(row.entry.status)) {
+    return STATE_RANK.unreachable
   }
   return STATE_RANK[row.entry.status.state]
 }

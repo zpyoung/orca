@@ -14,6 +14,7 @@ export type ActiveHeimdallWatcherState = {
   watcherId: string
   kind: WatcherKindId
   state: WatcherStatusState
+  phase: string
   contact: 'live' | 'unverifiable'
   attention: boolean
   observedAtMs: number
@@ -107,6 +108,7 @@ export function useActiveHeimdallWatcherState(
             watcherId: row.target.watcherId,
             kind: row.entry.enrollment.kind,
             state: row.entry.status.state,
+            phase: row.entry.status.phase,
             contact: row.contact,
             observedAtMs: row.observedAtMs,
             attention: isHeimdallAttentionRow(row)

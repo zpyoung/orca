@@ -13,6 +13,7 @@
         "terminal": "완료",
         "disabled": "중지됨",
         "unreachable": "호스트에 연결할 수 없음",
+        "tickError": "오류 · 재시도 중",
         "lostContact": "호스트에 연결할 수 없음 · 마지막 확인 {{age}}",
         "phase": "현재 단계"
       },
