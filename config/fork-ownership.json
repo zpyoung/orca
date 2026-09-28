@@ -4373,6 +4373,12 @@
       "feature": "heimdall",
       "kind": "registration",
       "lines": ["  ['main/fork-heimdall/judgment/client.ts', 1]"]
+    },
+    {
+      "path": "src/main/daemon/serialize-grid-transcript-replay.test.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["KNOWN_PREEXISTING_I2_FAILURES['claude-code-ready-cold-start'] = 8"]
     }
   ],
   "exceptions": [
@@ -5516,6 +5522,36 @@
       "reason": "Migrates session-option command coverage to terminal-tab-scoped runtime targets.",
       "status": "pending-upstream",
       "ledger": "bug-1"
+    },
+    {
+      "path": ".github/workflows/terminal-ime-e2e.yml",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": ".github/workflows/golden-e2e-experiment.yml",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "config/scripts/run-terminal-ibus-hangul-e2e.mjs",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "config/scripts/terminal-ime-e2e-workflow.test.mjs",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "config/scripts/playwright-focused-workflow-selection.test.mjs",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
     }
   ],
   "residuals": {
@@ -7342,6 +7378,10 @@
     "src/main/proxy-guarded-fetch-call-site-audit.test.ts": {
       "added": 2,
       "removed": 1
+    },
+    "src/main/daemon/serialize-grid-transcript-replay.test.ts": {
+      "added": 1,
+      "removed": 0
     }
   }
 }

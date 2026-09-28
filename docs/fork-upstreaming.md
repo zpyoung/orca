@@ -38,6 +38,10 @@ recorded with `config/scripts/capture-agent-pty-transcript.mjs` against Claude C
 - `src/main/runtime/runtime-terminal-wait.ts`
 - `src/main/runtime/claude-readiness-transcripts.test.ts`
 - `src/main/runtime/__fixtures__/claude-code-*.txt` and `.meta.json`
+- `src/main/daemon/serialize-grid-transcript-replay.test.ts`: one registration line adding the
+  cold-start fixture's 8 checkpoints to `KNOWN_PREEXISTING_I2_FAILURES`. Verified with
+  `ORCA_OLD_SERIALIZE_ADDON` built from v1.4.207: all 8 are `both-fail`, with no regression or I1
+  byte diff. Upstream takes this line with the fixture.
 
 **Status:** pending-upstream. Not yet submitted.
 
@@ -672,3 +676,28 @@ stake in.
 **Paths:** `config/scripts/hourly-build-version.test.mjs`.
 
 **Status:** pending-upstream. Not yet submitted.
+
+## Focused Playwright file selection
+
+**Defect:** Playwright 1.63, which v1.4.215 adopted, reads the `--` that `pnpm run test:e2e --
+<spec>` forwards as the end of file selection. The real-IME workflow's deterministic step therefore
+runs all 841 e2e tests instead of `terminal-ime-exact-byte.spec.ts`, and the job times out at 25
+minutes. The golden-e2e workflow and the native IBus runner have the same shape.
+
+**Fork change:** none of its own. It is upstream's fix, #23270 (`dffb3498e2`), cherry-picked whole:
+drop the forwarded `--` from each focused command and add upstream's contract test for it.
+
+**Why upstream, not isolated:** it already is upstream, on `main`. Neither v1.4.215 nor v1.4.216
+carries it, and without an exception the next sync resets these files to a tag that still has the
+bug.
+
+**Paths:**
+
+- `.github/workflows/terminal-ime-e2e.yml`
+- `.github/workflows/golden-e2e-experiment.yml`
+- `config/scripts/run-terminal-ibus-hangul-e2e.mjs`
+- `config/scripts/terminal-ime-e2e-workflow.test.mjs`
+- `config/scripts/playwright-focused-workflow-selection.test.mjs`
+
+**Status:** merged upstream, awaiting a stable tag. Drop these exceptions at the first sync whose tag
+contains `dffb3498e2`.
