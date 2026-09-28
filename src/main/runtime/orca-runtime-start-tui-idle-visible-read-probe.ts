@@ -58,7 +58,7 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
       return
     }
     void withTimeout(
-      this.readTerminal(waiter.handle, {}, {
+      this.readTerminal(waiter.handle, agent === 'antigravity' ? { screen: true } : {}, {
         timeoutMs: providerTimeoutMs,
         retireOnTimeout: true,
         // Why: the ready banner stays in scrollback for the whole session, so
@@ -78,7 +78,10 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
           this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
           return
         }
-        const snapshotText = projection.tail.join('\n')
+        const snapshotText =
+          agent === 'antigravity'
+            ? [...projection.tail, projection.draft ?? ''].join('\n')
+            : projection.tail.join('\n')
         const blockedReason = detectTerminalWaitBlockedReason(snapshotText)
         if (!blockedReason && !isKnownReadyPromptPreview(snapshotText)) {
           this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)

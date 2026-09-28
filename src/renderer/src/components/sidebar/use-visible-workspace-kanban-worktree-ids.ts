@@ -11,6 +11,7 @@ import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
 } from './workspace-creator-visibility'
+import { getStructuredChatWorktreeIds } from './visible-worktree-activity-inputs'
 import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 import { useWorkspaceActivityFilter } from './fork-workspace-activity-window/use-workspace-activity-filter'
 import { useWorkspaceReviewFilter } from './fork-workspace-review-filters/use-workspace-review-filter'
@@ -55,6 +56,9 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
   const browserTabsByWorktree = useAppStore((s) =>
     !showSleepingWorkspaces ? s.browserTabsByWorktree : null
   )
+  const worktreeIdsWithStructuredChat = useAppStore((s) =>
+    getStructuredChatWorktreeIds(showSleepingWorkspaces, s.unifiedTabsByWorktree)
+  )
   const agentStatusEpoch = useAppStore((s) => (!showSleepingWorkspaces ? s.agentStatusEpoch : 0))
   // Why: skip the clock entirely when the epoch is the opt-out sentinel, so a
   // sleeping-workspaces board cannot evict the sample the live boards share.
@@ -86,6 +90,7 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
         ptyIdsByTabId,
         browserTabsByWorktree,
         worktreeIdsWithLiveAgent,
+        worktreeIdsWithStructuredChat,
         hideDefaultBranchWorkspace,
         hideAutomationGeneratedWorkspaces,
         hideCliCreatedWorkspaces,

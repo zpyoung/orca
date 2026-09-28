@@ -43,6 +43,7 @@ function session(
     status,
     hasMore: false,
     loadingEarlier: false,
+    olderHistoryGeneration: 0,
     loadEarlier: vi.fn(),
     readPhase
   }

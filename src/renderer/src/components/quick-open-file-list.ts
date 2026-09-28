@@ -11,7 +11,12 @@ import {
   listRuntimeFiles,
   searchRuntimeFilePaths
 } from '@/runtime/runtime-file-client'
-import { createRuntimeRpcAbortError } from '@/runtime/abortable-runtime-environment-call'
+import { debounceRuntimeFileRequest } from '@/runtime/runtime-file-request-debounce'
+import { splitFileNameFilterTokens } from '../../../shared/file-name-filter-tokens'
+import {
+  nextCappedLocalListing,
+  type CappedLocalListing
+} from '@/components/quick-open-capped-local-listing'
 import { useAppStore } from '@/store'
 import { useWorktreesForRepo } from '@/store/selectors'
 import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
@@ -41,28 +46,6 @@ const NO_LISTING: RuntimeFileListing = { requestKey: '', files: [], truncated: f
 export function cleanRuntimeFileListError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   return raw.replace(/^Error invoking remote method '[^']+':\s*Error:\s*/, '')
-}
-
-function debounceRuntimeFilePathSearch(
-  delayMs: number,
-  signal: AbortSignal,
-  search: () => Promise<{ files: string[]; truncated: boolean }>
-): Promise<{ files: string[]; truncated: boolean }> {
-  return new Promise((resolve, reject) => {
-    const onAbort = (): void => {
-      signal.removeEventListener('abort', onAbort)
-      window.clearTimeout(timer)
-      reject(createRuntimeRpcAbortError())
-    }
-    const timer = window.setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      void search().then(resolve, reject)
-    }, delayMs)
-    signal.addEventListener('abort', onAbort, { once: true })
-    if (signal.aborted) {
-      onAbort()
-    }
-  })
 }
 
 export function isNestedWorktreePath(parentPath: string, childPath: string): boolean {
@@ -138,11 +121,14 @@ export function getNestedWorktreeExcludeRequest(
 export function useRuntimeFileListForWorktree({
   enabled,
   worktreeId,
-  query
+  query,
+  hostFilterWhenCapped = false
 }: {
   enabled: boolean
   worktreeId: string | null
   query?: string
+  /** When a local listing hits its cap, re-list with `query` applied as the Explorer name filter on the host. */
+  hostFilterWhenCapped?: boolean
 }): RuntimeFileListState {
   const worktree = useAppStore((state) =>
     // Why: folder workspaces live behind getKnownWorktreeById, not worktreesByRepo.
@@ -258,8 +244,23 @@ export function useRuntimeFileListForWorktree({
       connectionId
     }
 
+    const listFiles = (nameFilter?: string) =>
+      listRuntimeFiles(requestContext, {
+        rootPath: worktreePath,
+        excludePaths,
+        requestToken,
+        maxResults: QUICK_OPEN_LISTING_MAX_RESULTS,
+        ...(nameFilter ? { nameFilter } : {}),
+        signal: requestAbortController.signal
+      }).then((files) => ({
+        // #12547: naming the cap is what makes a full page readable as "there is more". Reporting
+        // false unconditionally is what made the truncation silent — the host bounds the scan to
+        // the cap it is given, so a full page means there are more paths behind it.
+        files,
+        truncated: files.length >= QUICK_OPEN_LISTING_MAX_RESULTS
+      }))
     const request = usesRuntimePathSearch
-      ? debounceRuntimeFilePathSearch(120, requestAbortController.signal, () =>
+      ? debounceRuntimeFileRequest(120, requestAbortController.signal, () =>
           searchRuntimeFilePaths(requestContext, {
             query: remoteQuery,
             limit: 32,
@@ -268,25 +269,22 @@ export function useRuntimeFileListForWorktree({
             signal: requestAbortController.signal
           })
         )
-      : listRuntimeFiles(requestContext, {
-          rootPath: worktreePath,
-          excludePaths,
-          requestToken,
-          maxResults: QUICK_OPEN_LISTING_MAX_RESULTS,
-          signal: requestAbortController.signal
-        }).then((files) => ({
-          // #12547: naming the cap is what makes a full page readable as "there is more". Reporting
-          // false unconditionally is what made the truncation silent — the host bounds the scan to
-          // the cap it is given, so a full page means there are more paths behind it.
-          files,
-          truncated: files.length >= QUICK_OPEN_LISTING_MAX_RESULTS
-        }))
+      : hostNameFilter
+        ? debounceRuntimeFileRequest(120, requestAbortController.signal, () =>
+            listFiles(hostNameFilter)
+          )
+        : listFiles()
 
     void request
       .then((result) => {
         if (!cancelled) {
           setListing({ requestKey, ...result })
           setListedOperationOwner(requestOperationOwner)
+          if (!usesRuntimePathSearch && !hostNameFilter) {
+            setCappedLocalListing((current) =>
+              nextCappedLocalListing(current, listingKey, result.truncated)
+            )
+          }
         }
       })
       .catch((error) => {
@@ -317,6 +315,8 @@ export function useRuntimeFileListForWorktree({
     operationOwnerKey,
     operationRouteAvailable,
     requestKey,
+    hostNameFilter,
+    listingKey,
     runtimeEnvironmentId,
     target.canList,
     worktreeId,

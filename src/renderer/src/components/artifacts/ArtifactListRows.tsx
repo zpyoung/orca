@@ -1,6 +1,4 @@
-import { Fragment } from 'react'
-import { Copy, ExternalLink, MoreHorizontal, Trash2 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { VirtualizedList } from '@/components/virtualized-list'
 import type { ArtifactListItem } from '../../../../shared/artifacts'
 import { Button } from '@/components/ui/button'
 import {
@@ -72,30 +70,34 @@ function artifactRowActions(
   ]
 }
 
+/**
+ * The artifacts table body, windowed inside the collection's scroller. Load more only appends, so
+ * between refreshes the list grows without bound; below the virtualize threshold rows stay in
+ * natural flow.
+ */
 export function ArtifactListRows({
   artifacts,
   deletingId,
   selectedSlug,
+  scrollElement,
+  hasMore,
   selectArtifact,
   deleteArtifact
 }: {
   artifacts: readonly ArtifactListItem[]
   deletingId: string | null
   selectedSlug: string | null
+  scrollElement: HTMLDivElement | null
+  // Why it has to reach the rows: the cursor is what makes the loaded count not the real total, so
+  // without it every row would announce a set size the Load more button next to it contradicts.
+  hasMore: boolean
   selectArtifact: (slug: string) => void
   deleteArtifact: (item: ArtifactListItem) => void
 }): React.JSX.Element {
-  return (
-    <>
-      {artifacts.map((item) => {
-        const name = artifactName(item)
-        const typeLabel = artifactTypeLabel(item)
-        const updatedLabel = formatArtifactUpdatedCompact(item.artifact.updatedAt)
-        const expiryLabel = formatArtifactExpiryCompact(item.artifact.expiresAt)
-        const sizeLabel = formatByteSize(item.artifact.byteSize)
-        const isSelected = selectedSlug === item.artifact.slug
-        const deleting = deletingId === item.artifact.slug
-        const rowActions = artifactRowActions(item, deleting, deleteArtifact)
+  // Why: appended pages are deduped against the slugs already loaded, and the first page's are
+  // unique per the server, so a slug identifies the last row without an index — which `renderRow`
+  // does not supply.
+  const lastSlug = artifacts.at(-1)?.artifact.slug
 
         return (
           <ContextMenu key={item.artifact.slug}>

@@ -23,7 +23,13 @@ import {
 } from './visible-worktree-host-scope'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { buildWorktreeComparator, sortWorktreesSmart } from './smart-sort'
-import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
+import { isInactiveWorkspace } from '@/lib/worktree-activity-state'
+export {
+  EMPTY_STRUCTURED_CHAT_WORKTREE_IDS,
+  getWorktreeIdsWithStructuredChat
+} from './visible-worktree-activity-inputs'
+// Runtime edge only one way: the builder imports VisibleWorktreeOptions as a type, which erases.
+import { buildVisibleWorktreeOptionsFromState } from './visible-worktree-options-from-state'
 import { useAppStore } from '@/store'
 import { getAllWorktreesFromState, getRepoMapFromState } from '@/store/selectors'
 import {
@@ -41,11 +47,7 @@ import {
   computeRenderedSidebarWorktreeOrder,
   computeRenderedSidebarWorktrees
 } from './rendered-sidebar-worktree-order'
-import {
-  EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
-  getPairedDeviceIdsByEnvironment,
-  isWorkspaceFromOtherDevice
-} from './workspace-creator-visibility'
+import { isWorkspaceFromOtherDevice } from './workspace-creator-visibility'
 import { isDefaultBranchWorkspace } from './default-branch-workspace'
 import { getLineageAncestorIndex, getSortedWorktreeRankIndex } from './visible-worktree-indexes'
 import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
@@ -63,10 +65,10 @@ import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters
  * Whether the "Hide sleeping" sweep must keep this row (#8873).
  *
  * Why isMainWorktree and not isDefaultBranchWorkspace: the project's primary
- * checkout is the repo's only guaranteed entry point. Folder workspaces and
- * detached-HEAD mains fail the default-branch predicate yet often have no
- * sibling row at all, so sweeping them drops the entire project out of the
- * sidebar, Cmd+J and the board with no way back except changing a filter.
+ * checkout is the repo's only guaranteed entry point. Detached-HEAD and offline
+ * SSH mains fail the default-branch predicate yet often have no sibling row at
+ * all, so sweeping them drops the entire project out of the sidebar, Cmd+J and
+ * the board with no way back except changing a filter.
  *
  * Why shared: the sidebar pipeline and the jump palette both apply this, and a
  * second copy is how the two surfaces drift.
@@ -78,6 +80,7 @@ export type VisibleWorktreeOptions = {
   ptyIdsByTabId: Record<string, string[]> | null
   browserTabsByWorktree?: Record<string, { id: string }[]> | null
   worktreeIdsWithLiveAgent: ReadonlySet<string>
+  worktreeIdsWithStructuredChat?: ReadonlySet<string>
   hideDefaultBranchWorkspace: boolean
   hideAutomationGeneratedWorkspaces: boolean
   hideCliCreatedWorkspaces: boolean
@@ -117,7 +120,7 @@ export function computeVisibleWorktrees(
   }
 
   if (opts.hideDefaultBranchWorkspace) {
-    all = all.filter((w) => !isDefaultBranchWorkspace(w))
+    all = all.filter((w) => !isDefaultBranchWorkspace(w, opts.repoMap.get(w.repoId)))
   }
 
   if (opts.hideAutomationGeneratedWorkspaces) {
@@ -169,7 +172,8 @@ export function computeVisibleWorktrees(
           opts.tabsByWorktree,
           opts.ptyIdsByTabId,
           opts.browserTabsByWorktree,
-          opts.worktreeIdsWithLiveAgent
+          opts.worktreeIdsWithLiveAgent,
+          opts.worktreeIdsWithStructuredChat
         )
     )
   }

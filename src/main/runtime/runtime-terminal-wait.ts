@@ -2,6 +2,7 @@ import type {
   RuntimeTerminalWait as RuntimeTerminalWaitResult,
   RuntimeTerminalWaitCondition
 } from '../../shared/runtime-types'
+import { hasAntigravityTerminalHeader } from './antigravity-terminal-readiness'
 import {
   detectTerminalWaitBlockedReason,
   isKnownReadyPromptPreview,
@@ -32,7 +33,11 @@ type RuntimeTerminalWaitDependencies = {
   quiescenceMs: number
   getPaneAgent(ptyId: string | null | undefined): TuiAgent | null
   getFirstPartyAgentStatus(ptyId: string | null | undefined): FirstPartyAgentStatus
-  startVisibleReadProbe(waiter: TerminalWaiter, waiterTimeoutMs: number): void
+  startVisibleReadProbe(
+    waiter: TerminalWaiter,
+    waiterTimeoutMs: number,
+    agent: TuiAgent | null
+  ): void
 }
 
 export class RuntimeTerminalWait {
@@ -49,6 +54,7 @@ export class RuntimeTerminalWait {
       record: pty,
       readPositiveBodyEvidence: () =>
         this.deps.getAdoptedPtyIdleStatus(pty) === 'idle' || isKnownReadyPromptPreview(waitText),
+      readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
       agent: this.deps.getPaneAgent(pty.ptyId),
       firstPartyStatus: this.deps.getFirstPartyAgentStatus(pty.ptyId),
       quiescenceMs: this.deps.quiescenceMs
@@ -60,6 +66,7 @@ export class RuntimeTerminalWait {
       record: leaf,
       rendererTitle: leaf.paneTitle ?? this.deps.getTabTitle(leaf.tabId),
       readPositiveBodyEvidence: () => isKnownReadyPromptPreview(waitText),
+      readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
       agent: this.deps.getPaneAgent(leaf.ptyId),
       firstPartyStatus: this.deps.getFirstPartyAgentStatus(leaf.ptyId),
       quiescenceMs: this.deps.quiescenceMs

@@ -29,7 +29,13 @@ import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../fork-sessi
 
 export function initializeMainProcessAccountServices(): void {
   const store = state.store
-  if (!store || !state.claudeUsage || !state.codexUsage || !state.openCodeUsage) {
+  if (
+    !store ||
+    !state.claudeUsage ||
+    !state.codexUsage ||
+    !state.openCodeUsage ||
+    !state.museUsage
+  ) {
     throw new Error('Usage stores must be initialized before account services')
   }
   state.rateLimits = new RateLimitService()
@@ -112,7 +118,8 @@ export function initializeMainProcessAccountServices(): void {
     const settings = store.getSettings()
     return {
       sessionCookie: settings.opencodeSessionCookie,
-      workspaceIdOverride: settings.opencodeWorkspaceId
+      workspaceIdOverride: settings.opencodeWorkspaceId,
+      apiKey: settings.opencodeGoApiKey
     }
   })
   state.rateLimits.setMiniMaxConfigResolver(() => {
