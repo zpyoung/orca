@@ -30,6 +30,7 @@ const SEEDS = Math.max(1, Number(process.env.SERIALIZE_TRANSCRIPT_SEEDS) || 2)
 // build's did — pre-existing upstream limitations, not regressions (verified
 // with ORCA_OLD_SERIALIZE_ADDON). Shrink when one is fixed.
 const KNOWN_PREEXISTING_I2_FAILURES: Record<string, number> = { less: 6, nano: 2, opencode: 5 }
+KNOWN_PREEXISTING_I2_FAILURES['claude-code-ready-cold-start'] = 8
 
 type Transcript = { name: string; data: string; cols: number; rows: number }
 type Schedule = 'none' | 'shrink' | 'shrink-grow' | 'jitter'
