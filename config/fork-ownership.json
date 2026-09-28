@@ -1081,6 +1081,30 @@
       "lines": ["const TELEMETRY_ENABLED = false"]
     },
     {
+      "path": "config/scripts/pr-ready-check-reuse.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)",
+        "      ['code_paths', ...PR_CHECK_JOBS].toSpliced(2, 0, 'fork_ownership_guard')"
+      ]
+    },
+    {
+      "path": "config/scripts/pr-ready-check-gate.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)",
+        "      FORK_OWNERSHIP_GUARD: 'success',"
+      ]
+    },
+    {
+      "path": "src/main/updater.feed-attempt-lifetime.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
+    },
+    {
       "path": "src/main/updater.publishing-window-feed.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -2189,9 +2213,9 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
-        "        if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, pane.leafId))) {",
-        "      if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, clickedPane.leafId))) {"
+        "import { terminalDockLeafOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "        if (!terminalDockLeafOwnsFocus(tabId, pane.leafId)) {",
+        "      if (!terminalDockLeafOwnsFocus(tabId, clickedPane.leafId)) {"
       ]
     },
     {
@@ -4207,6 +4231,21 @@
       "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
     },
     {
+      "path": "src/renderer/src/lib/agent-launch-caller-profiles-test-harness.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE } from '../fork-hosted-review-sitter/fix-checks-agent-launch-caller-profile'",
+        "  HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/agent-launch-caller-profile-census.test.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": ["    expect(ids.length).toBe(13)", "      'hosted-review-fix-checks',"]
+    },
+    {
       "path": "src/main/ipc/filesystem-download-lifetime.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -5593,8 +5632,8 @@
       "removed": 4
     },
     "config/scripts/check-max-lines-ratchet.test.mjs": {
-      "added": 9,
-      "removed": 9
+      "added": 22,
+      "removed": 22
     },
     "config/scripts/generate-bundled-skill-guides.mjs": {
       "added": 6,
@@ -5962,6 +6001,18 @@
     },
     "src/main/telemetry/client.ts": {
       "added": 2,
+      "removed": 1
+    },
+    "config/scripts/pr-ready-check-reuse.test.mjs": {
+      "added": 6,
+      "removed": 8
+    },
+    "config/scripts/pr-ready-check-gate.test.mjs": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/main/updater.feed-attempt-lifetime.test.ts": {
+      "added": 1,
       "removed": 1
     },
     "src/main/updater.publishing-window-feed.test.ts": {
@@ -6493,7 +6544,7 @@
       "removed": 3
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts": {
-      "added": 16,
+      "added": 15,
       "removed": 3
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts": {
@@ -7005,8 +7056,8 @@
       "removed": 0
     },
     "src/main/persistence-ui-state.test.ts": {
-      "added": 13,
-      "removed": 1
+      "added": 12,
+      "removed": 0
     },
     "src/main/persistence/loading-store/store.ts": {
       "added": 4,
@@ -7215,6 +7266,14 @@
     "src/shared/workspace-scope.ts": {
       "added": 20,
       "removed": 0
+    },
+    "src/renderer/src/lib/agent-launch-caller-profiles-test-harness.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/lib/agent-launch-caller-profile-census.test.ts": {
+      "added": 2,
+      "removed": 1
     },
     "src/main/ipc/filesystem-download-lifetime.test.ts": {
       "added": 7,
