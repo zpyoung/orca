@@ -187,6 +187,7 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
       tabId: string
       root: TerminalPaneLayoutNode | null
       expandedLeafId: string | null
+      chatLeafId?: string | null
       titlesByLeafId?: Record<string, string>
     }
   ): TerminalLayoutSnapshot | undefined {
@@ -206,6 +207,7 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
           ...cloneTerminalLayoutSnapshot(existing),
           root: args.root ?? existing.root,
           expandedLeafId: args.expandedLeafId,
+          ...(args.chatLeafId !== undefined ? { chatLeafId: args.chatLeafId ?? undefined } : {}),
           ...(args.titlesByLeafId ? { titlesByLeafId: args.titlesByLeafId } : {})
         }
       }
@@ -224,6 +226,7 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
       tabId: string
       root: TerminalPaneLayoutNode | null
       expandedLeafId: string | null
+      chatLeafId?: string | null
       titlesByLeafId?: Record<string, string>
     }
   ): void {
@@ -243,6 +246,7 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
           ...tab.parentLayout,
           root: args.root ?? tab.parentLayout.root,
           expandedLeafId: args.expandedLeafId,
+          ...(args.chatLeafId !== undefined ? { chatLeafId: args.chatLeafId ?? undefined } : {}),
           ...(args.titlesByLeafId ? { titlesByLeafId: args.titlesByLeafId } : {})
         }
       }

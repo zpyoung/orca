@@ -127,17 +127,12 @@ describe('PR E2E gate contract', () => {
     const successLoop = verifyStep.run.slice(verifyStep.run.indexOf(successMarker))
     expect(successLoop.length).toBeGreaterThan(0)
     expect(verifyStep.run).toContain('"$CODE_PATHS" != "success"')
-    expect(verifyStep.run).toContain('"$ROOT_DIRECTORY_GUARD" != "success"')
     for (const job of prWorkflow.jobs.verify.needs) {
       const envVar = job.replaceAll('-', '_').toUpperCase()
       expect(verifyStep.env[envVar]).toBe(`\${{ needs.${job}.result }}`)
-      // fork_ownership_guard is ungated like root_directory_guard: it runs on every PR,
-      // so it is checked unconditionally above rather than through the SHOULD_RUN loop.
-      if (
-        job === 'code_paths' ||
-        job === 'root_directory_guard' ||
-        job === 'fork_ownership_guard'
-      ) {
+      // fork_ownership_guard is ungated: it runs on every PR, so it is checked
+      // unconditionally above rather than through the SHOULD_RUN loop.
+      if (job === 'code_paths' || job === 'fork_ownership_guard') {
         continue
       }
       expect(successLoop).toContain(`"$${envVar}"`)
@@ -542,7 +537,8 @@ describe('PR E2E gate contract', () => {
       )
     }
     for (const source of [
-      'src/main/ipc/rg-availability.ts',
+      'src/main/ripgrep/bundled-ripgrep-path.ts',
+      'src/shared/bundled-ripgrep.ts',
       'src/shared/ripgrep-process-availability.ts'
     ]) {
       expect(selectPrE2eSpecs([source]), source).toEqual([

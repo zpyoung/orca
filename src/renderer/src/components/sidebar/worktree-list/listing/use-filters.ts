@@ -26,7 +26,8 @@ import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
 import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
 import {
   getVisibleWorktreeBrowserActivityTabs,
-  getVisibleWorktreeTerminalActivityTabs
+  getVisibleWorktreeTerminalActivityTabs,
+  getWorktreeIdsWithStructuredChat
 } from '../../visible-worktree-activity-inputs'
 import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/use-workspace-filter-chrome'
 import type { SidebarFilterState } from '../../visible-worktree-kinds'
@@ -98,7 +99,7 @@ export function useSidebarWorktreeFilters() {
     if (scopedHostIds && !scopedHostIds.includes(targetHostId)) {
       state.setVisibleWorkspaceHostIds([...scopedHostIds, targetHostId])
     }
-    if (state.hideDefaultBranchWorkspace && isDefaultBranchWorkspace(worktree)) {
+    if (state.hideDefaultBranchWorkspace && isDefaultBranchWorkspace(worktree, repo)) {
       state.setHideDefaultBranchWorkspace(false)
     }
     if (state.hideAutomationGeneratedWorkspaces && isAutomationGeneratedWorkspace(worktree)) {
@@ -136,7 +137,8 @@ export function useSidebarWorktreeFilters() {
           tabsByWorktree,
           state.ptyIdsByTabId,
           browserTabsByWorktree,
-          liveAgentWorktrees
+          liveAgentWorktrees,
+          getWorktreeIdsWithStructuredChat(state.unifiedTabsByWorktree)
         )
       ) {
         state.setShowSleepingWorkspaces(true)

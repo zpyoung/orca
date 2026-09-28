@@ -14,7 +14,7 @@ import type { TerminalPaneLayoutNode } from '../../shared/terminal-tab-types'
 import type { TerminalDockPropsPatch } from './fork-terminal-dock/terminal-dock-session-tab-props'
 
 export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWithCloseStructuredAgentSessionTab {
-  protected closeHeadlessMobileTerminalTab(
+  protected async closeHeadlessMobileTerminalTab(
     worktreeId: string,
     snapshot: RuntimeMobileSessionTabsSnapshot,
     tab: RuntimeMobileSessionTerminalTab,
@@ -24,7 +24,7 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       authorizedPty?: RuntimePtyWorktreeRecord
       force?: boolean
     } = {}
-  ): void {
+  ): Promise<void> {
     const closedParentTabId = tab.parentTabId
     const retirementProofs = snapshot.tabs.flatMap((candidate) => {
       if (candidate.type !== 'terminal' || candidate.parentTabId !== closedParentTabId) {
@@ -37,11 +37,17 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       )
       return proof ? [proof] : []
     })
-    const projectedPtyIds = this.commitHeadlessTerminalTabRetirement(
+    const acknowledgeRetirement = this.captureTerminalTabRetirement(worktreeId, closedParentTabId)
+    const projectedPtyIds = await this.commitHeadlessTerminalTabRetirement(
       worktreeId,
       closedParentTabId,
       { allowMissing: options.allowMissingPersistedTab, force: options.force }
     )
+    if (!acknowledgeRetirement().matches) {
+      throw new Error('terminal_pane_owner_changed')
+    }
+    // Renderer frames may add other tabs while the durable close is in flight.
+    snapshot = this.mobileSessionTabsByWorktree.get(worktreeId) ?? snapshot
     this.clearRuntimeSessionOwnershipForMobileTab(worktreeId, snapshot, closedParentTabId)
     if (options.authorizedPty) {
       options.authorizedPty.runtimeSessionOwned = false
@@ -173,6 +179,7 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       tabId: string
       root: TerminalPaneLayoutNode | null
       expandedLeafId: string | null
+      chatLeafId?: string | null
       titlesByLeafId?: Record<string, string>
     }
   ): Promise<{ updated: true }> {
@@ -198,6 +205,7 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
         tabId: hostTabId,
         root: acceptedLayout.root,
         expandedLeafId: acceptedLayout.expandedLeafId,
+        chatLeafId: acceptedLayout.chatLeafId ?? null,
         ...(acceptedLayout.titlesByLeafId ? { titlesByLeafId: acceptedLayout.titlesByLeafId } : {})
       })
     }

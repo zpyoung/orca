@@ -10,12 +10,6 @@ import {
   buildAgentPromptPasteBytes,
   getAgentPromptSubmitDelayMs
 } from '../../shared/agent-prompt-injection'
-import {
-  agentSessionLeaseFixture,
-  agentSessionRecordFixture
-} from '../../shared/agent-session-record.test-fixture'
-import type { AgentSessionRecord } from '../../shared/agent-session-record'
-import { agentSessionPtyWriteGate } from './agent-session-pty-write-gate'
 import { createAgentPromptSubmissionRuntime } from './agent-prompt-submission-runtime-test-fixture'
 import type { OrcaRuntimeService } from './orca-runtime'
 
@@ -54,12 +48,6 @@ const BUNDLED_WRITER_EXTERNALS: Record<string, object> = {
     assertAgentPromptRequestActive: () => {},
     waitForAgentPromptDelay: async () => {},
     waitForAgentPromptPromise: async (promise: Promise<unknown>) => await promise
-  },
-  './agent-session-pty-write-gate': {
-    agentSessionPtyWriteGate: {
-      assertAdmitted: () => null,
-      assertReadmitted: () => {}
-    }
   },
   './agent-prompt-submission-verification': {
     isTerminalSendSettlementAgent: () => false,
@@ -180,7 +168,6 @@ function createOmpLargePasteHarness(onSubmit: (prompt: string) => void): {
 
 afterEach(() => {
   vi.useRealTimers()
-  agentSessionPtyWriteGate.detachRecordLookup()
 })
 
 describe('OMP agent prompt submission', () => {
@@ -303,22 +290,6 @@ describe('OMP agent prompt submission', () => {
         }
       })
     ).rejects.toThrow('terminal_handle_stale')
-    expect(created.writes).toEqual([])
-  })
-
-  it('rechecks the admitted session fence before the atomic write', async () => {
-    let record: AgentSessionRecord = agentSessionRecordFixture(agentSessionLeaseFixture())
-    const created = await createAgentPromptSubmissionRuntime(() => undefined, 'omp')
-    agentSessionPtyWriteGate.attachRecordLookup(() => record)
-    agentSessionPtyWriteGate.bindPty(PTY_ID, record.sessionId)
-
-    await expect(
-      created.runtime.sendTerminalAgentPrompt(created.handle, 'respect the owner', {
-        beforeWrite: () => {
-          record = agentSessionRecordFixture(agentSessionLeaseFixture({ runtimeFence: 8 }))
-        }
-      })
-    ).rejects.toThrow('agent_session_checkpoint_stale')
     expect(created.writes).toEqual([])
   })
 

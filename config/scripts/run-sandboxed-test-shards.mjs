@@ -52,7 +52,9 @@ const IMAGE_CONTEXT_ROOTS = [
   'config/scripts',
   'package.json',
   'pnpm-lock.yaml',
-  'pnpm-workspace.yaml'
+  'pnpm-workspace.yaml',
+  // install-electron-package-binary.mjs re-exports its zip extractor from here.
+  'src/shared/zip-extractor-command.ts'
 ]
 
 /** Matches the serialized shell-contract selection in pr.yml. */

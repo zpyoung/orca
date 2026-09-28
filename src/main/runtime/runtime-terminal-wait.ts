@@ -2,9 +2,11 @@ import type {
   RuntimeTerminalWait as RuntimeTerminalWaitResult,
   RuntimeTerminalWaitCondition
 } from '../../shared/runtime-types'
+import { hasAntigravityTerminalHeader } from './antigravity-terminal-readiness'
 import {
   detectTerminalWaitBlockedReason,
   isKnownReadyPromptPreview,
+  isMuseReadyPromptPreview,
   tuiIdleNeedsVisibleScreenProbe
 } from './terminal-wait-detection'
 import {
@@ -32,7 +34,11 @@ type RuntimeTerminalWaitDependencies = {
   quiescenceMs: number
   getPaneAgent(ptyId: string | null | undefined): TuiAgent | null
   getFirstPartyAgentStatus(ptyId: string | null | undefined): FirstPartyAgentStatus
-  startVisibleReadProbe(waiter: TerminalWaiter, waiterTimeoutMs: number): void
+  startVisibleReadProbe(
+    waiter: TerminalWaiter,
+    waiterTimeoutMs: number,
+    agent: TuiAgent | null
+  ): void
 }
 
 export class RuntimeTerminalWait {
@@ -49,6 +55,7 @@ export class RuntimeTerminalWait {
       record: pty,
       readPositiveBodyEvidence: () =>
         this.deps.getAdoptedPtyIdleStatus(pty) === 'idle' || isKnownReadyPromptPreview(waitText),
+      readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
       agent: this.deps.getPaneAgent(pty.ptyId),
       firstPartyStatus: this.deps.getFirstPartyAgentStatus(pty.ptyId),
       quiescenceMs: this.deps.quiescenceMs
@@ -60,6 +67,7 @@ export class RuntimeTerminalWait {
       record: leaf,
       rendererTitle: leaf.paneTitle ?? this.deps.getTabTitle(leaf.tabId),
       readPositiveBodyEvidence: () => isKnownReadyPromptPreview(waitText),
+      readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
       agent: this.deps.getPaneAgent(leaf.ptyId),
       firstPartyStatus: this.deps.getFirstPartyAgentStatus(leaf.ptyId),
       quiescenceMs: this.deps.quiescenceMs
@@ -141,14 +149,21 @@ export class RuntimeTerminalWait {
             this.waiters.resolve(waiter, buildPtyTerminalWaitResult(handle, condition, live.pty))
           } else {
             this.polls.startPty(waiter, live.pty)
+            const paneAgent = this.deps.getPaneAgent(live.pty.ptyId)
             if (
-              tuiIdleNeedsVisibleScreenProbe(
-                live.pty.lastAgentStatus,
-                livePtyWaitText,
-                this.deps.getPaneAgent(live.pty.ptyId)
-              )
+              // AGY can retain a stale working/blocked status after a trust dialog was
+              // dismissed. Its visible composer is authoritative, so probe whenever the
+              // pane is identified as AGY (or its banner is present), regardless of that
+              // stale status.
+              ((paneAgent === 'antigravity' ||
+                hasAntigravityTerminalHeader(livePtyWaitText) ||
+                live.pty.lastAgentStatus === null) &&
+                (livePtyWaitText.length === 0 ||
+                  paneAgent === 'antigravity' ||
+                  hasAntigravityTerminalHeader(livePtyWaitText))) ||
+              tuiIdleNeedsVisibleScreenProbe(live.pty.lastAgentStatus, livePtyWaitText, paneAgent)
             ) {
-              this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs)
+              this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs, paneAgent)
             }
           }
         }
@@ -239,14 +254,17 @@ export class RuntimeTerminalWait {
             // while the last OSC title is still "working"; keep polling the
             // preview/title until the waiter resolves or hits its timeout.
             this.polls.startLeaf(waiter, live.leaf)
+            const paneAgent = this.deps.getPaneAgent(live.leaf.ptyId)
             if (
-              tuiIdleNeedsVisibleScreenProbe(
-                live.leaf.lastAgentStatus,
-                liveLeafWaitText,
-                this.deps.getPaneAgent(live.leaf.ptyId)
-              )
+              ((paneAgent === 'antigravity' ||
+                hasAntigravityTerminalHeader(liveLeafWaitText) ||
+                live.leaf.lastAgentStatus === null) &&
+                (liveLeafWaitText.length === 0 ||
+                  paneAgent === 'antigravity' ||
+                  hasAntigravityTerminalHeader(liveLeafWaitText))) ||
+              tuiIdleNeedsVisibleScreenProbe(live.leaf.lastAgentStatus, liveLeafWaitText, paneAgent)
             ) {
-              this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs)
+              this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs, paneAgent)
             }
           }
         }

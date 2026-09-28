@@ -854,7 +854,7 @@
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": ["        job === 'fork_ownership_guard'"]
+      "lines": ["      if (job === 'code_paths' || job === 'fork_ownership_guard') {"]
     },
     {
       "path": "src/shared/pane-agent-identity-inventory.test.ts",
@@ -1079,6 +1079,30 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["const TELEMETRY_ENABLED = false"]
+    },
+    {
+      "path": "config/scripts/pr-ready-check-reuse.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)",
+        "      ['code_paths', ...PR_CHECK_JOBS].toSpliced(2, 0, 'fork_ownership_guard')"
+      ]
+    },
+    {
+      "path": "config/scripts/pr-ready-check-gate.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)",
+        "      FORK_OWNERSHIP_GUARD: 'success',"
+      ]
+    },
+    {
+      "path": "src/main/updater.feed-attempt-lifetime.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
     },
     {
       "path": "src/main/updater.publishing-window-feed.test.ts",
@@ -2189,9 +2213,9 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
-        "        if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, pane.leafId))) {",
-        "      if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, clickedPane.leafId))) {"
+        "import { terminalDockLeafOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "        if (!terminalDockLeafOwnsFocus(tabId, pane.leafId)) {",
+        "      if (!terminalDockLeafOwnsFocus(tabId, clickedPane.leafId)) {"
       ]
     },
     {
@@ -2505,12 +2529,12 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/artifacts/ArtifactListRows.tsx",
+      "path": "src/renderer/src/components/artifacts/ArtifactListRow.tsx",
       "feature": "artifact-passwords",
       "kind": "registration",
       "lines": [
         "import { ArtifactNameWithProtection } from './fork-artifact-passwords/artifact-protection-display'",
-        "                <ArtifactNameWithProtection item={item} name={name} />"
+        "          <ArtifactNameWithProtection item={item} name={name} />"
       ]
     },
     {
@@ -3397,8 +3421,18 @@
         "  all = filterWorktreesByActivity(all, opts.workspaceActivity, opts.repoMap)",
         "  workspaceReview?: WorkspaceReviewFilterContext",
         "  all = filterWorktreesByReview(all, opts.workspaceReview, opts.repoMap)",
-        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'",
-        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktree-options-from-state.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'",
+        "import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/use-workspace-review-filter'",
+        "    workspaceActivity: getWorkspaceActivityFilterContext(state),",
+        "    workspaceReview: getWorkspaceReviewFilterContext(state),"
       ]
     },
     {
@@ -4197,6 +4231,33 @@
       "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
     },
     {
+      "path": "src/renderer/src/lib/agent-launch-caller-profiles-test-harness.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE } from '../fork-hosted-review-sitter/fix-checks-agent-launch-caller-profile'",
+        "  HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/agent-launch-caller-profile-census.test.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": ["    expect(ids.length).toBe(13)", "      'hosted-review-fix-checks',"]
+    },
+    {
+      "path": "src/main/ipc/filesystem-download-lifetime.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    cancellations,", "    cancellations"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const BASELINE_REF = 'v1.4.208-rc.0.zy01'"]
+    },
+    {
       "path": "src/renderer/src/components/cmd-j/palette-live-status.tsx",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -4312,6 +4373,12 @@
       "feature": "heimdall",
       "kind": "registration",
       "lines": ["  ['main/fork-heimdall/judgment/client.ts', 1]"]
+    },
+    {
+      "path": "src/main/daemon/serialize-grid-transcript-replay.test.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["KNOWN_PREEXISTING_I2_FAILURES['claude-code-ready-cold-start'] = 8"]
     }
   ],
   "exceptions": [
@@ -4455,7 +4522,7 @@
     },
     {
       "path": "src/renderer/src/assets/main.css",
-      "reason": "Adds canonical light/dark warning surface and foreground tokens for non-error attention states; the design-system extension belongs upstream rather than in feature-local CSS.",
+      "reason": "Adds the canonical light/dark warning foreground token beside upstream's warning hue, surface and border roles; the design-system extension belongs upstream rather than in feature-local CSS.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#warning-status-tokens"
     },
@@ -5059,12 +5126,6 @@
       "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
     },
     {
-      "path": "config/scripts/run-typecheck-projects-in-parallel.mjs",
-      "reason": "Keeps the node and web tsc projects out of the same wave; together they peak near 20 GB and get the 16 GB ubuntu-latest typecheck runner OOM-killed.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#typecheck-projects-oom-the-ci-runner"
-    },
-    {
       "path": "config/scripts/ci-dependency-download-cache.test.mjs",
       "reason": "Contracts for the fork-owned PR job graph. Upstream asserts its Windows lane still carries the addon checks; this fork removed the Windows PR lanes, so the case asserts the removal instead.",
       "status": "permanent"
@@ -5461,6 +5522,36 @@
       "reason": "Migrates session-option command coverage to terminal-tab-scoped runtime targets.",
       "status": "pending-upstream",
       "ledger": "bug-1"
+    },
+    {
+      "path": ".github/workflows/terminal-ime-e2e.yml",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": ".github/workflows/golden-e2e-experiment.yml",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "config/scripts/run-terminal-ibus-hangul-e2e.mjs",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "config/scripts/terminal-ime-e2e-workflow.test.mjs",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "config/scripts/playwright-focused-workflow-selection.test.mjs",
+      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
     }
   ],
   "residuals": {
@@ -5577,8 +5668,8 @@
       "removed": 4
     },
     "config/scripts/check-max-lines-ratchet.test.mjs": {
-      "added": 9,
-      "removed": 9
+      "added": 22,
+      "removed": 22
     },
     "config/scripts/generate-bundled-skill-guides.mjs": {
       "added": 6,
@@ -5589,7 +5680,7 @@
       "removed": 1
     },
     "config/scripts/pr-e2e-gate-contract.test.mjs": {
-      "added": 7,
+      "added": 3,
       "removed": 1
     },
     "config/tsconfig.cli.json": {
@@ -5677,7 +5768,7 @@
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write-input.ts": {
-      "added": 90,
+      "added": 82,
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write.ts": {
@@ -5825,8 +5916,8 @@
       "removed": 2
     },
     "src/main/runtime/orca-runtime.ts": {
-      "added": 7,
-      "removed": 2
+      "added": 8,
+      "removed": 3
     },
     "src/main/runtime/rpc/methods/artifacts.ts": {
       "added": 3,
@@ -5948,6 +6039,18 @@
       "added": 2,
       "removed": 1
     },
+    "config/scripts/pr-ready-check-reuse.test.mjs": {
+      "added": 6,
+      "removed": 8
+    },
+    "config/scripts/pr-ready-check-gate.test.mjs": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/main/updater.feed-attempt-lifetime.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "src/main/updater.publishing-window-feed.test.ts": {
       "added": 5,
       "removed": 5
@@ -6016,7 +6119,7 @@
       "added": 3,
       "removed": 13
     },
-    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": {
+    "src/renderer/src/components/artifacts/ArtifactListRow.tsx": {
       "added": 2,
       "removed": 3
     },
@@ -6284,9 +6387,13 @@
       "added": 7,
       "removed": 2
     },
+    "src/renderer/src/components/sidebar/visible-worktree-options-from-state.ts": {
+      "added": 4,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/visible-worktrees.ts": {
-      "added": 19,
-      "removed": 1
+      "added": 14,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
       "added": 18,
@@ -6473,7 +6580,7 @@
       "removed": 3
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts": {
-      "added": 16,
+      "added": 15,
       "removed": 3
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts": {
@@ -7005,8 +7112,8 @@
       "removed": 0
     },
     "src/main/runtime/rpc/dispatcher.ts": {
-      "added": 2,
-      "removed": 1
+      "added": 1,
+      "removed": 0
     },
     "src/main/runtime/rpc/errors.ts": {
       "added": 9,
@@ -7196,6 +7303,22 @@
       "added": 20,
       "removed": 0
     },
+    "src/renderer/src/lib/agent-launch-caller-profiles-test-harness.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/lib/agent-launch-caller-profile-census.test.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/ipc/filesystem-download-lifetime.test.ts": {
+      "added": 7,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "tests/e2e/cross-version-wire/cross-version-session-tabs-retirement-proof.unit.test.ts": {
       "added": 1,
       "removed": 1
@@ -7255,6 +7378,10 @@
     "src/main/proxy-guarded-fetch-call-site-audit.test.ts": {
       "added": 2,
       "removed": 1
+    },
+    "src/main/daemon/serialize-grid-transcript-replay.test.ts": {
+      "added": 1,
+      "removed": 0
     }
   }
 }

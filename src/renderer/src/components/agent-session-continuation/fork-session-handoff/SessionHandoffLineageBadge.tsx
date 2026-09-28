@@ -259,7 +259,7 @@ export function activateLineageEndpoint(endpoint: LineageEndpointIdentity): void
   if (!activationResult) {
     return
   }
-  useAppStore.getState().setActiveTabType('terminal')
+  useAppStore.getState().setActiveTabType('terminal', target.worktreeId)
   activateTabAndFocusPane(target.tabId, target.leafId, {
     flashFocusedPane: true,
     scrollToBottomIfOutputSinceLastView: true

@@ -9,6 +9,7 @@ import {
   OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS
 } from '../../../shared/fork-heimdall-objective/contract-types'
 import { ObjectiveEnrollmentFieldHelp, objectiveGatesHelp } from './ObjectiveEnrollmentFieldHelp'
+import { createBrowserUuid } from '@/lib/browser-uuid'
 import type {
   ObjectiveEnrollmentDraft,
   ObjectiveEnrollmentGateDraft
@@ -160,7 +161,7 @@ export function ObjectiveEnrollmentGateFields({
             ...draft,
             gates: [
               ...draft.gates,
-              { rowKey: crypto.randomUUID(), name: '', command: '', timeoutSecondsText: '' }
+              { rowKey: createBrowserUuid(), name: '', command: '', timeoutSecondsText: '' }
             ]
           })
         }

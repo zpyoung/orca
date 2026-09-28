@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
+// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
@@ -22,6 +22,8 @@ import type {
   SessionOptionsSurface
 } from '../../../../../shared/native-chat-session-options'
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
+import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
+import type { NativeChatComposerGoalMode } from '../use-native-chat-composer-submit'
 
 export type AgentComposerFieldProps = {
   terminalTabId: string
@@ -63,7 +65,9 @@ export type AgentComposerFieldProps = {
   onStop?: () => void
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
+  contextUsage?: NativeChatContextUsageSummary | null
   sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
+  goalMode?: NativeChatComposerGoalMode
 }
 
 export type AgentComposerImageAttachment = {
@@ -137,7 +141,9 @@ export function AgentComposerField({
   onStop,
   sessionOptionsSurface,
   sessionOptionsSnapshot,
-  sessionOptionsPickerRequest
+  contextUsage,
+  sessionOptionsPickerRequest,
+  goalMode
 }: AgentComposerFieldProps): React.JSX.Element {
   const widthClassName = useNativeChatWidthClassName()
   // Value the IME started from, and whether a programmatic clear was dropped on top of it.
@@ -307,7 +313,14 @@ export function AgentComposerField({
                     ? `${pickerListboxId}-option-${Math.min(activeSuggestion, autocomplete.items.length - 1)}`
                     : undefined
                 }
-                placeholder={nativeChatComposerPlaceholder(hasPty, canSend)}
+                placeholder={
+                  goalMode?.active
+                    ? translate(
+                        'components.native-chat.goal.placeholder',
+                        'Describe your goal, define measurable outcomes for best results'
+                      )
+                    : nativeChatComposerPlaceholder(hasPty, canSend)
+                }
                 // Why: coarse-pointer min-height follows the app's touch target convention.
                 // field-sizing:content grows the field with the draft; the 8lh cap (plus
                 // py-1) turns further growth into internal scrolling, and scrollbar-sleek
@@ -340,7 +353,9 @@ export function AgentComposerField({
                 onStop={onStop}
                 sessionOptionsSurface={sessionOptionsSurface}
                 sessionOptionsSnapshot={sessionOptionsSnapshot}
+                contextUsage={contextUsage}
                 sessionOptionsPickerRequest={sessionOptionsPickerRequest}
+                onExitGoalMode={goalMode?.active ? goalMode.exit : undefined}
               />
             </div>
           </div>

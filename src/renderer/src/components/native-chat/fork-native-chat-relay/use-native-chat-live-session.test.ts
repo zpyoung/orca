@@ -229,7 +229,7 @@ describe('useNativeChatLiveSession — transport routing', () => {
     )
     // Kick off load-earlier against env-1, then flip the owner before it resolves.
     await act(async () => {
-      latest?.loadEarlier()
+      void latest?.loadEarlier()
     })
     await rerender(root, {
       paneKey: PANE,
@@ -264,7 +264,9 @@ describe('useNativeChatLiveSession — transport routing', () => {
     transport.readSession.mockImplementationOnce(
       () => new Promise((resolve) => (resolveEarlier = resolve))
     )
-    await act(async () => latest?.loadEarlier())
+    await act(async () => {
+      void latest?.loadEarlier()
+    })
 
     await act(async () =>
       transport.emit({
@@ -298,7 +300,9 @@ describe('useNativeChatLiveSession — transport routing', () => {
     transport.readSession.mockImplementationOnce(
       () => new Promise((resolve) => (resolveEarlier = resolve))
     )
-    await act(async () => latest?.loadEarlier())
+    await act(async () => {
+      void latest?.loadEarlier()
+    })
 
     await act(async () =>
       transport.emit({
@@ -333,7 +337,9 @@ describe('useNativeChatLiveSession — transport routing', () => {
     transport.readSession.mockImplementationOnce(
       () => new Promise((resolve) => (resolveEarlier = resolve))
     )
-    await act(async () => latest?.loadEarlier())
+    await act(async () => {
+      void latest?.loadEarlier()
+    })
 
     await rerender(root, {
       paneKey: PANE,
@@ -369,7 +375,9 @@ describe('useNativeChatLiveSession — transport routing', () => {
       beforeOffset: 0
     })
 
-    await act(async () => latest?.loadEarlier())
+    await act(async () => {
+      void latest?.loadEarlier()
+    })
 
     expect(transport.readSession).toHaveBeenLastCalledWith(
       expect.objectContaining({ beforeOffset: 4_096 })
@@ -397,7 +405,9 @@ describe('useNativeChatLiveSession — transport routing', () => {
       beforeOffset: 4_096
     })
 
-    await act(async () => latest?.loadEarlier())
+    await act(async () => {
+      void latest?.loadEarlier()
+    })
 
     expect(latest?.hasMore).toBe(false)
   })
@@ -413,7 +423,9 @@ describe('useNativeChatLiveSession — transport routing', () => {
     await act(async () => transport.emit({ type: 'snapshot', messages: many, hasMore: true }))
     transport.readSession.mockResolvedValueOnce({ messages: [assistant('grown', 'g')] })
 
-    await act(async () => latest?.loadEarlier())
+    await act(async () => {
+      void latest?.loadEarlier()
+    })
 
     expect(transport.readSession).toHaveBeenLastCalledWith(
       expect.objectContaining({ limit: NATIVE_CHAT_INITIAL_LIMIT + 200 })
@@ -578,7 +590,9 @@ describe('useNativeChatLiveSession — transport routing', () => {
     transport.readSession.mockImplementationOnce(
       () => new Promise((resolve) => (resolveEarlier = resolve))
     )
-    await act(async () => latest?.loadEarlier())
+    await act(async () => {
+      void latest?.loadEarlier()
+    })
     await act(async () =>
       transport.emit({
         type: 'appended',

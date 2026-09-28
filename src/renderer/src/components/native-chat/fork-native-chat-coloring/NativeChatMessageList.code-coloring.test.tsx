@@ -38,7 +38,8 @@ function sessionWith(messages: NativeChatMessage[]): NativeChatLiveSession {
     agent: 'claude',
     hasMore: false,
     loadingEarlier: false,
-    loadEarlier: () => {},
+    olderHistoryGeneration: 0,
+    loadEarlier: () => Promise.resolve('exhausted'),
     readPhase: 'ready'
   }
 }

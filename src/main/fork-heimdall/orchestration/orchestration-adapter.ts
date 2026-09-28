@@ -1,7 +1,10 @@
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { OrchestrationDb, RunRow } from '../../runtime/orchestration/db'
 import { OrchestrationError } from '../../runtime/orchestration/orchestration-error'
-import { resolveRunScope } from '../../runtime/rpc/methods/orchestration/runs/run-scope'
+import {
+  orchestrationCallerIdentity,
+  resolveRunScope
+} from '../../runtime/rpc/methods/orchestration/runs/run-scope'
 import { startLocalWorker } from '../../runtime/rpc/methods/orchestration/worker/local-worker-start'
 import { inspectWorkerTerminal } from '../../runtime/rpc/methods/orchestration/worker/worker-observation'
 import type { WorkerReleaseReceipt } from '../../runtime/rpc/methods/orchestration/worker/worker-release-completion'
@@ -168,7 +171,11 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
             ),
             db,
             run,
-            coordinatorPane: identity.paneKey,
+            coordinator: orchestrationCallerIdentity(this.runtime, {
+              handle: identity.handle,
+              paneKey: identity.paneKey,
+              session: undefined
+            }),
             orchestrationMutation: mutation?.identity,
             mode
           }
@@ -446,6 +453,7 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
         runId,
         callerTerminalHandle: enrollment.coordinatorIdentity.handle,
         callerPaneKey: enrollment.coordinatorIdentity.paneKey,
+        callerSession: undefined,
         requireCurrentConsumer: true
       })
       this.assertRunIdentity(enrollment, run)

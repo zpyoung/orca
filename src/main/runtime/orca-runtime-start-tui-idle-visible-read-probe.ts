@@ -26,6 +26,8 @@ import {
 } from './terminal-wait-results'
 import { createSetupCompletionScanner } from './orchestration/setup-completion-signal'
 import { buildTerminalWaitText } from './terminal-wait-tail-state'
+import { isAntigravityReadyPromptSnapshot } from './antigravity-terminal-readiness'
+import type { TuiAgent } from '../../shared/tui-agent'
 
 // Why re-probe: a TUI that paints with cursor moves (Claude Code) never reaches the newline tail the
 // poll reads, and its first frame lands after the wait starts, so a single look sees a blank screen.
@@ -40,6 +42,7 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
   protected startTuiIdleVisibleReadProbe(
     waiter: TerminalWaiter,
     waiterTimeoutMs: number,
+    agent: TuiAgent | null,
     deadlineMs = Date.now() + waiterTimeoutMs
   ): void {
     const settleMarginMs = Math.min(
@@ -58,7 +61,7 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
       return
     }
     void withTimeout(
-      this.readTerminal(waiter.handle, {}, {
+      this.readTerminal(waiter.handle, agent === 'antigravity' ? { screen: true } : {}, {
         timeoutMs: providerTimeoutMs,
         retireOnTimeout: true,
         // Why: the ready banner stays in scrollback for the whole session, so
@@ -75,13 +78,20 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
         // Why re-arm on a missing screen too: a fresh pane's first snapshot can time out or come
         // back before the provider holds a screen, and that says nothing about readiness.
         if (!projection || projection.source !== 'screen') {
-          this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
+          this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs, agent)
           return
         }
-        const snapshotText = projection.tail.join('\n')
+        const snapshotText =
+          agent === 'antigravity'
+            ? [...projection.tail, projection.draft ?? ''].join('\n')
+            : projection.tail.join('\n')
         const blockedReason = detectTerminalWaitBlockedReason(snapshotText)
-        if (!blockedReason && !isKnownReadyPromptPreview(snapshotText)) {
-          this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
+        const ready =
+          agent === 'antigravity'
+            ? isAntigravityReadyPromptSnapshot(snapshotText)
+            : isKnownReadyPromptPreview(snapshotText)
+        if (!blockedReason && !ready) {
+          this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs, agent)
           return
         }
         const result = this.buildTuiIdleProbeResult(waiter.handle, blockedReason)
@@ -91,12 +101,16 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
         this.terminalWaiters.resolve(waiter, result)
       })
       .catch(() => {
-        this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
+        this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs, agent)
       })
   }
 
   /** Looks again only while the screen is still the only usable evidence and the waiter has time left. */
-  protected rearmTuiIdleVisibleReadProbe(waiter: TerminalWaiter, deadlineMs: number): void {
+  protected rearmTuiIdleVisibleReadProbe(
+    waiter: TerminalWaiter,
+    deadlineMs: number,
+    agent: TuiAgent | null
+  ): void {
     const remainingMs = deadlineMs - Date.now() - TUI_IDLE_VISIBLE_PROBE_RETRY_MS
     if (remainingMs <= 0) {
       return
@@ -119,7 +133,7 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
         ) {
           return
         }
-        this.startTuiIdleVisibleReadProbe(waiter, deadlineMs - Date.now(), deadlineMs)
+        this.startTuiIdleVisibleReadProbe(waiter, deadlineMs - Date.now(), agent, deadlineMs)
       } catch {
         // Stale handle; nothing left to probe.
       }

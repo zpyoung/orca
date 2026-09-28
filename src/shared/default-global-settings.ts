@@ -141,6 +141,8 @@ export function buildDefaultSettings(args: {
     dockTerminalComposerByDefault: true,
     nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,
     nativeChatResumeWorkOnRestart: false,
+    nativeChatInheritShellEnvironment: true,
+    nativeChatShellEnvironmentVariables: [],
     nativeChatSessionOptions: {},
     openInApplications: [...DEFAULT_OPEN_IN_APPLICATIONS],
     rightSidebarOpenByDefault: true,
@@ -213,6 +215,7 @@ export function buildDefaultSettings(args: {
     defaultLinearTeamSelection: null,
     opencodeSessionCookie: '',
     opencodeWorkspaceId: '',
+    opencodeGoApiKey: '',
     minimaxGroupId: '',
     minimaxUsageModels: 'general',
     minimaxEndpoint: 'overseas',
@@ -224,6 +227,7 @@ export function buildDefaultSettings(args: {
     agentStatusHooksEnabled: true,
     tabAutoGenerateTitle: false,
     confirmClosePinnedTab: true,
+    editorPreviewTabsEnabled: true,
     keepComputerAwakeWhileAgentsRun: false,
     // Why: 'auto' probes keyboard layout so non-US users can type Option chars like @/€/[ out of the box (issue #903). See src/renderer/src/lib/keyboard-layout/*.
     terminalMacOptionAsAlt: 'auto',
@@ -239,6 +243,7 @@ export function buildDefaultSettings(args: {
     mobilePairingConnectionMode: 'automatic',
     mobilePairingCustomAddress: null,
     mobilePairingCustomAddresses: [],
+    machineName: '',
     // Why: off keeps the cosmetic overlay unmounted for users who never opt in.
     experimentalPet: false,
     experimentalActivity: false,

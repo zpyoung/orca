@@ -92,6 +92,8 @@ COPY --chown=runner:runner config/patches ./config/patches
 RUN pnpm install --no-frozen-lockfile --no-prefer-frozen-lockfile --ignore-scripts
 
 COPY --chown=runner:runner config/scripts ./config/scripts
+# Why: install-electron-package-binary.mjs re-exports its zip extractor from src/shared.
+COPY --chown=runner:runner src/shared/zip-extractor-command.ts ./src/shared/zip-extractor-command.ts
 
 RUN node config/scripts/ensure-native-runtime.mjs --runtime=node \
   && node config/scripts/install-electron-package-binary.mjs \
