@@ -41,15 +41,19 @@ import {
   CoordinatorSeatLostError,
   orchestrationRequestIdForAttemptFingerprint,
   QuestionAlreadyAnsweredError,
+  WorkerPromptUndeliverableError,
   type DispatchObservation,
   type HeimdallOrchestrationAdapter,
   type HeimdallOrchestrationPersistence,
   type RecoverDispatchResult,
-  type WatcherQuestionState
+  type WatcherQuestionState,
+  type WorkerIdleObservation
 } from './orchestration-contract'
 import { drainHeimdallMailbox, type MailboxDrainInput } from './mailbox-drain'
 import { answerWatcherQuestion, readWatcherQuestion } from './question-answer'
 import { listWatcherWorkers, releaseWatcherWorker, stopWatcherWorker } from './worker-controls'
+import { observeEnrolledWorkerIdle } from './worker-idle-observation'
+import { sendEnrolledWorkerPrompt } from './worker-prompt-send'
 import {
   dispatchResultFromReceipt,
   parseWorkerStartReceipt,
@@ -60,6 +64,7 @@ export {
   CoordinatorSeatLostError,
   orchestrationRequestIdForAttemptFingerprint,
   QuestionAlreadyAnsweredError,
+  WorkerPromptUndeliverableError,
   workspaceRuntimeId
 }
 export type { DispatchResult, DispatchWorkerInput }
@@ -68,7 +73,8 @@ export type {
   HeimdallOrchestrationAdapter,
   HeimdallOrchestrationPersistence,
   RecoverDispatchResult,
-  WatcherQuestionState
+  WatcherQuestionState,
+  WorkerIdleObservation
 }
 export type { CoordinatorIdentity } from '../../../shared/fork-heimdall/watcher-types'
 export type { MailboxCursor, MailboxDrainInput } from './mailbox-drain'
@@ -445,6 +451,18 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
         reason: error instanceof Error ? error.message : String(error)
       }
     }
+  }
+
+  observeWorkerIdle(enrollment: WatcherEnrollment, dispatchId: string) {
+    return observeEnrolledWorkerIdle(this.runtime, enrollment, dispatchId, (runId) =>
+      this.resolvePersistedRun(enrollment, runId)
+    )
+  }
+
+  sendWorkerPrompt(enrollment: WatcherEnrollment, dispatchId: string, text: string) {
+    return sendEnrolledWorkerPrompt(this.runtime, enrollment, dispatchId, text, (runId) =>
+      this.resolvePersistedRun(enrollment, runId)
+    )
   }
 
   private resolvePersistedRun(enrollment: WatcherEnrollment, runId: string): RunRow {

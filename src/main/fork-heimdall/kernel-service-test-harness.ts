@@ -115,6 +115,8 @@ export async function harness(
       status: 'live' | 'exited' | 'unverifiable'
       reason?: string
     }
+    idleObservation?: HeimdallOrchestrationAdapter['observeWorkerIdle']
+    now?: () => number
   } = {}
 ) {
   const directory = options.directory ?? (await mkdtemp(join(tmpdir(), 'heimdall-kernel-')))
@@ -159,7 +161,11 @@ export async function harness(
     ),
     drainMailbox: vi.fn(async (input) => options.mailbox?.(input) ?? []),
     answerQuestion: vi.fn(async () => {}),
-    readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
+    readQuestion: vi.fn(async () => ({ status: 'pending' as const })),
+    observeWorkerIdle: vi.fn(
+      options.idleObservation ?? (async () => ({ status: 'active' as const }))
+    ),
+    sendWorkerPrompt: vi.fn(async () => {})
   }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double for Store; this harness only ever reads the four accessors implemented above.
   const store = {
@@ -179,7 +185,7 @@ export async function harness(
     budgetClock,
     leaseStore,
     orchestration,
-    now: () => 100,
+    now: options.now ?? (() => 100),
     createId: () => `id-${++identifier}`,
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fake implements only the (callback, delay) call shape this harness needs, not setTimeout's full overload set.
     setTimer: ((callback: () => void, delay: number) => {
