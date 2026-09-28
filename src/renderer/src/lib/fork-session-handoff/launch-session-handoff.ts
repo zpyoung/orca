@@ -25,6 +25,7 @@ import {
   type ResolveHandoffDeliveryEvidenceArgs
 } from './handoff-delivery-evidence'
 import { enrichSessionLineage, recordSessionLineage } from './session-lineage-actions'
+import { createBrowserUuid } from '@/lib/browser-uuid'
 
 export type LaunchForkSessionHandoffArgs = {
   agent: TuiAgent
@@ -302,7 +303,7 @@ function resolveCollaborators(
     enrichLineage: overrides.enrichLineage ?? enrichSessionLineage,
     clearDraft: overrides.clearDraft ?? clearHandoffDraft,
     now: overrides.now ?? Date.now,
-    createLineageId: overrides.createLineageId ?? (() => globalThis.crypto.randomUUID())
+    createLineageId: overrides.createLineageId ?? createBrowserUuid
   }
 }
 
