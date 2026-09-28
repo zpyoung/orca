@@ -267,15 +267,23 @@ export class WatcherLedgerLifecycle {
   }
 
   closeForContactLoss(watcherId: string): void {
+    this.closeForWatcher(watcherId, 'contact-lost')
+  }
+
+  closeForWatcherStop(watcherId: string): void {
+    this.closeForWatcher(watcherId, 'shutdown')
+  }
+
+  private closeForWatcher(watcherId: string, reason: 'contact-lost' | 'shutdown'): void {
     for (const [attemptId, interval] of this.workerIntervals) {
       if (interval.watcherId !== watcherId) {
         continue
       }
       this.workerIntervals.delete(attemptId)
       try {
-        this.releaseInterval(interval, 'contact-lost')
+        this.releaseInterval(interval, reason)
       } catch (error) {
-        console.warn('[heimdall] worker interval release failed on contact loss:', error)
+        console.warn('[heimdall] worker interval release failed:', error)
       }
     }
   }

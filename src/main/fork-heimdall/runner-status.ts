@@ -180,25 +180,47 @@ export class WatcherRunnerStatusLifecycle {
     if (fired.disposition !== 'terminal') {
       throw new Error('A park predicate cannot make a watcher terminal')
     }
-    runner.enrollment = await this.dependencies.persistTerminal(runner, fired)
+    const enrollment = await this.dependencies.persistTerminal(runner, fired)
+    this.finishTerminal(runner, enrollment, fired.reason, true)
+  }
+
+  workspaceRemoved(
+    runner: WatcherRunner,
+    persist: (runner: WatcherRunner, fired: FiredStopPredicate) => WatcherRunner['enrollment']
+  ): void {
+    const fired = {
+      predicateId: 'workspace-removed',
+      disposition: 'terminal',
+      reason: 'Workspace removed from Orca'
+    } as const
+    const enrollment = persist(runner, fired)
+    this.finishTerminal(runner, enrollment, fired.reason, false)
+  }
+
+  private finishTerminal(
+    runner: WatcherRunner,
+    enrollment: WatcherRunner['enrollment'],
+    reason: string,
+    successfulTick: boolean
+  ): void {
+    runner.enrollment = enrollment
     runner.stopped = true
-    const ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-    const terminalSummary = this.dependencies.ledgerStore.readTerminalSummary(
-      runner.enrollment.watcherId
-    )
+    const ledger = this.dependencies.ledgerStore.read(enrollment.watcherId)
+    const terminalSummary = this.dependencies.ledgerStore.readTerminalSummary(enrollment.watcherId)
     runner.status = {
       ...runner.status,
       enabled: false,
       state: 'terminal',
       phase: 'terminal',
-      reason: fired.reason,
+      reason,
       parkReason: null,
-      budget: durableWatcherBudget(runner.enrollment, ledger, terminalSummary),
-      lastSuccessfulTickAtMs: this.dependencies.now(),
+      budget: durableWatcherBudget(enrollment, ledger, terminalSummary),
+      ...(successfulTick ? { lastSuccessfulTickAtMs: this.dependencies.now() } : {}),
       nextPulseAtMs: null
     }
     this.dependencies.publish(runner)
   }
+
   gate(runner: WatcherRunner, escalated: boolean, reason: string): void {
     runner.status = {
       ...runner.status,

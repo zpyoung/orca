@@ -435,18 +435,23 @@ higher epoch, which fences the old one out. Release is authenticated with both t
 and epoch: a stale holder cannot mark a successor's lease released. **A crashed app's lease
 self-heals after ~90 seconds; you do not need to delete anything.**
 
-The three failure modes look different in the UI:
+The four lease outcomes look different in the UI:
 
-- **`refused`** — someone else holds a live lease. The tick exits with `lease-refused`, publishes a
-  truthful status naming the holder and epoch (phase `lease-refused`, reason `Lease held by <holder>
-  (epoch <epoch>)`) instead of leaving a stale parked copy on screen, and retries at rapid pace.
+- **`refused`** — someone else holds a live lease. The tick exits with `lease-refused`, names the
+  holder and epoch in its status, and retries at rapid pace.
 - **`unverifiable`** — the host or filesystem could not be reached. The status becomes
   `unreachable` / `lease-unverifiable`, any active dispatch is closed for contact loss, and the pill
   switches to _Host unreachable · last confirmed …_. Contact loss is retried; it is not evidence
   that an asynchronous effect failed or did not land.
-- **`configuration-error`** — the durable target no longer resolves to the enrolled workspace or
-  authority. The watcher disables and parks with `park-configuration-error` instead of retrying a
-  configuration that cannot become correct merely through renewed contact.
+- **`configuration-error`** — the durable target resolves to a different enrolled workspace or
+  authority. The watcher disables and parks with `park-configuration-error`.
+- **`workspace-removed`** — the runtime's registered workspace resolver affirmatively cannot find
+  the enrolled Git worktree or folder. The watcher records a `workspace-removed` terminal fact and
+  durable budget summary, closes active budget intervals for watcher shutdown, disables itself, and
+  stops scheduling without a lease or kind handoff. This ends supervision, not any still-running
+  worker process; pending attempts remain pinned. An untyped selector miss for an SSH workspace is
+  only client bookkeeping, so it remains `unverifiable` alongside transport failures, ambiguous
+  selectors, and lease filesystem errors. Explicit host-reported absence is terminal.
 
 ## Kind: `hosted-review` (PR Sitter)
 
