@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { objectiveCapabilityModes } from '../../../shared/fork-heimdall-objective/contract-types'
 import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import {
+  effectiveNewWorktreeName,
+  isObjectiveLandingBarAvailable,
   validateObjectiveEnrollmentDraft,
   type ObjectiveEnrollmentDraft,
   type ObjectiveEnrollmentGateDraft
@@ -22,6 +24,9 @@ function gateDraft(
 function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnrollmentDraft {
   return {
     objectiveText: 'Ship the objective watcher',
+    newWorktreeName: '',
+    newWorktreeNameEdited: false,
+    newWorktreeBaseBranch: undefined,
     existingPlanText: '',
     tier: 'standard',
     landingBar: 'files-on-disk',
@@ -53,6 +58,53 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
 }
 
 const AVAILABILITY = { workspaceKind: 'git' as const, worktreeId: 'worktree' }
+const NEW_WORKTREE = { workspaceKind: 'git' as const, worktreeId: null, createsWorktree: true }
+
+describe('new objective worktree draft', () => {
+  it('suggests a branch-safe name from objective text', () => {
+    expect(effectiveNewWorktreeName(draft({ objectiveText: 'Ship the Objective Watcher!' }))).toBe(
+      'ship-the-objective-watcher'
+    )
+    expect(validateObjectiveEnrollmentDraft(draft(), NEW_WORKTREE)).toEqual([])
+  })
+
+  it('uses the edited name instead of regenerating a suggestion', () => {
+    expect(
+      effectiveNewWorktreeName(
+        draft({
+          objectiveText: 'Changed objective',
+          newWorktreeName: 'my-name',
+          newWorktreeNameEdited: true
+        })
+      )
+    ).toBe('my-name')
+  })
+
+  it('requires a nonblank effective new worktree name', () => {
+    expect(
+      validateObjectiveEnrollmentDraft(
+        draft({ newWorktreeName: '  ', newWorktreeNameEdited: true }),
+        NEW_WORKTREE
+      )
+    ).toContainEqual({ code: 'new-worktree-name-required' })
+    expect(
+      validateObjectiveEnrollmentDraft(draft({ objectiveText: '!!!' }), NEW_WORKTREE)
+    ).toContainEqual({ code: 'new-worktree-name-required' })
+    expect(
+      validateObjectiveEnrollmentDraft(draft({ newWorktreeNameEdited: true }), AVAILABILITY)
+    ).toEqual([])
+  })
+
+  it.each(['hosted-review', 'merged'] as const)(
+    'makes %s available to a worktree being created',
+    (landingBar) => {
+      expect(isObjectiveLandingBarAvailable(NEW_WORKTREE, landingBar)).toBe(true)
+      expect(
+        isObjectiveLandingBarAvailable({ workspaceKind: 'git', worktreeId: null }, landingBar)
+      ).toBe(false)
+    }
+  )
+})
 
 describe('objective enrollment gate validation', () => {
   it('accepts an empty gate list', () => {

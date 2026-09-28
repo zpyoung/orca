@@ -199,7 +199,8 @@
         "gates": "Gates",
         "gatesHelpLine": "Gates run on the integrated branch after every plan node has merged, before review and landing. Put the full test suite and other whole-tree checks here, not in plan nodes.",
         "addGate": "Add gate",
-        "gatesUnsupportedHost": "Gates are unavailable on this host's Orca version. Remove any gates below to continue."
+        "gatesUnsupportedHost": "Gates are unavailable on this host's Orca version. Remove any gates below to continue.",
+        "newWorktreeInRepo": "New worktree in {{repo}}"
       },
       "validation": {
         "workspaceRequired": "Choose a workspace.",

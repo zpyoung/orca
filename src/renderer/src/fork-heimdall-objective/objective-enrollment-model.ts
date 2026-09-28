@@ -22,6 +22,7 @@ import {
 } from '../../../shared/fork-heimdall-objective/contract-types'
 import type { CapabilityMode } from '../../../shared/fork-heimdall/watcher-types'
 import type { WatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
+import { slugifyForWorkspaceName } from '../../../shared/workspace-name'
 
 export const OBJECTIVE_TIERS = ObjectiveTierSchema.options
 export type { ObjectiveTier }
@@ -62,6 +63,9 @@ export type ObjectiveEnrollmentGateDraft = {
 
 export type ObjectiveEnrollmentDraft = {
   objectiveText: string
+  newWorktreeName: string
+  newWorktreeNameEdited: boolean
+  newWorktreeBaseBranch: string | undefined
   existingPlanText: string
   tier: ObjectiveTier
   landingBar: ObjectiveLandingBar
@@ -85,10 +89,12 @@ export type ObjectiveLandingBarAvailability = {
   workspaceKind: ObjectiveWorkspaceKind | null
   worktreeId: string | null
   parallelUnsupported?: boolean
+  createsWorktree?: boolean
 }
 
 export type ObjectiveEnrollmentErrorCode =
   | 'workspace-required'
+  | 'new-worktree-name-required'
   | 'objective-required'
   | 'objective-too-long'
   | 'existing-plan-too-long'
@@ -127,6 +133,13 @@ export function territoryGlobError(glob: string): ObjectiveEnrollmentError | nul
   return isAllowedObjectiveTerritoryGlob(glob) ? null : { code: 'territory-invalid', value: glob }
 }
 
+/** Returns the user-edited name or the suggested branch-safe name for a new worktree. */
+export function effectiveNewWorktreeName(draft: ObjectiveEnrollmentDraft): string {
+  return draft.newWorktreeNameEdited
+    ? draft.newWorktreeName
+    : slugifyForWorkspaceName(draft.objectiveText)
+}
+
 export function isObjectiveLandingBarAvailable(
   availability: ObjectiveLandingBarAvailability,
   landingBar: ObjectiveLandingBar
@@ -137,7 +150,7 @@ export function isObjectiveLandingBarAvailable(
   if (landingBar !== 'hosted-review' && landingBar !== 'merged') {
     return true
   }
-  return availability.worktreeId !== null
+  return availability.worktreeId !== null || availability.createsWorktree === true
 }
 
 export function validateObjectiveEnrollmentDraft(
@@ -148,6 +161,9 @@ export function validateObjectiveEnrollmentDraft(
   const objective = draft.objectiveText.trim()
   if (!draft.workspaceKind) {
     errors.push({ code: 'workspace-required' })
+  }
+  if (landingAvailability.createsWorktree && !effectiveNewWorktreeName(draft).trim()) {
+    errors.push({ code: 'new-worktree-name-required' })
   }
   if (!objective) {
     errors.push({ code: 'objective-required' })
