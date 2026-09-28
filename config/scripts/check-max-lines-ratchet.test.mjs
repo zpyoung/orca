@@ -71,11 +71,11 @@ describe('defaultLimitForPath', () => {
 
   it.each(['mts', 'cts'])('uses TypeScript budgets for .%s on either path separator', (ext) => {
     for (const prefix of ['a/b', 'a\\b']) {
-      expect(defaultLimitForPath(`${prefix}.${ext}`)).toBe(300)
-      expect(defaultLimitForPath(`${prefix}.test.${ext}`)).toBe(800)
-      expect(defaultLimitForPath(`${prefix}.spec.${ext}`)).toBe(800)
-      expect(defaultLimitForPath(`${prefix}.test.${ext}.backup`)).toBe(300)
-      expect(defaultLimitForPath(`${prefix}.testish.${ext}`)).toBe(300)
+      expect(defaultLimitForPath(`${prefix}.${ext}`)).toBe(500)
+      expect(defaultLimitForPath(`${prefix}.test.${ext}`)).toBe(1000)
+      expect(defaultLimitForPath(`${prefix}.spec.${ext}`)).toBe(1000)
+      expect(defaultLimitForPath(`${prefix}.test.${ext}.backup`)).toBe(500)
+      expect(defaultLimitForPath(`${prefix}.testish.${ext}`)).toBe(500)
     }
   })
 })
@@ -87,7 +87,7 @@ describe('collectMobileBumps', () => {
       JSON.stringify({
         overrides: paths.map((file, index) => ({
           files: [file],
-          rules: { 'max-lines': ['error', { max: (index === 0 ? 300 : 800) + extra }] }
+          rules: { 'max-lines': ['error', { max: (index === 0 ? 500 : 1000) + extra }] }
         }))
       })
     expect(collectMobileBumps(config(-1))).toEqual([])
@@ -175,14 +175,14 @@ describe('max-lines repository coverage', () => {
       })
       expect(initialized.code, initialized.stderr).toBe(0)
       const budgets = [
-        ['ts', 300],
-        ['mts', 300],
-        ['cts', 300],
-        ['tsx', 400],
-        ['mjs', 600],
+        ['ts', 500],
+        ['mts', 500],
+        ['cts', 500],
+        ['tsx', 600],
+        ['mjs', 800],
         ...['ts', 'tsx', 'mts', 'cts'].flatMap((ext) => [
-          [`test.${ext}`, 800],
-          [`spec.${ext}`, 800]
+          [`test.${ext}`, 1000],
+          [`spec.${ext}`, 1000]
         ])
       ]
       const expected = []
