@@ -1,3 +1,4 @@
+import type { EnrollmentAuthorizationScope } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type {
   AuthorizedEnrollment,
@@ -72,14 +73,62 @@ function validateEnrollment(
   }
 }
 
+type AuthorizationUndo = {
+  scope: EnrollmentAuthorizationScope
+  markPersisted(): void
+  settle(): Promise<void>
+}
+
+function authorizationUndo(): AuthorizationUndo {
+  const undos: (() => Promise<void>)[] = []
+  let persisted = false
+  return {
+    scope: {
+      onAbandoned: (undo) => {
+        undos.push(undo)
+      }
+    },
+    markPersisted: () => {
+      persisted = true
+    },
+    async settle() {
+      if (persisted) {
+        return
+      }
+      for (const undo of undos.toReversed()) {
+        try {
+          await undo()
+        } catch (error) {
+          console.warn('Heimdall enrollment authorization undo failed', error)
+        }
+      }
+    }
+  }
+}
+
+/** Enrolls or re-arms a watcher; authorization side effects are undone unless the enrollment persists. */
 export async function enrollWatcher(
   untrustedInput: EnrollInput,
   dependencies: KernelEnrollmentLifecycleDependencies
 ): Promise<EnrollResult> {
+  const undo = authorizationUndo()
+  try {
+    return await enrollAuthorizedWatcher(untrustedInput, dependencies, undo)
+  } finally {
+    await undo.settle()
+  }
+}
+
+async function enrollAuthorizedWatcher(
+  untrustedInput: EnrollInput,
+  dependencies: KernelEnrollmentLifecycleDependencies,
+  undo: AuthorizationUndo
+): Promise<EnrollResult> {
   const authorization = await authorizeKindEnrollment(
     dependencies.registry,
     untrustedInput,
-    dependencies.storageAuthority
+    dependencies.storageAuthority,
+    undo.scope
   )
   if (authorization.status !== 'authorized') {
     return authorization
@@ -148,6 +197,7 @@ export async function enrollWatcher(
         ? () => dependencies.appendBudgetGeneration(existing.watcherId)
         : undefined
     )
+    undo.markPersisted()
     dependencies.acknowledgePark(rearmed.watcherId)
     let runner = dependencies.runner(rearmed.watcherId)
     if (!runner) {
@@ -185,6 +235,7 @@ export async function enrollWatcher(
     terminalAtMs: null
   }
   const inserted = dependencies.enrollments.insert(enrollment)
+  undo.markPersisted()
   activateInsertedEnrollment(inserted, kind, dependencies)
   return { status: 'enrolled', entry: dependencies.entry(inserted) }
 }

@@ -629,6 +629,19 @@ value remains an error. Display diagnostics mark abbreviations; canonical report
 | Role agents          | planner / implementer / reviewer / integrator | automatic        |                                                                                           |
 | Sitter overrides     | four sitter capabilities                      | inherit          | applied at handoff                                                                        |
 
+### Enrollment on a new worktree
+
+From **New objective**, select **New worktree** under a Git repository, then choose its name and
+optionally a base branch. This is objective-only: PR Sitters still require an existing worktree with
+an open PR/MR. The enrollment request carries `newWorktree` in its objective kind payload, while
+`worktreeId` is null; the saved objective contract excludes `newWorktree`.
+
+Authorization creates an independent, inactive worktree on the repository's execution host using
+normal new-workspace setup policy. Invalid requests are refused before creation; if workspace
+resolution, landing-bar validation, or forge detection fails afterward, authorization force-removes
+the new worktree on that host and reports the original error. **Deleting the watcher leaves its
+enrolled worktree in place**, so user changes remain available.
+
 ### Capability defaults are not conservative
 
 `objectiveCapabilityModes` (`contract-types.ts:157-165`) returns:

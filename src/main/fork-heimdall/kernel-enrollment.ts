@@ -1,6 +1,7 @@
 import type { AutomationSchedulerOwner } from '../../shared/automations-types'
 import { deriveBudgetState, type BudgetPolicy } from '../../shared/fork-heimdall/budget'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { EnrollmentAuthorizationScope } from '../../shared/fork-heimdall/kind-contract'
 import { OWNER_INTERVENTION_CAPABILITY } from '../../shared/fork-heimdall/owner/owner-capability'
 import {
   AuthorizedEnrollmentSchema,
@@ -46,7 +47,8 @@ function isOwnerRefusal(error: unknown): error is { schedulerOwner: AutomationSc
 export async function authorizeKindEnrollment(
   registry: WatcherKindRegistry,
   untrustedInput: EnrollInput,
-  storageAuthority: HeimdallStorageAuthority = 'desktop'
+  storageAuthority: HeimdallStorageAuthority = 'desktop',
+  scope?: EnrollmentAuthorizationScope
 ): Promise<KindEnrollmentAuthorization> {
   const inputResult = EnrollInputSchema.safeParse(untrustedInput)
   if (!inputResult.success) {
@@ -72,7 +74,7 @@ export async function authorizeKindEnrollment(
 
   let authorizedUnknown: unknown
   try {
-    authorizedUnknown = await kind.authorizeEnrollment(input)
+    authorizedUnknown = await kind.authorizeEnrollment(input, scope)
   } catch (error) {
     if (isOwnerRefusal(error)) {
       return {

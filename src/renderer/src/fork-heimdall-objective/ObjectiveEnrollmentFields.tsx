@@ -28,6 +28,7 @@ import { ObjectiveEnrollmentGateFields } from './ObjectiveEnrollmentGateFields'
 import { ObjectiveExistingPlanInput } from './ObjectiveExistingPlanInput'
 import { ObjectiveEnrollmentParallelFields } from './ObjectiveEnrollmentParallelFields'
 import { ObjectiveWorkspacePicker } from './ObjectiveWorkspacePicker'
+import { ObjectiveNewWorktreeFields } from './ObjectiveNewWorktreeFields'
 import {
   isObjectiveLandingBarAvailable,
   OBJECTIVE_CAPABILITIES,
@@ -206,6 +207,15 @@ export function ObjectiveEnrollmentFields({
           }
         />
       </section>
+
+      {selectedWorkspace?.createsWorktree ? (
+        <ObjectiveNewWorktreeFields
+          repoId={selectedWorkspace.repoId}
+          draft={draft}
+          disabled={disabled}
+          onDraftChange={onDraftChange}
+        />
+      ) : null}
 
       <section className="space-y-3">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">

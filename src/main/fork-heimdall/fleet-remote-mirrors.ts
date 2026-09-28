@@ -3,6 +3,7 @@ import {
   type EnrollSuccess,
   type HeimdallRemoteOwner
 } from '../../shared/fork-heimdall/api'
+import { HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
 import { HeimdallSubscriptionEventReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
 import type {
   WatcherCommandRequest,
@@ -117,6 +118,14 @@ export class HeimdallRemoteFleetMirrors {
       mirror.enrollOwnerSupport === 'unsupported'
     ) {
       throw new HeimdallEnrollOwnerCapabilityError()
+    }
+    if (
+      input.kind === 'objective' &&
+      isRecord(input.kindPayload) &&
+      'newWorktree' in input.kindPayload &&
+      mirror.newWorktreeSupport !== 'supported'
+    ) {
+      throw new HeimdallCommandCapabilityError(HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY)
     }
     return enrollRemoteWatcher(
       this.environments,
