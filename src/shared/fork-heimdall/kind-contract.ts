@@ -191,6 +191,18 @@ export type KindConcurrencyPolicy<TWorld, TAction extends KernelAction> = {
       workerReleaseConfirmed(dispatchId: string): boolean
     }
   ): Promise<void>
+  /**
+   * Runs every tick regardless of snapshot freshness; implementations must not depend on the
+   * snapshot. Resolves true when it changed the world, so the tick re-reads a fresh snapshot.
+   */
+  cleanupWorkspaces?(
+    ledger: WatcherLedger,
+    context: {
+      enrollment: WatcherEnrollment
+      lease: LeaseGuard
+      workerReleaseConfirmed(dispatchId: string): boolean
+    }
+  ): Promise<boolean>
 }
 
 export type PlannerAdapter<TWorld> = {

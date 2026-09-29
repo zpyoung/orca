@@ -170,6 +170,116 @@ describe('Heimdall settled worker release', () => {
     await world.service.stopForShutdown()
   })
 
+  it('runs workspace cleanup after worker release on cached ticks and refreshes only when changed', async () => {
+    const events: string[] = []
+    const reads: boolean[] = []
+    const cleanupCalls: { releaseConfirmed: boolean; releaseEvidenceCount: number }[] = []
+    const registeredKind = kind({
+      read: async (_enrollment, { fresh }) => {
+        reads.push(fresh)
+        const revision = `snapshot-${reads.length}`
+        return {
+          freshness: fresh ? ('live' as const) : ('cached' as const),
+          contentIdentity: revision,
+          observedAtMs: reads.length,
+          world: { revision }
+        }
+      },
+      concurrency: {
+        canRunAlongside: () => true,
+        shouldDrainBudget: () => false,
+        preserveAttemptOnContentChange: () => false,
+        canRunWhenBudgetExhausted: () => false,
+        isIsolatedAttempt: () => false,
+        retainWorker: () => false,
+        async cleanupWorkspaces(ledger, context) {
+          events.push('cleanup')
+          cleanupCalls.push({
+            releaseConfirmed: context.workerReleaseConfirmed('dispatch-1'),
+            releaseEvidenceCount: releaseEvidence(ledger.entries).length
+          })
+          return cleanupCalls.length === 3
+        }
+      }
+    })
+    const releaseWorker = vi.fn(async (_enrollment: WatcherEnrollment, dispatchId: string) => {
+      events.push('release')
+      return {
+        dispatchId,
+        state: 'released' as const,
+        processAction: 'closed_agent_terminal' as const,
+        archive: null
+      }
+    })
+    const world = await releaseWorld({ registeredKind, releaseWorker })
+
+    await world.service.reconcileForTesting(world.watcherId)
+
+    expect(events).toEqual(['release', 'cleanup'])
+    expect(cleanupCalls).toEqual([{ releaseConfirmed: true, releaseEvidenceCount: 1 }])
+    expect(reads).toEqual([true])
+
+    await world.service.reconcileForTesting(world.watcherId)
+
+    expect(reads).toEqual([true, false])
+    expect(cleanupCalls).toHaveLength(2)
+
+    await world.service.reconcileForTesting(world.watcherId)
+
+    expect(cleanupCalls).toHaveLength(3)
+    expect(reads).toEqual([true, false, false, true])
+    expect(events).toEqual(['release', 'cleanup', 'cleanup', 'cleanup'])
+    await world.service.stopForShutdown()
+  })
+
+  it('reads fresh once when cleanup changes the world on a cached tick of a reconciling kind', async () => {
+    const reads: boolean[] = []
+    let cleanupCalls = 0
+    const reconcile = vi.fn(async () => undefined)
+    const registeredKind = kind({
+      read: async (_enrollment, { fresh }) => {
+        reads.push(fresh)
+        const revision = `snapshot-${reads.length}`
+        return {
+          freshness: fresh ? ('live' as const) : ('cached' as const),
+          contentIdentity: revision,
+          observedAtMs: reads.length,
+          world: { revision }
+        }
+      },
+      concurrency: {
+        canRunAlongside: () => true,
+        shouldDrainBudget: () => false,
+        preserveAttemptOnContentChange: () => false,
+        canRunWhenBudgetExhausted: () => false,
+        isIsolatedAttempt: () => false,
+        retainWorker: () => false,
+        cleanupWorkspaces: async () => {
+          cleanupCalls += 1
+          return cleanupCalls === 2
+        },
+        reconcile
+      }
+    })
+    const releaseWorker = vi.fn(async (_enrollment: WatcherEnrollment, dispatchId: string) => ({
+      dispatchId,
+      state: 'released' as const,
+      processAction: 'closed_agent_terminal' as const,
+      archive: null
+    }))
+    const world = await releaseWorld({ registeredKind, releaseWorker })
+
+    await world.service.reconcileForTesting(world.watcherId)
+    const readsAfterLiveTick = reads.length
+    expect(reconcile).toHaveBeenCalledOnce()
+
+    await world.service.reconcileForTesting(world.watcherId)
+
+    expect(reads.slice(readsAfterLiveTick)).toEqual([false, true])
+    expect(reconcile).toHaveBeenCalledOnce()
+    await world.service.stopForShutdown()
+  })
+
   it('recovers a durable accepted report, preserves earlier mail, and checkpoints its replay', async () => {
     let drains = 0
     const cursors: { previousDeliveryId: string | null; lastSequence: number }[] = []
