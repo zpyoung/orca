@@ -1,5 +1,5 @@
 ---
-last_released_commit: e18a6ac0d1e991d5c04d6623ed5f87d247b5de7c
+last_released_commit: 4406450a91fdef86b8bf83014646ae80f5db6cca
 upstream_synced: v1.4.215
 ---
 
@@ -11,6 +11,26 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.216-rc.0.zy03] - 2026-09-29
+
+Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4.215).
+
+### Added
+- The `orca` CLI can now manage Heimdall watchers end to end: create, budget (decimal `--hours`
+  are rounded), approve, and answer escalations, with workspace selection and enrollment refusals
+  reported consistently.
+
+### Fixed
+- A pull-request sitter no longer merges until every check on the current head commit has passed;
+  failures the sitter can fix itself are recovered first, and GitLab hosts without status checks
+  are tolerated.
+- Heimdall stops watchers whose registered workspace has been removed, after confirming the
+  workspace is really gone rather than just unreachable.
+- Objective watchers clean up applied dispatch worktrees on every tick. Worktrees that vanished or
+  hold uncommitted changes are kept and noted instead of force-removed.
+- A malformed batch of Jev judgments no longer discards the valid answers in it, and the failure is
+  diagnosed without state notices leaking into recorded reasons.
 
 ## [1.4.216-rc.0.zy02] - 2026-09-29
 
