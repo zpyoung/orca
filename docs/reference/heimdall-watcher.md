@@ -85,10 +85,12 @@ This supports both Git and folder objectives.
 The read phase asks one batch per new `(contentIdentity, projection digest)`. A newly arrived report
 changes that identity even if workspace files did not change. Answers and failures are pinned
 `client-observation` ledger entries, not a second cache; replay and unchanged ticks do not ask again,
-even after changing providers. New answers record their transport provider and the exact returned
-model stamp; model aliases are not treated as calibrated versions. Choice/Score answers without
-confidence or probabilities are unavailable, never assigned synthetic confidence.
-A durable pending entry prevents a restart from repeating an interrupted invocation.
+even after changing providers. Each valid answer in a partial batch is retained for shadow review,
+while the batch remains unavailable and cannot grant acting authority. Missing or invalid answers
+are counted by bounded field/shape reason; choice/score answers without confidence or probabilities
+are unavailable, never assigned synthetic confidence. New answers record their transport provider
+and exact returned model stamp; model aliases are not treated as calibrated versions. A durable
+pending entry prevents a restart from repeating an interrupted invocation.
 
 Before applying the 32 KiB state limit, the judgment projection losslessly shares exact repeated
 string values through a versioned `normalization.strings` table. Each original field keeps its
@@ -119,10 +121,13 @@ identical; an older, more-pruned answer cannot suppress judgment of newly retain
 
 HTTP 429/529 get at most three attempts with 100/200 ms backoff; each attempt times out after five
 seconds. Other failures fall through to the deterministic path and are recorded.
-Unavailable outcomes distinguish timeout, HTTP status, exhausted retries, state/request/response
-size, and malformed responses using bounded diagnostic codes. Unknown errors stay generic; API keys
-and provider response bodies are not persisted. Replaying the same unavailable identity makes no
-new provider call.
+Unavailable outcomes distinguish timeout, network failure, HTTP status, exhausted retries,
+state/request/response size, malformed JSON/UTF-8/envelopes, unexpected answer IDs, and bounded
+per-answer shape/type/missing-confidence/missing-probabilities, choice/score rubric, distribution,
+and score-weight mismatch counts. The outcome and Decision Trace show how many answers survived a
+partial batch. Unknown errors stay generic; API keys, arbitrary provider error text, response
+bodies, and answer IDs are not persisted. Replaying the same unavailable identity makes no new
+provider call.
 
 The **Decision Trace** shows participation and why answers were held (including shadow mode),
 distinct from disabled, remote, unavailable or never-completed requests. **Ledger activity** retains

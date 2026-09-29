@@ -8,6 +8,11 @@ import {
   type JudgmentProvider,
   type JudgmentQuestion
 } from '../../../shared/fork-heimdall/judgment/types'
+import {
+  JudgmentUnavailableReasonSchema,
+  normalizeAnswers,
+  OpenRouterAnswerSchema
+} from './answer-validation'
 import { cancelUnreadResponseBody } from '../../lib/unread-response-body'
 import { getMainHttpClient } from '../../network/http-client'
 
@@ -26,7 +31,6 @@ const JUDGMENT_TRANSPORTS: Record<JudgmentProvider, { url: string; model: string
   }
 const MAX_ATTEMPTS = 3
 const RETRY_BASE_DELAY_MS = 100
-const DISTRIBUTION_TOLERANCE = 1e-6
 
 export const JUDGMENT_MAX_STATE_BYTES = 32 * 1024
 export const JUDGMENT_MAX_REQUEST_BYTES = 256 * 1024
@@ -39,10 +43,12 @@ const JudgmentQuestionsSchema = z
 
 export { JudgmentAnswerSchema, JudgmentModelSchema, JudgmentQuestionSchema }
 export type { JudgmentAnswer, JudgmentProvider, JudgmentQuestion }
+
 export const JudgmentResponseSchema = z
   .object({
     model: JudgmentModelSchema,
-    answers: z.record(z.string().min(1), JudgmentAnswerSchema)
+    answers: z.record(z.string().min(1), JudgmentAnswerSchema),
+    unavailable: z.record(z.string().min(1), JudgmentUnavailableReasonSchema).optional()
   })
   .strict()
 
@@ -59,38 +65,6 @@ export const JudgmentVendorResponseSchema = z
   })
   .strict()
 
-const OpenRouterChoiceAnswerSchema = z
-  .object({
-    type: z.literal('choice'),
-    choice: z.string(),
-    probabilities: z.record(z.string(), z.number()).optional(),
-    confidence: z.number().optional()
-  })
-  .strict()
-
-const OpenRouterScoreAnswerSchema = z
-  .object({
-    type: z.literal('score'),
-    score: z.number(),
-    legend: z.record(z.string(), z.unknown()).optional(),
-    probabilities: z.record(z.string(), z.number()).optional(),
-    confidence: z.number().optional()
-  })
-  .strict()
-
-const OpenRouterNoulAnswerSchema = z
-  .object({
-    type: z.literal('noul'),
-    noul: z.number()
-  })
-  .strict()
-
-const OpenRouterAnswerSchema = z.discriminatedUnion('type', [
-  OpenRouterChoiceAnswerSchema,
-  OpenRouterScoreAnswerSchema,
-  OpenRouterNoulAnswerSchema
-])
-
 export const JudgmentOpenRouterResponseSchema = z
   .object({
     id: z.string().optional(),
@@ -106,6 +80,14 @@ export const JudgmentOpenRouterResponseSchema = z
       .strict()
   })
   .strict()
+
+const JudgmentVendorEnvelopeSchema = JudgmentVendorResponseSchema.extend({
+  answers: z.record(z.string(), z.unknown())
+}).strict()
+
+const JudgmentOpenRouterEnvelopeSchema = JudgmentOpenRouterResponseSchema.extend({
+  answers: z.record(z.string(), z.unknown())
+}).strict()
 
 export type JudgmentResponse = z.infer<typeof JudgmentResponseSchema>
 
@@ -124,10 +106,14 @@ export type JudgmentClientOptions = {
 
 export type JudgmentClientFailureDiagnostic =
   | { code: 'timeout' }
+  | { code: 'network-error' }
   | { code: 'http-status'; status: number }
   | { code: 'retry-exhausted'; status: number; attempts: number }
   | { code: 'state-size' | 'request-size' | 'response-size' }
-  | { code: 'malformed-response' }
+  | {
+      code: 'malformed-response'
+      reason?: 'invalid-json' | 'invalid-utf8' | 'invalid-envelope' | 'unexpected-answer'
+    }
   | { code: 'unknown' }
 
 export class JudgmentClientFailure extends Error {
@@ -263,138 +249,20 @@ async function readBoundedResponse(
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   } catch {
-    throw failure(provider, 'response is invalid', { code: 'malformed-response' })
+    throw failure(provider, 'response is invalid', {
+      code: 'malformed-response',
+      reason: 'invalid-utf8'
+    })
   }
 }
 
-function hasSameKeys(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
-  const leftKeys = Object.keys(left)
-  const rightKeys = Object.keys(right)
-  return leftKeys.length === rightKeys.length && leftKeys.every((key) => Object.hasOwn(right, key))
-}
-
-function isDistribution(probabilities: Record<string, number>): boolean {
-  const values = Object.values(probabilities)
-  if (values.length === 0) {
-    return false
-  }
-  const total = values.reduce((sum, probability) => sum + probability, 0)
-  return Math.abs(total - 1) <= DISTRIBUTION_TOLERANCE
-}
-
-function isChoiceAnswerValid(
-  answer: Extract<JudgmentAnswer, { type: 'choice' }>,
-  question: Extract<JudgmentQuestion, { type: 'choice' }>
-): boolean {
-  if (
-    !hasSameKeys(answer.probabilities, question.criteria) ||
-    !Object.hasOwn(question.criteria, answer.choice) ||
-    !isDistribution(answer.probabilities)
-  ) {
-    return false
-  }
-  const selectedProbability = answer.probabilities[answer.choice]
-  return Object.values(answer.probabilities).every(
-    (probability) => selectedProbability >= probability
-  )
-}
-
-function isScoreAnswerValid(
-  answer: Extract<JudgmentAnswer, { type: 'score' }>,
-  question: Extract<JudgmentQuestion, { type: 'score' }>
-): boolean {
-  const expectedLegend = Object.fromEntries(
-    question.criteria.map((description, index) => [String(index), description])
-  )
-  if (
-    !hasSameKeys(answer.legend, expectedLegend) ||
-    !hasSameKeys(answer.probabilities, expectedLegend) ||
-    !Object.entries(expectedLegend).every(
-      ([level, description]) => answer.legend[level] === description
-    ) ||
-    !isDistribution(answer.probabilities)
-  ) {
-    return false
-  }
-  if (answer.score < 0 || answer.score > question.criteria.length - 1) {
-    return false
-  }
-  const weightedScore = Object.entries(answer.probabilities).reduce(
-    (sum, [level, probability]) => sum + Number(level) * probability,
-    0
-  )
-  return Math.abs(answer.score - weightedScore) <= DISTRIBUTION_TOLERANCE
-}
-
-function answersMatchQuestions(
-  answers: Record<string, JudgmentAnswer>,
-  questions: Record<string, JudgmentQuestion>
-): boolean {
-  if (!hasSameKeys(answers, questions)) {
-    return false
-  }
-  return Object.entries(questions).every(([id, question]) => {
-    const answer = answers[id]
-    if (!answer || answer.type !== question.type) {
-      return false
-    }
-    if (answer.type === 'choice' && question.type === 'choice') {
-      return isChoiceAnswerValid(answer, question)
-    }
-    if (answer.type === 'score' && question.type === 'score') {
-      return isScoreAnswerValid(answer, question)
-    }
-    return answer.type === 'noul' && question.type === 'noul'
-  })
-}
-
-function normalizeOpenRouterAnswers(
-  answers: z.infer<typeof JudgmentOpenRouterResponseSchema>['answers'],
-  questions: Record<string, JudgmentQuestion>
-): Record<string, JudgmentAnswer> | null {
-  if (!hasSameKeys(answers, questions)) {
-    return null
-  }
-  const normalized: Record<string, JudgmentAnswer> = {}
-  for (const [id, question] of Object.entries(questions)) {
-    const answer = answers[id]
-    if (!answer || answer.type !== question.type) {
-      return null
-    }
-
-    let candidate: unknown
-    if (answer.type === 'choice' && question.type === 'choice') {
-      if (answer.confidence === undefined || answer.probabilities === undefined) {
-        return null
-      }
-      candidate = answer
-    } else if (answer.type === 'score' && question.type === 'score') {
-      if (answer.confidence === undefined || answer.probabilities === undefined) {
-        return null
-      }
-      // The score rubric deterministically defines the numeric legend, so an omitted
-      // transport legend can be restored without inventing model output.
-      candidate = {
-        ...answer,
-        legend:
-          answer.legend ??
-          Object.fromEntries(
-            question.criteria.map((description, index) => [String(index), description])
-          )
-      }
-    } else if (answer.type === 'noul' && question.type === 'noul') {
-      candidate = answer
-    } else {
-      return null
-    }
-
-    const parsed = JudgmentAnswerSchema.safeParse(candidate)
-    if (!parsed.success) {
-      return null
-    }
-    normalized[id] = parsed.data
-  }
-  return normalized
+function malformedResponse(
+  provider: JudgmentProvider,
+  reason: NonNullable<
+    Extract<JudgmentClientFailureDiagnostic, { code: 'malformed-response' }>['reason']
+  >
+): JudgmentClientFailure {
+  return failure(provider, 'response is invalid', { code: 'malformed-response', reason })
 }
 
 async function parseResponse(
@@ -407,29 +275,26 @@ async function parseResponse(
   try {
     raw = JSON.parse(body)
   } catch {
-    throw failure(provider, 'response is invalid', { code: 'malformed-response' })
+    throw malformedResponse(provider, 'invalid-json')
   }
 
-  try {
-    if (provider === 'typesafe') {
-      const parsed = JudgmentVendorResponseSchema.parse(raw)
-      if (!answersMatchQuestions(parsed.answers, questions)) {
-        throw failure(provider, 'response is invalid', { code: 'malformed-response' })
-      }
-      return { model: parsed.model, answers: parsed.answers }
-    }
+  const envelope =
+    provider === 'typesafe'
+      ? JudgmentVendorEnvelopeSchema.safeParse(raw)
+      : JudgmentOpenRouterEnvelopeSchema.safeParse(raw)
+  if (!envelope.success) {
+    throw malformedResponse(provider, 'invalid-envelope')
+  }
 
-    const parsed = JudgmentOpenRouterResponseSchema.parse(raw)
-    const answers = normalizeOpenRouterAnswers(parsed.answers, questions)
-    if (answers === null || !answersMatchQuestions(answers, questions)) {
-      throw failure(provider, 'response is invalid', { code: 'malformed-response' })
+  for (const id in envelope.data.answers) {
+    if (Object.hasOwn(envelope.data.answers, id) && !Object.hasOwn(questions, id)) {
+      throw malformedResponse(provider, 'unexpected-answer')
     }
-    return { model: parsed.model, answers }
-  } catch (error) {
-    if (error instanceof JudgmentClientFailure) {
-      throw error
-    }
-    throw failure(provider, 'response is invalid', { code: 'malformed-response' })
+  }
+
+  return {
+    model: envelope.data.model,
+    ...normalizeAnswers(provider, envelope.data.answers, questions)
   }
 }
 
@@ -480,7 +345,7 @@ export function createJudgmentClient(
       } catch {
         throw controller.signal.aborted
           ? failure(provider, 'request timed out', { code: 'timeout' })
-          : failure(provider, 'request failed')
+          : failure(provider, 'request failed', { code: 'network-error' })
       }
 
       if (!response.ok) {
