@@ -3,7 +3,13 @@
     {
       "name": "heimdall",
       "purpose": "Deterministic reconciler kernel supervising durable watchers; kinds register into it in-tree.",
-      "globs": ["**/fork-heimdall/**", "docs/reference/heimdall-watcher.md"]
+      "globs": [
+        "**/fork-heimdall/**",
+        "docs/reference/heimdall-watcher.md",
+        "skill-guides/orca-heimdall.md",
+        "skill-stubs/orca-heimdall.md",
+        "skills/orca-heimdall/**"
+      ]
     },
     {
       "name": "hosted-review-sitter",
@@ -373,6 +379,7 @@
         "  HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,",
         "  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,",
         "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,",
         "  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,",
         "  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY",
         "} from './fork-heimdall/capability'",
@@ -384,6 +391,7 @@
         "  HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,",
         "  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,",
         "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,",
         "  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,",
         "  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,"
       ]
@@ -623,7 +631,24 @@
       "kind": "registration",
       "lines": [
         "    name: 'heimdall',",
-        "    keys: ['heimdall debug', 'heimdall set-concurrency'],",
+        "    keys: [",
+        "      'heimdall debug',",
+        "      'heimdall list',",
+        "      'heimdall show',",
+        "      'heimdall objective',",
+        "      'heimdall create objective',",
+        "      'heimdall create hosted-review',",
+        "      'heimdall pause',",
+        "      'heimdall resume',",
+        "      'heimdall disarm',",
+        "      'heimdall rm',",
+        "      'heimdall approve',",
+        "      'heimdall answer',",
+        "      'heimdall answer-escalation',",
+        "      'heimdall stop-worker',",
+        "      'heimdall budget',",
+        "      'heimdall set-concurrency'",
+        "    ],",
         "    load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS"
       ]
     },
@@ -646,6 +671,20 @@
       "lines": [
         "  'Heimdall:',",
         "  '  heimdall debug            Collect a watcher debug report',",
+        "  '  heimdall list             List watcher fleet',",
+        "  '  heimdall show             Inspect a watcher and open escalations',",
+        "  '  heimdall objective        Inspect an objective plan and tasks',",
+        "  '  heimdall create           Enroll an objective or hosted-review watcher',",
+        "  '  heimdall pause            Pause a watcher',",
+        "  '  heimdall resume           Resume a watcher',",
+        "  '  heimdall disarm           Disarm a watcher',",
+        "  '  heimdall rm               Delete a disarmed watcher',",
+        "  '  heimdall approve          Approve an escalation',",
+        "  '  heimdall answer           Answer a worker question',",
+        "  '  heimdall answer-escalation Answer an escalation',",
+        "  '  heimdall stop-worker      Stop a dispatched worker',",
+        "  '  heimdall budget           Adjust watcher budget',",
+        "  '  heimdall set-concurrency  Change objective concurrency',",
         "  '',"
       ]
     },
@@ -653,7 +692,21 @@
       "path": "src/cli/root-help-text-secondary.ts",
       "feature": "heimdall",
       "kind": "registration",
-      "lines": ["  '  orca heimdall debug <watcherId> [--json] [--out <path>]',"]
+      "lines": [
+        "  '  orca heimdall debug <watcherId> [--json] [--out <path>]',",
+        "  '  orca heimdall list [--kind <kind>] [--worktree <selector>] [--json]',",
+        "  '  orca heimdall show <watcherId> [--json]',",
+        "  '  orca heimdall objective <watcherId> [--json]',",
+        "  '  orca heimdall create objective --objective <text> [--worktree <selector>] [--spec <json|@file>] [--json]',",
+        "  '  orca heimdall create hosted-review [--worktree <selector>] [--spec <json|@file>] [--json]',",
+        "  '  orca heimdall pause|resume|disarm|rm <watcherId> [--json]',",
+        "  '  orca heimdall approve <watcherId> <escalationId> [--json]',",
+        "  '  orca heimdall answer-escalation <watcherId> <escalationId> --body <text> [--json]',",
+        "  '  orca heimdall answer <watcherId> <messageId> --body <text> [--json]',",
+        "  '  orca heimdall stop-worker <watcherId> <dispatchId> [--json]',",
+        "  '  orca heimdall budget <watcherId> [--hours <n|none>] [--turns <n|none>] [--json]',",
+        "  '  orca heimdall set-concurrency <watcherId> <maxConcurrency> [--json]',"
+      ]
     },
     {
       "path": "src/preload/index.ts",
@@ -2956,6 +3009,22 @@
       ]
     },
     {
+      "path": "config/scripts/generate-bundled-skill-guides.mjs",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["  'orca-heimdall',", "  'orca-heimdall': [],", "  'orca-heimdall',"]
+    },
+    {
+      "path": "src/cli/bundled-skill-guides.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "    name: \"orca-heimdall\",",
+        "    markdown: ORCA_HEIMDALL_MARKDOWN,",
+        "    fullMarkdown: ORCA_HEIMDALL_MARKDOWN,"
+      ]
+    },
+    {
       "path": "src/cli/root-help-text-primary.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -3864,6 +3933,20 @@
       "feature": "ask-question-tool",
       "kind": "passthrough",
       "lines": ["  'runtime_busy',"]
+    },
+    {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE } from '../../../shared/fork-heimdall/enrollment-refusal-error'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,"]
     },
     {
       "path": "src/main/runtime/rpc/methods/client-ui.test.ts",
@@ -6373,6 +6456,12 @@
       "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "src/cli/specs/search.test.ts",
+      "reason": "Removes an invalid global assertion that CLI flags are exclusive; Heimdall create commands legitimately use repeatable flags.",
+      "status": "pending-upstream",
+      "ledger": "bug-253"
     }
   ],
   "residuals": {
@@ -6493,7 +6582,7 @@
       "removed": 22
     },
     "config/scripts/generate-bundled-skill-guides.mjs": {
-      "added": 6,
+      "added": 9,
       "removed": 0
     },
     "config/scripts/mac-build-compatibility.test.mjs": {
@@ -6525,11 +6614,11 @@
       "removed": 7
     },
     "src/cli/bundled-skill-guides.ts": {
-      "added": 22,
+      "added": 33,
       "removed": 0
     },
     "src/cli/handler-group-manifest.ts": {
-      "added": 24,
+      "added": 41,
       "removed": 0
     },
     "src/cli/handlers/artifacts.ts": {
@@ -6537,11 +6626,11 @@
       "removed": 1
     },
     "src/cli/root-help-text-primary.ts": {
-      "added": 18,
+      "added": 32,
       "removed": 0
     },
     "src/cli/root-help-text-secondary.ts": {
-      "added": 4,
+      "added": 16,
       "removed": 0
     },
     "src/cli/specs/artifacts.ts": {
@@ -7753,7 +7842,7 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 30,
+      "added": 32,
       "removed": 0
     },
     "src/shared/remote-runtime-client-capabilities.ts": {
@@ -7945,7 +8034,7 @@
       "removed": 0
     },
     "src/main/runtime/rpc/errors.ts": {
-      "added": 9,
+      "added": 11,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/client-ui.test.ts": {

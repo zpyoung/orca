@@ -29,6 +29,10 @@ export const HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE =
 // schema rejects it outright unless a client confirms this capability first.
 export const HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY =
   'heimdall.objective-role-launch.v1' as const
+// Why: the host derives branch/provider/review identity into persisted enrollment payloads. Clients
+// may omit those candidate fields only after confirming this runtime capability.
+export const HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY =
+  'heimdall.hosted-review-derived-payload.v1' as const
 // New objective payload fields cross a strict enrollment schema, which legacy hosts reject. Strip
 // explicit `required` for those hosts and refuse `all` unless support is advertised.
 export const HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY =

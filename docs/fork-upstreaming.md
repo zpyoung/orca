@@ -701,3 +701,19 @@ bug.
 
 **Status:** merged upstream, awaiting a stable tag. Drop these exceptions at the first sync whose tag
 contains `dffb3498e2`.
+
+## Repeatable CLI flags are not globally exclusive
+
+**Orca ledger:** `bug-253`.
+
+**What:** removes the global flag-exclusivity assertion from `src/cli/specs/search.test.ts`. Heimdall
+create commands legitimately accept repeatable flags, so a cross-command assertion that every flag
+is exclusive encodes an invalid CLI invariant.
+
+**Why upstream, not isolated:** this corrects a test in an upstream-owned CLI file rather than
+adding fork behavior. Keeping the deletion in-tree prevents stable-tag sync from restoring an
+assertion that conflicts with valid repeatable command flags.
+
+**Paths:** `src/cli/specs/search.test.ts`.
+
+**Status:** pending-upstream. Not yet submitted.

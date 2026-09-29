@@ -7,6 +7,7 @@ import type {
   HostedReviewSitterCapabilities,
   HostedReviewSitterDefinition
 } from '../../shared/fork-hosted-review-sitter/types'
+import { HostedReviewEnrollmentCandidateSchema } from '../../shared/fork-hosted-review-sitter/enrollment-candidate'
 import type { Store } from '../persistence'
 import { getAutomationSchedulerOwner } from '../persistence/scheduling-automations/automation-context-migration'
 import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
@@ -68,10 +69,11 @@ export async function authorizeHostedReviewSitterDefinition(
   if (input.kind !== 'hosted-review' || !input.worktreeId) {
     throw new Error('Hosted review enrollment requires an explicit Git worktree')
   }
-  const candidatePayload = parseHostedReviewEnrollmentPayload(input.kindPayload)
-  if (!candidatePayload) {
+  const candidateResult = HostedReviewEnrollmentCandidateSchema.safeParse(input.kindPayload)
+  if (!candidateResult.success) {
     throw new Error('Invalid hosted review enrollment payload')
   }
+  const candidatePayload = candidateResult.data
   const repo = store.getRepo(input.repoId)
   if (!repo) {
     throw new Error('Hosted review sitter repository is unavailable')

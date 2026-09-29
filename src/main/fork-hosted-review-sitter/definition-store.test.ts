@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { HostedReviewEnrollmentCandidateSchema } from '../../shared/fork-hosted-review-sitter/enrollment-candidate'
 import { enrollmentPayloadSchema, parseHostedReviewEnrollmentPayload } from './definition-store'
 
 const payload = {
@@ -24,6 +25,17 @@ describe('hosted review enrollment payload', () => {
   it('accepts the authoritative hosted review identity and policy', () => {
     expect(parseHostedReviewEnrollmentPayload(payload)).toEqual(payload)
     expect(enrollmentPayloadSchema.parse(payload)).toEqual(payload)
+  })
+
+  it('allows identity-free candidates without relaxing persisted enrollment requirements', () => {
+    const candidate = { branchUpdateMode: 'rebase', mergeMethod: null }
+
+    expect(HostedReviewEnrollmentCandidateSchema.safeParse(candidate)).toMatchObject({
+      success: true,
+      data: candidate
+    })
+    expect(enrollmentPayloadSchema.safeParse(candidate).success).toBe(false)
+    expect(parseHostedReviewEnrollmentPayload(candidate)).toBeNull()
   })
 
   it('defaults legacy stored payloads to all checks while preserving explicit required scope', () => {

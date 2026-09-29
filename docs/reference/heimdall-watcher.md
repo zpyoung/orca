@@ -20,9 +20,9 @@ pnpm dev
 ```
 
 `pnpm dev` writes `orca` / `orca-dev` wrappers pointing at `out/cli/index.js`
-(`config/scripts/dev-cli-terminal-wrapper.mjs:13`) but never builds it. Irrelevant for an
-observation-only sitter; required before any objective run, because dispatched workers finish by
-calling `orca orchestration send` (`src/main/fork-heimdall-objective/role-prompts.ts:177`).
+(`config/scripts/dev-cli-terminal-wrapper.mjs:13`) but never builds it. Run `pnpm build:cli` before
+using the Heimdall CLI. It is also required before an objective run, because dispatched workers
+finish by calling `orca orchestration send` (`src/main/fork-heimdall-objective/role-prompts.ts:177`).
 
 The dev profile is `~/Library/Application Support/orca-dev`, **shared by every worktree's `pnpm dev`**
 (`config/scripts/run-electron-vite-dev.mjs:428-433`). Two running instances means two writers on the
@@ -40,8 +40,8 @@ and loads its database as soon as the window renders. There is **no feature flag
 environment variable** that turns Heimdall on or off — with no enrollments it simply does nothing.
 
 The sidebar **Heimdall** entry is rendered unconditionally (`SidebarNav.tsx:233`), unlike its
-flag-gated siblings. There is **no CLI, no keyboard shortcut, and no command-palette entry**.
-Enrollment happens on exactly two surfaces:
+flag-gated siblings. There is no keyboard shortcut or command-palette entry. The `orca heimdall`
+CLI can also create and manage watchers; see [CLI](#cli) below. The UI's enrollment paths are:
 
 | Kind            | Path                                                                                                                                            |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1040,6 +1040,66 @@ kind-specific detail, live workers, the decision trace, and the watcher ledger.
 If a refresh fails the page keeps showing the last confirmed snapshot behind a warning banner rather
 than blanking (`HeimdallPage.tsx:219-230`).
 
+### CLI
+
+The `orca heimdall` CLI exposes fleet reads, enrollment, lifecycle controls, steering, and debug
+reports. Prefer `--json` for agent-driven use; refusals and indeterminate command outcomes include a
+reason and detail and return a nonzero exit code. Start with `list`, then inspect the exact watcher
+with `show` (and `objective` for objective plan/task details) before taking an action:
+
+```sh
+orca heimdall list [--kind objective|hosted-review] [--worktree <selector>] [--json]
+orca heimdall show <watcherId> [--json]
+orca heimdall objective <watcherId> [--json]
+orca heimdall create objective --objective <text> [--worktree <selector>] [--hours <n|none>] [--turns <n|none>] [--spec <json|@file>] [--json]
+orca heimdall create hosted-review [--worktree <selector>] [--hours <n|none>] [--turns <n|none>] [--spec <json|@file>] [--json]
+orca heimdall pause|resume|disarm|rm <watcherId> [--json]
+orca heimdall approve <watcherId> <escalationId> [--json]
+orca heimdall answer <watcherId> <messageId> --body <text> [--json]
+orca heimdall answer-escalation <watcherId> <escalationId> --body <text> [--json]
+orca heimdall budget <watcherId> [--hours <n|none>] [--turns <n|none>] [--json]
+orca heimdall stop-worker <watcherId> <dispatchId> [--json]
+orca heimdall set-concurrency <watcherId> <maxConcurrency> [--json]
+orca heimdall debug <watcherId> [--out <path>] [--json]
+```
+
+Objective creation requires either `--objective <text>` or `--objective-file <path>`; the latter
+reads UTF-8 text from the file.
+
+`create` defaults `--worktree` to `active`, resolved from the CLI's local working directory. On
+a paired runtime, supply an explicit selector for a workspace local to that runtime; the client
+directory cannot identify a server workspace. SSH- or other-runtime-owned workspaces are refused
+without local fallback. Objective defaults match the enrollment form: standard tier,
+`files-on-disk`
+landing bar, concurrency 3, whole-workspace territory (`**`), 4 active hours, and 40 turns. Its
+default capabilities are `plan: gated`, `implement/review/check/land: on`; `land` is `gated` for any
+other landing bar. Hosted-review defaults all four capabilities off, 4 active hours, and unlimited
+turns. Use repeatable `--cap <key>=<off|gated|on>` for per-kind capabilities. Both kinds accept
+`--hours` and `--turns`; hosted-review also accepts `--branch-update` and `--merge-method`. Pass a
+partial `EnrollInput` through `--spec <json|@file>`; explicit flags win. `--owner claude` (with
+optional `--owner-model` and `--owner-effort`) sets owner interventions to `gated`.
+
+In hosted-review `--spec`, set `kindPayload.mergeCheckScope` to `"all"` (the default) or
+`"required"`. The runtime must advertise `heimdall.hosted-review-check-scope.v1` for `"all"`; if it
+does not, create is refused rather than silently changing the requested scope. The CLI omits
+`"required"` from requests to legacy runtimes, preserving their older schema and behavior.
+
+Hosted-review creation requires the derived-payload runtime capability. If it is absent, update and
+restart that Orca runtime; adding candidate branch or review identity fields to `--spec` does not
+bypass the capability gate.
+
+Watcher-id commands resolve their fleet row and send its observed target plus owner fence. This
+allows commands to reach remote-owned watchers without a local fallback; if the owning host is
+unreachable, refresh the fleet and restore contact rather than targeting a same-id local watcher.
+Use an escalation id from `show` for `approve` or `answer-escalation`, and a pending question message
+id for `answer`. `budget` preserves an omitted limit; raise an exhausted budget before `resume`.
+`disarm` preserves the watcher record, while `rm` permanently deletes the watcher and history and
+does not stop worker terminals. Lifecycle, deletion, and owner-escalation-answer commands require
+their corresponding Heimdall runtime capabilities; update an older host instead of retrying an
+unsupported operation.
+
+See the bundled `orca-heimdall` skill guide for complete create flags/specs and refusal recovery.
+
 ### Controls
 
 Nine commands, all routed through `heimdall:command` and fenced by owner identity and a command
@@ -1155,8 +1215,10 @@ orca heimdall debug <watcherId>
 orca heimdall debug <watcherId> --out watcher-debug.json
 ```
 
-The CLI addresses watchers owned by the connected local kernel; use the fleet detail button for
-watchers owned by a paired runtime. Output is JSON, including when `--json` is omitted.
+The CLI resolves the watcher through its fleet row and sends the observed target and owner fence, so
+it can read local or reachable paired-runtime watchers. It never redirects an unavailable remote
+target to a same-id local watcher; refresh the fleet and restore owner contact first. Output is JSON,
+including when `--json` is omitted.
 
 Schema 2 includes enrollment, status, budget and open budget interval, recent ledger and tick
 traces, pending control operations, malformed enrollment state, orchestration workers, and live

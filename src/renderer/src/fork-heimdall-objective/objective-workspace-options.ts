@@ -10,6 +10,7 @@ import {
 import { isFolderRepo } from '../../../shared/repo-kind'
 import type { HeimdallRemoteOwner } from '../../../shared/fork-heimdall/api'
 import {
+  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../../shared/fork-heimdall/capability'
@@ -31,6 +32,7 @@ export type ObjectiveWorkspaceOption = {
   owner: HeimdallRemoteOwner | undefined
   ownerUnavailable: boolean
   parallelExecutionSupported?: boolean
+  roleLaunchSupported?: boolean
   createsWorktree?: true
   availableAgentIds: readonly string[]
 }
@@ -78,13 +80,17 @@ function runtimeSupportsCapability(
 function remoteOwner(
   state: ObjectiveWorkspaceState,
   hostId: string
-): Pick<ObjectiveWorkspaceOption, 'owner' | 'ownerUnavailable' | 'parallelExecutionSupported'> {
+): Pick<
+  ObjectiveWorkspaceOption,
+  'owner' | 'ownerUnavailable' | 'parallelExecutionSupported' | 'roleLaunchSupported'
+> {
   const host = parseExecutionHostId(hostId)
   if (host?.kind !== 'runtime') {
     return {
       owner: undefined,
       ownerUnavailable: false,
-      parallelExecutionSupported: true
+      parallelExecutionSupported: true,
+      roleLaunchSupported: true
     }
   }
   const environment = state.runtimeEnvironments.find(
@@ -101,12 +107,18 @@ function remoteOwner(
           state,
           environment.id,
           HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+        ),
+        roleLaunchSupported: runtimeSupportsCapability(
+          state,
+          environment.id,
+          HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY
         )
       }
     : {
         owner: undefined,
         ownerUnavailable: true,
-        parallelExecutionSupported: false
+        parallelExecutionSupported: false,
+        roleLaunchSupported: false
       }
 }
 

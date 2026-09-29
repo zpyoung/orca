@@ -63,6 +63,8 @@ function objectiveWorkspace(): ObjectiveWorkspaceOption {
     detail: '/workspace',
     owner: { connectionId: 'hermes', pairingRevision: 22 },
     ownerUnavailable: false,
+    parallelExecutionSupported: true,
+    roleLaunchSupported: true,
     availableAgentIds: ['codex']
   }
 }
@@ -99,12 +101,13 @@ describe('buildObjectiveEnrollmentSubmission gates', () => {
   it('strips gates for an older remote host alongside lanesEnabled', () => {
     const workspace = { ...objectiveWorkspace(), parallelExecutionSupported: false }
     const submission = buildObjectiveEnrollmentSubmission(
-      draft({ gates: [gateDraft()] }),
+      draft({ gates: [gateDraft()], lanesEnabled: true, maxConcurrency: 7 }),
       workspace
     )
 
     expect(submission.input.kindPayload).not.toHaveProperty('gates')
     expect(submission.input.kindPayload).not.toHaveProperty('lanesEnabled')
+    expect(submission.input.kindPayload).toMatchObject({ maxConcurrency: 1 })
   })
 })
 
@@ -187,5 +190,26 @@ describe('buildObjectiveEnrollmentSubmission roleLaunch', () => {
       }
     })
     expect(JSON.stringify(submission.input.kindPayload)).not.toContain('integrator')
+  })
+
+  it('omits roleLaunch when the selected host has not advertised role-launch support', () => {
+    const submission = buildObjectiveEnrollmentSubmission(
+      draft({ roleLaunch: { planner: { model: 'gpt-5', effort: 'high' } } }),
+      { ...objectiveWorkspace(), roleLaunchSupported: false }
+    )
+
+    expect(submission.input.kindPayload).not.toHaveProperty('roleLaunch')
+    expect(submission.input.kindPayload).toMatchObject({ lanesEnabled: true, maxConcurrency: 1 })
+  })
+
+  it('does not send roleLaunch when remote capability status is unknown', () => {
+    const { roleLaunchSupported: _roleLaunchSupported, ...unknownWorkspace } = objectiveWorkspace()
+    const submission = buildObjectiveEnrollmentSubmission(
+      draft({ roleLaunch: { planner: { model: 'gpt-5', effort: 'high' } } }),
+      unknownWorkspace
+    )
+
+    expect(submission.input.kindPayload).not.toHaveProperty('roleLaunch')
+    expect(submission.input.kindPayload).toMatchObject({ lanesEnabled: true, maxConcurrency: 1 })
   })
 })

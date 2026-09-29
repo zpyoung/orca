@@ -3,6 +3,7 @@ import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import {
+  HostedReviewEnrollmentCandidateSchema,
   actionWritesWorktree,
   decideHostedReview,
   describeHostedReviewSnapshot,
@@ -75,6 +76,7 @@ export function createHostedReviewKind(
     id: 'hosted-review',
     displayName: 'Hosted review',
     enrollmentPayloadSchema,
+    enrollmentInputSchema: HostedReviewEnrollmentCandidateSchema,
     authorizeEnrollment: (input) =>
       authorizeHostedReviewSitterDefinition(runtime, store, input, storageAuthority),
     describeEnrollment(enrollment) {
