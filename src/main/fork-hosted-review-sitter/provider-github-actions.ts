@@ -1,8 +1,10 @@
 import type {
+  HostedReviewMergeCheckScope,
   HostedReviewSnapshot,
   HostedReviewSitterActionResult,
   HostedReviewSitterDefinition
 } from '../../shared/fork-hosted-review-sitter/types'
+import { areCurrentHeadChecksGreen } from '../../shared/fork-hosted-review-sitter/decision-check-groups'
 import { throwIfAborted, type HostedReviewSitterGitExecution } from './provider-git'
 import {
   expectedStateMismatch,
@@ -32,18 +34,19 @@ function assertExpectedHead(snapshot: HostedReviewSnapshot, expectedHead: string
   }
 }
 
-function assertMergeGates(snapshot: HostedReviewSnapshot, expectedHead: string): void {
+function assertMergeGates(
+  snapshot: HostedReviewSnapshot,
+  expectedHead: string,
+  checkScope: HostedReviewMergeCheckScope
+): void {
   assertExpectedHead(snapshot, expectedHead)
   if (
     snapshot.lifecycle !== 'open' ||
     snapshot.draft ||
     snapshot.providerReadiness.verdict !== 'ready' ||
     snapshot.conflicts !== 'none' ||
-    !snapshot.checksComplete ||
-    snapshot.queue.membership === 'unknown' ||
-    snapshot.checks.some(
-      (check) => check.required && (check.headSha !== expectedHead || check.state !== 'passed')
-    )
+    !areCurrentHeadChecksGreen(snapshot, checkScope) ||
+    snapshot.queue.membership === 'unknown'
   ) {
     throw expectedStateMismatch('GitHub merge gates are no longer satisfied.')
   }
@@ -285,7 +288,10 @@ async function mergeOrEnqueue(
   tracker: HostedReviewSitterMutationTracker,
   assertLeaseHeld: () => Promise<void>
 ): Promise<HostedReviewSitterActionResult> {
-  assertMergeGates(state.snapshot, action.headSha)
+  if (action.checkScope !== definition.mergeCheckScope) {
+    throw expectedStateMismatch('GitHub merge-check scope changed since the action was built.')
+  }
+  assertMergeGates(state.snapshot, action.headSha, action.checkScope)
   throwIfAborted(signal)
   if (action.kind === 'merge') {
     if (state.snapshot.queue.required) {

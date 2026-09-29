@@ -8,6 +8,7 @@ import {
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import type { ObjectivePlanTask } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { ExecuteContext, LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
+import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -15,6 +16,7 @@ import { objectiveGitCommandForTarget, type ObjectiveWorkspaceTarget } from './c
 import { inspectObjectiveDispatchSession } from './dispatch-session'
 import { objectiveDirtyPathsByTerritory } from './landing-territory'
 import { OBJECTIVE_MERGE_TRAIN_MAX_PATHS } from './merge-train-git'
+import type { ObjectiveDispatchWorkspaceState } from './dispatch-worktree-lifecycle'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
 
@@ -132,7 +134,7 @@ async function enrolledHead(target: ObjectiveWorkspaceTarget): Promise<string> {
 /** Resolves an isolated dispatch strictly on the enrolled workspace's execution host. */
 export async function resolveObjectiveDispatchTarget(
   runtime: OrcaRuntimeService,
-  binding: ObjectiveSnapshotBinding,
+  binding: { enrollment: Pick<WatcherEnrollment, 'executionHostId' | 'repoId'> },
   record: ObjectiveDispatchRecord
 ): Promise<ObjectiveWorkspaceTarget> {
   if (isPendingWorkspace(record) || record.setupState === 'pending') {
@@ -158,6 +160,31 @@ export async function resolveObjectiveDispatchTarget(
     fileProvider: requireRuntimeFileProvider(target),
     gitTarget: target
   }
+}
+
+/** Reports whether a dispatch worktree is gone, or holds changes that removal would destroy. */
+export async function inspectObjectiveDispatchWorkspace(
+  runtime: OrcaRuntimeService,
+  enrollment: Pick<WatcherEnrollment, 'executionHostId' | 'repoId'>,
+  record: ObjectiveDispatchRecord
+): Promise<ObjectiveDispatchWorkspaceState> {
+  let target: ObjectiveWorkspaceTarget
+  try {
+    target = await resolveObjectiveDispatchTarget(runtime, { enrollment }, record)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'selector_not_found') {
+      return 'missing'
+    }
+    throw error
+  }
+  const status = await objectiveGitCommandForTarget(target)([
+    'status',
+    '--porcelain=v2',
+    '-z',
+    '--untracked-files=all',
+    '--'
+  ])
+  return status.stdout.length > 0 ? 'modified' : 'unmodified'
 }
 
 export async function resolveObjectiveAttemptTarget(args: {
@@ -431,6 +458,7 @@ export async function prepareObjectiveDispatchWorkspace(args: {
   }
 }
 export {
+  cleanupAppliedObjectiveDispatches,
   purgeObjectiveDispatchWorktrees,
   reconcileObjectiveDispatchWorktrees
 } from './dispatch-worktree-lifecycle'

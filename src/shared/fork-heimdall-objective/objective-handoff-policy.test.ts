@@ -126,7 +126,8 @@ describe('objective handoff policy', () => {
         reviewNumber: 42,
         reviewUrl: 'https://github.com/acme/repo/pull/42',
         branchUpdateMode: 'merge-base-update',
-        mergeMethod: null
+        mergeMethod: null,
+        mergeCheckScope: 'all'
       }
     })
   })

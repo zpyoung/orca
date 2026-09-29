@@ -66,6 +66,7 @@ function definition(
     },
     branchUpdateMode: 'merge-base-update',
     mergeMethod: null,
+    mergeCheckScope: 'required',
     ...overrides
   }
 }
@@ -170,7 +171,8 @@ function action(kind: HostedReviewSitterAction['kind']): HostedReviewSitterActio
         capability: 'merge',
         visibility: 'external',
         expectedState: { target: reviewSnapshot.url, before: reviewSnapshot.headSha },
-        mergeMethod: 'squash'
+        mergeMethod: 'squash',
+        checkScope: 'required'
       }
     case 'enqueue':
       return {
@@ -178,7 +180,8 @@ function action(kind: HostedReviewSitterAction['kind']): HostedReviewSitterActio
         kind,
         capability: 'merge',
         visibility: 'external',
-        expectedState: { target: reviewSnapshot.url, before: reviewSnapshot.headSha }
+        expectedState: { target: reviewSnapshot.url, before: reviewSnapshot.headSha },
+        checkScope: 'required'
       }
   }
 }
@@ -419,6 +422,39 @@ describe('hosted-review kind preflight', () => {
       expect(changedStateAction?.evidenceKey).not.toBe(originalAction.evidenceKey)
     }
   )
+  it('isolates all-scope merge evidence from legacy required-scope keys', () => {
+    const required = definition()
+    const all = definition({ mergeCheckScope: 'all' })
+    const optionalSkipped = {
+      ...review().checks[0]!,
+      checkKey: 'optional',
+      checkId: 'optional-1',
+      name: 'optional',
+      required: false,
+      state: 'skipped' as const,
+      observationId: 'optional:1'
+    }
+    const reviewSnapshot = review({ checks: [review().checks[0]!, optionalSkipped] })
+    const requiredAction = buildMergeAction(reviewSnapshot, required)
+    const allAction = buildMergeAction(reviewSnapshot, all)
+
+    expect(requiredAction?.evidenceKey).toBe(
+      JSON.stringify(['merge', 'head-1', 'squash', 'test=passed'])
+    )
+    expect(allAction).toMatchObject({
+      kind: 'merge',
+      checkScope: 'all',
+      evidenceKey: JSON.stringify([
+        'merge',
+        'all',
+        'head-1',
+        'squash',
+        'optional=skipped',
+        'test=passed'
+      ])
+    })
+    expect(allAction?.evidenceKey).not.toBe(requiredAction?.evidenceKey)
+  })
 
   it('escalates a review identity mismatch before considering contention', () => {
     const reviewSnapshot = review()

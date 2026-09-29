@@ -38,8 +38,10 @@ import { readObjectiveJudgmentReports } from '../fork-heimdall/judgment/report-p
 import { createObjectiveActionExecutor } from './action-executor'
 import { reconcileAmendedObjectiveDispatches } from './amendment-dispatch-reconciliation'
 import { createObjectiveConcurrencyPolicy } from './objective-concurrency'
-import { shouldRetainObjectiveWorker } from './dispatch-session'
+import { objectiveDispatchSessionExited, shouldRetainObjectiveWorker } from './dispatch-session'
 import {
+  cleanupAppliedObjectiveDispatches,
+  inspectObjectiveDispatchWorkspace,
   purgeObjectiveDispatchWorktrees,
   reconcileObjectiveDispatchWorktrees
 } from './dispatch-worktree'
@@ -270,6 +272,17 @@ export function createObjectiveKind(args: {
         ledger,
         latestEnrollments.get(attempt.watcherId)
       ),
+    cleanupWorkspaces: (_ledger, context) =>
+      cleanupAppliedObjectiveDispatches({
+        runtime: args.runtime,
+        objectiveStore: args.objectiveStore,
+        watcherId: context.enrollment.watcherId,
+        lease: context.lease,
+        workerReleaseConfirmed: context.workerReleaseConfirmed,
+        workerSessionExited: (owner) => objectiveDispatchSessionExited(args.runtime, owner),
+        inspectWorkspace: (record) =>
+          inspectObjectiveDispatchWorkspace(args.runtime, context.enrollment, record)
+      }),
     async reconcile(snapshot, ledger, context) {
       await reconcileAmendedObjectiveDispatches({
         ledger,
@@ -284,7 +297,10 @@ export function createObjectiveKind(args: {
           binding: requireObjectiveSnapshotBinding(snapshotBindings, snapshot),
           objectiveStore: args.objectiveStore,
           lease: context.lease,
-          workerReleaseConfirmed: context.workerReleaseConfirmed
+          workerReleaseConfirmed: context.workerReleaseConfirmed,
+          workerSessionExited: (owner) => objectiveDispatchSessionExited(args.runtime, owner),
+          inspectWorkspace: (record) =>
+            inspectObjectiveDispatchWorkspace(args.runtime, context.enrollment, record)
         })
       }
     }

@@ -83,7 +83,11 @@ function buildPayloadBase(
     capabilities: definition.capabilities,
     declined: describeDeclined(outcome),
     considered: 'considered' in outcome ? outcome.considered : [],
-    discrepancies: deriveHostedReviewSitterDiscrepancies(review, ledger).map((entry) => ({
+    discrepancies: deriveHostedReviewSitterDiscrepancies(
+      review,
+      ledger,
+      definition.mergeCheckScope
+    ).map((entry) => ({
       kind: entry.kind,
       status: entry.status,
       reason: entry.reason

@@ -440,18 +440,24 @@ higher epoch, which fences the old one out. Release is authenticated with both t
 and epoch: a stale holder cannot mark a successor's lease released. **A crashed app's lease
 self-heals after ~90 seconds; you do not need to delete anything.**
 
-The three failure modes look different in the UI:
+The four lease outcomes look different in the UI:
 
-- **`refused`** — someone else holds a live lease. The tick exits with `lease-refused`, publishes a
-  truthful status naming the holder and epoch (phase `lease-refused`, reason `Lease held by <holder>
-  (epoch <epoch>)`) instead of leaving a stale parked copy on screen, and retries at rapid pace.
+- **`refused`** — someone else holds a live lease. The tick exits with `lease-refused`, names the
+  holder and epoch in its status, and retries at rapid pace.
 - **`unverifiable`** — the host or filesystem could not be reached. The status becomes
   `unreachable` / `lease-unverifiable`, any active dispatch is closed for contact loss, and the pill
   switches to _Host unreachable · last confirmed …_. Contact loss is retried; it is not evidence
   that an asynchronous effect failed or did not land.
-- **`configuration-error`** — the durable target no longer resolves to the enrolled workspace or
-  authority. The watcher disables and parks with `park-configuration-error` instead of retrying a
-  configuration that cannot become correct merely through renewed contact.
+- **`configuration-error`** — the durable target resolves to a different enrolled workspace or
+  authority. The watcher disables and parks with `park-configuration-error`.
+- **`workspace-removed`** — a selector miss is confirmed against an authoritative workspace
+  catalog: a successful Git worktree scan omits the enrolled path, or the local folder registry no
+  longer contains it. An explicit server-reported absence also qualifies. The watcher records a
+  `workspace-removed` terminal fact and durable budget summary, closes active budget intervals for
+  watcher shutdown, disables itself, and stops scheduling without a lease or kind handoff. This
+  ends supervision, not any still-running worker process; pending attempts remain pinned. Failed
+  scans, untyped SSH selector misses, ambiguous selectors, transport failures, and lease filesystem
+  errors stay `unverifiable`.
 
 ## Kind: `hosted-review` (PR Sitter)
 
@@ -466,6 +472,7 @@ checks, and merges — each a separately gated capability.
 | `merge`            | off / gated / on                                    | **off**            | authorizes the merge API call                                  |
 | Branch update mode | merge base into branch / rebase onto base           | merge-base-update  |                                                                |
 | Merge method       | repository default / merge commit / squash / rebase | repository default |                                                                |
+| Merge check scope  | all checks / required checks only                  | all checks         | checks on the current review head must pass before merge       |
 | Active budget      | hours > 0, step 0.25                                | 4                  | no upper bound; counts only while a worker or action is active |
 
 All four capabilities default to `off` (`HostedReviewSitterPanel.tsx:43-48`), so a freshly armed
@@ -531,6 +538,16 @@ default. If the target requires a **merge queue or train**, a direct `merge` is 
 provider layer and the sitter emits `enqueue` instead. If your pinned merge method conflicts with the
 queue's configured method (GitHub) or the project's strategy and squash option (GitLab), the action
 throws rather than overriding the protection.
+
+With **All checks**, the sitter waits for every current-head check to finish and pass; a skipped
+non-required check also counts as satisfied. Failed non-required jobs enter the same rerun/fix flow
+as required failures. External status contexts and GitLab trigger jobs have no universally safe
+rerun target; they remain merge-blocking and escalate for owner resolution instead. **Required
+checks only** uses the base branch's required-check rules; if the branch has no such rules,
+pending or failed optional checks do not block merge. Older enrollments without a stored scope
+use **All checks** after upgrade. A remote host must support the check-scope capability to accept
+**All checks** or an objective that will hand off to a sitter; update the host or choose **Required
+checks only** for a direct sitter.
 
 ### How `fixChecks` actually works
 
@@ -712,9 +729,11 @@ with one commit at landing.
 - **Operator edits.** Uncommitted changes in the enrolled worktree pause the train with the note
   `Merge train paused by operator edits: …`. A parallel run never leaves that tree dirty itself, so
   those changes are always yours. The train resumes once the tree is clean.
-- **Cleanup.** An applied dispatch's worktree is removed. A failed or conflict-retained worktree
-  stays for inspection until the watcher is deleted. Setup or cleanup interrupted by a restart is
-  repaired on boot (`dispatch-worktree-lifecycle.ts`).
+- **Cleanup.** An applied dispatch's worktree is removed on the tick after it applies, once its
+  worker is released or its terminal has exited. If you took over its terminal, the worktree stays
+  until you close that terminal, and a worktree with uncommitted changes is never removed. A failed or conflict-retained worktree stays for inspection until
+  the watcher is deleted. Setup or cleanup interrupted by a restart is repaired on boot
+  (`dispatch-worktree-lifecycle.ts`).
 - **Dispatch branches are never pushed.** Only the enrolled branch lands, through the ladder below.
   On a parallel run, `committed-local-branch` records the enrolled head, which already holds the
   per-node commits, plus one final commit for anything left uncommitted.
@@ -1006,9 +1025,9 @@ through the handoff.
 
 Three more things the handoff fixes for you: the sitter inherits the objective's **remaining** budget
 rather than a fresh one (`remainingBudget`, `:63-70`), `branchUpdateMode` is hardcoded to
-`merge-base-update`, and `mergeMethod` is `null` (repository default) — overrides touch capabilities
-only. The review body is the objective text followed by every plan criterion as an acceptance
-checklist (`renderReviewBody`, `:92-101`).
+`merge-base-update`, `mergeMethod` is `null` (repository default), and `mergeCheckScope` is `all`
+(every current-head check). Overrides touch capabilities only. The review body is the objective
+text followed by every plan criterion as an acceptance checklist (`renderReviewBody`, `:92-101`).
 
 ## Reading the fleet page
 
@@ -1059,6 +1078,11 @@ turns. Use repeatable `--cap <key>=<off|gated|on>` for per-kind capabilities. Bo
 `--hours` and `--turns`; hosted-review also accepts `--branch-update` and `--merge-method`. Pass a
 partial `EnrollInput` through `--spec <json|@file>`; explicit flags win. `--owner claude` (with
 optional `--owner-model` and `--owner-effort`) sets owner interventions to `gated`.
+
+In hosted-review `--spec`, set `kindPayload.mergeCheckScope` to `"all"` (the default) or
+`"required"`. The runtime must advertise `heimdall.hosted-review-check-scope.v1` for `"all"`; if it
+does not, create is refused rather than silently changing the requested scope. The CLI omits
+`"required"` from requests to legacy runtimes, preserving their older schema and behavior.
 
 Hosted-review creation requires the derived-payload runtime capability. If it is absent, update and
 restart that Orca runtime; adding candidate branch or review identity fields to `--spec` does not

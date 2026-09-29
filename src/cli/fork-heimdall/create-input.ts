@@ -2,6 +2,8 @@ import type { z } from 'zod'
 import { BudgetPolicySchema, type BudgetPolicy } from '../../shared/fork-heimdall/budget'
 import {
   HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,
+  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
+  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE,
   HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
@@ -215,6 +217,16 @@ export function assertHeimdallCreateCapabilities(
       'The selected runtime does not support host-derived hosted-review enrollment. Update or restart Orca before creating a hosted-review watcher.'
     )
   }
+  if (
+    candidate.kind === 'hosted-review' &&
+    !runtimeCapabilities.includes(HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY) &&
+    candidate.kindPayload.mergeCheckScope !== 'required'
+  ) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE
+    )
+  }
 }
 
 export function buildHeimdallEnrollInput(
@@ -256,9 +268,13 @@ export function buildHeimdallEnrollInput(
       provider: _provider,
       reviewNumber: _reviewNumber,
       reviewUrl: _reviewUrl,
+      mergeCheckScope,
       ...policy
     } = candidate.kindPayload
-    kindPayload = policy
+    const mergeCheckScopeSupported = runtimeCapabilities.includes(
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+    )
+    kindPayload = mergeCheckScopeSupported ? { ...policy, mergeCheckScope } : policy
   }
   return parseHeimdallCreateSchema(
     EnrollInputSchema,

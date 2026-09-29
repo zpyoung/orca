@@ -6,6 +6,7 @@ import type {
   HostedReviewSnapshot,
   HostedReviewSitterDefinition
 } from '../../shared/fork-hosted-review-sitter/types'
+import { isCheckInMergeScope } from '../../shared/fork-hosted-review-sitter/decision-check-groups'
 import {
   deriveHostedReviewCheckIdentity,
   githubCheckState,
@@ -59,6 +60,19 @@ function checkNodeId(node: GitHubCheckNode): string {
   return workflowId
     ? `workflow:${workflowId}:check:${checkId ?? 'unknown'}`
     : `check:${checkId ?? 'unknown'}`
+}
+function checkRunExecutionId(node: GitHubCheckNode): string {
+  const suite = node.checkSuite && typeof node.checkSuite === 'object' ? node.checkSuite : null
+  const workflow =
+    suite && 'workflowRun' in suite && suite.workflowRun && typeof suite.workflowRun === 'object'
+      ? suite.workflowRun
+      : null
+  const workflowId = workflow && 'databaseId' in workflow ? numberValue(workflow.databaseId) : null
+  if (workflowId !== null) {
+    return `workflow:${workflowId}`
+  }
+  const suiteId = suite && 'databaseId' in suite ? numberValue(suite.databaseId) : null
+  return suiteId === null ? checkNodeId(node) : `suite:${suiteId}`
 }
 
 function checkObservationId(node: GitHubCheckNode, headSha: string): string {
@@ -120,7 +134,9 @@ export function normalizeChecks(
           ? stableFailureSignature(identity.checkKey, [stringValue(node.description)])
           : null
     }
-    const key = `${identity.checkKey}\0${identity.shardKey ?? ''}\0${identity.runtimeKey ?? ''}\0${node.__typename ?? 'unknown'}\0${appId ?? 'unknown-app'}`
+    const executionId =
+      node.__typename === 'CheckRun' ? checkRunExecutionId(node) : 'status-context'
+    const key = `${identity.checkKey}\0${identity.shardKey ?? ''}\0${identity.runtimeKey ?? ''}\0${node.__typename ?? 'unknown'}\0${appId ?? 'unknown-app'}\0${executionId}`
     const sortKey = checkNodeSortKey(node)
     if (!latest.has(key) || latest.get(key)!.sortKey <= sortKey) {
       latest.set(key, { snapshot, sortKey })
@@ -156,7 +172,11 @@ export async function attachGitHubFailureSignatures(
   let complete = true
   throwIfAborted(signal)
   for (const check of checks) {
-    if (!check.required || check.state !== 'failed' || check.failureSignature) {
+    if (
+      !isCheckInMergeScope(check, definition.mergeCheckScope) ||
+      check.state !== 'failed' ||
+      check.failureSignature
+    ) {
       continue
     }
     const workflow = check.checkId.match(/^workflow:(\d+):check:(\d+|unknown)$/)

@@ -3,7 +3,7 @@ import {
   hostedReviewContentIdentity,
   makeHostedReviewEvidenceKey
 } from './action-identity'
-import { currentRequiredChecks, type FailedCheckGroup } from './decision-check-groups'
+import { currentHeadChecks, type FailedCheckGroup } from './decision-check-groups'
 import type {
   HostedReviewAttemptEntry,
   HostedReviewCheckSnapshot,
@@ -222,14 +222,19 @@ export function buildMergeAction(
   review: HostedReviewSnapshot,
   sitter: HostedReviewSitterDefinition
 ): HostedReviewSitterAction | null {
-  const currentEvidence = currentRequiredChecks(review)
+  const checkScope = sitter.mergeCheckScope
+  const currentEvidence = currentHeadChecks(review, checkScope)
     .map((check) => `${check.checkKey}=${check.state}`)
     .sort()
   if (review.queue.required) {
     if (review.queue.membership !== 'not-enqueued') {
       return null
     }
-    const evidenceKey = makeHostedReviewEvidenceKey(['enqueue', review.headSha, ...currentEvidence])
+    const evidenceKey = makeHostedReviewEvidenceKey(
+      checkScope === 'all'
+        ? ['enqueue', 'all', review.headSha, ...currentEvidence]
+        : ['enqueue', review.headSha, ...currentEvidence]
+    )
     return {
       kind: 'enqueue',
       capability: 'merge',
@@ -238,17 +243,17 @@ export function buildMergeAction(
       evidenceKey,
       expectedState: { target: review.url, before: review.headSha },
       headSha: review.headSha,
-      reviewUrl: review.url
+      reviewUrl: review.url,
+      checkScope
     }
   }
 
   const mergeMethod = sitter.mergeMethod ?? review.defaultMergeMethod
-  const evidenceKey = makeHostedReviewEvidenceKey([
-    'merge',
-    review.headSha,
-    mergeMethod,
-    ...currentEvidence
-  ])
+  const evidenceKey = makeHostedReviewEvidenceKey(
+    checkScope === 'all'
+      ? ['merge', 'all', review.headSha, mergeMethod, ...currentEvidence]
+      : ['merge', review.headSha, mergeMethod, ...currentEvidence]
+  )
   return {
     kind: 'merge',
     capability: 'merge',
@@ -258,6 +263,7 @@ export function buildMergeAction(
     expectedState: { target: review.url, before: review.headSha },
     headSha: review.headSha,
     reviewUrl: review.url,
-    mergeMethod
+    mergeMethod,
+    checkScope
   }
 }

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,
+  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
   HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
@@ -243,16 +244,63 @@ describe('Heimdall create input builder', () => {
         fixChecks: 'off',
         merge: 'off'
       },
-      kindPayload: { branchUpdateMode: 'merge-base-update', mergeMethod: null }
+      kindPayload: {
+        branchUpdateMode: 'merge-base-update',
+        mergeMethod: null,
+        mergeCheckScope: 'all'
+      }
     })
     const workspace = { repoId: 'repo-1', worktreeId: 'wt-1', workspaceKind: 'git' as const }
     const input = buildHeimdallEnrollInput(candidate, workspace, [
-      HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY
+      HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
     ])
-    expect(input.kindPayload).toEqual({ branchUpdateMode: 'merge-base-update', mergeMethod: null })
+    expect(input.kindPayload).toEqual({
+      branchUpdateMode: 'merge-base-update',
+      mergeMethod: null,
+      mergeCheckScope: 'all'
+    })
     expect(() => buildHeimdallEnrollInput(candidate, workspace, [])).toThrow(
       /host-derived hosted-review enrollment/
     )
+  })
+
+  it('gates all-scope enrollment and omits required scope for legacy runtimes', () => {
+    const workspace = { repoId: 'repo-1', worktreeId: 'wt-1', workspaceKind: 'git' as const }
+    const allCandidate = buildHeimdallCreateCandidate(
+      new Map([
+        ['spec', JSON.stringify({ kindPayload: { mergeCheckScope: 'all' } })]
+      ]),
+      '/repo',
+      'hosted-review'
+    )
+    const derivedPayloadRuntime = [HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY]
+    const supportedRuntime = [
+      ...derivedPayloadRuntime,
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+    ]
+
+    expect(allCandidate).toMatchObject({ kindPayload: { mergeCheckScope: 'all' } })
+    expect(
+      buildHeimdallEnrollInput(allCandidate, workspace, supportedRuntime).kindPayload
+    ).toMatchObject({ mergeCheckScope: 'all' })
+    expect(() => buildHeimdallEnrollInput(allCandidate, workspace, derivedPayloadRuntime)).toThrow(
+      /not confirmed support for checking all hosted-review merge checks/
+    )
+
+    const requiredCandidate = buildHeimdallCreateCandidate(
+      new Map([
+        ['spec', JSON.stringify({ kindPayload: { mergeCheckScope: 'required' } })]
+      ]),
+      '/repo',
+      'hosted-review'
+    )
+    const legacyInput = buildHeimdallEnrollInput(requiredCandidate, workspace, derivedPayloadRuntime)
+    expect(legacyInput.kindPayload).toMatchObject({
+      branchUpdateMode: 'merge-base-update',
+      mergeMethod: null
+    })
+    expect(legacyInput.kindPayload).not.toHaveProperty('mergeCheckScope')
   })
 
   it('deep-merges hosted-review spec fields while CLI flags take precedence', () => {

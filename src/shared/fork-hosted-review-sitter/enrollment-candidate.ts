@@ -12,7 +12,8 @@ export const HostedReviewEnrollmentCandidateSchema = z.object({
     .refine((value) => value.startsWith('https://') || value.startsWith('http://'))
     .optional(),
   branchUpdateMode: z.enum(['merge-base-update', 'rebase']),
-  mergeMethod: z.enum(['merge', 'squash', 'rebase']).nullable()
+  mergeMethod: z.enum(['merge', 'squash', 'rebase']).nullable(),
+  mergeCheckScope: z.enum(['required', 'all']).default('all')
 })
 
 export type HostedReviewEnrollmentCandidate = z.infer<typeof HostedReviewEnrollmentCandidateSchema>

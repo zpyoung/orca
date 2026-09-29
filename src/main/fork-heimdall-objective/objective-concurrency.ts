@@ -33,6 +33,7 @@ export function createObjectiveConcurrencyPolicy(args: {
   snapshotBindings: WeakMap<Snapshot<ObjectiveWorld>, ObjectiveSnapshotBinding>
   retainWorker: Policy['retainWorker']
   reconcile: NonNullable<Policy['reconcile']>
+  cleanupWorkspaces?: Policy['cleanupWorkspaces']
 }): Policy {
   function isolatedAction(action: KernelAction, binding: ObjectiveSnapshotBinding): boolean {
     const record = args.objectiveStore.getDispatch(fingerprint(action))
@@ -124,6 +125,7 @@ export function createObjectiveConcurrencyPolicy(args: {
       return isolatedAction(attempt.action, binding)
     },
     retainWorker: args.retainWorker,
+    cleanupWorkspaces: args.cleanupWorkspaces,
     reconcile: args.reconcile
   }
 }

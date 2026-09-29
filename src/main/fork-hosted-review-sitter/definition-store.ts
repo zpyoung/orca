@@ -11,7 +11,8 @@ export const enrollmentPayloadSchema = z.object({
     .url()
     .refine((value) => value.startsWith('https://') || value.startsWith('http://')),
   branchUpdateMode: z.enum(['merge-base-update', 'rebase']),
-  mergeMethod: z.enum(['merge', 'squash', 'rebase']).nullable()
+  mergeMethod: z.enum(['merge', 'squash', 'rebase']).nullable(),
+  mergeCheckScope: z.enum(['required', 'all']).default('all')
 })
 
 export function parseHostedReviewEnrollmentPayload(

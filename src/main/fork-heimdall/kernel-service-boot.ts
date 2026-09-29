@@ -161,6 +161,8 @@ export function bootHeimdallKernelService(
       terminalTransition.terminate(runner, fired, (sitter, kind) =>
         context.activateHandoff(sitter, kind)
       ),
+    persistRemovedWorkspace: (runner, fired) =>
+      terminalTransition.commit(runner.enrollment, fired).enrollment,
     readEnrollment: (watcherId) => {
       const record = enrollments.get(watcherId)
       if (!record || isMalformedKindPayloadEnrollment(record)) {

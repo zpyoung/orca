@@ -1,5 +1,8 @@
 import type { BudgetState } from '../../shared/fork-heimdall/budget'
-import { getUnresolvedAttempts } from '../../shared/fork-heimdall/ledger-queries'
+import {
+  getInFlightAttempts,
+  getUnresolvedAttempts
+} from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import { TICK_TRACE_RING_CAPACITY } from '../../shared/fork-heimdall/tick-trace'
 import {
@@ -183,6 +186,9 @@ export function compactTerminalRetention(
     }
 
     const pinnedEventIds = new Set(getUnresolvedAttempts(ledger).map((entry) => entry.eventId))
+    for (const attempt of getInFlightAttempts(ledger)) {
+      pinnedEventIds.add(attempt.eventId)
+    }
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
     const rows = database
       .prepare(

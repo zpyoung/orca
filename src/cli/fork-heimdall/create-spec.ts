@@ -35,7 +35,8 @@ const HOSTED_REVIEW_PAYLOAD_KEYS: Record<string, true> = {
   reviewNumber: true,
   reviewUrl: true,
   branchUpdateMode: true,
-  mergeMethod: true
+  mergeMethod: true,
+  mergeCheckScope: true
 }
 
 function mergeDeep(base: unknown, overlay: unknown): unknown {

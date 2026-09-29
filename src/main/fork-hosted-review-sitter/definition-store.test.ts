@@ -8,6 +8,16 @@ const payload = {
   reviewNumber: 42,
   reviewUrl: 'https://github.com/acme/repo/pull/42',
   branchUpdateMode: 'merge-base-update',
+  mergeMethod: 'squash',
+  mergeCheckScope: 'all'
+} as const
+
+const legacyPayload = {
+  branch: 'feature/review',
+  provider: 'github',
+  reviewNumber: 42,
+  reviewUrl: 'https://github.com/acme/repo/pull/42',
+  branchUpdateMode: 'merge-base-update',
   mergeMethod: 'squash'
 } as const
 
@@ -28,12 +38,25 @@ describe('hosted review enrollment payload', () => {
     expect(parseHostedReviewEnrollmentPayload(candidate)).toBeNull()
   })
 
+  it('defaults legacy stored payloads to all checks while preserving explicit required scope', () => {
+    expect(parseHostedReviewEnrollmentPayload(legacyPayload)).toEqual({
+      ...legacyPayload,
+      mergeCheckScope: 'all'
+    })
+    expect(
+      parseHostedReviewEnrollmentPayload({ ...legacyPayload, mergeCheckScope: 'required' })
+    ).toEqual({ ...legacyPayload, mergeCheckScope: 'required' })
+  })
+
   it('rejects incomplete, non-http and unknown-provider payloads', () => {
     expect(parseHostedReviewEnrollmentPayload({ ...payload, reviewNumber: 0 })).toBeNull()
     expect(
       parseHostedReviewEnrollmentPayload({ ...payload, reviewUrl: 'file:///tmp/review' })
     ).toBeNull()
     expect(parseHostedReviewEnrollmentPayload({ ...payload, provider: 'other' })).toBeNull()
+    expect(
+      parseHostedReviewEnrollmentPayload({ ...payload, mergeCheckScope: 'optional' })
+    ).toBeNull()
     expect(parseHostedReviewEnrollmentPayload({ branchUpdateMode: 'rebase' })).toBeNull()
   })
 

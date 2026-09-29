@@ -249,6 +249,9 @@
           "check": "Check",
           "baseCommit": "Base commit",
           "mergeMethod": "Merge method",
+          "mergeCheckScope": "Merge check scope",
+          "checkScopeAll": "All checks",
+          "checkScopeRequired": "Required checks only",
           "updateMethod": "Update method",
           "review": "Review"
         }

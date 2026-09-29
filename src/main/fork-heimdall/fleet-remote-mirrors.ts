@@ -24,6 +24,10 @@ import {
   type FleetEnvironmentTransport
 } from './fleet-environment-transport'
 import {
+  enrollmentForMergeCheckScopeCompatibility,
+  enrollmentWithoutUnsupportedRoleLaunch
+} from './fleet-remote-enrollment-capabilities'
+import {
   captureRemoteDetailNotifications,
   HeimdallOwnerDetailReadError,
   projectRemoteDetail,
@@ -40,25 +44,13 @@ import { projectRemoteFleetEntry, routeRemoteFleetEntry } from './fleet-projecti
 import { remoteDetailKey, RemoteFleetMirrorState } from './fleet-remote-mirror-state'
 import type { WatcherNotificationPublication } from './notification'
 
-type FleetSyncPlan = {
-  key: string
-  mirrors: RemoteFleetMirrorState[]
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Strips `roleLaunch` from an objective enrollment when the remote host has not negotiated it. */
-function enrollmentWithoutUnsupportedRoleLaunch(
-  input: EnrollInput,
-  roleLaunchSupported: boolean
-): EnrollInput {
-  if (roleLaunchSupported || input.kind !== 'objective' || !isRecord(input.kindPayload)) {
-    return input
-  }
-  const { roleLaunch: _roleLaunch, ...legacyKindPayload } = input.kindPayload
-  return { ...input, kindPayload: legacyKindPayload }
+type FleetSyncPlan = {
+  key: string
+  mirrors: RemoteFleetMirrorState[]
 }
 
 export class HeimdallRemoteFleetMirrors {
@@ -127,11 +119,18 @@ export class HeimdallRemoteFleetMirrors {
     ) {
       throw new HeimdallCommandCapabilityError(HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY)
     }
+    const scopeCompatibleInput = enrollmentForMergeCheckScopeCompatibility(
+      input,
+      mirror.mergeCheckScopeSupport
+    )
     return enrollRemoteWatcher(
       this.environments,
       identity,
       enrollmentWithoutUnsupportedRoleLaunch(
-        enrollmentForParallelCompatibility(input, mirror.parallelExecutionSupport === 'supported'),
+        enrollmentForParallelCompatibility(
+          scopeCompatibleInput,
+          mirror.parallelExecutionSupport === 'supported'
+        ),
         mirror.roleLaunchSupport === 'supported'
       )
     )

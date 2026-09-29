@@ -13,6 +13,7 @@ import {
   makeWorkspaceKey,
   type LeaseWorkspaceTarget
 } from './lease-store'
+import { LeaseWorkspaceRemovedError } from './lease-workspace-absence'
 
 class MemoryFilesystem {
   readonly directories = new Set(['/workspace', '/workspace/.orca', '/workspace/.orca/heimdall'])
@@ -540,6 +541,52 @@ describe('host-routed epoch lease', () => {
       status: 'configuration-error',
       reason: 'Lease target does not match its workspace key'
     })
+  })
+
+  it('answers confirmed host absence as a removed workspace', async () => {
+    const store = new HostRoutedLeaseStore({
+      resolveTarget: async () => {
+        throw new LeaseWorkspaceRemovedError('workspace-removed')
+      }
+    })
+    await expect(
+      store.acquireOrRenew(makeWorkspaceKey('local', '/workspace'), 'owner', 90_000)
+    ).resolves.toEqual({ status: 'workspace-removed', reason: 'workspace-removed' })
+  })
+
+  it('keeps an unconfirmed local selector miss unverifiable', async () => {
+    const store = new HostRoutedLeaseStore({
+      resolveTarget: async () => {
+        throw new Error('selector_not_found')
+      }
+    })
+    await expect(
+      store.acquireOrRenew(makeWorkspaceKey('local', '/workspace'), 'owner', 90_000)
+    ).resolves.toEqual({ status: 'unverifiable', reason: 'selector_not_found' })
+  })
+
+  it.each([
+    new Error('transport unavailable'),
+    new Error('selector_not_found'),
+    new Error('selector_ambiguous'),
+    new Error('worktree_not_found_on_server')
+  ])('keeps unconfirmed target failures unverifiable (%s)', async (failure) => {
+    const store = new HostRoutedLeaseStore({
+      resolveTarget: async () => {
+        throw failure
+      }
+    })
+    await expect(
+      store.acquireOrRenew(makeWorkspaceKey('ssh:host-a', '/workspace'), 'owner', 90_000)
+    ).resolves.toEqual({ status: 'unverifiable', reason: failure.message })
+  })
+  it('does not turn a lease filesystem error into registry absence', async () => {
+    const fs = new MemoryFilesystem()
+    vi.spyOn(fs, 'createDir').mockRejectedValue(new Error('selector_not_found'))
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    await expect(
+      store.acquireOrRenew(makeWorkspaceKey('ssh:host-a', '/workspace'), 'owner', 90_000)
+    ).resolves.toEqual({ status: 'unverifiable', reason: 'selector_not_found' })
   })
 
   it('answers transport failure as unverifiable, never held', async () => {

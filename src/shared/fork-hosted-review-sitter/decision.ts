@@ -19,13 +19,16 @@ import {
   buildUpdateAction
 } from './decision-action-builders'
 import {
+  areCurrentHeadChecksGreen,
   deterministicFailureChecks,
-  failedCheckGroups,
   freshFailedChecksAfterRerun,
+  groupRequiresOwnerForRecovery,
+  primaryFailedCheckGroup,
   type FailedCheckGroup
 } from './decision-check-groups'
 import type {
   HostedReviewAttemptEntry,
+  HostedReviewMergeCheckScope,
   HostedReviewPreparedCommit,
   HostedReviewReadinessBlocker,
   HostedReviewSitterAction,
@@ -67,6 +70,7 @@ export type HostedReviewSitterNoActionReason =
   | 'rerun-unresolved'
   | 'awaiting-rerun-result'
   | 'failure-signature-unavailable'
+  | 'check-rerun-unavailable'
   | 'fix-already-attempted'
   | 'fix-already-published'
   | 'fix-preparation-unusable'
@@ -103,18 +107,6 @@ function declined(
   detail?: string
 ): { action: null; reason: HostedReviewSitterNoActionReason; detail?: string } {
   return detail === undefined ? { action: null, reason } : { action: null, reason, detail }
-}
-
-export function areCurrentHeadRequiredChecksGreen(review: HostedReviewSnapshot): boolean {
-  if (!review.checksComplete) {
-    return false
-  }
-  for (const check of review.checks) {
-    if (check.required && (check.headSha !== review.headSha || check.state !== 'passed')) {
-      return false
-    }
-  }
-  return true
 }
 
 function readinessAllowsOnly(
@@ -158,8 +150,12 @@ function desiredFixAction(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger,
   group: FailedCheckGroup,
+  scope: HostedReviewMergeCheckScope,
   preparedCommit: HostedReviewPreparedCommit | null
 ): PhaseOutcome {
+  if (groupRequiresOwnerForRecovery(review, group, scope)) {
+    return declined('check-rerun-unavailable', group.checkKey)
+  }
   const deterministic = deterministicFailureChecks(group)
   let preparation: PrepareFixAction | null = null
 
@@ -201,7 +197,7 @@ function desiredFixAction(
     if (rerunEntry.action.kind !== 'rerun-check') {
       return declined('rerun-unresolved')
     }
-    const freshFailures = freshFailedChecksAfterRerun(review, group, rerunEntry.action)
+    const freshFailures = freshFailedChecksAfterRerun(review, group, rerunEntry.action, scope)
     if (!freshFailures) {
       return declined('awaiting-rerun-result')
     }
@@ -375,11 +371,11 @@ export function explainDesiredAction(
     return fellThrough(declined('review-not-open', review.lifecycle))
   }
 
-  const checksGreen = areCurrentHeadRequiredChecksGreen(review)
-  const failures = failedCheckGroups(review)
+  const checksGreen = areCurrentHeadChecksGreen(review, sitter.mergeCheckScope)
+  const primaryFailure = primaryFailedCheckGroup(review, sitter.mergeCheckScope)
   // Conflicts usually stop CI from building a merge commit. A red check still comes first unless
   // the base moved, since the move is what made that check red.
-  const conflictOtherwiseReady = !review.draft && (failures.length === 0 || review.behindBase)
+  const conflictOtherwiseReady = !review.draft && (!primaryFailure || review.behindBase)
   if (review.conflicts === 'present') {
     if (sitter.capabilities.resolveConflicts === 'off') {
       return fellThrough(declined('capability-off', 'resolveConflicts'))
@@ -391,11 +387,17 @@ export function explainDesiredAction(
     considered.push({ phase: 'conflicts', reason: 'conflict-resolution-deferred' })
   }
 
-  if (failures.length > 0) {
+  if (primaryFailure) {
     if (sitter.capabilities.fixChecks === 'off') {
       considered.push({ phase: 'fix-checks', reason: 'capability-off', detail: 'fixChecks' })
     } else {
-      const outcome = desiredFixAction(review, ledger, failures[0]!, context.preparedCommit)
+      const outcome = desiredFixAction(
+        review,
+        ledger,
+        primaryFailure,
+        sitter.mergeCheckScope,
+        context.preparedCommit
+      )
       if (outcome.action) {
         return outcome
       }
@@ -412,7 +414,7 @@ export function explainDesiredAction(
     } else {
       const otherwiseReady =
         !review.draft && checksGreen && readinessAllowsOnly(review, UPDATE_READY_BLOCKERS)
-      const redAfterBaseMove = failures.length > 0 && !review.draft
+      const redAfterBaseMove = primaryFailure !== undefined && !review.draft
       if (!otherwiseReady && !redAfterBaseMove) {
         considered.push({ phase: 'update-branch', reason: 'update-not-ready' })
       } else {

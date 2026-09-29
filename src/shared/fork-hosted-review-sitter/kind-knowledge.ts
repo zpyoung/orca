@@ -1,6 +1,7 @@
 import { getInFlightAttempts } from '../fork-heimdall/ledger-queries'
 import type { PacingTier } from '../fork-heimdall/pacing'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
+import { currentHeadChecks, requiresOwnerForCheckRecovery } from './decision-check-groups'
 import type {
   HostedReviewCheckState,
   HostedReviewLifecycle,
@@ -74,11 +75,10 @@ export function paceHostedReview(
     return 'stopped'
   }
 
-  const currentRequired = review.checks.filter(
-    (check) => check.required && check.headSha === review.headSha
-  )
+  const scope = snapshot.world.definition.mergeCheckScope
+  const currentChecks = currentHeadChecks(review, scope)
   const settling =
-    currentRequired.some((check) => check.state === 'pending') ||
+    currentChecks.some((check) => check.state === 'pending') ||
     review.queue.membership === 'enqueued' ||
     getInFlightAttempts(ledger).length > 0
   if (settling) {
@@ -86,7 +86,9 @@ export function paceHostedReview(
   }
 
   const actionable =
-    currentRequired.some((check) => check.state === 'failed') ||
+    currentChecks.some(
+      (check) => check.state === 'failed' && !requiresOwnerForCheckRecovery(review, check, scope)
+    ) ||
     review.conflicts === 'present' ||
     review.behindBase
   return actionable ? 'active' : 'idle'

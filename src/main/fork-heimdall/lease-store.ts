@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
-import type { DirEntry } from '../../shared/filesystem-entry-types'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { WorkspaceKey } from '../../shared/fork-heimdall/watcher-types'
 import { resolveGitDir } from '../git/source-control/resolve-git-dir'
@@ -11,6 +10,8 @@ import type { IFilesystemProvider } from '../providers/types'
 import { ExecutionHostNotDispatchableError } from '../providers/execution-host-provider-dispatch'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { requireRuntimeGitProvider } from '../runtime/runtime-git-command-target'
+import { highestEpoch } from './lease-epoch-directory'
+import { LeaseWorkspaceRemovedError } from './lease-workspace-absence'
 import {
   parseLeaseHolderRecord,
   type LeaseHolderReadResult,
@@ -44,6 +45,7 @@ export type LeaseResult =
   | { status: 'refused'; reason: 'held-by-other'; holder: string; epoch: number }
   | { status: 'unverifiable'; reason: string }
   | { status: 'configuration-error'; reason: string }
+  | { status: 'workspace-removed'; reason: 'workspace-removed' }
 
 export type LeaseLocationDescription = {
   executionHostId: ExecutionHostId
@@ -99,24 +101,6 @@ function isAlreadyExists(error: unknown): boolean {
 
 function isNotFound(error: unknown): boolean {
   return getErrorCode(error) === 'ENOENT' || /not found/i.test(errorMessage(error))
-}
-
-function highestEpoch(entries: readonly DirEntry[]): number {
-  let highest = 0
-  for (const entry of entries) {
-    if (!entry.isDirectory || entry.isSymlink) {
-      continue
-    }
-    const match = /^epoch-(\d+)$/.exec(entry.name)
-    if (!match) {
-      continue
-    }
-    const epoch = Number(match[1])
-    if (Number.isSafeInteger(epoch) && epoch > highest) {
-      highest = epoch
-    }
-  }
-  return highest
 }
 
 class EpochLeaseGuard implements LeaseGuard {
@@ -239,6 +223,9 @@ export class HostRoutedLeaseStore implements LeaseStore {
       }
       return await this.claimNextEpoch(location, epoch + 1, holder, ttlMs)
     } catch (error) {
+      if (error instanceof LeaseWorkspaceRemovedError) {
+        return { status: 'workspace-removed', reason: 'workspace-removed' }
+      }
       if (
         error instanceof LeaseConfigurationError ||
         error instanceof ExecutionHostNotDispatchableError

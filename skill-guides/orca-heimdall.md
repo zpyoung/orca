@@ -205,15 +205,25 @@ Hosted-review-specific options:
 - `--merge-method merge|squash|rebase|default` selects a merge method; `default` follows the
   provider repository setting.
 
+For hosted-review `--spec`, set `kindPayload.mergeCheckScope` to `"all"` or `"required"`; omitted
+values default to `"all"`. `"all"` waits for every current-head check, while `"required"` uses only
+checks required by branch rules.
+
 `branch`, `provider`, `reviewNumber`, and `reviewUrl` are optional input candidates. A capable host
 derives the authoritative values from the selected worktree and forge; candidate values do not
 override or become persisted identity.
 
 Defaults are all four hosted-review capabilities (`updateBranch`, `resolveConflicts`, `fixChecks`,
-`merge`) set to `off`, 4 active hours, unlimited turns, `merge-base-update` for branch updates, and
-the provider's default merge method. The host must advertise the hosted-review derived-payload
-runtime capability. If it does not, update and restart that Orca runtime before retrying; including
-candidate identity values in `--spec` does not bypass the capability gate.
+`merge`) set to `off`, 4 active hours, unlimited turns, `merge-base-update` for branch updates,
+`all` for merge-check scope, and the provider's default merge method. The host must advertise the
+hosted-review derived-payload runtime capability. If it does not, update and restart that Orca
+runtime before retrying; including candidate identity values in `--spec` does not bypass the
+capability gate.
+
+The check-scope capability `heimdall.hosted-review-check-scope.v1` is required for `"all"`. If an
+older runtime does not advertise it, the CLI refuses an all-scope enrollment rather than silently
+dropping or changing the requested scope. `"required"` remains compatible: the CLI omits that field
+for the old runtime, preserving its legacy behavior. Update and restart the runtime to use `"all"`.
 
 This complete spec fragment selects a conservative sitter on a Git worktree with an open review:
 

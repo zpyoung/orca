@@ -189,6 +189,22 @@ export class WatcherRunnerLoop {
         this.dependencies.leaseTtlMs ?? 90_000
       )
       if (lease.status !== 'held') {
+        if (lease.status === 'workspace-removed') {
+          this.resyncEnrollment(runner)
+          if (runner.stopped || runner.controlPending === 'delete') {
+            return
+          }
+          this.dispatchLifecycle.closeForWatcherStop(runner.enrollment.watcherId)
+          const interval = this.dependencies.budgetClock.owned(runner.enrollment.watcherId)
+          if (interval) {
+            this.dependencies.budgetClock.close(interval, 'shutdown')
+          }
+          this.statusLifecycle.workspaceRemoved(runner, this.dependencies.persistRemovedWorkspace)
+          this.controlLifecycle.disarm(runner)
+          runner.reconcileAgain = false
+          trace.exitPath = 'lifecycle-terminal'
+          return
+        }
         if (lease.status === 'configuration-error') {
           trace.exitPath = 'error'
           trace.error = { message: lease.reason }
@@ -282,7 +298,18 @@ export class WatcherRunnerLoop {
         createId: () => this.createId()
       })
       ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      if (snapshot.freshness === 'live' && runner.kind.concurrency?.reconcile) {
+      const reconcilesThisTick =
+        snapshot.freshness === 'live' && runner.kind.concurrency?.reconcile !== undefined
+      const workspacesCleaned = await runner.kind.concurrency?.cleanupWorkspaces?.(ledger, {
+        enrollment: runner.enrollment,
+        lease: lease.guard,
+        workerReleaseConfirmed: (dispatchId) => workerReleaseConfirmed(ledger, dispatchId)
+      })
+      if (workspacesCleaned && !reconcilesThisTick) {
+        snapshot = await this.readFreshSnapshot(runner, trace, lease.guard)
+        ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      }
+      if (reconcilesThisTick && runner.kind.concurrency?.reconcile) {
         await runner.kind.concurrency.reconcile(snapshot, ledger, {
           enrollment: runner.enrollment,
           lease: lease.guard,
@@ -290,15 +317,7 @@ export class WatcherRunnerLoop {
             this.dependencies.orchestration.stopWorker(runner.enrollment, dispatchId),
           workerReleaseConfirmed: (dispatchId) => workerReleaseConfirmed(ledger, dispatchId)
         })
-        await lease.guard.assertHeld()
-        snapshot = requireLiveSnapshot(await runner.kind.read(runner.enrollment, { fresh: true }))
-        await lease.guard.assertHeld()
-        trace.snapshotReadCount += 1
-        runner.lastSnapshot = snapshot
-        runner.lastFullResyncAtMs = this.now()
-        runner.forceFresh = false
-        trace.snapshot = runner.kind.describeSnapshot(snapshot)
-        trace.contentIdentity = snapshot.contentIdentity
+        snapshot = await this.readFreshSnapshot(runner, trace, lease.guard)
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       }
       const recoveredUncertainBeforeStop =
@@ -417,6 +436,23 @@ export class WatcherRunnerLoop {
         }
       }
     }
+  }
+
+  private async readFreshSnapshot(
+    runner: WatcherRunner,
+    trace: WatcherTickTrace,
+    leaseGuard: NonNullable<WatcherRunner['leaseGuard']>
+  ): Promise<Snapshot<unknown>> {
+    await leaseGuard.assertHeld()
+    const snapshot = requireLiveSnapshot(await runner.kind.read(runner.enrollment, { fresh: true }))
+    await leaseGuard.assertHeld()
+    trace.snapshotReadCount += 1
+    runner.lastSnapshot = snapshot
+    runner.lastFullResyncAtMs = this.now()
+    runner.forceFresh = false
+    trace.snapshot = runner.kind.describeSnapshot(snapshot)
+    trace.contentIdentity = snapshot.contentIdentity
+    return snapshot
   }
 
   /**
