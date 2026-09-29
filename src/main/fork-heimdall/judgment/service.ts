@@ -1,9 +1,6 @@
 import {
-  JudgmentAnswerSchema,
-  JudgmentModelSchema,
   JudgmentQuestionRequestSchema,
   JudgmentSnapshotSchema,
-  type JudgmentAnswer,
   type JudgmentProvider,
   type JudgmentQuestion,
   type JudgmentQuestionRequest,
@@ -12,7 +9,9 @@ import {
 import { OBJECTIVE_JUDGMENT_QUESTION_IDS } from '../../../shared/fork-heimdall/judgment/registry'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/detail-types'
-import { JudgmentClientFailure, judgmentRequestFitsTransportLimits } from './client'
+import { judgmentRequestFitsTransportLimits, type JudgmentResponse } from './client'
+import { evaluationFailureReason } from './failure-reason'
+import { partialResponseReason, validateClientResponse } from './response-validation'
 import { computeJudgmentIdentity, type ComputedJudgmentIdentity } from './identity'
 import { expandJudgmentState, JUDGMENT_STATE_NORMALIZATION_GUIDANCE } from './state-normalization'
 import type {
@@ -41,10 +40,7 @@ export type JudgmentAccess =
   | { enabled: true; provider?: JudgmentProvider; apiKey: string }
 
 export type JudgmentClientPort = {
-  evaluate(
-    state: unknown,
-    questions: Record<string, JudgmentQuestion>
-  ): Promise<{ model: string; answers: Record<string, JudgmentAnswer> }>
+  evaluate(state: unknown, questions: Record<string, JudgmentQuestion>): Promise<JudgmentResponse>
 }
 
 export type JudgmentQuestionPolicy = JudgmentRecordedPolicy
@@ -123,40 +119,6 @@ function validatedRequests(
 
 function withStateNotices(reason: string, notices: readonly string[]): string {
   return notices.length === 0 ? reason : `${reason}; ${notices.join(' ')}`
-}
-
-const GENERIC_EVALUATION_FAILURE_REASON = 'judgment unavailable: evaluation failed'
-
-function evaluationFailureReason(error: unknown): string {
-  if (!(error instanceof JudgmentClientFailure)) {
-    return GENERIC_EVALUATION_FAILURE_REASON
-  }
-
-  const diagnostic = error.diagnostic
-  switch (diagnostic.code) {
-    case 'timeout':
-      return 'judgment unavailable: timeout'
-    case 'http-status':
-      return Number.isInteger(diagnostic.status) &&
-        diagnostic.status >= 100 &&
-        diagnostic.status <= 599
-        ? `judgment unavailable: http-status:${diagnostic.status}`
-        : GENERIC_EVALUATION_FAILURE_REASON
-    case 'retry-exhausted':
-      return diagnostic.status === 429 || diagnostic.status === 529
-        ? `judgment unavailable: retry-exhausted:${diagnostic.status}`
-        : GENERIC_EVALUATION_FAILURE_REASON
-    case 'state-size':
-      return 'judgment unavailable: state-size'
-    case 'request-size':
-      return 'judgment unavailable: request-size'
-    case 'response-size':
-      return 'judgment unavailable: response-size'
-    case 'malformed-response':
-      return 'judgment unavailable: malformed-response'
-    case 'unknown':
-      return GENERIC_EVALUATION_FAILURE_REASON
-  }
 }
 
 function withNormalizationGuidance(question: JudgmentQuestion): JudgmentQuestion {
@@ -457,40 +419,43 @@ export class JudgmentService {
     )
 
     try {
-      const response = await this.dependencies
+      const untrustedResponse: unknown = await this.dependencies
         .createClient(access.apiKey, { provider })
         .evaluate(computed.state, questions)
-      const responseIds = Object.keys(response.answers)
+      const response = validateClientResponse(untrustedResponse, requests)
       if (
-        !JudgmentModelSchema.safeParse(response.model).success ||
-        responseIds.length !== requests.length ||
-        requests.some(
-          (request) =>
-            response.answers[request.id] === undefined ||
-            !JudgmentAnswerSchema.safeParse(response.answers[request.id]).success
-        )
+        response.answers.size > 0 &&
+        !this.dependencies.store.hasModelVersion(input.watcherId, response.model)
       ) {
-        throw new JudgmentClientFailure('Judgment response is invalid', {
-          code: 'malformed-response'
-        })
-      }
-
-      if (!this.dependencies.store.hasModelVersion(input.watcherId, response.model)) {
         const notice = `Judgment model ${response.model} observed; acting thresholds require explicit calibration for this exact model.`
         this.dependencies.store.recordModelVersion(input.watcherId, response.model, notice)
         notices.push(notice)
       }
       for (const request of requests) {
-        this.dependencies.store.recordAnswer(
-          input.watcherId,
-          identity,
-          request,
-          policies.get(request.id)!,
-          provider,
-          response.model,
-          response.answers[request.id]!
-        )
+        const answer = response.answers.get(request.id)
+        if (answer !== undefined) {
+          this.dependencies.store.recordAnswer(
+            input.watcherId,
+            identity,
+            request,
+            policies.get(request.id)!,
+            provider,
+            response.model,
+            answer
+          )
+        }
       }
+      if (response.unavailable.size > 0) {
+        const reason = partialResponseReason(
+          response.answers.size,
+          requests.length,
+          response.unavailable
+        )
+        this.dependencies.store.recordOutcome(input.watcherId, identity, 'unavailable', reason)
+        const recorded = this.dependencies.store.history(input.watcherId, identity)
+        return snapshot(identity, 'unavailable', recorded.answers, reason, notices)
+      }
+
       this.dependencies.store.recordOutcome(
         input.watcherId,
         identity,
@@ -507,13 +472,9 @@ export class JudgmentService {
       )
     } catch (error) {
       const reason = evaluationFailureReason(error)
-      this.dependencies.store.recordOutcome(
-        input.watcherId,
-        identity,
-        'unavailable',
-        withStateNotices(reason, notices)
-      )
-      return snapshot(identity, 'unavailable', history.answers, reason, notices)
+      this.dependencies.store.recordOutcome(input.watcherId, identity, 'unavailable', reason)
+      const failedHistory = this.dependencies.store.history(input.watcherId, identity)
+      return snapshot(identity, 'unavailable', failedHistory.answers, reason, notices)
     }
   }
 }

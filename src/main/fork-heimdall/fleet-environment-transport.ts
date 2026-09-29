@@ -10,6 +10,7 @@ import {
 } from '../../shared/remote-runtime-client'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
@@ -66,14 +67,17 @@ export class HeimdallCommandCapabilityError extends Error {
     requiredCapability:
       | typeof HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
       | typeof HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
-      | typeof HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY = HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY = HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
   ) {
     super(
       requiredCapability === HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
         ? 'The owning runtime does not support permanent watcher deletion. Update the host and try again.'
         : requiredCapability === HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
           ? 'The owning runtime does not support parallel objective execution. Update the host and try again.'
-          : 'The owning runtime does not support Heimdall commands. Update the host and try again.'
+          : requiredCapability === HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
+            ? 'The owning runtime does not support enrolling on a new worktree. Update the host and try again.'
+            : 'The owning runtime does not support Heimdall commands. Update the host and try again.'
     )
     this.name = 'HeimdallCommandCapabilityError'
   }

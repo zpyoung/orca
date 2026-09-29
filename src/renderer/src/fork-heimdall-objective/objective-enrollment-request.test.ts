@@ -23,6 +23,9 @@ function gateDraft(
 function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnrollmentDraft {
   return {
     objectiveText: 'Ship the objective watcher',
+    newWorktreeName: '',
+    newWorktreeNameEdited: false,
+    newWorktreeBaseBranch: undefined,
     existingPlanText: '',
     tier: 'standard',
     landingBar: 'files-on-disk',
@@ -105,6 +108,48 @@ describe('buildObjectiveEnrollmentSubmission gates', () => {
     expect(submission.input.kindPayload).not.toHaveProperty('gates')
     expect(submission.input.kindPayload).not.toHaveProperty('lanesEnabled')
     expect(submission.input.kindPayload).toMatchObject({ maxConcurrency: 1 })
+  })
+})
+
+describe('buildObjectiveEnrollmentSubmission new worktree', () => {
+  const newWorkspace = () => ({
+    ...objectiveWorkspace(),
+    key: 'runtime:hermes:repo:new',
+    worktreeId: null,
+    branch: null,
+    createsWorktree: true as const
+  })
+
+  it('sends a suggested name with no base branch when unset', () => {
+    const submission = buildObjectiveEnrollmentSubmission(draft(), newWorkspace())
+
+    expect(submission.input.worktreeId).toBeNull()
+    expect(submission.input.kindPayload).toHaveProperty('newWorktree', {
+      name: 'ship-the-objective-watcher'
+    })
+  })
+
+  it('sends an edited name and trimmed base branch on a legacy parallel host', () => {
+    const submission = buildObjectiveEnrollmentSubmission(
+      draft({
+        newWorktreeName: '  my-worktree  ',
+        newWorktreeNameEdited: true,
+        newWorktreeBaseBranch: '  release  '
+      }),
+      { ...newWorkspace(), parallelExecutionSupported: false }
+    )
+
+    expect(submission.input.worktreeId).toBeNull()
+    expect(submission.input.kindPayload).toHaveProperty('newWorktree', {
+      name: 'my-worktree',
+      baseBranch: 'release'
+    })
+    expect(submission.input.kindPayload).not.toHaveProperty('lanesEnabled')
+  })
+
+  it('omits the field for an existing worktree', () => {
+    const submission = buildObjectiveEnrollmentSubmission(draft(), objectiveWorkspace())
+    expect(submission.input.kindPayload).not.toHaveProperty('newWorktree')
   })
 })
 

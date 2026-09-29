@@ -16,6 +16,7 @@ type TextGenerationRecipeConfiguration = {
   agentId?: SourceControlActionRecipe['agentId']
   commandInputTemplate?: string | null
   agentArgs?: string | null
+  launchOptions?: SourceControlActionRecipe['launchOptions'] | null
 }
 
 function textGenerationRecipeIsConfigured(
@@ -31,7 +32,11 @@ function textGenerationRecipeIsConfigured(
   ) {
     return true
   }
-  return typeof recipe?.agentArgs === 'string' && recipe.agentArgs.trim().length > 0
+  return (
+    (typeof recipe?.agentArgs === 'string' && recipe.agentArgs.trim().length > 0) ||
+    Boolean(recipe?.launchOptions?.model) ||
+    Boolean(recipe?.launchOptions?.optionValues)
+  )
 }
 
 export function generationParamsToActionRecipe(
@@ -40,7 +45,12 @@ export function generationParamsToActionRecipe(
   return {
     agentId: params.agentId,
     commandInputTemplate: params.commandInputTemplate ?? '{basePrompt}',
-    ...(params.agentArgs !== undefined ? { agentArgs: params.agentArgs } : {})
+    ...(params.recipeAgentArgs !== undefined
+      ? { agentArgs: params.recipeAgentArgs }
+      : params.agentArgs !== undefined
+        ? { agentArgs: params.agentArgs }
+        : {}),
+    ...(params.launchOptions ? { launchOptions: params.launchOptions } : {})
   }
 }
 

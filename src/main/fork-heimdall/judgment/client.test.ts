@@ -10,6 +10,7 @@ import {
   type JudgmentFetch,
   type JudgmentQuestion
 } from './client'
+import { JudgmentUnavailableReasonSchema } from './answer-validation'
 
 const API_KEY = 'secret-api-key'
 const QUESTIONS = {
@@ -169,26 +170,31 @@ describe('judgment client', () => {
     expect(String(init.body)).not.toContain(openRouterKey)
   })
 
-  it('refuses OpenRouter choice and score answers missing real confidence or probabilities', async () => {
+  it('reports OpenRouter confidence and probability omissions independently while preserving valid answers', async () => {
     const missingFields = [
-      ['route', 'confidence'],
-      ['route', 'probabilities'],
-      ['severity', 'confidence'],
-      ['severity', 'probabilities']
+      ['route', 'confidence', 'missing-confidence'],
+      ['route', 'probabilities', 'missing-probabilities'],
+      ['severity', 'confidence', 'missing-confidence'],
+      ['severity', 'probabilities', 'missing-probabilities']
     ] as const
 
-    for (const [answerId, field] of missingFields) {
+    for (const [answerId, field, reason] of missingFields) {
       const payload = validOpenRouterResponse()
       const answer = payload.answers[answerId]
       delete answer[field]
+      const expectedAnswers = { ...validVendorResponse().answers }
+      delete expectedAnswers[answerId]
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      const error = await clientFailure(
+      await expect(
         createJudgmentClient(API_KEY, { provider: 'openrouter', fetch: fetcher }).evaluate(
           'state',
           QUESTIONS
         )
-      )
-      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
+      ).resolves.toEqual({
+        model: payload.model,
+        answers: expectedAnswers,
+        unavailable: { [answerId]: reason }
+      })
       expect(fetcher).toHaveBeenCalledTimes(1)
     }
   })
@@ -211,16 +217,60 @@ describe('judgment client', () => {
     expect(fetcher).toHaveBeenCalledTimes(1)
   })
 
-  it('classifies malformed provider payload without exposing its body', async () => {
+  it('classifies invalid JSON without exposing its body or credentials', async () => {
     const providerBody = `malformed response containing ${API_KEY}`
     const fetcher = vi.fn<JudgmentFetch>(async () => new Response(providerBody))
     const error = await clientFailure(
       createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
     )
 
-    expect(error.diagnostic).toEqual({ code: 'malformed-response' })
+    expect(error.diagnostic).toEqual({
+      code: 'malformed-response',
+      reason: 'invalid-json'
+    })
     expect(error.message).not.toContain(API_KEY)
     expect(error.message).not.toContain(providerBody)
+    expect(JSON.stringify(error.diagnostic)).not.toContain(API_KEY)
+  })
+
+  it('returns bounded malformed-response reasons for invalid UTF-8 and invalid envelopes', async () => {
+    const invalidUtf8Fetcher = vi.fn<JudgmentFetch>(
+      async () => new Response(new Uint8Array([0xc3, 0x28]))
+    )
+    const utf8Error = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: invalidUtf8Fetcher }).evaluate('state', QUESTIONS)
+    )
+    expect(utf8Error.diagnostic).toEqual({
+      code: 'malformed-response',
+      reason: 'invalid-utf8'
+    })
+
+    const invalidEnvelope = {
+      ...validVendorResponse(),
+      provider_secret: API_KEY
+    }
+    const envelopeFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(invalidEnvelope))
+    const envelopeError = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: envelopeFetcher }).evaluate('state', QUESTIONS)
+    )
+    expect(envelopeError.diagnostic).toEqual({
+      code: 'malformed-response',
+      reason: 'invalid-envelope'
+    })
+    expect(envelopeError.message).not.toContain(API_KEY)
+    expect(JSON.stringify(envelopeError.diagnostic)).not.toContain(API_KEY)
+
+    const invalidModel = validVendorResponse()
+    invalidModel.model = `\u0000${API_KEY}`
+    const modelFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(invalidModel))
+    const modelError = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: modelFetcher }).evaluate('state', QUESTIONS)
+    )
+    expect(modelError.diagnostic).toEqual({
+      code: 'malformed-response',
+      reason: 'invalid-envelope'
+    })
+    expect(modelError.message).not.toContain(API_KEY)
   })
 
   it('accepts a noul answer without confidence and keeps schemas strict and finite', () => {
@@ -235,7 +285,28 @@ describe('judgment client', () => {
       JudgmentResponseSchema.safeParse({
         model: 'jev-version',
         answers: { urgent: { type: 'noul', noul: 0.5 } },
-        usage: { input_tokens: 1, output_tokens: 1 }
+        unavailable: { route: 'missing-answer' }
+      }).success
+    ).toBe(true)
+    expect(JudgmentUnavailableReasonSchema.options).toEqual([
+      'missing-answer',
+      'answer-shape',
+      'answer-type',
+      'missing-confidence',
+      'missing-probabilities',
+      'score-weight-mismatch',
+      'score-legend',
+      'score-range',
+      'probability-keys',
+      'probability-distribution',
+      'choice-invalid',
+      'choice-not-max'
+    ])
+    expect(
+      JudgmentResponseSchema.safeParse({
+        model: 'jev-version',
+        answers: { urgent: { type: 'noul', noul: 0.5 } },
+        unavailable: { route: 'secret-provider-detail' }
       }).success
     ).toBe(false)
   })
@@ -303,34 +374,158 @@ describe('judgment client', () => {
     const transportError = await clientFailure(
       createJudgmentClient(API_KEY, { fetch: transportFetcher }).evaluate('state', QUESTIONS)
     )
-    expect(transportError.diagnostic).toEqual({ code: 'unknown' })
+    expect(transportError.diagnostic).toEqual({ code: 'network-error' })
     expect(transportError.message).not.toContain(API_KEY)
+    expect(transportError.message).not.toContain('transport exposed')
     expect(transportFetcher).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects missing and unexpected answers', async () => {
+  it('preserves missing answers as unavailable and rejects unexpected answer IDs safely', async () => {
     const missing = validVendorResponse()
     delete missing.answers.urgent
-    const unexpected = validVendorResponse()
-    unexpected.answers.other = { type: 'noul', noul: 0.5 }
+    const missingFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(missing))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: missingFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toEqual({
+      model: missing.model,
+      answers: {
+        route: missing.answers.route,
+        severity: missing.answers.severity
+      },
+      unavailable: { urgent: 'missing-answer' }
+    })
 
-    for (const payload of [missing, unexpected]) {
+    const unexpectedId = `private-id-${API_KEY}`
+    const unexpected = validVendorResponse()
+    unexpected.answers[unexpectedId] = { type: 'noul', noul: 0.5 }
+    const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(unexpected))
+    const error = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
+    )
+    expect(error.diagnostic).toEqual({
+      code: 'malformed-response',
+      reason: 'unexpected-answer'
+    })
+    expect(error.message).not.toContain(unexpectedId)
+    expect(JSON.stringify(error.diagnostic)).not.toContain(unexpectedId)
+  })
+
+  it('reports missing TypeSafe confidence and probabilities without discarding other answers', async () => {
+    const missingFields = [
+      ['route', 'confidence', 'missing-confidence'],
+      ['route', 'probabilities', 'missing-probabilities'],
+      ['severity', 'confidence', 'missing-confidence'],
+      ['severity', 'probabilities', 'missing-probabilities']
+    ] as const
+
+    for (const [answerId, field, reason] of missingFields) {
+      const payload = validVendorResponse()
+      delete payload.answers[answerId][field]
+      const expectedAnswers = { ...validVendorResponse().answers }
+      delete expectedAnswers[answerId]
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      const error = await clientFailure(
+      await expect(
         createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
-      )
-      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
+      ).resolves.toEqual({
+        model: payload.model,
+        answers: expectedAnswers,
+        unavailable: { [answerId]: reason }
+      })
     }
   })
 
-  it('validates choice options and probability distributions against the question', async () => {
-    const unknownOption = validVendorResponse()
-    unknownOption.answers.route = {
+  it('reports a weighted score mismatch without discarding valid answers', async () => {
+    const payload = validVendorResponse()
+    payload.answers.severity = {
+      type: 'score',
+      score: 0,
+      legend: { '0': 'Low', '1': 'Medium', '2': 'High' },
+      probabilities: { '0': 0, '1': 0, '2': 1 },
+      confidence: 1
+    }
+    const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toEqual({
+      model: payload.model,
+      answers: {
+        route: payload.answers.route,
+        urgent: payload.answers.urgent
+      },
+      unavailable: { severity: 'score-weight-mismatch' }
+    })
+  })
+
+  it('distinguishes malformed answer shape from mismatched answer type', async () => {
+    const malformed = {
+      ...validVendorResponse(),
+      answers: { ...validVendorResponse().answers, route: { type: 'choice', choice: 7 } }
+    }
+    const expectedAnswers = { ...validVendorResponse().answers }
+    delete expectedAnswers.route
+    const malformedFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(malformed))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: malformedFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toEqual({
+      model: malformed.model,
+      answers: expectedAnswers,
+      unavailable: { route: 'answer-shape' }
+    })
+
+    const mismatched = validVendorResponse()
+    mismatched.answers.route = {
+      type: 'score',
+      score: 1,
+      legend: { '0': 'Low', '1': 'Medium', '2': 'High' },
+      probabilities: { '0': 0.1, '1': 0.8, '2': 0.1 },
+      confidence: 0.7
+    }
+    const mismatchFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(mismatched))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: mismatchFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toEqual({
+      model: mismatched.model,
+      answers: expectedAnswers,
+      unavailable: { route: 'answer-type' }
+    })
+  })
+
+  it('rejects unexpected OpenRouter answer IDs without exposing them', async () => {
+    const unexpectedId = `private-openrouter-id-${API_KEY}`
+    const unexpected = validOpenRouterResponse()
+    unexpected.answers[unexpectedId] = { type: 'noul', noul: 0.5 }
+    const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(unexpected))
+    const error = await clientFailure(
+      createJudgmentClient(API_KEY, { provider: 'openrouter', fetch: fetcher }).evaluate(
+        'state',
+        QUESTIONS
+      )
+    )
+
+    expect(error.diagnostic).toEqual({
+      code: 'malformed-response',
+      reason: 'unexpected-answer'
+    })
+    expect(error.message).not.toContain(unexpectedId)
+    expect(JSON.stringify(error.diagnostic)).not.toContain(unexpectedId)
+  })
+
+  it('keeps valid answers when individual choice answers are inconsistent', async () => {
+    const unknownProbabilityKey = validVendorResponse()
+    unknownProbabilityKey.answers.route = {
       type: 'choice',
       choice: 'automatic',
       probabilities: { automatic: 0.5, other: 0.5 },
       confidence: 0.4
     }
+    const keyFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(unknownProbabilityKey))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: keyFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toMatchObject({
+      answers: { severity: validVendorResponse().answers.severity, urgent: { type: 'noul' } },
+      unavailable: { route: 'probability-keys' }
+    })
+
     const invalidDistribution = validVendorResponse()
     invalidDistribution.answers.route = {
       type: 'choice',
@@ -338,17 +533,46 @@ describe('judgment client', () => {
       probabilities: { automatic: 0.8, human: 0.1 },
       confidence: 0.4
     }
+    const distributionFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(invalidDistribution))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: distributionFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toMatchObject({
+      answers: { severity: validVendorResponse().answers.severity, urgent: { type: 'noul' } },
+      unavailable: { route: 'probability-distribution' }
+    })
 
-    for (const payload of [unknownOption, invalidDistribution]) {
-      const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      const error = await clientFailure(
-        createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
-      )
-      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
+    const invalidChoice = validVendorResponse()
+    invalidChoice.answers.route = {
+      type: 'choice',
+      choice: 'unlisted',
+      probabilities: { automatic: 0.8, human: 0.2 },
+      confidence: 0.4
     }
+    const choiceFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(invalidChoice))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: choiceFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toMatchObject({
+      answers: { severity: validVendorResponse().answers.severity, urgent: { type: 'noul' } },
+      unavailable: { route: 'choice-invalid' }
+    })
+
+    const choiceNotMax = validVendorResponse()
+    choiceNotMax.answers.route = {
+      type: 'choice',
+      choice: 'human',
+      probabilities: { automatic: 0.8, human: 0.2 },
+      confidence: 0.4
+    }
+    const notMaxFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(choiceNotMax))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: notMaxFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toMatchObject({
+      answers: { severity: validVendorResponse().answers.severity, urgent: { type: 'noul' } },
+      unavailable: { route: 'choice-not-max' }
+    })
   })
 
-  it('validates score levels, legend, distribution, range, and weighted value', async () => {
+  it('keeps valid answers when individual score answers are inconsistent', async () => {
     const wrongLegend = validVendorResponse()
     wrongLegend.answers.severity = {
       type: 'score',
@@ -357,6 +581,49 @@ describe('judgment client', () => {
       probabilities: { '0': 0.1, '1': 0.8, '2': 0.1 },
       confidence: 0.7
     }
+
+    const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(wrongLegend))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toEqual({
+      model: wrongLegend.model,
+      answers: {
+        route: wrongLegend.answers.route,
+        urgent: wrongLegend.answers.urgent
+      },
+      unavailable: { severity: 'score-legend' }
+    })
+
+    const probabilityKeys = validVendorResponse()
+    probabilityKeys.answers.severity = {
+      type: 'score',
+      score: 1,
+      legend: { '0': 'Low', '1': 'Medium', '2': 'High' },
+      probabilities: { '0': 0.1, '1': 0.8, '3': 0.1 },
+      confidence: 0.7
+    }
+    const keysFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(probabilityKeys))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: keysFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toMatchObject({
+      unavailable: { severity: 'probability-keys' }
+    })
+
+    const invalidDistribution = validVendorResponse()
+    invalidDistribution.answers.severity = {
+      type: 'score',
+      score: 1,
+      legend: { '0': 'Low', '1': 'Medium', '2': 'High' },
+      probabilities: { '0': 0.1, '1': 0.8, '2': 0.2 },
+      confidence: 0.7
+    }
+    const distributionFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(invalidDistribution))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: distributionFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toMatchObject({
+      unavailable: { severity: 'probability-distribution' }
+    })
+
     const outOfRange = validVendorResponse()
     outOfRange.answers.severity = {
       type: 'score',
@@ -365,22 +632,12 @@ describe('judgment client', () => {
       probabilities: { '0': 0.1, '1': 0.8, '2': 0.1 },
       confidence: 0.7
     }
-    const inconsistentScore = validVendorResponse()
-    inconsistentScore.answers.severity = {
-      type: 'score',
-      score: 0,
-      legend: { '0': 'Low', '1': 'Medium', '2': 'High' },
-      probabilities: { '0': 0, '1': 0, '2': 1 },
-      confidence: 1
-    }
-
-    for (const payload of [wrongLegend, outOfRange, inconsistentScore]) {
-      const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      const error = await clientFailure(
-        createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
-      )
-      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
-    }
+    const rangeFetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(outOfRange))
+    await expect(
+      createJudgmentClient(API_KEY, { fetch: rangeFetcher }).evaluate('state', QUESTIONS)
+    ).resolves.toMatchObject({
+      unavailable: { severity: 'score-range' }
+    })
   })
 
   it('times out the request without surfacing the rejected transport message', async () => {

@@ -1,4 +1,5 @@
 import type { AppState } from '@/store/types'
+import { translate } from '@/i18n/i18n'
 import { collectActiveDashboardWorkspaces } from '@/components/dashboard/dashboard-snapshot-workspaces'
 import type { ObjectiveWorkspaceKind } from '../../../shared/fork-heimdall-objective/contract-types'
 import {
@@ -10,6 +11,7 @@ import { isFolderRepo } from '../../../shared/repo-kind'
 import type { HeimdallRemoteOwner } from '../../../shared/fork-heimdall/api'
 import {
   HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
+  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../../shared/fork-heimdall/capability'
 import {
@@ -31,6 +33,7 @@ export type ObjectiveWorkspaceOption = {
   ownerUnavailable: boolean
   parallelExecutionSupported?: boolean
   roleLaunchSupported?: boolean
+  createsWorktree?: true
   availableAgentIds: readonly string[]
 }
 
@@ -62,6 +65,18 @@ function agentsForHost(state: ObjectiveWorkspaceState, hostId: string): readonly
   )
 }
 
+function runtimeSupportsCapability(
+  state: ObjectiveWorkspaceState,
+  environmentId: string,
+  capability: string
+): boolean {
+  return (
+    state.runtimeStatusByEnvironmentId
+      .get(environmentId)
+      ?.status?.capabilities?.includes(capability) === true
+  )
+}
+
 function remoteOwner(
   state: ObjectiveWorkspaceState,
   hostId: string
@@ -88,16 +103,16 @@ function remoteOwner(
           pairingRevision: environment.pairingRevision ?? environment.createdAt
         },
         ownerUnavailable: false,
-        parallelExecutionSupported:
-          state.runtimeStatusByEnvironmentId
-            .get(environment.id)
-            ?.status?.capabilities?.includes(HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY) ===
-          true,
-        roleLaunchSupported:
-          state.runtimeStatusByEnvironmentId
-            .get(environment.id)
-            ?.status?.capabilities?.includes(HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY) ===
-          true
+        parallelExecutionSupported: runtimeSupportsCapability(
+          state,
+          environment.id,
+          HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+        ),
+        roleLaunchSupported: runtimeSupportsCapability(
+          state,
+          environment.id,
+          HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY
+        )
       }
     : {
         owner: undefined,
@@ -146,6 +161,43 @@ export function buildObjectiveWorkspaceOptions(
       detail: `${workspacePath} · ${worktreeHostId}`,
       ...remoteOwner(state, worktreeHostId),
       availableAgentIds: agentsForHost(state, worktreeHostId)
+    })
+  }
+  for (const repo of state.repos) {
+    if (isFolderRepo(repo)) {
+      continue
+    }
+    const hostId = getRepoExecutionHostId(repo)
+    const host = parseExecutionHostId(hostId)
+    if (
+      !host ||
+      (host.kind === 'runtime' &&
+        (!state.runtimeEnvironments.some((environment) => environment.id === host.environmentId) ||
+          !runtimeSupportsCapability(
+            state,
+            host.environmentId,
+            HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
+          )))
+    ) {
+      continue
+    }
+    options.push({
+      key: `${hostId}:${repo.id}:new`,
+      repoId: repo.id,
+      repoPath: repo.path,
+      worktreeId: null,
+      workspacePath: repo.path,
+      branch: null,
+      workspaceKind: 'git',
+      createsWorktree: true,
+      label: translate(
+        'fork.heimdallObjective.enrollment.newWorktreeInRepo',
+        'New worktree in {{repo}}',
+        { repo: repo.displayName }
+      ),
+      detail: `${repo.path} · ${hostId}`,
+      ...remoteOwner(state, hostId),
+      availableAgentIds: agentsForHost(state, hostId)
     })
   }
   // A folder Repo is independently authoritative; it remains eligible before its synthetic

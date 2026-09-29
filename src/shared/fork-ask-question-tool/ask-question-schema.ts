@@ -16,9 +16,18 @@ export type AskPreviewFormat = 'markdown' | 'html'
 export type AskPreview = { format: AskPreviewFormat; content: string }
 export type AskOption = { value: string; label: string; description?: string; preview?: AskPreview }
 
-export type AskQuestionCommon = { id: string; question: string; header?: string; required?: boolean }
+export type AskQuestionCommon = {
+  id: string
+  question: string
+  header?: string
+  required?: boolean
+}
 
-export type AskSelectQuestion = AskQuestionCommon & { type: 'select'; options: AskOption[]; default?: string }
+export type AskSelectQuestion = AskQuestionCommon & {
+  type: 'select'
+  options: AskOption[]
+  default?: string
+}
 export type AskMultiselectQuestion = AskQuestionCommon & {
   type: 'multiselect'
   options: AskOption[]
@@ -105,7 +114,7 @@ export function resolveAskWaitClientTimeoutMs(chunkMs: number | undefined): numb
   return (chunkMs === undefined ? ASK_DEFAULT_CHUNK_MS : chunkMs) + ASK_CHUNK_CLIENT_GRACE_MS
 }
 
-const MAX_QUESTIONS = 10
+export const MAX_ASK_QUESTIONS = 10
 const QUESTION_TYPES = new Set(['select', 'multiselect', 'text', 'number', 'date', 'confirm'])
 
 /**
@@ -127,8 +136,8 @@ export function validateAskSpec(input: unknown): AskSpecValidationResult {
   if (questionsRaw.length === 0) {
     errors.push({ path: 'questions', message: 'at least one question is required' })
   }
-  if (questionsRaw.length > MAX_QUESTIONS) {
-    errors.push({ path: 'questions', message: `at most ${MAX_QUESTIONS} questions allowed` })
+  if (questionsRaw.length > MAX_ASK_QUESTIONS) {
+    errors.push({ path: 'questions', message: `at most ${MAX_ASK_QUESTIONS} questions allowed` })
   }
 
   const seenIds = new Set<string>()
@@ -140,20 +149,40 @@ export function validateAskSpec(input: unknown): AskSpecValidationResult {
     : { ok: true, spec: { questions: questions as AskQuestion[] } }
 }
 
-function validateQuestion(raw: unknown, path: string, errors: AskValidationError[], seenIds: Set<string>): AskQuestion | Record<string, never> {
+function validateQuestion(
+  raw: unknown,
+  path: string,
+  errors: AskValidationError[],
+  seenIds: Set<string>
+): AskQuestion | Record<string, never> {
   if (!isPlainObject(raw)) {
     errors.push({ path, message: 'question must be an object' })
     return {}
   }
   if ('masked' in raw || 'sensitive' in raw) {
-    errors.push({ path, message: 'masked/sensitive input is not permitted; collect credentials out of band' })
+    errors.push({
+      path,
+      message: 'masked/sensitive input is not permitted; collect credentials out of band'
+    })
   }
 
   const common: AskQuestionCommon = {
     id: validateId(raw.id, path, errors, seenIds),
     question: validateQuestionText(raw.question, path, errors),
-    header: checkOptional(raw.header, isString, `${path}.header`, 'header must be a string', errors),
-    required: checkOptional(raw.required, isBoolean, `${path}.required`, 'required must be a boolean', errors)
+    header: checkOptional(
+      raw.header,
+      isString,
+      `${path}.header`,
+      'header must be a string',
+      errors
+    ),
+    required: checkOptional(
+      raw.required,
+      isBoolean,
+      `${path}.required`,
+      'required must be a boolean',
+      errors
+    )
   }
 
   const type = raw.type

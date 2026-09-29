@@ -13,6 +13,7 @@
         "terminal": "완료",
         "disabled": "중지됨",
         "unreachable": "호스트에 연결할 수 없음",
+        "tickError": "오류 · 재시도 중",
         "lostContact": "호스트에 연결할 수 없음 · 마지막 확인 {{age}}",
         "phase": "현재 단계"
       },
@@ -31,7 +32,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "확인이 필요한 감시자 {{count}}개"
+        "attention": "확인이 필요한 감시자 {{count}}개",
+        "bucket": {
+          "attention": "확인 필요",
+          "lostContact": "연락 두절",
+          "active": "활성"
+        }
       },
       "page": {
         "back": "뒤로",

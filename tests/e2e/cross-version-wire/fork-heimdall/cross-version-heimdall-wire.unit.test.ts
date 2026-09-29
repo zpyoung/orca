@@ -4,6 +4,7 @@ import { projectWatcherListEntryForClient } from '../../../../src/main/runtime/r
 import { HEIMDALL_METHODS } from '../../../../src/main/runtime/rpc/methods/fork-heimdall/heimdall'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY
 } from '../../../../src/shared/fork-heimdall/capability'
 import { RUNTIME_CAPABILITIES } from '../../../../src/shared/protocol-version'
@@ -358,6 +359,10 @@ describe('Heimdall cross-version wire registration', () => {
     )
     expect(methodNames(HEIMDALL_METHODS)).toContain('heimdall:command')
     expect(RUNTIME_CAPABILITIES).toContain(HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
+  })
+
+  it('advertises new objective worktree creation on capable hosts', () => {
+    expect(RUNTIME_CAPABILITIES).toContain(HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY)
   })
 })
 

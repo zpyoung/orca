@@ -46,6 +46,25 @@ export function wakeHeimdallMailboxRunners(args: {
   }
 }
 
+/**
+ * Whether an armed, unpaused watcher with an owner supervises this run, so its workers' questions go
+ * to that owner. A paused or disarmed watcher never ticks, so its owner could not answer in time.
+ */
+export function isOwnedHeimdallRun(runners: Iterable<WatcherRunner>, runId: string): boolean {
+  for (const runner of runners) {
+    const { enrollment } = runner
+    if (
+      enrollment.orchestrationRunId === runId &&
+      enrollment.owner &&
+      enrollment.enabled &&
+      !enrollment.paused
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
 // Remote workers notify dispatch-scoped mailboxes rather than their home run address.
 function hasPendingDispatchAddress(
   runner: WatcherRunner,

@@ -558,8 +558,33 @@ describe('Heimdall kernel enrollment and scheduling', () => {
     await failing.service.reconcileForTesting(failingEnrollment.entry.enrollment.watcherId)
     expect((await failing.service.list())[0]).toMatchObject({
       enrollment: { enabled: true },
-      status: { state: 'unreachable', reason: 'host offline' }
+      // an uncoded throw carries no evidence about the execution host, so it is not lost contact
+      status: { state: 'held', phase: 'tick-error', reason: 'host offline' }
     })
     expect(failing.schedule).toHaveBeenCalled()
+    await failing.service.stopForShutdown()
+  })
+
+  it('reports only a transport failure from the execution host as unreachable', async () => {
+    const world = await harness()
+    world.service.registerKind(
+      kind({
+        read: async () => {
+          throw Object.assign(new Error('SSH link lost'), { code: 'CONNECTION_LOST' })
+        }
+      })
+    )
+    const enrolled = await world.service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    world.schedule.mockClear()
+    await world.service.reconcileForTesting(enrolled.entry.enrollment.watcherId)
+    expect((await world.service.list())[0]).toMatchObject({
+      enrollment: { enabled: true },
+      status: { state: 'unreachable', phase: 'error', reason: 'SSH link lost' }
+    })
+    expect(world.schedule).toHaveBeenCalled()
+    await world.service.stopForShutdown()
   })
 })

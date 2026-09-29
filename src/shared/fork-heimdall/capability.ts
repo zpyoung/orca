@@ -33,6 +33,9 @@ export const HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY =
 // may omit those candidate fields only after confirming this runtime capability.
 export const HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY =
   'heimdall.hosted-review-derived-payload.v1' as const
+// Why: an old host rejects newWorktree in the strict objective payload; clients must refuse rather than strip it.
+export const HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY =
+  'heimdall.objective-new-worktree.v1' as const
 /** Wire-shape capabilities every remote client advertises so hosts publish Heimdall's newer fields. */
 export const HEIMDALL_REMOTE_CLIENT_CAPABILITIES = [
   HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,

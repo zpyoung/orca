@@ -5,9 +5,11 @@ import {
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
   OBJECTIVE_GATES_MAX,
   OBJECTIVE_LAUNCH_MODEL_MAX_LENGTH,
+  OBJECTIVE_PATH_MAX_LENGTH,
   OBJECTIVE_TEXT_MAX_LENGTH,
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
+  ObjectiveEnrollmentRequestSchema,
   ObjectiveGateSchema,
   ObjectiveRoleLaunchSchema,
   objectiveCapabilityModes,
@@ -38,6 +40,55 @@ function payload(overrides: Partial<ObjectiveEnrollmentPayload> = {}): Objective
     ...overrides
   }
 }
+
+describe('objective enrollment request', () => {
+  it('accepts an optional new worktree and trims its bounded name and base branch', () => {
+    expect(ObjectiveEnrollmentRequestSchema.parse(payload())).toEqual(payload())
+    expect(
+      ObjectiveEnrollmentRequestSchema.parse({
+        ...payload(),
+        newWorktree: { name: '  objective-worktree  ', baseBranch: '  main  ' }
+      }).newWorktree
+    ).toEqual({ name: 'objective-worktree', baseBranch: 'main' })
+  })
+
+  it('rejects empty or overlong worktree fields and unknown request keys', () => {
+    expect(
+      ObjectiveEnrollmentRequestSchema.safeParse({ ...payload(), newWorktree: { name: '  ' } })
+        .success
+    ).toBe(false)
+    expect(
+      ObjectiveEnrollmentRequestSchema.safeParse({
+        ...payload(),
+        newWorktree: { name: 'worktree', baseBranch: '  ' }
+      }).success
+    ).toBe(false)
+    expect(
+      ObjectiveEnrollmentRequestSchema.safeParse({
+        ...payload(),
+        newWorktree: { name: 'x'.repeat(OBJECTIVE_PATH_MAX_LENGTH + 1) }
+      }).success
+    ).toBe(false)
+    expect(
+      ObjectiveEnrollmentRequestSchema.safeParse({
+        ...payload(),
+        newWorktree: { name: 'worktree', unknown: true }
+      }).success
+    ).toBe(false)
+    expect(
+      ObjectiveEnrollmentRequestSchema.safeParse({ ...payload(), unknown: true }).success
+    ).toBe(false)
+  })
+
+  it('does not permit a request-only newWorktree in the persisted payload', () => {
+    expect(
+      ObjectiveEnrollmentPayloadSchema.safeParse({
+        ...payload(),
+        newWorktree: { name: 'objective-worktree' }
+      }).success
+    ).toBe(false)
+  })
+})
 
 describe('objectiveDispatchTaskSnapshotByteLength', () => {
   it('measures the exact UTF-8 byte length of the serialized snapshot', () => {

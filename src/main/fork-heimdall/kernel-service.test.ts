@@ -18,11 +18,16 @@ import {
   notifyHeimdallMailboxArrival,
   setHeimdallMailboxWake
 } from './mailbox-wake-registry'
+import {
+  clearForcedHandoffPolicy,
+  getForcedHandoffPolicy
+} from '../fork-ask-question-tool/forced-handoff-policy'
 
 vi.mock('electron', () => ({}))
 
 afterEach(() => {
   setHeimdallMailboxWake(null)
+  clearForcedHandoffPolicy()
 })
 
 describe('Heimdall kernel service', () => {
@@ -912,7 +917,7 @@ describe('Heimdall kernel service', () => {
 describe('Heimdall kernel service mailbox wake', () => {
   function liveEnrollmentRow(
     watcherId: string,
-    overrides: { orchestrationRunId?: string | null } = {}
+    overrides: { orchestrationRunId?: string | null; owner?: { agent: string } } = {}
   ) {
     return {
       ...authorized(enrollmentInput()),
@@ -922,6 +927,7 @@ describe('Heimdall kernel service mailbox wake', () => {
       commandRevision: 0,
       coordinatorIdentity: { handle: 'coordinator', paneKey: 'pane' },
       orchestrationRunId: overrides.orchestrationRunId ?? null,
+      ...(overrides.owner ? { owner: overrides.owner } : {}),
       createdAtMs: 1,
       terminalAtMs: null
     }
@@ -982,5 +988,55 @@ describe('Heimdall kernel service mailbox wake', () => {
     )
 
     expect(schedule).not.toHaveBeenCalled()
+  })
+
+  it("forces worker questions to an owned watcher's run and no other", async () => {
+    const { service, enrollmentStore } = await harness()
+    service.registerKind(kind())
+    enrollmentStore.insert(
+      liveEnrollmentRow('watcher-owned', {
+        orchestrationRunId: 'run-owned',
+        owner: { agent: 'claude' }
+      })
+    )
+    enrollmentStore.insert({
+      ...liveEnrollmentRow('watcher-unowned', { orchestrationRunId: 'run-free' }),
+      workspaceKey: 'local::/workspace/review-2'
+    })
+
+    // The desktop app never calls start(); loading the kernel through any read must arm the policy.
+    await service.list()
+    const policy = getForcedHandoffPolicy()
+
+    expect(policy?.isForcedRun('run-owned')).toBe(true)
+    expect(policy?.isForcedRun('run-free')).toBe(false)
+    expect(policy?.isForcedRun('run-unknown')).toBe(false)
+  })
+
+  it('does not force questions to a paused owned watcher, whose owner cannot answer', async () => {
+    const { service, enrollmentStore } = await harness()
+    service.registerKind(kind())
+    enrollmentStore.insert({
+      ...liveEnrollmentRow('watcher-paused', {
+        orchestrationRunId: 'run-paused',
+        owner: { agent: 'claude' }
+      }),
+      paused: true
+    })
+
+    await service.list()
+
+    expect(getForcedHandoffPolicy()?.isForcedRun('run-paused')).toBe(false)
+  })
+
+  it('clears the forced hand-off policy on shutdown', async () => {
+    const { service } = await harness()
+    service.registerKind(kind())
+
+    service.start()
+    expect(getForcedHandoffPolicy()).not.toBeNull()
+    await service.stopForShutdown()
+
+    expect(getForcedHandoffPolicy()).toBeNull()
   })
 })

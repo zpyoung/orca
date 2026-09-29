@@ -1,0 +1,14 @@
+{
+  "auto": {
+    "components": {
+      "feature": {
+        "wall": {
+          "AiCommitPrSettingsFields": {
+            "a8a91aa917": "アクションレシピで設定されています。",
+            "b66be73624": "{{value0}} ではアクションレシピによって上書きされます。"
+          }
+        }
+      }
+    }
+  }
+}

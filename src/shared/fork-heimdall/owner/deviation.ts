@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH } from '../../fork-heimdall-objective/contract-types'
+import { WORKER_LAST_MESSAGE_MAX_BYTES } from './worker-last-message'
 
 const IdSchema = z.string().trim().min(1).max(1_024)
 const DetailBase = { detail: z.string().trim().min(1).max(4_096).optional() } as const
@@ -159,7 +160,13 @@ export const StallDeviationSchema = z
     dispatchId: IdSchema,
     taskKey: IdSchema.optional(),
     inFlightSinceMs: z.number().int().nonnegative(),
-    thresholdMs: z.number().int().nonnegative()
+    thresholdMs: z.number().int().nonnegative(),
+    /** Absent on records written before the idle trigger existed; absent means `silent`. */
+    trigger: z.enum(['silent', 'idle']).optional(),
+    idleSinceMs: z.number().int().nonnegative().optional(),
+    /** Worker-authored, redacted, untrusted text; see `clipWorkerLastMessage`. */
+    lastMessage: z.string().trim().min(1).max(WORKER_LAST_MESSAGE_MAX_BYTES).optional(),
+    messageTruncated: z.boolean().optional()
   })
   .strict()
 export type StallDeviation = z.infer<typeof StallDeviationSchema>

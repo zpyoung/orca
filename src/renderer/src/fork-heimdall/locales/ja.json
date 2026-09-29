@@ -13,6 +13,7 @@
         "terminal": "完了",
         "disabled": "停止",
         "unreachable": "ホストに接続できません",
+        "tickError": "エラー · 再試行中",
         "lostContact": "ホストに接続できません · 最終確認: {{age}}",
         "phase": "現在のフェーズ"
       },
@@ -31,7 +32,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}}件のウォッチャーに対応が必要です"
+        "attention": "{{count}}件のウォッチャーに対応が必要です",
+        "bucket": {
+          "attention": "対応が必要",
+          "lostContact": "接続を確認できません",
+          "active": "稼働中"
+        }
       },
       "page": {
         "back": "戻る",

@@ -29,10 +29,12 @@ import {
 } from './objective-workspace-options'
 
 afterEach(cleanup)
-
 function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnrollmentDraft {
   return {
     objectiveText: 'Ship the objective watcher',
+    newWorktreeName: '',
+    newWorktreeNameEdited: false,
+    newWorktreeBaseBranch: undefined,
     existingPlanText: '',
     tier: 'standard',
     landingBar: 'files-on-disk',
@@ -56,14 +58,12 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
     ...overrides
   }
 }
-
 function textareaValue(element: HTMLElement): string {
   if (!(element instanceof HTMLTextAreaElement)) {
     throw new Error('expected a textarea element')
   }
   return element.value
 }
-
 function objectiveWorkspace(): ObjectiveWorkspaceOption {
   return {
     key: 'runtime:hermes:repo:worktree',

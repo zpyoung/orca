@@ -320,12 +320,13 @@ describe('durable judgment evaluation', () => {
     expect(JSON.stringify(ledger.read(watcherId))).not.toContain(secret)
   })
 
-  it('persists distinct safe client failure categories and replays them without new calls', async () => {
+  it('persists bounded failure causes without exposing provider text', async () => {
     const unsafeText = 'private-key provider-body'
     const cases: {
       diagnostic: JudgmentClientFailureDiagnostic
       reasonCode: string
     }[] = [
+      { diagnostic: { code: 'network-error' }, reasonCode: 'network-error' },
       { diagnostic: { code: 'timeout' }, reasonCode: 'timeout' },
       {
         diagnostic: { code: 'http-status', status: 503 },
@@ -350,6 +351,22 @@ describe('durable judgment evaluation', () => {
       {
         diagnostic: { code: 'malformed-response' },
         reasonCode: 'malformed-response'
+      },
+      {
+        diagnostic: { code: 'malformed-response', reason: 'invalid-json' },
+        reasonCode: 'malformed-response:invalid-json'
+      },
+      {
+        diagnostic: { code: 'malformed-response', reason: 'invalid-utf8' },
+        reasonCode: 'malformed-response:invalid-utf8'
+      },
+      {
+        diagnostic: { code: 'malformed-response', reason: 'invalid-envelope' },
+        reasonCode: 'malformed-response:invalid-envelope'
+      },
+      {
+        diagnostic: { code: 'malformed-response', reason: 'unexpected-answer' },
+        reasonCode: 'malformed-response:unexpected-answer'
       }
     ]
 
@@ -378,6 +395,208 @@ describe('durable judgment evaluation', () => {
     const persisted = JSON.stringify(ledger.read(watcherId))
     expect(persisted).not.toContain('private-key')
     expect(persisted).not.toContain('provider-body')
+  })
+
+  it('retains valid answers from partial results and replays terminal unavailability', async () => {
+    const partialRequests = [
+      ...requests,
+      { ...requests[0]!, id: 'failure:dispatch-2', subjectId: 'dispatch-2' }
+    ]
+    dependencies.createClient = () => ({
+      evaluate: async () => {
+        calls += 1
+        return {
+          model,
+          answers: {
+            'failure:dispatch-1': {
+              type: 'choice',
+              choice: 'infra',
+              probabilities: { infra: 0.98, criteria: 0.02 },
+              confidence: 0.95
+            }
+          },
+          unavailable: { 'failure:dispatch-2': 'missing-confidence' }
+        }
+      }
+    })
+    const input = {
+      watcherId,
+      contentIdentity: 'partial-response',
+      world: world(),
+      requests: partialRequests,
+      authority: 'local-desktop' as const
+    }
+
+    const first = await new JudgmentService(dependencies).evaluate(input)
+    expect(first.status).toBe('unavailable')
+    expect(first.answers['failure:dispatch-1']?.answer).toEqual({
+      type: 'choice',
+      choice: 'infra',
+      probabilities: { infra: 0.98, criteria: 0.02 },
+      confidence: 0.95
+    })
+    expect(first.answers['failure:dispatch-2']).toBeUndefined()
+    expect(first.reason).toContain('valid=1/2')
+    expect(first.reason).toContain('missing-confidence=1')
+    expect(first.notices.some((notice) => notice.includes('observed'))).toBe(true)
+    for (const notice of first.notices) {
+      expect(first.reason).not.toContain(notice)
+    }
+
+    const replay = await new JudgmentService(dependencies).evaluate(input)
+    expect(replay.status).toBe('unavailable')
+    expect(replay.answers).toEqual(first.answers)
+    expect(replay.reason).toBe(first.reason)
+    expect(calls).toBe(1)
+  })
+
+  it('records bounded field-failure counts when every item is unavailable', async () => {
+    const reasons = [
+      'missing-answer',
+      'answer-shape',
+      'answer-type',
+      'missing-confidence',
+      'missing-probabilities',
+      'score-weight-mismatch',
+      'score-legend',
+      'score-range',
+      'probability-keys',
+      'probability-distribution',
+      'choice-invalid',
+      'choice-not-max'
+    ] as const
+    const fieldRequests = reasons.map((_, index) => ({
+      ...requests[0]!,
+      id: `failure:field-${index}`,
+      subjectId: `dispatch-${index}`
+    }))
+    dependencies.createClient = () => ({
+      evaluate: async () => {
+        calls += 1
+        return {
+          model,
+          answers: {},
+          unavailable: reasons.reduce<Record<string, (typeof reasons)[number]>>(
+            (result, reason, index) => {
+              result[fieldRequests[index]!.id] = reason
+              return result
+            },
+            {}
+          )
+        }
+      }
+    })
+    const result = await new JudgmentService(dependencies).evaluate({
+      watcherId,
+      contentIdentity: 'all-fields-unavailable',
+      world: world(),
+      requests: fieldRequests,
+      authority: 'local-desktop'
+    })
+
+    expect(result.status).toBe('unavailable')
+    expect(Object.keys(result.answers)).toEqual([])
+    expect(result.reason).toContain(`valid=0/${reasons.length}`)
+    for (const reason of reasons) {
+      expect(result.reason).toContain(`${reason}=1`)
+    }
+    for (const request of fieldRequests) {
+      expect(result.reason).not.toContain(request.id)
+    }
+    expect(calls).toBe(1)
+  })
+
+  it('rejects a malicious client-port map without salvaging answers or storing its ID', async () => {
+    const maliciousId = 'private-answer-id'
+    dependencies.createClient = () => ({
+      evaluate: async () => {
+        calls += 1
+        return {
+          model,
+          answers: {
+            'failure:dispatch-1': {
+              type: 'choice',
+              choice: 'infra',
+              probabilities: { infra: 0.98, criteria: 0.02 },
+              confidence: 0.95
+            },
+            [maliciousId]: {
+              type: 'choice',
+              choice: 'infra',
+              probabilities: { infra: 0.98, criteria: 0.02 },
+              confidence: 0.95
+            }
+          }
+        }
+      }
+    })
+    const result = await new JudgmentService(dependencies).evaluate({
+      watcherId,
+      contentIdentity: 'malicious-client-map',
+      world: world(),
+      requests,
+      authority: 'local-desktop'
+    })
+
+    expect(result.status).toBe('unavailable')
+    expect(result.answers).toEqual({})
+    expect(result.reason).toContain('malformed-response:unexpected-answer')
+    expect(result.reason).not.toContain(maliciousId)
+    const persisted = JSON.stringify(ledger.read(watcherId))
+    expect(persisted).not.toContain(maliciousId)
+    expect(calls).toBe(1)
+  })
+
+  it('retains a durable subset if recording a later valid answer fails', async () => {
+    const partialRequests = [
+      ...requests,
+      { ...requests[0]!, id: 'failure:dispatch-2', subjectId: 'dispatch-2' }
+    ]
+    const originalRecordAnswer = dependencies.store.recordAnswer.bind(dependencies.store)
+    let answerWrites = 0
+    dependencies.store.recordAnswer = (...args) => {
+      answerWrites += 1
+      if (answerWrites === 2) {
+        throw new Error('private recorder detail')
+      }
+      originalRecordAnswer(...args)
+    }
+    dependencies.createClient = () => ({
+      evaluate: async () => {
+        calls += 1
+        const answer = {
+          type: 'choice' as const,
+          choice: 'infra',
+          probabilities: { infra: 0.98, criteria: 0.02 },
+          confidence: 0.95
+        }
+        return {
+          model,
+          answers: {
+            'failure:dispatch-1': answer,
+            'failure:dispatch-2': answer
+          }
+        }
+      }
+    })
+    const input = {
+      watcherId,
+      contentIdentity: 'partial-recorder',
+      world: world(),
+      requests: partialRequests,
+      authority: 'local-desktop' as const
+    }
+    const first = await new JudgmentService(dependencies).evaluate(input)
+    expect(first.status).toBe('unavailable')
+    expect(Object.keys(first.answers)).toEqual(['failure:dispatch-1'])
+    expect(first.reason).toContain('evaluation failed')
+    expect(JSON.stringify(ledger.read(watcherId))).not.toContain('private recorder detail')
+
+    const replay = await new JudgmentService(dependencies).evaluate(input)
+    expect(replay.status).toBe('unavailable')
+    expect(replay.answers).toEqual(first.answers)
+    expect(replay.reason).toBe(first.reason)
+    expect(calls).toBe(1)
   })
 
   it('classifies a malformed result returned through the client port', async () => {

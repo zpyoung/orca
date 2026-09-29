@@ -1,6 +1,6 @@
 import {
   OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS,
-  type ObjectiveEnrollmentPayload,
+  type ObjectiveEnrollmentRequest,
   type ObjectiveGate,
   type ObjectiveRoleAgents,
   type ObjectiveRoleLaunch,
@@ -20,6 +20,7 @@ import {
 import {
   OBJECTIVE_ROLES,
   OBJECTIVE_SITTER_CAPABILITIES,
+  effectiveNewWorktreeName,
   parseWriteTerritory
 } from './objective-enrollment-model'
 import type { ObjectiveEnrollmentDraft } from './objective-enrollment-model'
@@ -80,7 +81,8 @@ export function buildObjectiveEnrollmentSubmission(
       ? Number(gateDraft.timeoutSecondsText)
       : OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS
   }))
-  const parallelKindPayload: ObjectiveEnrollmentPayload = {
+  const baseBranch = draft.newWorktreeBaseBranch?.trim()
+  const parallelKindPayload: ObjectiveEnrollmentRequest = {
     objectiveText: draft.objectiveText.trim(),
     ...(existingPlan ? { existingPlan } : {}),
     tier: draft.tier,
@@ -88,6 +90,14 @@ export function buildObjectiveEnrollmentSubmission(
     lanesEnabled: draft.lanesEnabled,
     maxConcurrency: workspace.workspaceKind === 'folder' ? 1 : draft.maxConcurrency,
     workspaceKind: workspace.workspaceKind,
+    ...(workspace.createsWorktree
+      ? {
+          newWorktree: {
+            name: effectiveNewWorktreeName(draft).trim(),
+            ...(baseBranch ? { baseBranch } : {})
+          }
+        }
+      : {}),
     writeTerritory: parseWriteTerritory(draft.writeTerritoryText),
     roleAgents,
     ...(roleLaunch ? { roleLaunch } : {}),

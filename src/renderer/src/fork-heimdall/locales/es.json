@@ -13,6 +13,7 @@
         "terminal": "Completado",
         "disabled": "Detenido",
         "unreachable": "Equipo inaccesible",
+        "tickError": "Error · reintentando",
         "lostContact": "Equipo inaccesible · última confirmación hace {{age}}",
         "phase": "Fase actual"
       },
@@ -31,7 +32,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}} vigilantes requieren atención"
+        "attention": "{{count}} vigilantes requieren atención",
+        "bucket": {
+          "attention": "Necesita tu atención",
+          "lostContact": "Sin contacto",
+          "active": "Activo"
+        }
       },
       "page": {
         "back": "Volver",

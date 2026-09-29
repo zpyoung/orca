@@ -1,5 +1,5 @@
 ---
-last_released_commit: ffe35fc7eb396ab24a5c77fe3aa98e64f1adeb49
+last_released_commit: e18a6ac0d1e991d5c04d6623ed5f87d247b5de7c
 upstream_synced: v1.4.215
 ---
 
@@ -11,6 +11,34 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.216-rc.0.zy02] - 2026-09-29
+
+Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4.215).
+
+### Added
+- Automations and source-control agent recipes can set the model, reasoning effort, and extra
+  agent arguments for the agents they launch, and each automation run records the launch settings
+  it used.
+- Heimdall notices a supervised worker that has sat idle at its prompt for two minutes without
+  reporting, and shows the watcher's owner the worker's last message. The owner can reply straight
+  into the worker's prompt; a watcher with no owner hands a question asked in plain prose to you.
+- When a watcher has an owner, its workers' questions now go to that owner instead of appearing as
+  cards in the app, including questions from structured Claude and Codex workers. The owner's reply
+  is returned to the worker. A paused watcher's workers still ask you directly.
+- An objective watcher can be enrolled into a new worktree created for it, picked as "New worktree
+  in <repo>" with a name and base branch. The worktree is removed again if enrollment fails.
+- The Heimdall sidebar entry shows how many watchers need attention, have lost contact, are
+  active, or are inactive.
+
+### Fixed
+- An owner's answer aimed at a question it could not reach no longer stalls the watcher on every
+  tick and starves later questions. The owner is told why the answer was refused, and an answer
+  that stays undeliverable is handed to you after the stall window.
+- A local, repeatable watcher failure is now shown as "Error · retrying" instead of being reported
+  as lost contact with the host.
+- The objective planner no longer tells workers to rely on machine-local files, such as
+  `.claude/settings.local.json`, that a fresh worktree may not have.
 
 ## [1.4.216-rc.0.zy01] - 2026-09-28
 

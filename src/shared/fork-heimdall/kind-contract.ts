@@ -102,6 +102,11 @@ export type SubmissionAdapter<TWorld> = {
   ): Promise<SubmissionPreflightResult>
 }
 
+/** Undo steps for authorization side effects, run only when the kernel does not persist the enrollment. */
+export type EnrollmentAuthorizationScope = {
+  onAbandoned(undo: () => Promise<void>): void
+}
+
 export type KindIdentity<TEnrollmentPayload = unknown> = {
   id: WatcherKindId
   displayName: string
@@ -113,7 +118,10 @@ export type KindIdentity<TEnrollmentPayload = unknown> = {
    */
   enrollmentInputSchema?: z.ZodType
   /** Re-resolves every persisted authority field from the renderer's candidate selection. */
-  authorizeEnrollment(input: EnrollInput): Promise<AuthorizedEnrollment>
+  authorizeEnrollment(
+    input: EnrollInput,
+    scope?: EnrollmentAuthorizationScope
+  ): Promise<AuthorizedEnrollment>
   /**
    * Validates kind-owned progress invariants after authoritative workspace lookup.
    * `existing` is null only for first enrollment.

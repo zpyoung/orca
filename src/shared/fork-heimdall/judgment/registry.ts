@@ -17,6 +17,12 @@ export const OBJECTIVE_JUDGMENT_QUESTION_IDS = {
   approvalLikelihood: 'objective.approval-likelihood'
 } as const
 
+/** Kernel-level questions that belong to no watcher kind. */
+export const HEIMDALL_JUDGMENT_QUESTION_IDS = {
+  stallCause: 'heimdall.stall-cause'
+} as const
+
+export const STALL_CAUSE_CONFIDENCE_THRESHOLD = JUDGMENT_PUBLISHED_HIGH_CONFIDENCE
 export const ADVERSARIAL_PRESCREEN_CONFIDENCE_THRESHOLD = JUDGMENT_PUBLISHED_HIGH_CONFIDENCE
 export const FAILURE_CLASSIFICATION_CONFIDENCE_THRESHOLD = JUDGMENT_PUBLISHED_HIGH_CONFIDENCE
 export const AGENT_ROUTING_CONFIDENCE_THRESHOLD = JUDGMENT_PUBLISHED_HIGH_CONFIDENCE
@@ -131,8 +137,20 @@ export const OBJECTIVE_JUDGMENT_REGISTRY: JudgmentQuestionRegistry = {
   }
 }
 
+/** Shadow-only: nothing reads a stall-cause answer, and it is not in the acting gate's registry. */
+export const HEIMDALL_JUDGMENT_REGISTRY: JudgmentQuestionRegistry = {
+  [HEIMDALL_JUDGMENT_QUESTION_IDS.stallCause]: {
+    mode: 'shadow',
+    thresholdName: 'stall-cause-high-confidence',
+    calibratedModel: null,
+    answerType: 'choice',
+    confidenceThreshold: STALL_CAUSE_CONFIDENCE_THRESHOLD,
+    confidenceRule: 'greater-than'
+  }
+}
+
 export function getJudgmentQuestionPolicy(questionId: string): JudgmentQuestionPolicy | null {
-  const entry = OBJECTIVE_JUDGMENT_REGISTRY[questionId]
+  const entry = OBJECTIVE_JUDGMENT_REGISTRY[questionId] ?? HEIMDALL_JUDGMENT_REGISTRY[questionId]
   if (!entry) {
     return null
   }

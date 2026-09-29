@@ -340,7 +340,9 @@ function orchestrationSimulation(
       return entries
     }),
     answerQuestion: vi.fn(async () => undefined),
-    readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
+    readQuestion: vi.fn(async () => ({ status: 'pending' as const })),
+    observeWorkerIdle: vi.fn(async () => ({ status: 'active' as const })),
+    sendWorkerPrompt: vi.fn(async () => {})
   } satisfies HeimdallOrchestrationAdapter
   return { adapter, delivered, dispatchWorker, queueWorkerEscalation, reportPaths }
 }

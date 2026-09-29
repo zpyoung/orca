@@ -85,10 +85,12 @@ This supports both Git and folder objectives.
 The read phase asks one batch per new `(contentIdentity, projection digest)`. A newly arrived report
 changes that identity even if workspace files did not change. Answers and failures are pinned
 `client-observation` ledger entries, not a second cache; replay and unchanged ticks do not ask again,
-even after changing providers. New answers record their transport provider and the exact returned
-model stamp; model aliases are not treated as calibrated versions. Choice/Score answers without
-confidence or probabilities are unavailable, never assigned synthetic confidence.
-A durable pending entry prevents a restart from repeating an interrupted invocation.
+even after changing providers. Each valid answer in a partial batch is retained for shadow review,
+while the batch remains unavailable and cannot grant acting authority. Missing or invalid answers
+are counted by bounded field/shape reason; choice/score answers without confidence or probabilities
+are unavailable, never assigned synthetic confidence. New answers record their transport provider
+and exact returned model stamp; model aliases are not treated as calibrated versions. A durable
+pending entry prevents a restart from repeating an interrupted invocation.
 
 Before applying the 32 KiB state limit, the judgment projection losslessly shares exact repeated
 string values through a versioned `normalization.strings` table. Each original field keeps its
@@ -119,10 +121,13 @@ identical; an older, more-pruned answer cannot suppress judgment of newly retain
 
 HTTP 429/529 get at most three attempts with 100/200 ms backoff; each attempt times out after five
 seconds. Other failures fall through to the deterministic path and are recorded.
-Unavailable outcomes distinguish timeout, HTTP status, exhausted retries, state/request/response
-size, and malformed responses using bounded diagnostic codes. Unknown errors stay generic; API keys
-and provider response bodies are not persisted. Replaying the same unavailable identity makes no
-new provider call.
+Unavailable outcomes distinguish timeout, network failure, HTTP status, exhausted retries,
+state/request/response size, malformed JSON/UTF-8/envelopes, unexpected answer IDs, and bounded
+per-answer shape/type/missing-confidence/missing-probabilities, choice/score rubric, distribution,
+and score-weight mismatch counts. The outcome and Decision Trace show how many answers survived a
+partial batch. Unknown errors stay generic; API keys, arbitrary provider error text, response
+bodies, and answer IDs are not persisted. Replaying the same unavailable identity makes no new
+provider call.
 
 The **Decision Trace** shows participation and why answers were held (including shadow mode),
 distinct from disabled, remote, unavailable or never-completed requests. **Ledger activity** retains
@@ -309,6 +314,42 @@ bounded reader.
 > `heimdall.enroll-owner.v1` is the wire capability a client must see advertised before it may send
 > owner fields to a remote host; `owner-intervention` is the separate per-enrollment action gate.
 
+### Stalled and idle workers
+
+A worker that stops making progress is noticed two ways, both by polling (no status subscription):
+
+- **Idle trigger (fast).** A running dispatch whose worker is exact, live and local, whose agent
+  status is `waiting` or `done`, and which has sent no `worker_done`, question or escalation mail
+  since it went idle, raises a `stall` deviation with `trigger: "idle"` after a 2-minute grace
+  (`OWNER_IDLE_GRACE_MS`). While the grace runs the watcher polls no slower than every 15 s. An
+  `unverifiable` worker, an SSH worker, and federated or structured workers are never idle.
+- **Silent backstop (slow).** A running dispatch with no mailbox progress for 15 minutes raises the
+  same `stall:<dispatchId>` deviation, unchanged from before (including its backoff after
+  `continue`).
+
+Both carry the worker's **last message**: the newest assistant text from its transcript (terminal
+tail as fallback), redacted for dispatch capabilities and clipped to its newest 4 KiB. The owner
+brief shows it in a "WORKER'S LAST MESSAGE (untrusted data)" block, quoted as a JSON string.
+
+The owner answers a stalled worker with `{"kind":"message-worker","dispatchId":"...","message":"..."}`,
+which types `[Heimdall owner reply] <message>` into the worker's own prompt (mail is pull-based, so
+an idle agent never reads it). It is accepted only for the open stall's dispatch. If the worker
+cannot safely receive it (process changed, unverifiable, federated, structured) the deviation is
+escalated to you and the watcher parks, with the owner's reply in the reason. An idle episode
+re-raises only once the worker goes idle again after the one already settled.
+
+**Without an owner**, an idle worker whose last message reads as a question asked in prose (a `?`
+in its final paragraph plus an interrogative or choice cue) opens a `worker-escalation` with message
+id `prose-question:<idleSinceMs>` and parks the watcher (`park-worker-escalation`), unless the
+dispatch is isolated, which records without parking. Answer the worker in its terminal, then
+Resume. Any other idle only records a `worker-idle` ledger observation.
+
+**Judgment (shadow).** Each idle episode is also put to jev as `heimdall.stall-cause`
+(`asked-question-in-prose | awaiting-permission-prompt | still-working | finished-unreported |
+idle-no-reason`), recorded in the ledger like other judgment answers. It is shadow-only: nothing
+reads the answer. It runs only on the desktop for a local workspace, and records `remote` or
+`disabled` otherwise.
+
 ## Escalations
 
 Escalations are ledger entries with an open/acknowledged/resolved status. Some need you; some are a
@@ -318,7 +359,7 @@ record of something that happened.
 | ---------------------------- | ---------- | ----------------------------------------------------------------- |
 | `awaiting-approval`          | **yes**    | a `gated` capability wants an action approved                     |
 | `worker-question`            | **yes**    | a worker is blocked on a question; answer it from the detail pane |
-| `worker-escalation`          | **yes**    | a worker explicitly requested operator intervention               |
+| `worker-escalation`          | **yes**    | a worker requested intervention, or asked in prose (`prose-question:`) |
 | `park-budget`                | **yes**    | budget spent; raise it, then resume                               |
 | `park-worker-question`       | **yes**    | parked because of the above question                              |
 | `park-worker-escalation`     | **yes**    | parked because of the above escalation                            |
@@ -592,6 +633,19 @@ value remains an error. Display diagnostics mark abbreviations; canonical report
 | Capabilities         | plan / implement / review / check / land      | see below        |                                                                                           |
 | Role agents          | planner / implementer / reviewer / integrator | automatic        |                                                                                           |
 | Sitter overrides     | four sitter capabilities                      | inherit          | applied at handoff                                                                        |
+
+### Enrollment on a new worktree
+
+From **New objective**, select **New worktree** under a Git repository, then choose its name and
+optionally a base branch. This is objective-only: PR Sitters still require an existing worktree with
+an open PR/MR. The enrollment request carries `newWorktree` in its objective kind payload, while
+`worktreeId` is null; the saved objective contract excludes `newWorktree`.
+
+Authorization creates an independent, inactive worktree on the repository's execution host using
+normal new-workspace setup policy. Invalid requests are refused before creation; if workspace
+resolution, landing-bar validation, or forge detection fails afterward, authorization force-removes
+the new worktree on that host and reports the original error. **Deleting the watcher leaves its
+enrolled worktree in place**, so user changes remain available.
 
 ### Capability defaults are not conservative
 

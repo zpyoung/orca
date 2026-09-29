@@ -13,6 +13,7 @@
         "terminal": "Terminé",
         "disabled": "Arrêté",
         "unreachable": "Hôte injoignable",
+        "tickError": "Erreur · nouvelle tentative",
         "lostContact": "Hôte injoignable · dernière confirmation {{age}}",
         "phase": "Phase actuelle"
       },
@@ -31,7 +32,12 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}} observateurs nécessitent votre attention"
+        "attention": "{{count}} observateurs nécessitent votre attention",
+        "bucket": {
+          "attention": "Votre attention requise",
+          "lostContact": "Contact perdu",
+          "active": "Actif"
+        }
       },
       "page": {
         "back": "Retour",
