@@ -1,5 +1,5 @@
-import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
-import type { EnrollResult, WatcherKindId } from '../../shared/fork-heimdall/watcher-types'
+import { HEIMDALL_CHANNELS, type EnrollSuccess } from '../../shared/fork-heimdall/api'
+import type { WatcherKindId } from '../../shared/fork-heimdall/watcher-types'
 import type { RuntimeWorktreeRecord, RuntimeStatus } from '../../shared/runtime-types'
 import {
   getRepoExecutionHostId,
@@ -8,7 +8,6 @@ import {
 } from '../../shared/execution-host'
 import type { Repo } from '../../shared/repo-types'
 import type { CommandHandler, HandlerContext } from '../dispatch'
-import { formatHeimdallEnrollmentRefusal } from '../../shared/fork-heimdall/enrollment-refusal-text'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import {
@@ -58,10 +57,7 @@ async function resolveCreateWorkspace(
   }
 }
 
-function formatEnrollmentResult(result: EnrollResult, kind: WatcherKindId): string {
-  if (result.status === 'refused') {
-    return formatHeimdallEnrollmentRefusal(result)
-  }
+function formatEnrollmentResult(result: EnrollSuccess, kind: WatcherKindId): string {
   const action = result.status === 're-armed' ? 're-armed' : 'enrolled'
   return `Heimdall ${kind} watcher ${result.entry.enrollment.watcherId} ${action}.`
 }
@@ -79,13 +75,10 @@ function createHandler(kind: WatcherKindId): CommandHandler {
     )
     const workspace = await resolveCreateWorkspace(context, selector)
     const input = buildHeimdallEnrollInput(candidate, workspace, runtimeCapabilities)
-    const response = await context.client.call<EnrollResult>(HEIMDALL_CHANNELS.enroll, {
+    const response = await context.client.call<EnrollSuccess>(HEIMDALL_CHANNELS.enroll, {
       input,
       owner: null
     })
-    if (response.result.status === 'refused') {
-      process.exitCode = 1
-    }
     printResult(response, context.json, (result) => formatEnrollmentResult(result, kind))
   }
 }

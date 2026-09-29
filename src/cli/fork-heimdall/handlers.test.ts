@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
+import { toRuntimeExecutionHostId } from '../../shared/execution-host'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
@@ -304,13 +305,31 @@ describe('orca heimdall read handlers', () => {
     expect(log.mock.calls.join('\n')).not.toContain('watcher-1')
   })
 
-  it('filters a remote workspace by its owning runtime identity', async () => {
+  it.each([
+    ['execution host', { hostId: toRuntimeExecutionHostId('remote-environment') }],
+    ['routed owner', { hostId: 'local', runtimeOwnerEnvironmentId: 'remote-environment' }]
+  ])('filters a paired runtime workspace by its %s identity', async (_identity, worktreeOwner) => {
     const remoteId = 'repo-remote::/remote'
     const remoteTarget = {
       watcherId: 'remote-watcher',
       connectionId: 'remote-environment',
       pairingRevision: 12
     }
+    const wrongRuntime = workspaceFleetRow(
+      'wrong-runtime-watcher',
+      {
+        watcherId: 'wrong-runtime-watcher',
+        connectionId: 'other-environment',
+        pairingRevision: 12
+      },
+      {
+        executionHostId: 'local',
+        workspaceKey: 'local::/remote',
+        repoId: 'repo-remote',
+        worktreeId: remoteId,
+        workspacePath: '/remote'
+      }
+    )
     const remote = workspaceFleetRow('remote-watcher', remoteTarget, {
       executionHostId: 'local',
       workspaceKey: 'local::/remote',
@@ -334,12 +353,11 @@ describe('orca heimdall read handlers', () => {
             id: remoteId,
             repoId: 'repo-remote',
             path: '/remote',
-            hostId: 'runtime:remote-environment',
-            runtimeOwnerEnvironmentId: 'remote-environment'
+            ...worktreeOwner
           }
         }
       })
-      .mockResolvedValueOnce(fleetSnapshotResponse([local, remote]))
+      .mockResolvedValueOnce(fleetSnapshotResponse([local, remote, wrongRuntime]))
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await HEIMDALL_HANDLERS['heimdall list'](
@@ -349,6 +367,7 @@ describe('orca heimdall read handlers', () => {
     expect(callMock).toHaveBeenNthCalledWith(1, 'worktree.show', { worktree: `id:${remoteId}` })
     expect(log.mock.calls.join('\n')).toContain('remote-watcher')
     expect(log.mock.calls.join('\n')).not.toContain('local-watcher')
+    expect(log.mock.calls.join('\n')).not.toContain('wrong-runtime-watcher')
   })
 
   it('shows the selected remote watcher, latest open escalations, and unverifiable worker liveness', async () => {

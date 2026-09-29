@@ -1,5 +1,10 @@
 import { HEIMDALL_CHANNELS, type EnrollSuccess } from '../../shared/fork-heimdall/api'
 import {
+  HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+  HeimdallEnrollmentRefusalError,
+  HeimdallEnrollmentRefusalErrorDataSchema
+} from '../../shared/fork-heimdall/enrollment-refusal-error'
+import {
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
@@ -70,6 +75,13 @@ export async function enrollRemoteWatcher(
     )
   }
   if (response.ok !== true) {
+    if (response.error.code === HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE) {
+      const refusal = HeimdallEnrollmentRefusalErrorDataSchema.safeParse(response.error.data)
+      if (!refusal.success) {
+        throw new Error('The owning runtime returned an invalid Heimdall enrollment refusal.')
+      }
+      throw new HeimdallEnrollmentRefusalError(refusal.data, response.error.message)
+    }
     if (response.error.message.startsWith('Heimdall enrollment refused:')) {
       throw new Error(response.error.message)
     }

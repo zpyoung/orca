@@ -395,4 +395,36 @@ describe('Heimdall create input builder', () => {
       assertHeimdallCreateCapabilities(candidate, [HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY])
     ).not.toThrow()
   })
+
+  it('rejects objective gates on legacy runtimes and preserves them on supported runtimes', () => {
+    const candidate = buildHeimdallCreateCandidate(
+      new Map([
+        ['objective', 'Ship the report export'],
+        ['gate', 'lint=pnpm lint']
+      ]),
+      '/repo',
+      'objective'
+    )
+    const workspace = {
+      repoId: 'repo-1',
+      worktreeId: 'wt-1',
+      workspaceKind: 'git'
+    } as const
+
+    expect(() => buildHeimdallEnrollInput(candidate, workspace, [])).toThrow(
+      /does not support objective gates/
+    )
+    const supported = buildHeimdallEnrollInput(candidate, workspace, [
+      HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+    ])
+    expect(supported.kindPayload).toMatchObject({
+      gates: [
+        {
+          name: 'lint',
+          command: 'pnpm lint',
+          timeoutSeconds: OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS
+        }
+      ]
+    })
+  })
 })

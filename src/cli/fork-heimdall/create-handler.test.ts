@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
 import {
+  HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+  heimdallEnrollmentRefusalError
+} from '../../shared/fork-heimdall/enrollment-refusal-error'
+import {
   HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
 import type { HandlerContext } from '../dispatch'
+import { reportCliError } from '../format'
+import { RuntimeRpcFailureError } from '../runtime-client'
 import { HEIMDALL_CREATE_HANDLERS } from './create-handler'
 
 const callMock = vi.fn()
@@ -269,7 +275,7 @@ describe('Heimdall create handlers', () => {
     expect(logSpy).toHaveBeenCalledOnce()
   })
 
-  it('rejects hosted-review folders and reports refusal results with a failing exit status', async () => {
+  it('rejects hosted-review folders and unsupported legacy hosted-review payloads', async () => {
     const folder = context([], [HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY])
     await expect(HEIMDALL_CREATE_HANDLERS['heimdall create hosted-review'](folder)).rejects.toThrow(
       /hosted-review watchers require a Git worktree/
@@ -295,40 +301,56 @@ describe('Heimdall create handlers', () => {
       message: expect.stringContaining('host-derived hosted-review enrollment')
     })
     expect(callMock.mock.calls.map(([method]) => method)).toEqual(['status.get'])
+  })
 
-    const refused = context([['objective', 'Ship it']], [], {
-      id: 'repo-1::/repo',
-      repoId: 'repo-1'
+  it('surfaces thrown refusal fields through CLI JSON and text errors', async () => {
+    const refusalError = heimdallEnrollmentRefusalError({
+      status: 'refused',
+      reason: 'duplicate-workspace',
+      existingWatcherId: 'existing-1'
     })
+    const refusal = refusalError.data
+    const failure = new RuntimeRpcFailureError({
+      id: 'enroll-1',
+      ok: false,
+      error: {
+        code: HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+        message: refusalError.message,
+        data: refusal
+      },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+    process.env.ORCA_WORKSPACE_ID = 'folder:folder-1'
+    const ctx = context([['objective', 'Ship it']])
     callMock.mockImplementation(async (method: string) => {
       if (method === 'status.get') {
         return response({ capabilities: [] })
       }
       if (method === 'worktree.list') {
-        return response({ worktrees: [{ id: 'repo-1::/repo', path: '/client-machine/work' }] })
+        return response({ worktrees: [{ id: 'folder:folder-1', path: '/client-machine/work' }] })
       }
       if (method === 'worktree.show') {
-        return response({ worktree: { id: 'repo-1::/repo', repoId: 'repo-1' } })
-      }
-      if (method === 'repo.show') {
-        return response({ repo: { kind: 'git' } })
+        return response({ worktree: { id: 'folder:folder-1', repoId: 'folder-repo' } })
       }
       if (method === HEIMDALL_CHANNELS.enroll) {
-        return response({
-          status: 'refused',
-          reason: 'duplicate-workspace',
-          existingWatcherId: 'existing-1'
-        })
+        throw failure
       }
       throw new Error(`Unexpected RPC ${method}`)
     })
+    const error = await HEIMDALL_CREATE_HANDLERS['heimdall create objective'](ctx).catch(
+      (cause: unknown) => cause
+    )
+    expect(error).toBe(failure)
+
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    await HEIMDALL_CREATE_HANDLERS['heimdall create objective'](refused)
-    expect(process.exitCode).toBe(1)
-    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0])).result).toMatchObject({
-      status: 'refused',
-      reason: 'duplicate-workspace',
-      existingWatcherId: 'existing-1'
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    reportCliError(error, true)
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toMatchObject({
+      ok: false,
+      error: { code: HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE, data: refusal }
     })
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).not.toHaveProperty('result')
+    reportCliError(error, false)
+    expect(errorSpy).toHaveBeenCalledWith(refusalError.message)
   })
 })

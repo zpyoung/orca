@@ -1,6 +1,6 @@
 import { HEIMDALL_CHANNELS, type HeimdallFleetSnapshot } from '../../shared/fork-heimdall/api'
 import type { WatcherFleetEntry } from '../../shared/fork-heimdall/fleet-types'
-import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID, toRuntimeExecutionHostId } from '../../shared/execution-host'
 import type { RuntimeWorktreeRecord } from '../../shared/runtime-types'
 import { normalizeWorktreeSelectorForCaller, resolveCurrentWorktreeSelector } from '../selectors'
 import type { HandlerContext } from '../dispatch'
@@ -76,11 +76,12 @@ export function watcherMatchesWorktree(
   if (!sameWorkspace) {
     return false
   }
-  if (row.target.connectionId !== null) {
-    return worktree.runtimeOwnerEnvironmentId === row.target.connectionId
+  if (worktree.runtimeOwnerEnvironmentId !== undefined) {
+    return row.target.connectionId === worktree.runtimeOwnerEnvironmentId
   }
-  return (
-    worktree.runtimeOwnerEnvironmentId === undefined &&
-    enrollment.executionHostId === (worktree.hostId ?? LOCAL_EXECUTION_HOST_ID)
-  )
+  const worktreeHostId = worktree.hostId ?? LOCAL_EXECUTION_HOST_ID
+  if (row.target.connectionId !== null) {
+    return worktreeHostId === toRuntimeExecutionHostId(row.target.connectionId)
+  }
+  return enrollment.executionHostId === worktreeHostId
 }

@@ -2,7 +2,8 @@ import type { z } from 'zod'
 import { BudgetPolicySchema, type BudgetPolicy } from '../../shared/fork-heimdall/budget'
 import {
   HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,
-  HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY
+  HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
 import {
   HostedReviewEnrollmentCandidateSchema,
@@ -194,6 +195,17 @@ export function assertHeimdallCreateCapabilities(
       'The selected runtime does not support Heimdall owner enrollment. Update or restart Orca, or retry without --owner.'
     )
   }
+  if (
+    candidate.kind === 'objective' &&
+    (candidate.kindPayload.gates?.length ?? 0) > 0 &&
+    !runtimeCapabilities.includes(HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY)
+  ) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'The selected runtime does not support objective gates. Update or restart Orca, or retry without objective gates.'
+    )
+  }
+
   if (
     candidate.kind === 'hosted-review' &&
     !runtimeCapabilities.includes(HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY)

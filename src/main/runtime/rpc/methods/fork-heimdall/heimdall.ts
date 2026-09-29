@@ -9,7 +9,7 @@ import {
   type HeimdallFleetSnapshot,
   type WatcherDetail
 } from '../../../../../shared/fork-heimdall/api'
-import { formatHeimdallEnrollmentRefusal } from '../../../../../shared/fork-heimdall/enrollment-refusal-text'
+import { heimdallEnrollmentRefusalError } from '../../../../../shared/fork-heimdall/enrollment-refusal-error'
 import { requireHeimdallKernel, requireHeimdallTransport } from './kernel-binding'
 import { HEIMDALL_OBJECTIVE_METHODS } from '../fork-heimdall-objective/objective-detail-method'
 import {
@@ -48,7 +48,7 @@ export const HEIMDALL_METHODS = [
       if (!('input' in request)) {
         const legacy = await requireHeimdallKernel(runtime).enroll(request)
         if (legacy.status === 'refused') {
-          throw new Error(formatHeimdallEnrollmentRefusal(legacy))
+          throw heimdallEnrollmentRefusalError(legacy)
         }
         return projectLegacyEnrollResult({
           ...legacy,
@@ -64,7 +64,7 @@ export const HEIMDALL_METHODS = [
           ? await requireHeimdallKernel(runtime).enroll(input)
           : await requireHeimdallTransport(runtime).enroll(input, owner ?? undefined)
       if (result.status === 'refused') {
-        throw new Error(formatHeimdallEnrollmentRefusal(result))
+        throw heimdallEnrollmentRefusalError(result)
       }
       return { ...result, entry: projectWatcherListEntryForClient(result.entry, context) }
     }

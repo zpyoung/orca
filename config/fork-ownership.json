@@ -3933,6 +3933,20 @@
       "lines": ["  'runtime_busy',"]
     },
     {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE } from '../../../shared/fork-heimdall/enrollment-refusal-error'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,"]
+    },
+    {
       "path": "src/main/runtime/rpc/methods/client-ui.test.ts",
       "feature": "project-ledger",
       "kind": "registration",
@@ -6440,6 +6454,12 @@
       "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
+    },
+    {
+      "path": "src/cli/specs/search.test.ts",
+      "reason": "Removes an invalid global assertion that CLI flags are exclusive; Heimdall create commands legitimately use repeatable flags.",
+      "status": "pending-upstream",
+      "ledger": "bug-253"
     }
   ],
   "residuals": {
@@ -8012,7 +8032,7 @@
       "removed": 0
     },
     "src/main/runtime/rpc/errors.ts": {
-      "added": 9,
+      "added": 11,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/client-ui.test.ts": {

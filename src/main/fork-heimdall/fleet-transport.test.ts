@@ -14,6 +14,7 @@ import type {
   WatcherFleetEntry
 } from '../../shared/fork-heimdall/fleet-types'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
+import { HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE } from '../../shared/fork-heimdall/enrollment-refusal-error'
 import {
   HeimdallEnrollOwnerCapabilityError,
   type FleetEnvironmentSubscriptionCallbacks,
@@ -775,6 +776,86 @@ describe('HeimdallFleetTransport', () => {
       'heimdall:enroll',
       { input: enrollInput({ agent: 'claude' }), owner: null }
     )
+    transport.dispose()
+  })
+
+  it('preserves structured refusal data through local and remote enrollment transports', async () => {
+    const refusal = {
+      status: 'refused',
+      reason: 'duplicate-workspace',
+      existingWatcherId: 'existing-1'
+    } as const
+    const localKernel = kernel()
+    localKernel.enroll = vi.fn(async () => refusal)
+    const localTransport = new HeimdallFleetTransport({
+      kernel: localKernel,
+      userDataPath: () => '/unused'
+    })
+    await expect(localTransport.enroll(enrollInput(undefined))).rejects.toMatchObject({
+      code: HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+      data: refusal
+    })
+    localTransport.dispose()
+
+    const remote = environmentHarness()
+    remote.environment.mutate = vi.fn(async () => ({
+      id: 'heimdall:enroll',
+      ok: false as const,
+      error: {
+        code: HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+        message:
+          'Heimdall enrollment refused: duplicate-workspace: watcher existing-1 already owns this workspace',
+        data: refusal
+      },
+      _meta: { runtimeId: 'runtime-remote' }
+    }))
+    const remoteTransport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    await expect(
+      remoteTransport.enroll(enrollInput(undefined), REMOTE_OWNER)
+    ).rejects.toMatchObject({
+      code: HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+      data: refusal
+    })
+    remoteTransport.dispose()
+  })
+
+  it('rejects unallowlisted remote refusal fields without forwarding them', async () => {
+    const remote = environmentHarness()
+    remote.environment.mutate = vi.fn(async () => ({
+      id: 'heimdall:enroll',
+      ok: false as const,
+      error: {
+        code: HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+        message: 'Heimdall enrollment refused: duplicate-workspace',
+        data: {
+          status: 'refused',
+          reason: 'duplicate-workspace',
+          existingWatcherId: 'existing-1',
+          privateDetail: 'private-detail'
+        }
+      },
+      _meta: { runtimeId: 'runtime-remote' }
+    }))
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    const failure = await transport
+      .enroll(enrollInput(undefined), REMOTE_OWNER)
+      .catch((cause: unknown) => cause)
+    expect(failure).toBeInstanceOf(Error)
+    if (!(failure instanceof Error)) {
+      throw new Error('Expected an invalid remote refusal error')
+    }
+    expect(failure.message).toBe(
+      'The owning runtime returned an invalid Heimdall enrollment refusal.'
+    )
+    expect(failure).not.toHaveProperty('data')
     transport.dispose()
   })
 })

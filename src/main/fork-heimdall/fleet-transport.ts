@@ -1,5 +1,5 @@
 import type { EnrollInput, EnrollResult } from '../../shared/fork-heimdall/watcher-types'
-import { formatHeimdallEnrollmentRefusal } from '../../shared/fork-heimdall/enrollment-refusal-text'
+import { heimdallEnrollmentRefusalError } from '../../shared/fork-heimdall/enrollment-refusal-error'
 import type { EnrollSuccess, HeimdallRemoteOwner } from '../../shared/fork-heimdall/api'
 import {
   HeimdallFleetSnapshotSchema,
@@ -83,7 +83,7 @@ export class HeimdallFleetTransport {
     }
     const result = await this.kernel.enroll(input)
     if (result.status === 'refused') {
-      throw new Error(formatHeimdallEnrollmentRefusal(result))
+      throw heimdallEnrollmentRefusalError(result)
     }
     this.schedulePublish(true)
     return result
