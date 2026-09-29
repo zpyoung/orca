@@ -16,6 +16,17 @@ const repo: Repo = {
   addedAt: 0
 }
 
+type RuntimeTargetProbe = {
+  resolveRuntimeGitTarget?: () => Promise<never>
+  resolveRuntimeFileTarget?: () => Promise<never>
+  listRepos?: () => Pick<Repo, 'id' | 'path' | 'connectionId' | 'executionHostId' | 'kind'>[]
+  listDetectedManagedWorktrees?: () => Promise<{
+    authoritative: boolean
+    worktrees: { id: string; path?: string }[]
+  }>
+  listFolderWorkspaces?: () => { id: string }[]
+}
+
 async function enrolledWorkspace(worktreeId: string | null = 'worktree-1') {
   const world = await harness()
   world.service.registerKind(kind())
@@ -26,9 +37,12 @@ async function enrolledWorkspace(worktreeId: string | null = 'worktree-1') {
   return { world, enrollment: result.entry.enrollment }
 }
 
-function leaseFor(enrollment: WatcherEnrollment, runtimeStub: object): HostRoutedLeaseStore {
+function leaseFor(
+  enrollment: WatcherEnrollment,
+  runtimeStub: RuntimeTargetProbe
+): HostRoutedLeaseStore {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the host only calls the runtime methods supplied by each test before target resolution throws.
-  const runtime = runtimeStub as OrcaRuntimeService
+  const runtime = runtimeStub as unknown as OrcaRuntimeService
   const host = new HeimdallKernelHost(
     runtime,
     () => enrollment,
