@@ -7,6 +7,7 @@ import {
 } from './decision'
 import { hostedReviewAttemptFingerprint, hostedReviewContentIdentity } from './action-identity'
 import { deriveHostedReviewSitterDiscrepancies } from './reconciliation'
+import { paceHostedReview } from './kind-knowledge'
 import { HOSTED_REVIEW_STOP_PREDICATES } from './stop-policy'
 import type {
   HostedReviewCheckSnapshot,
@@ -115,6 +116,7 @@ function sitter(
     },
     branchUpdateMode: 'merge-base-update',
     mergeMethod: null,
+    mergeCheckScope: 'required',
     ...overrides
   }
 }
@@ -264,6 +266,87 @@ describe('PR sitter desired-action safety policy', () => {
     expect(computeDesiredAction(cached, sitter(), ledger())).toBeNull()
     expect(computeDesiredAction(incomplete, sitter(), ledger())).toBeNull()
     expect(computeDesiredAction(review(), sitter(), ledger())).toMatchObject({ kind: 'merge' })
+  })
+  it('holds for pending optional checks and makes failed optional checks actionable in all scope', () => {
+    const allChecks = sitter({ mergeCheckScope: 'all' })
+    const optionalPending = check({
+      checkKey: 'optional',
+      checkId: 'check-optional',
+      required: false,
+      state: 'pending',
+      observationId: 'optional:pending'
+    })
+    expect(
+      computeDesiredAction(review({ checks: [check(), optionalPending] }), allChecks, ledger())
+    ).toBeNull()
+
+    const optionalFailed = { ...optionalPending, state: 'failed' as const }
+    expect(
+      computeDesiredAction(review({ checks: [check(), optionalFailed] }), allChecks, ledger())
+    ).toMatchObject({ kind: 'rerun-check', checkKey: 'optional', checkIds: ['check-optional'] })
+    expect(
+      computeDesiredAction(review({ checks: [check(), optionalPending] }), sitter(), ledger())
+    ).toMatchObject({ kind: 'merge', checkScope: 'required' })
+    expect(
+      computeDesiredAction(review({ checks: [check(), optionalFailed] }), sitter(), ledger())
+    ).toMatchObject({ kind: 'merge', checkScope: 'required' })
+  })
+
+  it('allows skipped optional checks in all scope while retaining required-check behavior', () => {
+    const allChecks = sitter({ mergeCheckScope: 'all' })
+    const optionalSkipped = check({ required: false, state: 'skipped' })
+    expect(
+      computeDesiredAction(review({ checks: [check(), optionalSkipped] }), allChecks, ledger())
+    ).toMatchObject({ kind: 'merge', checkScope: 'all' })
+    expect(computeDesiredAction(review({ checks: [] }), allChecks, ledger())).toMatchObject({
+      kind: 'merge',
+      checkScope: 'all'
+    })
+    expect(
+      computeDesiredAction(review({ checks: [check({ state: 'skipped' })] }), allChecks, ledger())
+    ).toBeNull()
+  })
+  it('reconciles failed optional checks only when all checks are in scope', () => {
+    const optionalFailure = check({
+      checkKey: 'optional',
+      required: false,
+      state: 'failed',
+      failureSignature: 'failure:optional'
+    })
+    const snapshot = review({ checks: [optionalFailure] })
+
+    expect(deriveHostedReviewSitterDiscrepancies(snapshot, ledger(), 'required')).toEqual([])
+    expect(deriveHostedReviewSitterDiscrepancies(snapshot, ledger(), 'all')).toMatchObject([
+      { kind: 'check-failure', reason: 'check-failed:optional', status: 'open' }
+    ])
+  })
+  it('paces current optional check activity only in all scope', () => {
+    const pace = (snapshotReview: HostedReviewSnapshot, mergeCheckScope: 'required' | 'all') =>
+      paceHostedReview(
+        {
+          freshness: 'live',
+          contentIdentity: 'content-1',
+          observedAtMs: 0,
+          world: {
+            review: snapshotReview,
+            definition: sitter({ mergeCheckScope }),
+            preparedCommit: null
+          }
+        },
+        ledger()
+      )
+    const requiredCheck = check()
+    const pendingOptional = check({
+      checkKey: 'optional',
+      required: false,
+      state: 'pending'
+    })
+    const failedOptional = { ...pendingOptional, state: 'failed' as const }
+
+    expect(pace(review({ checks: [requiredCheck, pendingOptional] }), 'all')).toBe('rapid')
+    expect(pace(review({ checks: [requiredCheck, pendingOptional] }), 'required')).toBe('idle')
+    expect(pace(review({ checks: [requiredCheck, failedOptional] }), 'all')).toBe('active')
+    expect(pace(review({ checks: [requiredCheck, failedOptional] }), 'required')).toBe('idle')
   })
 
   it('uses the merge queue instead of bypassing it', () => {
@@ -485,7 +568,7 @@ describe('PR sitter desired-action safety policy', () => {
         detail: 'a rerun reproduced this failure with no classifiable signature'
       }
     })
-    expect(deriveHostedReviewSitterDiscrepancies(reproduced, history)).toContainEqual(
+    expect(deriveHostedReviewSitterDiscrepancies(reproduced, history, 'required')).toContainEqual(
       expect.objectContaining({ kind: 'unverifiable-failure', status: 'escalated' })
     )
   })
@@ -614,7 +697,7 @@ describe('PR sitter desired-action safety policy', () => {
         detail: "same failure recurred after the sitter's own fix (produced head-2)"
       }
     })
-    expect(deriveHostedReviewSitterDiscrepancies(fixedHead, history)).toContainEqual(
+    expect(deriveHostedReviewSitterDiscrepancies(fixedHead, history, 'required')).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
     )
 
@@ -677,7 +760,7 @@ describe('PR sitter desired-action safety policy', () => {
         detail: "same failure recurred after the sitter's own fix (produced head-2)"
       }
     })
-    expect(deriveHostedReviewSitterDiscrepancies(repeated, history)).toContainEqual(
+    expect(deriveHostedReviewSitterDiscrepancies(repeated, history, 'required')).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
     )
   })
@@ -745,7 +828,7 @@ describe('PR sitter desired-action safety policy', () => {
         detail: "same failure recurred after the sitter's own fix (produced head-2)"
       }
     })
-    expect(deriveHostedReviewSitterDiscrepancies(repeated, history)).toContainEqual(
+    expect(deriveHostedReviewSitterDiscrepancies(repeated, history, 'required')).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
     )
   })

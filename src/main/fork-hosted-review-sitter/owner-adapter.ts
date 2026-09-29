@@ -15,7 +15,8 @@ import {
 } from '../../shared/fork-hosted-review-sitter/decision-action-builders'
 import {
   deterministicFailureChecks,
-  failedCheckGroups
+  failedCheckGroups,
+  requiresOwnerForCheckRecovery
 } from '../../shared/fork-hosted-review-sitter/decision-check-groups'
 import {
   describeHostedReviewInterventions,
@@ -25,6 +26,7 @@ import {
   type HostedReviewSitterSpecificIntervention
 } from '../../shared/fork-hosted-review-sitter/owner-intervention'
 import type {
+  HostedReviewMergeCheckScope,
   HostedReviewSitterAction,
   HostedReviewSitterCapability,
   HostedReviewSnapshot,
@@ -52,10 +54,10 @@ function isHostedReviewSitterSpecificIntervention(
   return intervention.kind === 'retry-rung' || intervention.kind === 'skip-capability'
 }
 
-function firstFailedGroup(review: HostedReviewSnapshot) {
-  const group = failedCheckGroups(review)[0]
+function firstFailedGroup(review: HostedReviewSnapshot, scope: HostedReviewMergeCheckScope) {
+  const group = failedCheckGroups(review, scope)[0]
   if (!group) {
-    throw new Error('No failing required check to act on')
+    throw new Error('No failing check in scope to act on')
   }
   return group
 }
@@ -67,9 +69,12 @@ function baseRungAction(
 ): HostedReviewSitterAction {
   switch (rung) {
     case 'rerun-check':
-      return buildRerunAction(world.review, firstFailedGroup(world.review))
+      return buildRerunAction(
+        world.review,
+        firstFailedGroup(world.review, world.definition.mergeCheckScope)
+      )
     case 'prepare-fix': {
-      const group = firstFailedGroup(world.review)
+      const group = firstFailedGroup(world.review, world.definition.mergeCheckScope)
       const built = buildPrepareFixAction(
         world.review,
         group.checkKey,
@@ -106,7 +111,10 @@ function skipCapabilityAction(
     case 'resolveConflicts':
       return buildPrepareConflictAction(world.review)
     case 'fixChecks':
-      return buildRerunAction(world.review, firstFailedGroup(world.review))
+      return buildRerunAction(
+        world.review,
+        firstFailedGroup(world.review, world.definition.mergeCheckScope)
+      )
   }
 }
 
@@ -122,13 +130,43 @@ export function createHostedReviewOwnerAdapter(): OwnerAdapter<
     describeState: describeHostedReviewOwnerState,
     describeInterventions: describeHostedReviewInterventions,
     interventionSchema: HostedReviewSitterInterventionSchema,
-    rejectIntervention(intervention, _snapshot, _ledger, enrollment) {
+    rejectIntervention(intervention, snapshot, _ledger, enrollment) {
       if (!isHostedReviewSitterSpecificIntervention(intervention)) {
         throw new Error('Hosted review owner adapter received a non-sitter intervention.')
       }
-      return intervention.kind === 'skip-capability'
-        ? rejectCapabilityGrant(intervention.capability, enrollment)
-        : rejectCapabilityGrant(RUNG_CAPABILITY[intervention.rung], enrollment)
+      const capability =
+        intervention.kind === 'skip-capability'
+          ? intervention.capability
+          : RUNG_CAPABILITY[intervention.rung]
+      const capabilityRejection = rejectCapabilityGrant(capability, enrollment)
+      if (capabilityRejection) {
+        return capabilityRejection
+      }
+      const requestsRerun =
+        (intervention.kind === 'retry-rung' && intervention.rung === 'rerun-check') ||
+        (intervention.kind === 'skip-capability' && intervention.capability === 'fixChecks')
+      if (requestsRerun) {
+        const [group] = failedCheckGroups(
+          snapshot.world.review,
+          snapshot.world.definition.mergeCheckScope
+        )
+        if (
+          group?.checks.some((check) =>
+            requiresOwnerForCheckRecovery(
+              snapshot.world.review,
+              check,
+              snapshot.world.definition.mergeCheckScope
+            )
+          )
+        ) {
+          return {
+            gate: 'sitter-overrides',
+            reason:
+              'This optional status check has no provider rerun endpoint; resolve it through its check provider or request a fix instead.'
+          }
+        }
+      }
+      return null
     },
     actionForIntervention(intervention, snapshot: Snapshot<HostedReviewWorld>) {
       if (!isHostedReviewSitterSpecificIntervention(intervention)) {

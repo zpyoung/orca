@@ -29,6 +29,16 @@ export const HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE =
 // schema rejects it outright unless a client confirms this capability first.
 export const HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY =
   'heimdall.objective-role-launch.v1' as const
+// New objective payload fields cross a strict enrollment schema, which legacy hosts reject. Strip
+// explicit `required` for those hosts and refuse `all` unless support is advertised.
+export const HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY =
+  'heimdall.hosted-review-check-scope.v1' as const
+export const HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE =
+  'The owning runtime has not confirmed support for checking all hosted-review merge checks. ' +
+  'Update the host or choose "required" merge-check scope.'
+export const HEIMDALL_OBJECTIVE_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE =
+  'The owning runtime has not confirmed support for all-check hosted-review handoffs. ' +
+  'Update the host before enrolling an objective that requires hosted review.'
 /** Wire-shape capabilities every remote client advertises so hosts publish Heimdall's newer fields. */
 export const HEIMDALL_REMOTE_CLIENT_CAPABILITIES = [
   HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,

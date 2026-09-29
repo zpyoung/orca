@@ -126,7 +126,8 @@ export async function authorizeHostedReviewSitterDefinition(
     reviewNumber: review.number,
     reviewUrl: review.url,
     branchUpdateMode: candidatePayload.branchUpdateMode,
-    mergeMethod: candidatePayload.mergeMethod
+    mergeMethod: candidatePayload.mergeMethod,
+    mergeCheckScope: candidatePayload.mergeCheckScope
   }
   return {
     kind: 'hosted-review',

@@ -88,7 +88,8 @@ export function deriveHandoffInput(args: {
       reviewNumber: args.landing.reviewNumber,
       reviewUrl: args.landing.reviewUrl,
       branchUpdateMode: 'merge-base-update',
-      mergeMethod: null
+      mergeMethod: null,
+      mergeCheckScope: 'all'
     }
   }
 }

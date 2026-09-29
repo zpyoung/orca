@@ -13,6 +13,7 @@ import { translate } from '@/i18n/i18n'
 import type { CapabilityMode } from '../../../shared/fork-heimdall/watcher-types'
 import type {
   HostedReviewBranchUpdateMode,
+  HostedReviewMergeCheckScope,
   HostedReviewMergeMethod,
   HostedReviewSitterCapabilities,
   HostedReviewSitterCapability
@@ -42,6 +43,10 @@ function isMergeMethodChoice(value: string): value is 'default' | HostedReviewMe
   return value === 'default' || value === 'merge' || value === 'squash' || value === 'rebase'
 }
 
+function isMergeCheckScope(value: string): value is HostedReviewMergeCheckScope {
+  return value === 'required' || value === 'all'
+}
+
 function branchUpdateModeLabel(mode: HostedReviewBranchUpdateMode): string {
   switch (mode) {
     case 'merge-base-update':
@@ -64,6 +69,18 @@ function mergeMethodChoiceLabel(method: 'default' | HostedReviewMergeMethod): st
       return translate('fork.hostedReviewSitter.enrollment.mergeSquash', 'Squash and merge')
     case 'rebase':
       return translate('fork.hostedReviewSitter.enrollment.mergeRebase', 'Rebase and merge')
+  }
+}
+
+function mergeCheckScopeLabel(scope: HostedReviewMergeCheckScope): string {
+  switch (scope) {
+    case 'all':
+      return translate('fork.hostedReviewSitter.enrollment.checkScopeAll', 'All checks')
+    case 'required':
+      return translate(
+        'fork.hostedReviewSitter.enrollment.checkScopeRequired',
+        'Required checks only'
+      )
   }
 }
 
@@ -114,6 +131,7 @@ export type HostedReviewSitterEnrollmentFormProps = {
   capabilities: HostedReviewSitterCapabilities
   branchUpdateMode: HostedReviewBranchUpdateMode
   mergeMethod: 'default' | HostedReviewMergeMethod
+  mergeCheckScope: HostedReviewMergeCheckScope
   activeBudgetHours: number
   activeElsewhereCount: number
   blockedReason: string | null
@@ -123,6 +141,7 @@ export type HostedReviewSitterEnrollmentFormProps = {
   onCapabilitiesChange: (capabilities: HostedReviewSitterCapabilities) => void
   onBranchUpdateModeChange: (mode: HostedReviewBranchUpdateMode) => void
   onMergeMethodChange: (method: 'default' | HostedReviewMergeMethod) => void
+  onMergeCheckScopeChange: (scope: HostedReviewMergeCheckScope) => void
   onActiveBudgetHoursChange: (hours: number) => void
   onArm: () => void
 }
@@ -131,6 +150,7 @@ export function HostedReviewSitterEnrollmentForm({
   capabilities,
   branchUpdateMode,
   mergeMethod,
+  mergeCheckScope,
   activeBudgetHours,
   activeElsewhereCount,
   blockedReason,
@@ -140,12 +160,14 @@ export function HostedReviewSitterEnrollmentForm({
   onCapabilitiesChange,
   onBranchUpdateModeChange,
   onMergeMethodChange,
+  onMergeCheckScopeChange,
   onActiveBudgetHoursChange,
   onArm
 }: HostedReviewSitterEnrollmentFormProps): React.JSX.Element {
   const validBudget = Number.isFinite(activeBudgetHours) && activeBudgetHours > 0
   const branchUpdateLabelId = useId()
   const mergeMethodLabelId = useId()
+  const mergeCheckScopeLabelId = useId()
   const budgetInputId = useId()
   const activeElsewhereCopy =
     activeElsewhereCount === 1
@@ -263,6 +285,44 @@ export function HostedReviewSitterEnrollmentForm({
             </SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-1">
+        <label
+          id={mergeCheckScopeLabelId}
+          className="text-[10px] font-medium text-muted-foreground"
+        >
+          {translate('fork.hostedReviewSitter.enrollment.mergeCheckScope', 'Merge check scope')}
+        </label>
+        <Select
+          value={mergeCheckScope}
+          onValueChange={(value) => {
+            if (isMergeCheckScope(value)) {
+              onMergeCheckScopeChange(value)
+            }
+          }}
+          disabled={busy}
+        >
+          <SelectTrigger aria-labelledby={mergeCheckScopeLabelId} size="sm" className="h-7 w-full">
+            <SelectValue>
+              <span className="text-[11px]">{mergeCheckScopeLabel(mergeCheckScope)}</span>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">
+              <span className="text-xs">{mergeCheckScopeLabel('all')}</span>
+            </SelectItem>
+            <SelectItem value="required">
+              <span className="text-xs">{mergeCheckScopeLabel('required')}</span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          {translate(
+            'fork.hostedReviewSitter.enrollment.checkScopeHelp',
+            'With All checks, every current-head check must pass (or be skipped if optional). Required checks only waits for checks marked required by repository rules.'
+          )}
+        </p>
       </div>
 
       <div className="space-y-1">

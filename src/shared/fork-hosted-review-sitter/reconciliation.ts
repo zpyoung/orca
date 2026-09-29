@@ -8,11 +8,13 @@ import {
   getLatestHostedReviewAttempts,
   getUnresolvedHostedReviewAttempts
 } from './ledger-adapter'
+import { currentHeadChecks, requiresOwnerForCheckRecovery } from './decision-check-groups'
 import { getRepeatedFailureAfterOwnFixEvidence } from './stop-policy'
 import type {
   DerivedHostedReviewSitterDiscrepancy,
   HostedReviewAttemptEntry,
   HostedReviewCheckSnapshot,
+  HostedReviewMergeCheckScope,
   HostedReviewSitterAction,
   HostedReviewSitterContention,
   HostedReviewSitterDiscrepancyKind,
@@ -59,40 +61,49 @@ function toDerived(
     reason: draft.reason
   }
 }
-
-function currentRequiredFailures(
-  review: HostedReviewSnapshot
-): readonly HostedReviewCheckSnapshot[] {
-  return review.checks.filter(
-    (check) => check.required && check.headSha === review.headSha && check.state === 'failed'
-  )
+function checkFailureEvidenceKey(
+  check: HostedReviewCheckSnapshot,
+  ownerRecoveryRequired: boolean
+): string {
+  const parts = [
+    check.checkKey,
+    check.failureSignature,
+    check.failureSignature ? null : check.observationId
+  ]
+  if (ownerRecoveryRequired) {
+    parts.push('owner-recovery')
+  }
+  return makeHostedReviewEvidenceKey(parts)
 }
 
-function checkFailureDrafts(review: HostedReviewSnapshot): readonly DiscrepancyDraft[] {
+function checkFailureDrafts(
+  review: HostedReviewSnapshot,
+  scope: HostedReviewMergeCheckScope
+): readonly DiscrepancyDraft[] {
   const unique = new Map<string, HostedReviewCheckSnapshot>()
-  for (const check of currentRequiredFailures(review)) {
-    const identity = makeHostedReviewEvidenceKey([
-      check.checkKey,
-      check.failureSignature,
-      check.failureSignature ? null : check.observationId
-    ])
+  for (const check of currentHeadChecks(review, scope).filter((item) => item.state === 'failed')) {
+    const identity = checkFailureEvidenceKey(
+      check,
+      requiresOwnerForCheckRecovery(review, check, scope)
+    )
     const previous = unique.get(identity)
     if (!previous || check.observationId.localeCompare(previous.observationId) < 0) {
       unique.set(identity, check)
     }
   }
   return [...unique.values()].map((check) => {
-    const evidenceKey = makeHostedReviewEvidenceKey([
-      check.checkKey,
-      check.failureSignature,
-      check.failureSignature ? null : check.observationId
-    ])
+    const requiresOwner = requiresOwnerForCheckRecovery(review, check, scope)
+    const evidenceKey = checkFailureEvidenceKey(check, requiresOwner)
     return {
       kind: 'check-failure',
       evidenceKey,
       headSha: review.headSha,
-      defaultStatus: 'open',
-      reason: `required-check-failed:${check.checkKey}`
+      defaultStatus: requiresOwner ? 'escalated' : 'open',
+      reason: requiresOwner
+        ? `check-recovery-requires-owner:${check.checkKey}`
+        : check.required
+          ? `required-check-failed:${check.checkKey}`
+          : `check-failed:${check.checkKey}`
     }
   })
 }
@@ -109,7 +120,8 @@ function latestCompletedReruns(ledger: WatcherLedger): readonly RerunCheckAction
 
 function unverifiableFailureDrafts(
   review: HostedReviewSnapshot,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope
 ): readonly DiscrepancyDraft[] {
   const drafts: DiscrepancyDraft[] = []
   for (const rerun of latestCompletedReruns(ledger)) {
@@ -117,8 +129,11 @@ function unverifiableFailureDrafts(
       continue
     }
     const original = new Set(rerun.observationIds)
-    const freshFailures = currentRequiredFailures(review).filter(
-      (check) => check.checkKey === rerun.checkKey && !original.has(check.observationId)
+    const freshFailures = currentHeadChecks(review, scope).filter(
+      (check) =>
+        check.state === 'failed' &&
+        check.checkKey === rerun.checkKey &&
+        !original.has(check.observationId)
     )
     if (freshFailures.length === 0 || freshFailures.some((check) => check.failureSignature)) {
       continue
@@ -140,9 +155,10 @@ function unverifiableFailureDrafts(
 
 function repeatedFixDrafts(
   review: HostedReviewSnapshot,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope
 ): readonly DiscrepancyDraft[] {
-  return getRepeatedFailureAfterOwnFixEvidence(review, ledger).map((evidence) => ({
+  return getRepeatedFailureAfterOwnFixEvidence(review, ledger, scope).map((evidence) => ({
     kind: 'fix-did-not-resolve',
     evidenceKey: makeHostedReviewEvidenceKey([
       evidence.sourceHeadSha,
@@ -187,13 +203,14 @@ function unresolvedActionDrafts(
 function activeDrafts(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger,
-  contention?: HostedReviewSitterContention
+  contention: HostedReviewSitterContention | undefined,
+  scope: HostedReviewMergeCheckScope
 ): readonly DiscrepancyDraft[] {
   const drafts: DiscrepancyDraft[] = [
-    ...repeatedFixDrafts(review, ledger),
+    ...repeatedFixDrafts(review, ledger, scope),
     ...unresolvedActionDrafts(review, ledger, contention),
-    ...unverifiableFailureDrafts(review, ledger),
-    ...checkFailureDrafts(review)
+    ...unverifiableFailureDrafts(review, ledger, scope),
+    ...checkFailureDrafts(review, scope)
   ]
   if (review.conflicts === 'present') {
     drafts.push({
@@ -244,9 +261,10 @@ function parseDiscrepancyId(
 export function deriveHostedReviewSitterDiscrepancies(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope,
   contention?: HostedReviewSitterContention
 ): readonly DerivedHostedReviewSitterDiscrepancy[] {
-  const active = activeDrafts(review, ledger, contention)
+  const active = activeDrafts(review, ledger, contention, scope)
   const activeIds = new Set(active.map(discrepancyId))
   const derived = active.map((draft) => toDerived(draft, ledger))
 

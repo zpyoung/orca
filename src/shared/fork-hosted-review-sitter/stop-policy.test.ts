@@ -47,7 +47,9 @@ function review(overrides: Partial<HostedReviewSnapshot> = {}): HostedReviewSnap
   }
 }
 
-function definition(): HostedReviewSitterDefinition {
+function definition(
+  mergeCheckScope: 'required' | 'all' = 'required'
+): HostedReviewSitterDefinition {
   return {
     repoId: 'repo-1',
     worktreeId: 'worktree-1',
@@ -58,7 +60,8 @@ function definition(): HostedReviewSitterDefinition {
     reviewUrl: 'https://github.com/acme/repo/pull/42',
     capabilities: { updateBranch: 'on', resolveConflicts: 'on', fixChecks: 'on', merge: 'on' },
     branchUpdateMode: 'merge-base-update',
-    mergeMethod: null
+    mergeMethod: null,
+    mergeCheckScope
   }
 }
 
@@ -137,6 +140,26 @@ describe('hosted review sitter stop predicates opt into owner deviations', () =>
       deviation: { kind: 'check-failed', criterionId: 'test', timedOut: null }
     })
   })
+  it('paces repeated optional failures only when all checks are in scope', () => {
+    const optionalFailure = check({ required: false })
+    const allScopeWorld: HostedReviewWorld = {
+      review: review({ checks: [optionalFailure] }),
+      definition: definition('all'),
+      preparedCommit: null
+    }
+    const requiredScopeWorld: HostedReviewWorld = {
+      ...allScopeWorld,
+      definition: definition('required')
+    }
+    const history = ledger([fixAttributionEntry()])
+
+    expect(
+      evaluateStopPredicates(HOSTED_REVIEW_STOP_PREDICATES, snapshot(allScopeWorld), history)
+    ).toMatchObject({ predicateId: 'repeated-failure-after-own-fix' })
+    expect(
+      evaluateStopPredicates(HOSTED_REVIEW_STOP_PREDICATES, snapshot(requiredScopeWorld), history)
+    ).toBeNull()
+  })
 
   it('reports a check-failed deviation when a rerun reproduces an unclassifiable failure', () => {
     const world: HostedReviewWorld = {
@@ -154,6 +177,31 @@ describe('hosted review sitter stop predicates opt into owner deviations', () =>
     expect(fired).toMatchObject({
       predicateId: 'unverifiable-reproduced-failure',
       deviation: { kind: 'check-failed', criterionId: 'test', timedOut: null }
+    })
+  })
+  it('tracks unclassifiable optional failures after rerun in all scope', () => {
+    const world: HostedReviewWorld = {
+      review: review({
+        checks: [
+          check({
+            required: false,
+            observationId: 'run-2:attempt-1',
+            failureSignature: null
+          })
+        ]
+      }),
+      definition: definition('all'),
+      preparedCommit: null
+    }
+    const fired = evaluateStopPredicates(
+      HOSTED_REVIEW_STOP_PREDICATES,
+      snapshot(world),
+      ledger([completedRerunEntry(['run-1:attempt-1'])])
+    )
+
+    expect(fired).toMatchObject({
+      predicateId: 'unverifiable-reproduced-failure',
+      deviation: { kind: 'check-failed', criterionId: 'test' }
     })
   })
 

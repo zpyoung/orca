@@ -25,7 +25,8 @@ const DEFINITION: HostedReviewSitterDefinition = {
   reviewUrl: 'https://github.com/example/repo/pull/63',
   capabilities: { updateBranch: 'on', resolveConflicts: 'on', fixChecks: 'on', merge: 'gated' },
   branchUpdateMode: 'merge-base-update',
-  mergeMethod: 'squash'
+  mergeMethod: 'squash',
+  mergeCheckScope: 'required'
 }
 
 // The repo row decides the sitter's execution host: a bare row is local, a `connectionId` is SSH.

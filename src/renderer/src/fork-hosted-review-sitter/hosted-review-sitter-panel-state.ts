@@ -9,8 +9,14 @@ import type { ApprovalScope, WatcherLedger } from '../../../shared/fork-heimdall
 import type { WatcherListEntry } from '../../../shared/fork-heimdall/watcher-types'
 import type {
   HostedReviewEnrollmentPayload,
+  HostedReviewMergeCheckScope,
   HostedReviewSitterProvider
 } from '../../../shared/fork-hosted-review-sitter/types'
+
+type HostedReviewEnrollmentPayloadIngress = Omit<
+  HostedReviewEnrollmentPayload,
+  'mergeCheckScope'
+> & { mergeCheckScope?: HostedReviewMergeCheckScope }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -39,7 +45,7 @@ export function isSupportedProvider(provider: string): provider is HostedReviewS
 
 function isHostedReviewEnrollmentPayload(
   value: Record<string, unknown>
-): value is HostedReviewEnrollmentPayload {
+): value is HostedReviewEnrollmentPayloadIngress {
   return (
     typeof value.branch === 'string' &&
     (value.provider === 'github' || value.provider === 'gitlab') &&
@@ -49,7 +55,10 @@ function isHostedReviewEnrollmentPayload(
     (value.mergeMethod === null ||
       value.mergeMethod === 'merge' ||
       value.mergeMethod === 'squash' ||
-      value.mergeMethod === 'rebase')
+      value.mergeMethod === 'rebase') &&
+    (value.mergeCheckScope === undefined ||
+      value.mergeCheckScope === 'required' ||
+      value.mergeCheckScope === 'all')
   )
 }
 
@@ -58,10 +67,18 @@ export function hostedReviewPayload(entry: WatcherListEntry): HostedReviewEnroll
     return null
   }
   const payload = entry.enrollment.kindPayload
-  if (!isRecord(payload)) {
+  if (!isRecord(payload) || !isHostedReviewEnrollmentPayload(payload)) {
     return null
   }
-  return isHostedReviewEnrollmentPayload(payload) ? payload : null
+  return {
+    branch: payload.branch,
+    provider: payload.provider,
+    reviewNumber: payload.reviewNumber,
+    reviewUrl: payload.reviewUrl,
+    branchUpdateMode: payload.branchUpdateMode,
+    mergeMethod: payload.mergeMethod,
+    mergeCheckScope: payload.mergeCheckScope ?? 'all'
+  }
 }
 
 export type HostedReviewSitterSelection = {

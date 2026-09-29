@@ -1,22 +1,85 @@
 import { makeHostedReviewEvidenceKey } from './action-identity'
-import type { HostedReviewCheckSnapshot, HostedReviewSnapshot, RerunCheckAction } from './types'
+import type {
+  HostedReviewCheckSnapshot,
+  HostedReviewMergeCheckScope,
+  HostedReviewSnapshot,
+  RerunCheckAction
+} from './types'
 
 export type FailedCheckGroup = {
   checkKey: string
   checks: readonly HostedReviewCheckSnapshot[]
 }
 
-/** Required checks reported against the snapshot's own head, ignoring stale carry-over. */
-export function currentRequiredChecks(
-  review: HostedReviewSnapshot
-): readonly HostedReviewCheckSnapshot[] {
-  return review.checks.filter((check) => check.required && check.headSha === review.headSha)
+/** Scope membership is shared by failure recovery and merge readiness. */
+export function isCheckInMergeScope(
+  check: HostedReviewCheckSnapshot,
+  scope: HostedReviewMergeCheckScope
+): boolean {
+  return scope === 'all' || check.required
+}
+/** External statuses and trigger jobs have no universally safe job-rerun target. */
+export function requiresOwnerForCheckRecovery(
+  review: HostedReviewSnapshot,
+  check: HostedReviewCheckSnapshot,
+  scope: HostedReviewMergeCheckScope
+): boolean {
+  if (review.provider === 'gitlab' && check.checkId.startsWith('bridge:')) {
+    return true
+  }
+  if (scope !== 'all' || check.required) {
+    return false
+  }
+  return review.provider === 'github'
+    ? check.checkId.startsWith('status:')
+    : check.checkId.startsWith('status-check:')
 }
 
-/** Failed current-head required checks, grouped by check key in a stable order. */
-export function failedCheckGroups(review: HostedReviewSnapshot): readonly FailedCheckGroup[] {
+/** Checks selected for the current head, ignoring stale optional carry-over. */
+export function currentHeadChecks(
+  review: HostedReviewSnapshot,
+  scope: HostedReviewMergeCheckScope
+): readonly HostedReviewCheckSnapshot[] {
+  return review.checks.filter(
+    (check) => check.headSha === review.headSha && isCheckInMergeScope(check, scope)
+  )
+}
+
+/** Required evidence stays strict; all-scope permits only skipped optional checks. */
+export function areCurrentHeadChecksGreen(
+  review: HostedReviewSnapshot,
+  scope: HostedReviewMergeCheckScope
+): boolean {
+  if (!review.checksComplete) {
+    return false
+  }
+  for (const check of review.checks) {
+    if (!isCheckInMergeScope(check, scope)) {
+      continue
+    }
+    if (check.headSha !== review.headSha) {
+      if (check.required) {
+        return false
+      }
+      continue
+    }
+    if (
+      check.state !== 'passed' &&
+      !(scope === 'all' && !check.required && check.state === 'skipped')
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+/** Failed current-head checks in scope, grouped by check key in a stable order. */
+export function failedCheckGroups(
+  review: HostedReviewSnapshot,
+  scope: HostedReviewMergeCheckScope
+): readonly FailedCheckGroup[] {
   const grouped = new Map<string, HostedReviewCheckSnapshot[]>()
-  for (const check of currentRequiredChecks(review)) {
+  for (const check of currentHeadChecks(review, scope)) {
     if (check.state !== 'failed') {
       continue
     }
@@ -74,9 +137,12 @@ export function deterministicFailureChecks(
 export function freshFailedChecksAfterRerun(
   review: HostedReviewSnapshot,
   group: FailedCheckGroup,
-  rerun: RerunCheckAction
+  rerun: RerunCheckAction,
+  scope: HostedReviewMergeCheckScope
 ): readonly HostedReviewCheckSnapshot[] | null {
-  const current = currentRequiredChecks(review).filter((check) => check.checkKey === group.checkKey)
+  const current = currentHeadChecks(review, scope).filter(
+    (check) => check.checkKey === group.checkKey
+  )
   if (current.length === 0) {
     return null
   }

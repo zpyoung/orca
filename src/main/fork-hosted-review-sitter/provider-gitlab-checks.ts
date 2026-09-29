@@ -5,6 +5,7 @@ import type {
   HostedReviewSnapshot,
   HostedReviewSitterDefinition
 } from '../../shared/fork-hosted-review-sitter/types'
+import { isCheckInMergeScope } from '../../shared/fork-hosted-review-sitter/decision-check-groups'
 import type { ProjectRef } from '../gitlab/gl-utils'
 import { encodedProject } from '../gitlab/project-path-encoding'
 import {
@@ -137,38 +138,37 @@ export async function loadAllPipelineRows(
           page,
           signal
         )
-        if (kind === 'jobs') {
-          for (const row of rows) {
-            jobs.push({
-              ...row,
-              sitter_pipeline_path: target.logicalPath,
-              sitter_project_key: target.projectKey,
-              pipeline: isRecord(row.pipeline)
-                ? row.pipeline
-                : { id: target.pipelineId, sha: target.sha }
-            })
+        for (const row of rows) {
+          jobs.push({
+            ...row,
+            sitter_pipeline_path: target.logicalPath,
+            sitter_project_key: target.projectKey,
+            sitter_is_bridge: kind === 'bridges',
+            pipeline: isRecord(row.pipeline)
+              ? row.pipeline
+              : { id: target.pipelineId, sha: target.sha }
+          })
+          if (kind !== 'bridges') {
+            continue
           }
-        } else {
-          for (const row of rows) {
-            const downstream: GitLabPipeline | null = isRecord(row.downstream_pipeline)
-              ? row.downstream_pipeline
-              : null
-            const childId = numberValue(downstream?.id)
-            if (!childId) {
-              continue
-            }
-            const childProjectId = numberValue(downstream?.project_id)
-            if (queue.length >= 21) {
-              complete = false
-              continue
-            }
-            queue.push({
-              projectKey: childProjectId ? String(childProjectId) : target.projectKey,
-              pipelineId: childId,
-              sha: stringValue(downstream?.sha) || target.sha,
-              logicalPath: `${target.logicalPath}/${stringValue(row.name) || 'bridge'}`
-            })
+          const downstream: GitLabPipeline | null = isRecord(row.downstream_pipeline)
+            ? row.downstream_pipeline
+            : null
+          const childId = numberValue(downstream?.id)
+          if (!childId) {
+            continue
           }
+          const childProjectId = numberValue(downstream?.project_id)
+          if (queue.length >= 21) {
+            complete = false
+            continue
+          }
+          queue.push({
+            projectKey: childProjectId ? String(childProjectId) : target.projectKey,
+            pipelineId: childId,
+            sha: stringValue(downstream?.sha) || target.sha,
+            logicalPath: `${target.logicalPath}/${stringValue(row.name) || 'bridge'}`
+          })
         }
         if (rows.length < 100) {
           break
@@ -212,6 +212,7 @@ export function normalizePipelineJobs(
     const stage = stringValue(job.stage)
     const pipelinePath = stringValue(job.sitter_pipeline_path)
     const projectKey = stringValue(job.sitter_project_key)
+    const bridge = job.sitter_is_bridge === true
     const identity = deriveHostedReviewCheckIdentity(name)
     const id = numberValue(job.id)!
     const pipelineSha = stringValue(job.pipeline?.sha) || fallbackHeadSha
@@ -225,16 +226,24 @@ export function normalizePipelineJobs(
     }
     const rawState = gitlabJobState(job.status)
     const state = rawState === 'skipped' && allowSkippedPipeline ? 'passed' : rawState
+    const checkKey = [pipelinePath, stage, identity.checkKey].filter(Boolean).join('/')
     return {
       ...identity,
-      checkKey: [pipelinePath, stage, identity.checkKey].filter(Boolean).join('/'),
-      checkId: `job:${encodeURIComponent(projectKey)}:${id}`,
+      checkKey,
+      checkId: `${bridge ? 'bridge' : 'job'}:${projectKey}:${id}`,
       name,
       required,
       headSha: pipelineSha,
       state,
-      observationId: `${pipelineSha}:job:${id}:${stringValue(job.started_at)}:${stringValue(job.finished_at)}`,
-      failureSignature: null
+      observationId: `${pipelineSha}:${bridge ? 'bridge' : 'job'}:${id}:${stringValue(job.started_at)}:${stringValue(job.finished_at)}`,
+      failureSignature:
+        bridge && state === 'failed'
+          ? stableFailureSignature(checkKey, [
+              name,
+              stringValue(job.status),
+              stringValue(job.failure_reason)
+            ])
+          : null
     }
   })
   return { checks, complete }
@@ -248,7 +257,7 @@ export async function loadExternalStatusChecks(
   required: boolean,
   signal?: AbortSignal
 ): Promise<{ checks: HostedReviewCheckSnapshot[]; complete: boolean }> {
-  if (!required) {
+  if (!required && definition.mergeCheckScope !== 'all') {
     return { checks: [], complete: true }
   }
   try {
@@ -277,7 +286,7 @@ export async function loadExternalStatusChecks(
       }
     }
     if (rows.length === 0) {
-      return { checks: [], complete: false }
+      return { checks: [], complete: !required }
     }
     const checks: HostedReviewCheckSnapshot[] = []
     for (const raw of rows) {
@@ -296,7 +305,7 @@ export async function loadExternalStatusChecks(
         ...identity,
         checkId: `status-check:${id}`,
         name,
-        required: true,
+        required,
         headSha,
         state,
         observationId: `${headSha}:status-check:${id}:${stringValue(status.status)}`,
@@ -322,7 +331,11 @@ export async function attachGitLabFailureSignatures(
 ): Promise<boolean> {
   let complete = true
   for (const check of checks) {
-    if (!check.required || check.state !== 'failed' || check.failureSignature) {
+    if (
+      !isCheckInMergeScope(check, definition.mergeCheckScope) ||
+      check.state !== 'failed' ||
+      check.failureSignature
+    ) {
       continue
     }
     const match = check.checkId.match(/^job:([^:]+):(\d+)$/)

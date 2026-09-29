@@ -42,7 +42,8 @@ const definition = {
   reviewUrl: 'https://github.com/acme/repo/pull/42',
   capabilities: { updateBranch: 'on', resolveConflicts: 'gated', fixChecks: 'on', merge: 'gated' },
   branchUpdateMode: 'merge-base-update',
-  mergeMethod: 'squash'
+  mergeMethod: 'squash',
+  mergeCheckScope: 'required'
 } as const
 
 const review = {
@@ -456,7 +457,8 @@ describe('hosted review kind', () => {
           evidenceKey: 'enqueue:test',
           expectedState: { target: definition.reviewUrl, before: review.headSha },
           headSha: review.headSha,
-          reviewUrl: definition.reviewUrl
+          reviewUrl: definition.reviewUrl,
+          checkScope: 'required'
         },
         expectedAfter: `enqueued:${review.headSha}`,
         landedReview: {

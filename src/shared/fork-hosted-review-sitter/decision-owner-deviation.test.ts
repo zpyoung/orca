@@ -72,6 +72,7 @@ function sitter(
     capabilities: { updateBranch: 'on', resolveConflicts: 'on', fixChecks: 'on', merge: 'on' },
     branchUpdateMode: 'merge-base-update',
     mergeMethod: null,
+    mergeCheckScope: 'required',
     ...overrides
   }
 }
@@ -141,7 +142,7 @@ function deterministicRedReview(
 describe('hosted review sitter owner deviations', () => {
   it('deviates when a check rerun never settles', () => {
     const red = review({ checks: [check()] })
-    const group = failedCheckGroups(red)[0]!
+    const group = failedCheckGroups(red, 'required')[0]!
     const rerun = buildRerunAction(red, group)
     const outcome = decide(red, sitter(), ledger([unresolvedAttempt(rerun)]))
     expect(outcome).toMatchObject({
@@ -152,7 +153,7 @@ describe('hosted review sitter owner deviations', () => {
 
   it('keeps an in-flight rerun a plain decline, not a deviation', () => {
     const red = review({ checks: [check()] })
-    const group = failedCheckGroups(red)[0]!
+    const group = failedCheckGroups(red, 'required')[0]!
     const rerun = buildRerunAction(red, group)
     const outcome = decide(red, sitter(), ledger([attempt(rerun, 'attempted')]))
     expect(outcome).toMatchObject({ action: null, reason: 'merge-gates-unsatisfied' })
@@ -188,7 +189,7 @@ describe('hosted review sitter owner deviations', () => {
 
   it('reports a worker-unverifiable deviation for a prepare-fix that never resolves', () => {
     const red = deterministicRedReview()
-    const group = failedCheckGroups(red)[0]!
+    const group = failedCheckGroups(red, 'required')[0]!
     const preparation = buildPrepareFixAction(
       red,
       group.checkKey,
@@ -204,7 +205,7 @@ describe('hosted review sitter owner deviations', () => {
 
   it('reports a worker-unverifiable deviation when a completed fix leaves no usable prepared commit', () => {
     const red = deterministicRedReview()
-    const group = failedCheckGroups(red)[0]!
+    const group = failedCheckGroups(red, 'required')[0]!
     const preparation = buildPrepareFixAction(
       red,
       group.checkKey,
@@ -220,7 +221,7 @@ describe('hosted review sitter owner deviations', () => {
 
   it('deviates when publishing a fix never settles', () => {
     const red = deterministicRedReview()
-    const group = failedCheckGroups(red)[0]!
+    const group = failedCheckGroups(red, 'required')[0]!
     const preparation = buildPrepareFixAction(
       red,
       group.checkKey,
