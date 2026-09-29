@@ -12,6 +12,7 @@ import { REPEATED_FLAG_SEPARATOR } from '../args'
 import { getRequiredStringFlag } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
 import { parseHeimdallCreateSchema } from './create-input-validation'
+import { hoursToMilliseconds } from './watcher-command-values'
 
 const HOSTED_REVIEW_CAPABILITY_KEYS: Record<string, true> = {
   updateBranch: true,
@@ -69,14 +70,8 @@ function parseHours(value: string | undefined): number | null | undefined {
   if (value === 'none') {
     return null
   }
-  const hours = Number(value)
-  const milliseconds = Math.round(hours * 3_600_000)
-  if (
-    !Number.isFinite(hours) ||
-    hours <= 0 ||
-    !Number.isSafeInteger(milliseconds) ||
-    milliseconds <= 0
-  ) {
+  const milliseconds = hoursToMilliseconds(value)
+  if (milliseconds === undefined || milliseconds <= 0) {
     throw new RuntimeClientError('invalid_argument', '--hours must be a positive number or none.')
   }
   return milliseconds

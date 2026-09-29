@@ -2,7 +2,7 @@ import { HEIMDALL_CHANNELS, type HeimdallFleetSnapshot } from '../../shared/fork
 import type { WatcherFleetEntry } from '../../shared/fork-heimdall/fleet-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import type { RuntimeWorktreeRecord } from '../../shared/runtime-types'
-import { getOptionalWorktreeSelector, normalizeWorktreeSelectorForCaller } from '../selectors'
+import { normalizeWorktreeSelectorForCaller, resolveCurrentWorktreeSelector } from '../selectors'
 import type { HandlerContext } from '../dispatch'
 import { getRequiredStringFlag } from '../flags'
 import { RuntimeClientError } from '../runtime/types'
@@ -31,6 +31,22 @@ export async function resolveWatcherRow(
   return row
 }
 
+/** Resolves a --worktree value, preferring the local folder workspace for active/current. */
+export async function resolveHeimdallWorkspaceSelector(
+  requested: string,
+  cwd: string,
+  client: HandlerContext['client']
+): Promise<string> {
+  if (requested !== 'active' && requested !== 'current') {
+    return await normalizeWorktreeSelectorForCaller(requested, cwd, client)
+  }
+  const folderWorkspaceId = process.env.ORCA_WORKSPACE_ID?.trim()
+  if (!client.isRemote && folderWorkspaceId?.startsWith('folder:')) {
+    return folderWorkspaceId
+  }
+  return await resolveCurrentWorktreeSelector(cwd, client)
+}
+
 export async function resolveWatcherWorktreeFilter(
   flags: Map<string, string | boolean>,
   cwd: string,
@@ -40,25 +56,7 @@ export async function resolveWatcherWorktreeFilter(
   if (requested === undefined) {
     return undefined
   }
-  let selector: string | undefined
-  const folderWorkspaceId = process.env.ORCA_WORKSPACE_ID?.trim()
-  if (
-    (requested === 'active' || requested === 'current') &&
-    !client.isRemote &&
-    folderWorkspaceId?.startsWith('folder:')
-  ) {
-    selector = folderWorkspaceId
-  } else if (requested === 'active' || requested === 'current') {
-    selector = await getOptionalWorktreeSelector(flags, 'worktree', cwd, client)
-  } else {
-    selector = await normalizeWorktreeSelectorForCaller(requested, cwd, client)
-  }
-  if (selector === undefined) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      'The --worktree selector did not resolve to a workspace'
-    )
-  }
+  const selector = await resolveHeimdallWorkspaceSelector(requested, cwd, client)
   const response = await client.call<{ worktree: RuntimeWorktreeRecord }>('worktree.show', {
     worktree: selector
   })

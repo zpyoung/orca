@@ -787,6 +787,29 @@ describe('orca heimdall mutation handlers', () => {
     })
   })
 
+  it('rounds decimal budget hours that are not exact in binary floating point', async () => {
+    primeCommand()
+    callMock.mockResolvedValueOnce({
+      id: 'command-1',
+      ok: true,
+      result: { status: 'applied', appliedAtMs: 20 }
+    })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await HEIMDALL_HANDLERS['heimdall budget'](
+      context([
+        ['watcher-id', WATCHER_ID],
+        ['hours', '1.1']
+      ])
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(3, HEIMDALL_CHANNELS.command, {
+      target: TARGET,
+      expectedOwner: OWNER_FENCE,
+      command: { kind: 'adjust-budget', budget: { wallClockActiveMs: 3_960_000, turns: 9 } }
+    })
+  })
+
   it('maps none to no limit and merges an omitted hours dimension', async () => {
     primeCommand()
     callMock.mockResolvedValueOnce({

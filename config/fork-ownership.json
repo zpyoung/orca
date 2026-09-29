@@ -691,7 +691,8 @@
         "  '  orca heimdall create objective --objective <text> [--worktree <selector>] [--spec <json|@file>] [--json]',",
         "  '  orca heimdall create hosted-review [--worktree <selector>] [--spec <json|@file>] [--json]',",
         "  '  orca heimdall pause|resume|disarm|rm <watcherId> [--json]',",
-        "  '  orca heimdall approve|answer-escalation <watcherId> <escalationId> [--body <text>] [--json]',",
+        "  '  orca heimdall approve <watcherId> <escalationId> [--json]',",
+        "  '  orca heimdall answer-escalation <watcherId> <escalationId> --body <text> [--json]',",
         "  '  orca heimdall answer <watcherId> <messageId> --body <text> [--json]',",
         "  '  orca heimdall stop-worker <watcherId> <dispatchId> [--json]',",
         "  '  orca heimdall budget <watcherId> [--hours <n|none>] [--turns <n|none>] [--json]',",
@@ -3776,6 +3777,12 @@
       ]
     },
     {
+      "path": "config/scripts/generate-bundled-skill-guides.test.mjs",
+      "feature": "project-ledger",
+      "kind": "registration",
+      "lines": ["      'orca-ledger'"]
+    },
+    {
       "path": "src/cli/help.ts",
       "feature": "project-ledger",
       "kind": "registration",
@@ -4759,12 +4766,6 @@
       "path": "config/scripts/fork-ownership-manifest.test.mjs",
       "reason": "Tests for the manifest loader; a fork-added test matching no other entry would otherwise fail the guard's own coverage rule.",
       "status": "permanent"
-    },
-    {
-      "path": "config/scripts/generate-bundled-skill-guides.test.mjs",
-      "reason": "Removes a wording-only test that rejects valid version-matched skill guides unless they repeat one exact explanatory sentence; the generator's artifact and command-safety behavior remains covered.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#skill-guide-executable-wording-test"
     },
     {
       "path": "config/scripts/install-electron-package-binary.mjs",
@@ -5788,7 +5789,7 @@
       "removed": 0
     },
     "src/cli/root-help-text-secondary.ts": {
-      "added": 15,
+      "added": 16,
       "removed": 0
     },
     "src/cli/specs/artifacts.ts": {
@@ -7118,6 +7119,10 @@
     "src/renderer/src/components/tab-bar/SortableTab.tsx": {
       "added": 2,
       "removed": 0
+    },
+    "config/scripts/generate-bundled-skill-guides.test.mjs": {
+      "added": 7,
+      "removed": 1
     },
     "src/cli/help.ts": {
       "added": 7,

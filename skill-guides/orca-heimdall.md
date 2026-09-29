@@ -16,7 +16,7 @@ action deterministically, then applies capability, approval, budget, and safety 
 action can run. Use the CLI as an **observe → decide → act** loop: inspect the current fleet and
 watcher evidence first, decide only from that evidence, then issue the narrowest command.
 
-`ORCA` is the executable placeholder resolved by the discovery stub. Substitute it before running
+`ORCA` is a placeholder for the executable you resolved in the stub. Substitute it before running
 commands; do not create a shell variable or run `ORCA` literally. Prefer `--json` when an agent
 needs to read the result. `--json` uses the standard Orca CLI envelope; inspect the `result` as well
 as process success, because refusals and indeterminate outcomes are returned as structured results.

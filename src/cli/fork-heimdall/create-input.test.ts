@@ -347,6 +347,22 @@ describe('Heimdall create input builder', () => {
     }
   })
 
+  it('accepts only plain decimal hours, matching the budget command', () => {
+    const build = (hours: string): unknown =>
+      buildHeimdallCreateCandidate(
+        new Map([
+          ['objective', 'Ship it'],
+          ['hours', hours]
+        ]),
+        '/repo',
+        'objective'
+      )
+    expect(build('1.1')).toMatchObject({ budget: { wallClockActiveMs: 3_960_000 } })
+    for (const hours of ['0x10', '1e3', ' 2 ', '0', '-1']) {
+      expect(() => build(hours)).toThrow(/--hours must be a positive number or none/)
+    }
+  })
+
   it('gates owner enrollment on runtime support and defaults owner intervention to gated', () => {
     const candidate = buildHeimdallCreateCandidate(
       new Map([

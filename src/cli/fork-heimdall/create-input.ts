@@ -222,15 +222,11 @@ export function buildHeimdallEnrollInput(
         'kindPayload.landingBar: folder workspaces support only files-on-disk.'
       )
     }
-    const payload = parseHeimdallCreateSchema(
-      ObjectiveEnrollmentPayloadSchema,
-      {
-        ...candidate.kindPayload,
-        workspaceKind: workspace.workspaceKind,
-        ...(workspace.workspaceKind === 'folder' ? { maxConcurrency: 1 } : {})
-      },
-      'kindPayload'
-    )
+    const payload: ObjectiveEnrollmentPayload = {
+      ...candidate.kindPayload,
+      workspaceKind: workspace.workspaceKind,
+      ...(workspace.workspaceKind === 'folder' ? { maxConcurrency: 1 } : {})
+    }
     kindPayload = parseHeimdallCreateSchema(
       ObjectiveEnrollmentPayloadSchema,
       adaptObjectiveEnrollmentToCapabilities(payload, runtimeCapabilities),
@@ -243,18 +239,14 @@ export function buildHeimdallEnrollInput(
         'workspace: hosted-review watchers require a Git worktree.'
       )
     }
-    const payload: Record<string, unknown> = {
-      ...parseHeimdallCreateSchema(
-        HostedReviewEnrollmentCandidateSchema.strict(),
-        candidate.kindPayload,
-        'kindPayload'
-      )
-    }
-    delete payload.branch
-    delete payload.provider
-    delete payload.reviewNumber
-    delete payload.reviewUrl
-    kindPayload = payload
+    const {
+      branch: _branch,
+      provider: _provider,
+      reviewNumber: _reviewNumber,
+      reviewUrl: _reviewUrl,
+      ...policy
+    } = candidate.kindPayload
+    kindPayload = policy
   }
   return parseHeimdallCreateSchema(
     EnrollInputSchema,

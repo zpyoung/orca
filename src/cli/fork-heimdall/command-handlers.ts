@@ -198,7 +198,7 @@ export const HEIMDALL_COMMAND_HANDLERS: Record<string, CommandHandler> = {
         const hoursText =
           command.budget.wallClockActiveMs === null
             ? 'none'
-            : `${command.budget.wallClockActiveMs} ms`
+            : `${command.budget.wallClockActiveMs / 3_600_000} hours`
         const turnsText = command.budget.turns === null ? 'none' : `${command.budget.turns} turns`
         return `Updated Heimdall watcher ${watcherId} budget to ${hoursText} / ${turnsText}.`
       }

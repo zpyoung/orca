@@ -27,6 +27,16 @@ export function latestApprovalScopeForEscalation(
   return latestForScope?.escalationId === escalationId ? escalation.approvalScope : null
 }
 
+/** Converts a plain decimal hours string to whole milliseconds, or undefined when it is not one. */
+export function hoursToMilliseconds(value: string): number | undefined {
+  if (!/^\d+(?:\.\d+)?$/u.test(value)) {
+    return undefined
+  }
+  // round: decimal hours like 1.1 are not exact in binary floating point
+  const milliseconds = Math.round(Number(value) * 3_600_000)
+  return Number.isSafeInteger(milliseconds) ? milliseconds : undefined
+}
+
 export function parseBudgetHours(value: string | undefined): number | null | undefined {
   if (value === undefined) {
     return undefined
@@ -34,15 +44,9 @@ export function parseBudgetHours(value: string | undefined): number | null | und
   if (value === 'none') {
     return null
   }
-  if (!/^\d+(?:\.\d+)?$/u.test(value)) {
+  const milliseconds = hoursToMilliseconds(value)
+  if (milliseconds === undefined) {
     throw new RuntimeClientError('invalid_argument', '--hours must be non-negative hours or none')
-  }
-  const milliseconds = Number(value) * 3_600_000
-  if (!Number.isSafeInteger(milliseconds)) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      '--hours must resolve to a whole, safe number of milliseconds'
-    )
   }
   return milliseconds
 }
