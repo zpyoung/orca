@@ -13,6 +13,8 @@ export type HostedReviewSitterCapability =
 export type HostedReviewSitterCapabilities = Record<HostedReviewSitterCapability, CapabilityMode>
 
 export type HostedReviewMergeMethod = 'merge' | 'squash' | 'rebase'
+export type HostedReviewMergeCheckScope = 'required' | 'all'
+
 export type HostedReviewBranchUpdateMode = 'merge-base-update' | 'rebase'
 
 /** Kind-owned payload persisted inside a kernel enrollment. Authority replaces the review identity. */
@@ -24,6 +26,7 @@ export type HostedReviewEnrollmentPayload = {
   branchUpdateMode: HostedReviewBranchUpdateMode
   /** `null` follows the provider snapshot's repository default. */
   mergeMethod: HostedReviewMergeMethod | null
+  mergeCheckScope: HostedReviewMergeCheckScope
 }
 
 /** Authorized view supplied to providers and the pure decision core. */
@@ -199,10 +202,12 @@ export type MergeAction = HostedReviewExternalActionBase & {
   kind: 'merge'
   capability: 'merge'
   mergeMethod: HostedReviewMergeMethod
+  checkScope: HostedReviewMergeCheckScope
 }
 
 export type EnqueueAction = HostedReviewExternalActionBase & {
   kind: 'enqueue'
+  checkScope: HostedReviewMergeCheckScope
   capability: 'merge'
 }
 

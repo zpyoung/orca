@@ -472,6 +472,7 @@ checks, and merges — each a separately gated capability.
 | `merge`            | off / gated / on                                    | **off**            | authorizes the merge API call                                  |
 | Branch update mode | merge base into branch / rebase onto base           | merge-base-update  |                                                                |
 | Merge method       | repository default / merge commit / squash / rebase | repository default |                                                                |
+| Merge check scope  | all checks / required checks only                  | all checks         | checks on the current review head must pass before merge       |
 | Active budget      | hours > 0, step 0.25                                | 4                  | no upper bound; counts only while a worker or action is active |
 
 All four capabilities default to `off` (`HostedReviewSitterPanel.tsx:43-48`), so a freshly armed
@@ -537,6 +538,16 @@ default. If the target requires a **merge queue or train**, a direct `merge` is 
 provider layer and the sitter emits `enqueue` instead. If your pinned merge method conflicts with the
 queue's configured method (GitHub) or the project's strategy and squash option (GitLab), the action
 throws rather than overriding the protection.
+
+With **All checks**, the sitter waits for every current-head check to finish and pass; a skipped
+non-required check also counts as satisfied. Failed non-required jobs enter the same rerun/fix flow
+as required failures. External status contexts and GitLab trigger jobs have no universally safe
+rerun target; they remain merge-blocking and escalate for owner resolution instead. **Required
+checks only** uses the base branch's required-check rules; if the branch has no such rules,
+pending or failed optional checks do not block merge. Older enrollments without a stored scope
+use **All checks** after upgrade. A remote host must support the check-scope capability to accept
+**All checks** or an objective that will hand off to a sitter; update the host or choose **Required
+checks only** for a direct sitter.
 
 ### How `fixChecks` actually works
 
@@ -1012,9 +1023,9 @@ through the handoff.
 
 Three more things the handoff fixes for you: the sitter inherits the objective's **remaining** budget
 rather than a fresh one (`remainingBudget`, `:63-70`), `branchUpdateMode` is hardcoded to
-`merge-base-update`, and `mergeMethod` is `null` (repository default) — overrides touch capabilities
-only. The review body is the objective text followed by every plan criterion as an acceptance
-checklist (`renderReviewBody`, `:92-101`).
+`merge-base-update`, `mergeMethod` is `null` (repository default), and `mergeCheckScope` is `all`
+(every current-head check). Overrides touch capabilities only. The review body is the objective
+text followed by every plan criterion as an acceptance checklist (`renderReviewBody`, `:92-101`).
 
 ## Reading the fleet page
 

@@ -34,6 +34,32 @@ function publishFixAction(
 }
 
 describe('approval action presentation', () => {
+  it.each([
+    { checkScope: 'all', label: 'All checks' },
+    { checkScope: 'required', label: 'Required checks only' }
+  ] as const)('shows the $checkScope policy for merge approvals', ({ checkScope, label }) => {
+    const action: KernelAction = {
+      kind: 'merge',
+      capability: 'merge',
+      visibility: 'external',
+      contentIdentity: 'merge-content',
+      evidenceKey: 'merge-evidence',
+      checkScope
+    }
+    const presentation = approvalActionPresentation(
+      {
+        actionKind: 'merge',
+        contentIdentity: 'merge-content',
+        evidenceKey: 'merge-evidence'
+      },
+      action
+    )
+
+    expect(presentation.details).toContainEqual({
+      label: 'Merge check scope',
+      value: label
+    })
+  })
   it('enriches from only a complete approval-scope match', () => {
     const scope: ApprovalScope = {
       actionKind: 'publish-fix',

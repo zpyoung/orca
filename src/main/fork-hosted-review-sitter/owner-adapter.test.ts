@@ -47,7 +47,10 @@ function review(overrides: Partial<HostedReviewSnapshot> = {}): HostedReviewSnap
   }
 }
 
-function definition(capabilities: HostedReviewSitterCapabilities): HostedReviewSitterDefinition {
+function definition(
+  capabilities: HostedReviewSitterCapabilities,
+  mergeCheckScope: 'required' | 'all' = 'required'
+): HostedReviewSitterDefinition {
   return {
     repoId: 'repo-1',
     worktreeId: 'worktree-1',
@@ -58,7 +61,8 @@ function definition(capabilities: HostedReviewSitterCapabilities): HostedReviewS
     reviewUrl: 'https://github.com/acme/repo/pull/42',
     capabilities,
     branchUpdateMode: 'merge-base-update',
-    mergeMethod: null
+    mergeMethod: null,
+    mergeCheckScope
   }
 }
 
@@ -179,6 +183,36 @@ describe('hosted review sitter owner adapter', () => {
     )
     expect(rejection).toBeNull()
   })
+  it('refuses owner reruns for all-scope optional status contexts without rerun APIs', () => {
+    const statusFailure = check({
+      checkKey: 'external',
+      checkId: 'status:opaque-id',
+      required: false
+    })
+    const world = snapshot({
+      review: review({ checks: [statusFailure] }),
+      definition: definition(ON_CAPS, 'all'),
+      preparedCommit: null
+    })
+    const retryRejection = adapter.rejectIntervention(
+      { kind: 'retry-rung', rung: 'rerun-check', rationale: 'retry external check' },
+      world,
+      ledger(),
+      enrollment(ON_CAPS)
+    )
+    const skipRejection = adapter.rejectIntervention(
+      { kind: 'skip-capability', capability: 'fixChecks', rationale: 'skip external check' },
+      world,
+      ledger(),
+      enrollment(ON_CAPS)
+    )
+
+    expect(retryRejection).toMatchObject({
+      gate: 'sitter-overrides',
+      reason: expect.stringContaining('no provider rerun endpoint')
+    })
+    expect(skipRejection).toEqual(retryRejection)
+  })
 
   it('builds a fresh-evidence action for an accepted retry-rung', () => {
     const behind = review({ behindBase: true })
@@ -197,6 +231,27 @@ describe('hosted review sitter owner adapter', () => {
       snapshot({ review: review(), definition: definition(ON_CAPS), preparedCommit: null })
     )
     expect(['rerun-check', 'prepare-fix']).toContain(action.kind)
+  })
+  it('uses all-scope optional failures for owner-triggered reruns', () => {
+    const optionalFailure = check({
+      checkKey: 'optional',
+      checkId: 'optional-1',
+      required: false
+    })
+    const action = adapter.actionForIntervention(
+      { kind: 'retry-rung', rung: 'rerun-check', rationale: 'retry optional check' },
+      snapshot({
+        review: review({ checks: [optionalFailure] }),
+        definition: definition(ON_CAPS, 'all'),
+        preparedCommit: null
+      })
+    )
+
+    expect(action).toMatchObject({
+      kind: 'rerun-check',
+      checkKey: 'optional',
+      checkIds: ['optional-1']
+    })
   })
 
   it('keeps the stale triggering check and required live checks while making omissions visible', () => {

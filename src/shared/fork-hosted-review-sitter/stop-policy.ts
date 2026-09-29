@@ -7,21 +7,13 @@ import {
   getHostedReviewFixAttributions,
   getLatestHostedReviewAttempts
 } from './ledger-adapter'
+import { currentHeadChecks } from './decision-check-groups'
 import type {
   HostedReviewAttemptEntry,
-  HostedReviewCheckSnapshot,
+  HostedReviewMergeCheckScope,
   HostedReviewSnapshot,
   HostedReviewWorld
 } from './types'
-
-function currentRequiredFailures(
-  review: HostedReviewSnapshot
-): readonly HostedReviewCheckSnapshot[] {
-  return review.checks.filter(
-    (check) => check.required && check.headSha === review.headSha && check.state === 'failed'
-  )
-}
-
 function producedHeadForCompletedEntry(
   entry: HostedReviewAttemptEntry,
   ledger: WatcherLedger
@@ -94,9 +86,10 @@ export type RepeatedOwnFixEvidence = {
 
 export function getRepeatedFailureAfterOwnFixEvidence(
   review: HostedReviewSnapshot,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope
 ): readonly RepeatedOwnFixEvidence[] {
-  const failures = currentRequiredFailures(review)
+  const failures = currentHeadChecks(review, scope).filter((check) => check.state === 'failed')
   const ownedAncestors = sitterOwnedAncestorHeads(review.headSha, ledger)
   const matches = new Map<string, RepeatedOwnFixEvidence>()
   for (const attribution of getHostedReviewFixAttributions(ledger)) {
@@ -142,9 +135,10 @@ export function getRepeatedFailureAfterOwnFixEvidence(
 
 export function hasRepeatedFailureAfterOwnFix(
   review: HostedReviewSnapshot,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope
 ): boolean {
-  return getRepeatedFailureAfterOwnFixEvidence(review, ledger).length > 0
+  return getRepeatedFailureAfterOwnFixEvidence(review, ledger, scope).length > 0
 }
 
 export type UnverifiableReproducedFailureEvidence = {
@@ -155,7 +149,8 @@ export type UnverifiableReproducedFailureEvidence = {
 /** A completed rerun still fails without a classifiable signature: the check itself, not the rerun, is unverifiable. */
 export function getUnverifiableReproducedFailureEvidence(
   review: HostedReviewSnapshot,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope
 ): readonly UnverifiableReproducedFailureEvidence[] {
   const evidence: UnverifiableReproducedFailureEvidence[] = []
   for (const entry of getLatestHostedReviewAttempts(ledger)) {
@@ -168,9 +163,8 @@ export function getUnverifiableReproducedFailureEvidence(
     }
     const rerun = entry.action
     const original = new Set(rerun.observationIds)
-    const current = review.checks.filter(
-      (check) =>
-        check.required && check.headSha === review.headSha && check.checkKey === rerun.checkKey
+    const current = currentHeadChecks(review, scope).filter(
+      (check) => check.checkKey === rerun.checkKey
     )
     if (current.length === 0 || current.some((check) => original.has(check.observationId))) {
       continue
@@ -185,9 +179,10 @@ export function getUnverifiableReproducedFailureEvidence(
 
 export function hasUnverifiableReproducedFailure(
   review: HostedReviewSnapshot,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope
 ): boolean {
-  return getUnverifiableReproducedFailureEvidence(review, ledger).length > 0
+  return getUnverifiableReproducedFailureEvidence(review, ledger, scope).length > 0
 }
 
 export const hostedReviewLifecycleTerminalPredicate: StopPredicate<HostedReviewWorld> = {
@@ -206,7 +201,11 @@ export const HOSTED_REVIEW_STOP_PREDICATES: readonly StopPredicate<HostedReviewW
   {
     id: 'repeated-failure-after-own-fix',
     evaluate(snapshot, ledger) {
-      const evidence = getRepeatedFailureAfterOwnFixEvidence(snapshot.world.review, ledger)
+      const evidence = getRepeatedFailureAfterOwnFixEvidence(
+        snapshot.world.review,
+        ledger,
+        snapshot.world.definition.mergeCheckScope
+      )
       return evidence.length === 0
         ? { stop: false }
         : {
@@ -221,7 +220,11 @@ export const HOSTED_REVIEW_STOP_PREDICATES: readonly StopPredicate<HostedReviewW
     deviationForFiring(_verdict, snapshot, ledger): CheckFailedDeviation {
       // re-derived rather than parsed back out of `verdict.detail`; guaranteed non-empty since
       // `evaluate` only fires with at least one entry, using the same snapshot and ledger
-      const [primary] = getRepeatedFailureAfterOwnFixEvidence(snapshot.world.review, ledger)
+      const [primary] = getRepeatedFailureAfterOwnFixEvidence(
+        snapshot.world.review,
+        ledger,
+        snapshot.world.definition.mergeCheckScope
+      )
       return {
         kind: 'check-failed',
         criterionId: primary!.checkKey,
@@ -235,12 +238,20 @@ export const HOSTED_REVIEW_STOP_PREDICATES: readonly StopPredicate<HostedReviewW
   {
     id: 'unverifiable-reproduced-failure',
     evaluate(snapshot, ledger) {
-      return hasUnverifiableReproducedFailure(snapshot.world.review, ledger)
+      return hasUnverifiableReproducedFailure(
+        snapshot.world.review,
+        ledger,
+        snapshot.world.definition.mergeCheckScope
+      )
         ? { stop: true, reason: 'unverifiable-reproduced-failure' }
         : { stop: false }
     },
     deviationForFiring(_verdict, snapshot, ledger): CheckFailedDeviation {
-      const [primary] = getUnverifiableReproducedFailureEvidence(snapshot.world.review, ledger)
+      const [primary] = getUnverifiableReproducedFailureEvidence(
+        snapshot.world.review,
+        ledger,
+        snapshot.world.definition.mergeCheckScope
+      )
       return {
         kind: 'check-failed',
         criterionId: primary!.checkKey,

@@ -740,7 +740,10 @@ describe('HeimdallFleetTransport', () => {
   })
 
   it('lets an ownerless enroll through a remote that has not negotiated owner support', async () => {
-    const remote = environmentHarness(['heimdall.commands.v1'])
+    const remote = environmentHarness([
+      'heimdall.commands.v1',
+      'heimdall.hosted-review-check-scope.v1'
+    ])
     remote.environment.mutate = vi.fn(async () =>
       successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
     )
@@ -757,7 +760,11 @@ describe('HeimdallFleetTransport', () => {
   })
 
   it('sends the owner selection once the remote negotiates owner support', async () => {
-    const remote = environmentHarness(['heimdall.commands.v1', 'heimdall.enroll-owner.v1'])
+    const remote = environmentHarness([
+      'heimdall.commands.v1',
+      'heimdall.enroll-owner.v1',
+      'heimdall.hosted-review-check-scope.v1'
+    ])
     remote.environment.mutate = vi.fn(async () =>
       successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
     )

@@ -21,6 +21,7 @@ import type { EnrollInput } from '../../../shared/fork-heimdall/watcher-types'
 import type {
   HostedReviewBranchUpdateMode,
   HostedReviewEnrollmentPayload,
+  HostedReviewMergeCheckScope,
   HostedReviewMergeMethod,
   HostedReviewSitterCapabilities
 } from '../../../shared/fork-hosted-review-sitter/types'
@@ -135,6 +136,7 @@ function HostedReviewSitterPanelContent({
   const ownerBranchUpdateMode = currentPayload?.branchUpdateMode ?? 'merge-base-update'
   const ownerMergeMethod: 'default' | HostedReviewMergeMethod =
     currentPayload?.mergeMethod ?? 'default'
+  const ownerMergeCheckScope = currentPayload?.mergeCheckScope ?? 'all'
   const ownerActiveBudgetMs = currentEntry?.enrollment.budget.wallClockActiveMs
   const ownerActiveBudgetHours =
     ownerActiveBudgetMs === null
@@ -162,6 +164,8 @@ function HostedReviewSitterPanelContent({
   const [mergeMethodOverride, setMergeMethodOverride] = useState<
     'default' | HostedReviewMergeMethod | null
   >(null)
+  const [mergeCheckScopeOverride, setMergeCheckScopeOverride] =
+    useState<HostedReviewMergeCheckScope | null>(null)
   const [activeBudgetHoursOverride, setActiveBudgetHoursOverride] = useState<number | null>(null)
   const capabilities: HostedReviewSitterCapabilities = {
     updateBranch: capabilityOverrides.updateBranch ?? ownerCapabilities.updateBranch,
@@ -172,6 +176,7 @@ function HostedReviewSitterPanelContent({
   const branchUpdateMode = branchUpdateModeOverride ?? ownerBranchUpdateMode
   const mergeMethod = mergeMethodOverride ?? ownerMergeMethod
   const activeBudgetHours = activeBudgetHoursOverride ?? ownerActiveBudgetHours
+  const mergeCheckScope = mergeCheckScopeOverride ?? ownerMergeCheckScope
   const requestSerialRef = useRef(0)
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -293,7 +298,8 @@ function HostedReviewSitterPanelContent({
         reviewNumber,
         reviewUrl,
         branchUpdateMode,
-        mergeMethod: mergeMethod === 'default' ? null : mergeMethod
+        mergeMethod: mergeMethod === 'default' ? null : mergeMethod,
+        mergeCheckScope
       } satisfies HostedReviewEnrollmentPayload
     }
     void runMutation('enroll', async () => {
@@ -307,6 +313,7 @@ function HostedReviewSitterPanelContent({
       setCapabilityOverrides({})
       setBranchUpdateModeOverride(null)
       setMergeMethodOverride(null)
+      setMergeCheckScopeOverride(null)
       setActiveBudgetHoursOverride(null)
     })
   }
@@ -486,6 +493,7 @@ function HostedReviewSitterPanelContent({
                     capabilities={capabilities}
                     branchUpdateMode={branchUpdateMode}
                     mergeMethod={mergeMethod}
+                    mergeCheckScope={mergeCheckScope}
                     activeBudgetHours={activeBudgetHours}
                     activeElsewhereCount={activeEntries.length}
                     blockedReason={enrollBlockedReason}
@@ -505,6 +513,7 @@ function HostedReviewSitterPanelContent({
                     }}
                     onBranchUpdateModeChange={setBranchUpdateModeOverride}
                     onMergeMethodChange={setMergeMethodOverride}
+                    onMergeCheckScopeChange={setMergeCheckScopeOverride}
                     onActiveBudgetHoursChange={setActiveBudgetHoursOverride}
                     onArm={enroll}
                   />

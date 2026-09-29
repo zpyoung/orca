@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
@@ -8,6 +9,7 @@ import {
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { EnrollInput, WatcherListEntry } from '../../shared/fork-heimdall/watcher-types'
+import { RUNTIME_CAPABILITIES } from '../../shared/protocol-version'
 import {
   HeimdallCommandCapabilityError,
   type FleetEnvironmentTransport
@@ -89,7 +91,9 @@ function environmentHarness(capabilities: string[]): FleetEnvironmentTransport {
   }
 }
 
-function objectiveEnrollInput(): EnrollInput {
+function objectiveEnrollInput(
+  landingBar: 'files-on-disk' | 'pushed-ref' | 'hosted-review' | 'merged' = 'files-on-disk'
+): EnrollInput {
   return {
     kind: 'objective',
     repoId: 'repo-1',
@@ -97,8 +101,28 @@ function objectiveEnrollInput(): EnrollInput {
     capabilities: {},
     budget: { wallClockActiveMs: null, turns: null },
     kindPayload: {
+      landingBar,
       roleAgents: {},
       roleLaunch: { planner: { model: 'opus', effort: 'high' } }
+    }
+  }
+}
+
+function hostedReviewEnrollInput(mergeCheckScope?: 'required' | 'all'): EnrollInput {
+  return {
+    kind: 'hosted-review',
+    repoId: 'repo-1',
+    worktreeId: 'worktree-1',
+    capabilities: {},
+    budget: { wallClockActiveMs: null, turns: null },
+    kindPayload: {
+      branch: 'feature/review',
+      provider: 'github',
+      reviewNumber: 42,
+      reviewUrl: 'https://github.com/org/repo/pull/42',
+      branchUpdateMode: 'merge-base-update',
+      mergeMethod: null,
+      ...(mergeCheckScope === undefined ? {} : { mergeCheckScope })
     }
   }
 }
@@ -185,7 +209,10 @@ describe('HeimdallRemoteFleetMirrors.enroll newWorktree capability gating', () =
     await mirrors.enroll(input, REMOTE_OWNER)
 
     expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
-      input: { ...input, kindPayload: { roleAgents: {}, maxConcurrency: 1 } },
+      input: {
+        ...input,
+        kindPayload: { roleAgents: {}, maxConcurrency: 1, landingBar: 'files-on-disk' }
+      },
       owner: null
     })
   })
@@ -196,7 +223,8 @@ describe('HeimdallRemoteFleetMirrors.enroll roleLaunch capability gating', () =>
     const environment = environmentHarness([
       'heimdall.commands.v1',
       'heimdall.parallel-execution.v1',
-      'heimdall.objective-role-launch.v1'
+      'heimdall.objective-role-launch.v1',
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
     ])
     const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
     const input = objectiveEnrollInput()
@@ -220,22 +248,104 @@ describe('HeimdallRemoteFleetMirrors.enroll roleLaunch capability gating', () =>
     await mirrors.enroll(input, REMOTE_OWNER)
 
     expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
-      input: { ...input, kindPayload: { roleAgents: {} } },
+      input: { ...input, kindPayload: { roleAgents: {}, landingBar: 'files-on-disk' } },
       owner: null
     })
   })
 
-  it('leaves a non-objective enrollment untouched regardless of role-launch support', async () => {
+  it('leaves below-hosted-review objective enrollment compatible with an older host', async () => {
+    const environment = environmentHarness([
+      'heimdall.commands.v1',
+      'heimdall.parallel-execution.v1',
+      'heimdall.objective-role-launch.v1'
+    ])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    const input = objectiveEnrollInput('pushed-ref')
+
+    await mirrors.enroll(input, REMOTE_OWNER)
+
+    expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
+      input,
+      owner: null
+    })
+  })
+})
+
+describe('HeimdallRemoteFleetMirrors.enroll merge-check scope capability gating', () => {
+  it('advertises support for hosted-review check scope', () => {
+    expect(RUNTIME_CAPABILITIES).toContain(HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY)
+  })
+
+  it('sends all scope unchanged for a hosted-review enrollment when the remote advertises support', async () => {
+    const environment = environmentHarness([
+      'heimdall.commands.v1',
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+    ])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    const input = hostedReviewEnrollInput('all')
+
+    await mirrors.enroll(input, REMOTE_OWNER)
+
+    expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
+      input,
+      owner: null
+    })
+  })
+
+  it('refuses all scope on a hosted-review enrollment when the remote does not advertise support', async () => {
     const environment = environmentHarness(['heimdall.commands.v1'])
     const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
-    const input: EnrollInput = {
-      kind: 'hosted-review',
-      repoId: 'repo-1',
-      worktreeId: 'worktree-1',
-      capabilities: {},
-      budget: { wallClockActiveMs: null, turns: null },
-      kindPayload: {}
+
+    await expect(mirrors.enroll(hostedReviewEnrollInput('all'), REMOTE_OWNER)).rejects.toThrow(
+      /Update the host or choose "required"/
+    )
+    expect(environment.mutate).not.toHaveBeenCalled()
+  })
+
+  it('treats a missing hosted-review scope as all on a remote that lacks support', async () => {
+    const environment = environmentHarness(['heimdall.commands.v1'])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+
+    await expect(mirrors.enroll(hostedReviewEnrollInput(), REMOTE_OWNER)).rejects.toThrow(
+      /Update the host or choose "required"/
+    )
+    expect(environment.mutate).not.toHaveBeenCalled()
+  })
+
+  it('strips explicit required scope before enrolling a hosted review on an older host', async () => {
+    const environment = environmentHarness(['heimdall.commands.v1'])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+
+    await mirrors.enroll(hostedReviewEnrollInput('required'), REMOTE_OWNER)
+
+    expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
+      input: hostedReviewEnrollInput(),
+      owner: null
+    })
+  })
+
+  it.each(['hosted-review', 'merged'] as const)(
+    'refuses objective landing bar %s on a host that cannot honor its hosted-review handoff',
+    async (landingBar) => {
+      const environment = environmentHarness(['heimdall.commands.v1'])
+      const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+
+      await expect(mirrors.enroll(objectiveEnrollInput(landingBar), REMOTE_OWNER)).rejects.toThrow(
+        /Update the host before enrolling/
+      )
+      expect(environment.mutate).not.toHaveBeenCalled()
     }
+  )
+
+  it('allows a hosted-review objective handoff on a host that advertises support', async () => {
+    const environment = environmentHarness([
+      'heimdall.commands.v1',
+      'heimdall.parallel-execution.v1',
+      'heimdall.objective-role-launch.v1',
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+    ])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    const input = objectiveEnrollInput('hosted-review')
 
     await mirrors.enroll(input, REMOTE_OWNER)
 

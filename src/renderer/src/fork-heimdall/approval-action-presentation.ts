@@ -306,6 +306,19 @@ function actionDetails(action: KernelAction): readonly ApprovalActionDetail[] {
     translate('fork.heimdall.approval.detail.mergeMethod', 'Merge method'),
     stringProperty(action, 'mergeMethod')
   )
+  if (action.kind === 'merge' || action.kind === 'enqueue') {
+    const checkScope = stringProperty(action, 'checkScope')
+    const checkScopeLabel =
+      checkScope === 'all'
+        ? translate('fork.heimdall.approval.detail.checkScopeAll', 'All checks')
+        : checkScope === 'required'
+          ? translate('fork.heimdall.approval.detail.checkScopeRequired', 'Required checks only')
+          : null
+    add(
+      translate('fork.heimdall.approval.detail.mergeCheckScope', 'Merge check scope'),
+      checkScopeLabel
+    )
+  }
   add(
     translate('fork.heimdall.approval.detail.updateMethod', 'Update method'),
     stringProperty(action, 'mode')

@@ -525,6 +525,7 @@ describe('objective enrollment authorization', () => {
     })
 
     expect(EnrollInputSchema.parse(handoff)).toEqual(handoff)
+    expect(handoff.kindPayload).toMatchObject({ mergeCheckScope: 'all' })
     expect(enrollmentPayloadSchema.parse(handoff.kindPayload)).toEqual(handoff.kindPayload)
   })
 })
