@@ -2,6 +2,7 @@ import { createAutomationManagementActions } from './automation-management-actio
 import { createAutomationRunActions } from './automation-run-actions'
 import { createAutomationRunWorkspaceAction } from './automation-run-workspace-action'
 import { createAutomationSaveAction } from './automation-save-action'
+import { useAutomationLaunchOverridesGateState } from './fork-automation-launch-settings/use-automation-launch-overrides-gate-state'
 import { useAutomationDraftEffects } from './use-automation-draft-effects'
 import { useAutomationEditorActions } from './use-automation-editor-actions'
 import { useAutomationRunPageState } from './use-automation-run-page-state'
@@ -68,6 +69,7 @@ export function useAutomationsPageController() {
     destination,
     destinationForm
   })
+  const launchOverridesGate = useAutomationLaunchOverridesGateState({ store, local, destination })
   const saveAutomation = createAutomationSaveAction({
     store,
     local,
@@ -75,7 +77,8 @@ export function useAutomationsPageController() {
     setup,
     destination,
     destinationForm,
-    pageRefresh
+    pageRefresh,
+    launchOverridesGate
   })
   const actionContext = {
     store,
@@ -108,6 +111,7 @@ export function useAutomationsPageController() {
     pageRefresh,
     draftEffects,
     editorActions,
+    launchOverridesGate,
     saveAutomation,
     managementActions,
     runActions,

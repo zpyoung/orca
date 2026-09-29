@@ -11,7 +11,7 @@ export function HeimdallStatusPill({ row }: { row: WatcherFleetEntry }): React.J
     ? translate('fork.heimdall.status.lostContact', 'Host unreachable · last confirmed {{age}}', {
         age: formatHeimdallAge(row.observedAtMs)
       })
-    : watcherStatusLabel(row.entry.status.state)
+    : watcherStatusLabel(row.entry.status)
   return (
     <HeimdallTonePill tone={watcherStatusTone(row)} title={label}>
       {lostContact ? <WifiOff aria-hidden /> : null}

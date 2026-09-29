@@ -45,6 +45,7 @@ export type SourceControlFixSplitButtonProps = {
   savedAgentId?: TuiAgent | null
   savedCommandInputTemplate?: string | null
   savedAgentArgs?: string | null
+  savedLaunchOptions?: SourceControlActionRecipe['launchOptions'] | null
   onSaveAgentDefault?: (
     target: SourceControlAiWriteTarget,
     actionId: SourceControlLaunchActionId,
@@ -82,6 +83,7 @@ export function SourceControlFixSplitButton({
   savedAgentId,
   savedCommandInputTemplate,
   savedAgentArgs,
+  savedLaunchOptions,
   onSaveAgentDefault,
   onOpenSettings,
   onFixWithDefaultAgent,
@@ -161,6 +163,7 @@ export function SourceControlFixSplitButton({
           savedAgentId={savedAgentId}
           savedCommandInputTemplate={savedCommandInputTemplate}
           savedAgentArgs={savedAgentArgs}
+          savedLaunchOptions={savedLaunchOptions}
           onSaveAgentDefault={onSaveAgentDefault}
           onOpenSettings={onOpenSettings}
           onLaunched={onPromptDelivered}

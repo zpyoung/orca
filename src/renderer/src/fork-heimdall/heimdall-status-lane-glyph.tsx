@@ -5,6 +5,7 @@ import { StateIndicatorTooltip } from '@/components/StateIndicatorTooltip'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { WorktreeStatus } from '@/lib/worktree-status'
+import { isWatcherTickErrorStatus } from '../../../shared/fork-heimdall/watcher-tick-error'
 import { formatHeimdallAge } from './fleet-format'
 import { useActiveHeimdallWatcherState } from './active-watcher-registry'
 import { watcherKindLabel, watcherStatusLabel } from './watcher-status-copy'
@@ -17,7 +18,7 @@ type HeimdallLaneGlyphProps = {
   kindLabel: string
   stateLabel: string
   attention: boolean
-  lostContact: boolean
+  degraded: boolean
   withTooltip?: boolean
 }
 
@@ -27,7 +28,7 @@ function HeimdallLaneGlyph({
   kindLabel,
   stateLabel,
   attention,
-  lostContact,
+  degraded,
   withTooltip = true
 }: HeimdallLaneGlyphProps): React.JSX.Element {
   const label = translate('fork.heimdall.indicator.tooltip', '{{kind}} · {{state}}', {
@@ -45,7 +46,7 @@ function HeimdallLaneGlyph({
           'size-[13px]',
           attention
             ? 'text-status-warning'
-            : lostContact
+            : degraded
               ? 'text-status-warning'
               : 'text-status-success'
         )}
@@ -90,10 +91,10 @@ export function useHeimdallGlyph(
               'Host unreachable · last confirmed {{age}}',
               { age: formatHeimdallAge(watcher.observedAtMs) }
             )
-          : watcherStatusLabel(watcher.state)
+          : watcherStatusLabel(watcher)
       }
       attention={attention}
-      lostContact={lostContact}
+      degraded={lostContact || isWatcherTickErrorStatus(watcher)}
     />
   )
 }

@@ -1,9 +1,11 @@
 import { errorBackoffMs, HEIMDALL_RAPID_POLL_MS } from '../../shared/fork-heimdall/pacing'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
+import { WATCHER_TICK_ERROR_PHASE } from '../../shared/fork-heimdall/watcher-tick-error'
 import type { WatcherLedgerLifecycle } from './ledger-lifecycle'
 import { errorText } from './runner-actions'
 import { isCoordinatorSeatLost, type WatcherRunnerStatusLifecycle } from './runner-status'
 import type { WatcherRunner } from './runner-state'
+import { isExecutionHostContactLoss } from './tick-error-classification'
 
 type RunnerErrorLifecycleDependencies = {
   dispatchLifecycle: WatcherLedgerLifecycle
@@ -52,10 +54,11 @@ export class WatcherRunnerErrorLifecycle {
       ...(error instanceof Error && error.stack ? { stack: error.stack } : {})
     }
     runner.consecutiveErrors += 1
+    const contactLost = isExecutionHostContactLoss(error)
     runner.status = {
       ...runner.status,
-      state: 'unreachable',
-      phase: 'error',
+      state: contactLost ? 'unreachable' : 'held',
+      phase: contactLost ? 'error' : WATCHER_TICK_ERROR_PHASE,
       reason: errorText(error),
       nextPulseAtMs: null
     }

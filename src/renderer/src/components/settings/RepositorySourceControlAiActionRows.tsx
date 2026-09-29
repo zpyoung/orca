@@ -1,5 +1,9 @@
 import type React from 'react'
 import { Terminal } from 'lucide-react'
+import type {
+  AgentLaunchOptionSelection,
+  AgentLaunchOverrides
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { CUSTOM_AGENT_ID } from '../../../../shared/commit-message-agent-spec'
 import type {
@@ -11,7 +15,7 @@ import {
   SOURCE_CONTROL_ACTION_LABELS,
   type SourceControlActionId
 } from '../../../../shared/source-control-ai-actions'
-import { Input } from '../ui/input'
+import { AgentLaunchOverridesFields } from '../fork-automation-launch-settings/AgentLaunchOverridesFields'
 import { Label } from '../ui/label'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -35,9 +39,11 @@ import {
   commandTemplateStateLabel,
   readInheritedAgentArgs,
   readInheritedCommandTemplate,
+  readInheritedLaunchOptions,
   resolveAgentArgsPlaceholderAgent
 } from './repository-source-control-ai-labels'
 import { hasOwnActionOverride } from './repository-source-control-ai-draft'
+import { agentLaunchOptionSelectionFromOverrides } from './source-control-ai-action-recipe-draft'
 import { getRepositorySourceControlAiActionRecipeSectionId } from './repository-settings-targets'
 import { translate } from '@/i18n/i18n'
 
@@ -50,8 +56,12 @@ type RepositorySourceControlAiActionRowsProps = {
   onActionAgentChange: (actionId: SourceControlActionId, value: string) => void
   onActionTemplateChange: (actionId: SourceControlActionId, value: string) => void
   onActionAgentArgsChange: (actionId: SourceControlActionId, value: string) => void
+  onActionLaunchOptionsChange: (
+    actionId: SourceControlActionId,
+    value: AgentLaunchOptionSelection
+  ) => void
   onAppendVariable: (actionId: SourceControlActionId, variable: string) => void
-  /** Per-action saving state for CLI args + command template (matches global recipes). */
+  /** Per-action saving state for launch options, CLI args, and command template. */
   savingActionIds: Partial<Record<SourceControlActionId, boolean>>
   actionDirtyById: Record<SourceControlActionId, boolean>
   onActionDiscard: (actionId: SourceControlActionId) => void
@@ -67,6 +77,7 @@ export function RepositorySourceControlAiActionRows({
   onActionAgentChange,
   onActionTemplateChange,
   onActionAgentArgsChange,
+  onActionLaunchOptionsChange,
   onAppendVariable,
   savingActionIds,
   actionDirtyById,
@@ -86,6 +97,7 @@ export function RepositorySourceControlAiActionRows({
         const override = repoAi.actionOverrides?.[actionId]
         const inheritedTemplate = readInheritedCommandTemplate(source, actionId)
         const inheritedAgentArgs = readInheritedAgentArgs(source, actionId)
+        const inheritedLaunchOptions = readInheritedLaunchOptions(source, actionId)
         const templateValue =
           hasOverride && typeof override?.commandInputTemplate === 'string'
             ? override.commandInputTemplate
@@ -93,13 +105,37 @@ export function RepositorySourceControlAiActionRows({
         const agentArgsValue =
           hasOverride && typeof override?.agentArgs === 'string' ? override.agentArgs : ''
         const effectiveAgent = hasOverride ? override?.agentId : source.actions?.[actionId]?.agentId
+        const launchAgent = resolveAgentArgsPlaceholderAgent(
+          effectiveAgent,
+          source,
+          actionId,
+          defaultTuiAgent
+        )
         const agentArgsPlaceholder =
           hasOverride && agentArgsValue
             ? ''
-            : inheritedAgentArgs ||
-              getSourceControlAgentArgsPlaceholder(
-                resolveAgentArgsPlaceholderAgent(effectiveAgent, source, actionId, defaultTuiAgent)
-              )
+            : inheritedAgentArgs || getSourceControlAgentArgsPlaceholder(launchAgent)
+        const launchOptionsValue =
+          override?.launchOptions === null
+            ? {}
+            : (override?.launchOptions ?? inheritedLaunchOptions)
+        const launchOverrides: AgentLaunchOverrides = {
+          ...launchOptionsValue,
+          agentArgs: agentArgsValue
+        }
+        const onLaunchOverridesChange = (
+          updater: (current: AgentLaunchOverrides) => AgentLaunchOverrides
+        ): void => {
+          const next = updater(launchOverrides)
+          const nextAgentArgs = next.agentArgs ?? ''
+          if (nextAgentArgs !== agentArgsValue) {
+            onActionAgentArgsChange(actionId, nextAgentArgs)
+          }
+          const nextLaunchOptions = agentLaunchOptionSelectionFromOverrides(next)
+          if (JSON.stringify(nextLaunchOptions) !== JSON.stringify(launchOptionsValue)) {
+            onActionLaunchOptionsChange(actionId, nextLaunchOptions)
+          }
+        }
         const agentOptions = getAgentCatalogForAction(actionId, effectiveAgent)
         const agentWarningText = getSourceControlActionAgentWarningText(actionId, effectiveAgent)
         const agentSupportText = getSourceControlActionAgentSupportText(actionId)
@@ -212,19 +248,14 @@ export function RepositorySourceControlAiActionRows({
                 ) : agentSupportText ? (
                   <p className="text-[11px] text-muted-foreground">{agentSupportText}</p>
                 ) : null}
-                <Label className="text-[11px] text-muted-foreground">
-                  {translate(
-                    'auto.components.settings.RepositorySourceControlAiActionRows.7a3a8e431d',
-                    'CLI arguments'
-                  )}
-                </Label>
-                <Input
-                  value={agentArgsValue}
-                  onChange={(event) => onActionAgentArgsChange(actionId, event.target.value)}
+                <AgentLaunchOverridesFields
+                  agent={launchAgent}
+                  value={launchOverrides}
+                  onChange={onLaunchOverridesChange}
+                  agentArgsPlaceholder={agentArgsPlaceholder}
+                  inheritedAgentArgs={inheritedAgentArgs}
                   disabled={!hasOverride}
-                  placeholder={agentArgsPlaceholder}
-                  spellCheck={false}
-                  className="h-8 font-mono text-xs disabled:cursor-not-allowed disabled:bg-muted/40"
+                  idPrefix={`repo-${repoId}-source-control-action-${actionId}`}
                 />
               </div>
               <div className="space-y-2">

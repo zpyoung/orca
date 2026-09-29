@@ -2,6 +2,7 @@ import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
   HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,
+  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
   HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
@@ -46,6 +47,7 @@ export class RemoteFleetMirrorState {
   parallelExecutionSupport: HeimdallCommandSupport = 'unknown'
   roleLaunchSupport: HeimdallCommandSupport = 'unknown'
   mergeCheckScopeSupport: HeimdallCommandSupport = 'unknown'
+  newWorktreeSupport: HeimdallCommandSupport = 'unknown'
   ownerGeneratedAtMs = -1
   entries: WatcherFleetEntry[] = []
   readonly details = new Map<string, WatcherDetail>()
@@ -77,6 +79,7 @@ export class RemoteFleetMirrorState {
     this.parallelExecutionSupport = 'unknown'
     this.roleLaunchSupport = 'unknown'
     this.mergeCheckScopeSupport = 'unknown'
+    this.newWorktreeSupport = 'unknown'
     this.ownerGeneratedAtMs = -1
     this.subscriptionUnsupported = false
     this.eventProcessing = Promise.resolve()
@@ -109,6 +112,7 @@ export class RemoteFleetMirrorState {
     const previousParallelExecutionSupport = this.parallelExecutionSupport
     const previousRoleLaunchSupport = this.roleLaunchSupport
     const previousMergeCheckScopeSupport = this.mergeCheckScopeSupport
+    const previousNewWorktreeSupport = this.newWorktreeSupport
     this.commandSupport = statusCapabilitySupport(status, HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
     this.deleteSupport = statusCapabilitySupport(status, HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY)
     this.answerEscalationSupport = statusCapabilitySupport(
@@ -131,6 +135,10 @@ export class RemoteFleetMirrorState {
       status,
       HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
     )
+    this.newWorktreeSupport = statusCapabilitySupport(
+      status,
+      HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
+    )
     const supportChanged = (): boolean =>
       previousSupport !== this.commandSupport ||
       previousDeleteSupport !== this.deleteSupport ||
@@ -138,7 +146,8 @@ export class RemoteFleetMirrorState {
       previousEnrollOwnerSupport !== this.enrollOwnerSupport ||
       previousParallelExecutionSupport !== this.parallelExecutionSupport ||
       previousRoleLaunchSupport !== this.roleLaunchSupport ||
-      previousMergeCheckScopeSupport !== this.mergeCheckScopeSupport
+      previousMergeCheckScopeSupport !== this.mergeCheckScopeSupport ||
+      previousNewWorktreeSupport !== this.newWorktreeSupport
     if (fleet.status === 'fulfilled' && fleet.value.ok === true) {
       const parsed = HeimdallFleetSnapshotSchema.safeParse(fleet.value.result)
       if (parsed.success) {

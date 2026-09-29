@@ -1,10 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
+import {
+  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
+  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
+  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+} from '../../shared/fork-heimdall/capability'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { EnrollInput, WatcherListEntry } from '../../shared/fork-heimdall/watcher-types'
-import { HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
 import { RUNTIME_CAPABILITIES } from '../../shared/protocol-version'
-import type { FleetEnvironmentTransport } from './fleet-environment-transport'
+import {
+  HeimdallCommandCapabilityError,
+  type FleetEnvironmentTransport
+} from './fleet-environment-transport'
 import { HeimdallRemoteFleetMirrors } from './fleet-remote-mirrors'
 
 const REMOTE_IDENTITY = { id: 'environment-1', pairingRevision: 7 }
@@ -117,6 +126,94 @@ function hostedReviewEnrollInput(mergeCheckScope?: 'required' | 'all'): EnrollIn
     }
   }
 }
+
+describe('HeimdallRemoteFleetMirrors.enroll newWorktree capability gating', () => {
+  const newWorktree = { name: 'new-objective', baseBranch: 'main' }
+
+  it.each(['unsupported', 'unknown'])(
+    'refuses an %s host without sending enrollment',
+    async (support) => {
+      const environment = environmentHarness([HEIMDALL_COMMANDS_RUNTIME_CAPABILITY])
+      if (support === 'unknown') {
+        vi.mocked(environment.status).mockRejectedValueOnce(new Error('status unavailable'))
+      }
+      const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+      const input = {
+        ...objectiveEnrollInput(),
+        worktreeId: null,
+        kindPayload: { newWorktree, roleAgents: {} }
+      }
+
+      await expect(mirrors.enroll(input, REMOTE_OWNER)).rejects.toThrow(
+        HeimdallCommandCapabilityError
+      )
+      expect(environment.mutate).not.toHaveBeenCalled()
+    }
+  )
+
+  it('preserves newWorktree when parallel and role-launch compatibility fields are removed', async () => {
+    const environment = environmentHarness([
+      HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+      HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
+    ])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    const input = {
+      ...objectiveEnrollInput(),
+      worktreeId: null,
+      kindPayload: {
+        roleAgents: {},
+        roleLaunch: { planner: { model: 'opus', effort: 'high' } },
+        newWorktree
+      }
+    }
+
+    await mirrors.enroll(input, REMOTE_OWNER)
+
+    expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
+      input: { ...input, kindPayload: { roleAgents: {}, newWorktree, maxConcurrency: 1 } },
+      owner: null
+    })
+  })
+
+  it('sends newWorktree unchanged to a host supporting every enrollment capability', async () => {
+    const environment = environmentHarness([
+      HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+      HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
+      HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
+      HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+    ])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    const input = {
+      ...objectiveEnrollInput(),
+      worktreeId: null,
+      kindPayload: {
+        roleAgents: {},
+        roleLaunch: { planner: { model: 'opus', effort: 'high' } },
+        newWorktree
+      }
+    }
+
+    await mirrors.enroll(input, REMOTE_OWNER)
+
+    expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
+      input,
+      owner: null
+    })
+  })
+
+  it('still enrolls without newWorktree when the host does not advertise support', async () => {
+    const environment = environmentHarness([HEIMDALL_COMMANDS_RUNTIME_CAPABILITY])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    const input = objectiveEnrollInput()
+
+    await mirrors.enroll(input, REMOTE_OWNER)
+
+    expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
+      input: { ...input, kindPayload: { roleAgents: {}, maxConcurrency: 1 } },
+      owner: null
+    })
+  })
+})
 
 describe('HeimdallRemoteFleetMirrors.enroll roleLaunch capability gating', () => {
   it('sends roleLaunch through unchanged when the remote negotiates role-launch support', async () => {

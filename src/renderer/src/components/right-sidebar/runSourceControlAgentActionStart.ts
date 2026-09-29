@@ -1,4 +1,8 @@
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import {
+  agentLaunchOverridesToSessionOptionValues,
+  type AgentLaunchOptionSelection
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -20,6 +24,7 @@ type RunSourceControlAgentActionStartArgs = {
   agentArgs: string
   /** False when the launch would be structured native chat, which reads no CLI arguments. */
   agentArgsApply: boolean
+  launchOptions?: AgentLaunchOptionSelection
   commandTemplate: string
   saveTargetValue: string
   actionId: SourceControlLaunchActionId
@@ -36,6 +41,7 @@ type RunSourceControlAgentActionStartArgs = {
     commandInput: string
     /** Omitted when CLI arguments do not apply, so the launch resolves the global setting. */
     agentArgs?: string
+    launchOptions: AgentLaunchOptionSelection
   }) => boolean | Promise<boolean>
   onSaveAgentDefault?: (
     target: SourceControlAiWriteTarget,
@@ -60,6 +66,7 @@ export async function runSourceControlAgentActionStart({
   trimmedCommandInput,
   agentArgs,
   agentArgsApply,
+  launchOptions = {},
   commandTemplate,
   saveTargetValue,
   actionId,
@@ -78,6 +85,7 @@ export async function runSourceControlAgentActionStart({
   onLaunched,
   onClose
 }: RunSourceControlAgentActionStartArgs): Promise<boolean> {
+  const useLaunchOptions = Boolean(launchOptions.model)
   let launched = false
   let launchFailureNotified = false
   let launchAcceptedNotified = false
@@ -95,7 +103,8 @@ export async function runSourceControlAgentActionStart({
     launched = await onStart({
       agent: selectedAgent,
       commandInput: trimmedCommandInput,
-      agentArgs: launchAgentArgs
+      agentArgs: launchAgentArgs,
+      launchOptions
     })
     if (launched) {
       notifyLaunchAccepted()
@@ -107,6 +116,10 @@ export async function runSourceControlAgentActionStart({
       groupId: groupId ?? worktreeId,
       prompt: trimmedCommandInput,
       agentArgs: launchAgentArgs,
+      ...(useLaunchOptions
+        ? { sessionOptions: agentLaunchOverridesToSessionOptionValues(launchOptions) }
+        : {}),
+      includeSessionOptionCatalogDefaults: useLaunchOptions ? false : undefined,
       promptDelivery,
       launchPlatform,
       launchSource
@@ -150,7 +163,8 @@ export async function runSourceControlAgentActionStart({
   const launchRecipe = {
     agentId: selectedAgent,
     commandInputTemplate: commandTemplate,
-    agentArgs
+    agentArgs,
+    ...(Object.keys(launchOptions).length > 0 ? { launchOptions } : {})
   }
   const launchRecipeAlreadySaved = Boolean(
     saveTarget &&

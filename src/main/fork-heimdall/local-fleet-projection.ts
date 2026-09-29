@@ -8,6 +8,7 @@ import type {
 import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
+import { isWatcherTickErrorStatus } from '../../shared/fork-heimdall/watcher-tick-error'
 import type { WatcherListEntry } from '../../shared/fork-heimdall/watcher-types'
 
 const ATTENTION_RANK: Record<WatcherListEntry['status']['state'], number> = {
@@ -19,6 +20,13 @@ const ATTENTION_RANK: Record<WatcherListEntry['status']['state'], number> = {
   watching: 4,
   disabled: 5,
   terminal: 6
+}
+
+/** A reachable owner whose ticks keep failing ranks with a lost one: both stall the watcher. */
+function localAttentionRank(entry: WatcherFleetEntry): number {
+  return isWatcherTickErrorStatus(entry.entry.status)
+    ? ATTENTION_RANK.unreachable
+    : ATTENTION_RANK[entry.entry.status.state]
 }
 
 export function watcherOwnerFence(entry: WatcherListEntry): WatcherOwnerFence {
@@ -237,8 +245,7 @@ export function localFleetEntry(
 
 export function sortLocalFleetByAttention(entries: WatcherFleetEntry[]): WatcherFleetEntry[] {
   return entries.sort((left, right) => {
-    const attention =
-      ATTENTION_RANK[left.entry.status.state] - ATTENTION_RANK[right.entry.status.state]
+    const attention = localAttentionRank(left) - localAttentionRank(right)
     if (attention !== 0) {
       return attention
     }

@@ -41,6 +41,25 @@ describe('AskDb', () => {
     expect(row.answers_json).toBeNull()
   })
 
+  it('keeps a hand-off timeout for its wait but arms no registry expiry', () => {
+    db = new AskDb(':memory:')
+    const { row } = db.registerAsk(
+      baseParams({
+        paneKey: null,
+        origin: 'handoff',
+        timeoutMs: 60_000,
+        handoff: {
+          runId: 'run_1',
+          dispatchId: 'dispatch_1',
+          askerHandle: 'term_1',
+          questionId: null
+        }
+      })
+    )
+    expect(row.timeout_ms).toBe(60_000)
+    expect(row.expires_at).toBeNull()
+  })
+
   it('restores rows unchanged after reopening the database file', () => {
     dir = mkdtempSync(join(tmpdir(), 'orca-ask-db-'))
     const dbPath = join(dir, 'asks.db')
@@ -88,7 +107,11 @@ describe('AskDb', () => {
   it('does not purge a resolved row inside the 24h retention window', () => {
     db = new AskDb(':memory:')
     db.registerAsk(baseParams())
-    db.commitAskResult('ask_1', { status: 'answered', answersJson: '{}' }, '2024-01-01T12:00:00.000Z')
+    db.commitAskResult(
+      'ask_1',
+      { status: 'answered', answersJson: '{}' },
+      '2024-01-01T12:00:00.000Z'
+    )
 
     const purged = db.purgeStaleTerminalRows('2024-01-02T00:00:00.000Z')
 
@@ -100,13 +123,21 @@ describe('AskDb', () => {
     vi.useFakeTimers({ now: new Date('2024-01-02T00:00:01.000Z') })
     db = new AskDb(':memory:')
     db.registerAsk(baseParams({ askId: 'ask_stale', requestId: 'req_stale' }))
-    db.commitAskResult('ask_stale', { status: 'answered', answersJson: '{}' }, '2024-01-01T00:00:00.000Z')
+    db.commitAskResult(
+      'ask_stale',
+      { status: 'answered', answersJson: '{}' },
+      '2024-01-01T00:00:00.000Z'
+    )
 
     db.startPeriodicPurge(1_000)
     expect(db.getAsk('ask_stale')).toBeUndefined()
 
     db.registerAsk(baseParams({ askId: 'ask_stale_2', requestId: 'req_stale_2' }))
-    db.commitAskResult('ask_stale_2', { status: 'answered', answersJson: '{}' }, '2024-01-01T00:00:00.000Z')
+    db.commitAskResult(
+      'ask_stale_2',
+      { status: 'answered', answersJson: '{}' },
+      '2024-01-01T00:00:00.000Z'
+    )
     vi.advanceTimersByTime(1_000)
     expect(db.getAsk('ask_stale_2')).toBeUndefined()
 
@@ -134,7 +165,11 @@ describe('AskDb', () => {
     db.stopPeriodicPurge()
 
     db.registerAsk(baseParams({ askId: 'ask_stale', requestId: 'req_stale' }))
-    db.commitAskResult('ask_stale', { status: 'answered', answersJson: '{}' }, '2024-01-01T00:00:00.000Z')
+    db.commitAskResult(
+      'ask_stale',
+      { status: 'answered', answersJson: '{}' },
+      '2024-01-01T00:00:00.000Z'
+    )
     vi.advanceTimersByTime(5_000)
 
     expect(db.getAsk('ask_stale')).toBeDefined()
@@ -170,10 +205,7 @@ describe('AskDb', () => {
     dir = mkdtempSync(join(tmpdir(), 'orca-ask-db-'))
     const dbPath = join(dir, 'asks.db')
     const first = new AskDb(dbPath)
-    const { row } = first.registerAsk(
-      baseParams({ timeoutMs: 60_000 }),
-      '2024-01-01T00:00:00.000Z'
-    )
+    const { row } = first.registerAsk(baseParams({ timeoutMs: 60_000 }), '2024-01-01T00:00:00.000Z')
     expect(row.expires_at).toBe('2024-01-01T00:01:00.000Z')
     first.close()
 
@@ -196,7 +228,12 @@ describe('AskDb', () => {
     const { row } = db.registerAsk(
       baseParams({
         origin: 'handoff',
-        handoff: { runId: 'run_1', dispatchId: 'dispatch_1', askerHandle: 'coordinator', questionId: null }
+        handoff: {
+          runId: 'run_1',
+          dispatchId: 'dispatch_1',
+          askerHandle: 'coordinator',
+          questionId: null
+        }
       })
     )
     expect(row.handoff_run_id).toBe('run_1')

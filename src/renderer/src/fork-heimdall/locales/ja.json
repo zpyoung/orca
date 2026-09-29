@@ -13,6 +13,7 @@
         "terminal": "完了",
         "disabled": "停止",
         "unreachable": "ホストに接続できません",
+        "tickError": "エラー · 再試行中",
         "lostContact": "ホストに接続できません · 最終確認: {{age}}",
         "phase": "現在のフェーズ"
       },

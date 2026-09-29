@@ -134,6 +134,32 @@ describe('StallCauseJudge', () => {
     expect(outcomes()).toEqual(['unavailable'])
   })
 
+  it('records a missing-confidence answer as unavailable with its field reason', async () => {
+    const { entries, judge, evaluate, outcomes } = world({
+      evaluate: async () => ({
+        model: 'jev-1.13',
+        answers: {},
+        unavailable: { 'stall-cause': 'missing-confidence' }
+      })
+    })
+
+    await expect(judge.judge(localEnrollment, input)).resolves.toBe('unavailable')
+    await expect(judge.judge(localEnrollment, input)).resolves.toBe('replayed')
+    expect(evaluate).toHaveBeenCalledTimes(1)
+    expect(outcomes()).toEqual(['unavailable'])
+    expect(
+      entries.some(
+        (entry) => entry.kind === 'client-observation' && entry.what === JUDGMENT_ANSWER_OBSERVATION
+      )
+    ).toBe(false)
+    const outcome = entries.find(
+      (entry) => entry.kind === 'client-observation' && entry.what === 'judgment-outcome'
+    )
+    expect(
+      outcome?.kind === 'client-observation' && JSON.parse(outcome.detail ?? '{}').reason
+    ).toBe('judgment unavailable: partial-response; valid=0/1; unavailable=missing-confidence=1')
+  })
+
   it('coalesces concurrent considerations of one episode', async () => {
     let release: () => void = () => {}
     const gate = new Promise<void>((resolve) => {

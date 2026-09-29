@@ -20,6 +20,7 @@ describe('buildPlannerPromptPolicySection', () => {
       'A fresh session spends about 30% of a node orienting.',
       'Node checks must be scoped',
       'Node checks judge file contents',
+      'Implementers work in fresh worktrees',
       'OBJECTIVE GATES: none declared',
       'Objective gates run the full suite',
       'Every task must declare territory',
@@ -55,6 +56,18 @@ describe('buildPlannerPromptPolicySection', () => {
     expect(section).toContain(
       'Declare assumptions naming the task keys that depend on each one, with evidence on the ones you verified yourself.'
     )
+  })
+
+  it('tells the planner a worker worktree may lack machine-local untracked files', () => {
+    const section = buildPlannerPromptPolicySection({
+      effectiveMaxConcurrency: 1,
+      lanesEnabled: false,
+      gates: undefined
+    })
+
+    expect(section).toContain('.claude/settings.local.json')
+    expect(section).toContain('not guaranteed to be present')
+    expect(section).toContain('process environment')
   })
 
   it('omits the lanes line when lanesEnabled is false', () => {

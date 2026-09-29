@@ -3,6 +3,7 @@ import {
   type EnrollSuccess,
   type HeimdallRemoteOwner
 } from '../../shared/fork-heimdall/api'
+import { HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
 import { HeimdallSubscriptionEventReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
 import type {
   WatcherCommandRequest,
@@ -42,6 +43,10 @@ import { commandRemoteWatcher } from './fleet-remote-command'
 import { projectRemoteFleetEntry, routeRemoteFleetEntry } from './fleet-projection'
 import { remoteDetailKey, RemoteFleetMirrorState } from './fleet-remote-mirror-state'
 import type { WatcherNotificationPublication } from './notification'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
 
 type FleetSyncPlan = {
   key: string
@@ -105,6 +110,14 @@ export class HeimdallRemoteFleetMirrors {
       mirror.enrollOwnerSupport === 'unsupported'
     ) {
       throw new HeimdallEnrollOwnerCapabilityError()
+    }
+    if (
+      input.kind === 'objective' &&
+      isRecord(input.kindPayload) &&
+      'newWorktree' in input.kindPayload &&
+      mirror.newWorktreeSupport !== 'supported'
+    ) {
+      throw new HeimdallCommandCapabilityError(HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY)
     }
     const scopeCompatibleInput = enrollmentForMergeCheckScopeCompatibility(
       input,

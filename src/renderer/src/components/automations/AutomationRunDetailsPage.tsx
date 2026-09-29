@@ -3,10 +3,12 @@ import { Eye, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { cn } from '@/lib/utils'
+import { getAgentCatalog } from '@/lib/agent-catalog'
 import { translate } from '@/i18n/i18n'
 import type { Automation, AutomationRun } from '../../../../shared/automations-types'
 import { AutomationRunPageFrame } from './AutomationRunPageFrame'
 import { getAutomationRunContent } from './automation-run-content'
+import { formatAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-display'
 import type { AutomationRunViewState } from './automation-run-view-state'
 import type { AutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
 import {
@@ -38,6 +40,12 @@ export function AutomationRunDetailsPage({
   onOpenWorkspace: () => void
   onBack: () => void
 }): React.JSX.Element {
+  const runLaunchAgentId = run.launchSettings?.agentId
+  const runLaunchAgentLabel =
+    getAgentCatalog().find((agent) => agent.id === runLaunchAgentId)?.label ?? runLaunchAgentId
+  const runLaunchDisplay = runLaunchAgentLabel
+    ? formatAutomationRunLaunchSettings(run.launchSettings, runLaunchAgentLabel)
+    : null
   return (
     <section className="flex min-h-0 flex-1 p-5">
       <AutomationRunPageFrame
@@ -46,15 +54,21 @@ export function AutomationRunDetailsPage({
           formatAutomationDateTimeWithRelative(run.scheduledFor, relativeNow),
           'Orca',
           workspaceDisplay?.detailLabel ??
-            translate('auto.components.automations.AutomationsPage.noWorkspace', 'No workspace')
+            translate('auto.components.automations.AutomationsPage.noWorkspace', 'No workspace'),
+          ...(runLaunchDisplay ? [runLaunchDisplay.summary] : [])
         ]}
         detail={
-          run.outputSnapshot?.truncated
-            ? translate(
-                'auto.components.automations.AutomationsPage.latestSavedOutput',
-                'Latest saved output'
-              )
-            : null
+          [
+            run.outputSnapshot?.truncated
+              ? translate(
+                  'auto.components.automations.AutomationsPage.latestSavedOutput',
+                  'Latest saved output'
+                )
+              : null,
+            runLaunchDisplay?.agentArgs
+          ]
+            .filter((value): value is string => Boolean(value))
+            .join(' · ') || null
         }
         statusLabel={getAutomationRunStatusLabel(run.status)}
         statusVariant={getAutomationRunStatusVariant(run.status)}

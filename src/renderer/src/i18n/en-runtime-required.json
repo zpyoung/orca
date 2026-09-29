@@ -855,6 +855,10 @@
             "74168d7ada": "idle",
             "d8f40128ee": "{basePrompt} is Orca's default prompt."
           },
+          "SourceControlTextGenerationDialogForm": {
+            "4eab815004": "CLI arguments",
+            "551ffd111b": "--model sonnet"
+          },
           "activity": {
             "bar": {
               "buttons": {
@@ -1424,6 +1428,9 @@
           "setupProjectOnHost": "Set up on another host",
           "setupProjectOnHostHelp": "Choose a host, then import an existing checkout, clone the repository there, or track a setup that will be provisioned later."
         },
+        "RepositorySourceControlAiActionRows": {
+          "7a3a8e431d": "CLI arguments"
+        },
         "RepositorySourceControlAiEnablement": {
           "30ae6dcce8": "Global default is",
           "84233d1bb3": "Off",
@@ -1478,6 +1485,7 @@
           "fac59213fc": "Search builtin themes"
         },
         "SourceControlAiActionRecipeDefaults": {
+          "2cb4bb7e5d": "CLI arguments",
           "a9359c8aa9": "Unknown error"
         },
         "SparsePresetSettingsSection": {

@@ -97,6 +97,9 @@ export function SourceControlPanelDialogs({
         getLaunchActionRecipe('resolveConflicts').commandInputTemplate ?? null
       }
       savedResolveConflictsAgentArgs={getLaunchActionRecipe('resolveConflicts').agentArgs ?? null}
+      savedResolveConflictsLaunchOptions={
+        getLaunchActionRecipe('resolveConflicts').launchOptions ?? null
+      }
       onSaveAgentDefault={saveLaunchActionDefault}
       onOpenSourceControlAiSettings={openSourceControlAiSettings}
       commitGenerationDialogOpen={commitGenerationDialogOpen}

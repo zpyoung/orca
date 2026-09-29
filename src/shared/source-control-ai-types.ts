@@ -1,3 +1,4 @@
+import type { AgentLaunchOptionSelection } from './fork-automation-launch-settings/agent-launch-overrides'
 import type { CommitMessageAiModelCapability } from './commit-message-ai-types'
 import type { TuiAgent } from './tui-agent'
 import type { CustomAgentId } from './commit-message-agent-spec'
@@ -57,6 +58,7 @@ export type RepoSourceControlAiOverrides = {
         agentId?: TuiAgent | CustomAgentId | null
         commandInputTemplate?: string | null
         agentArgs?: string | null
+        launchOptions?: AgentLaunchOptionSelection | null
       }
     >
   >
@@ -72,6 +74,7 @@ export type CompleteSourceControlActionRecipe = {
   agentId: TuiAgent | CustomAgentId | null
   commandInputTemplate: string
   agentArgs?: string
+  launchOptions?: AgentLaunchOptionSelection | null
 }
 
 export type WritableRepoSourceControlAiOverrides = {

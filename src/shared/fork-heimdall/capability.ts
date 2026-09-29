@@ -39,6 +39,9 @@ export const HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE =
 export const HEIMDALL_OBJECTIVE_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE =
   'The owning runtime has not confirmed support for all-check hosted-review handoffs. ' +
   'Update the host before enrolling an objective that requires hosted review.'
+// Why: an old host rejects newWorktree in the strict objective payload; clients must refuse rather than strip it.
+export const HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY =
+  'heimdall.objective-new-worktree.v1' as const
 /** Wire-shape capabilities every remote client advertises so hosts publish Heimdall's newer fields. */
 export const HEIMDALL_REMOTE_CLIENT_CAPABILITIES = [
   HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,

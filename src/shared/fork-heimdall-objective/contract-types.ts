@@ -229,6 +229,20 @@ export const ObjectiveEnrollmentPayloadSchema = z
   .strict()
 export type ObjectiveEnrollmentPayload = z.infer<typeof ObjectiveEnrollmentPayloadSchema>
 
+export const ObjectiveNewWorktreeRequestSchema = z
+  .object({
+    name: BoundedTextSchema(OBJECTIVE_PATH_MAX_LENGTH),
+    baseBranch: BoundedTextSchema(OBJECTIVE_PATH_MAX_LENGTH).optional()
+  })
+  .strict()
+export type ObjectiveNewWorktreeRequest = z.infer<typeof ObjectiveNewWorktreeRequestSchema>
+
+/** newWorktree is request-only and must never be persisted in an enrollment contract. */
+export const ObjectiveEnrollmentRequestSchema = ObjectiveEnrollmentPayloadSchema.extend({
+  newWorktree: ObjectiveNewWorktreeRequestSchema.optional()
+}).strict()
+export type ObjectiveEnrollmentRequest = z.infer<typeof ObjectiveEnrollmentRequestSchema>
+
 export function objectiveCapabilityModes(landingBar: ObjectiveLandingBar): ObjectiveCapabilities {
   return {
     plan: 'gated',

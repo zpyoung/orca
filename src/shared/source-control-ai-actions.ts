@@ -1,3 +1,7 @@
+import {
+  normalizeAgentLaunchOverrides,
+  type AgentLaunchOptionSelection
+} from './fork-automation-launch-settings/agent-launch-overrides'
 import { isCustomAgentId, type CustomAgentId } from './commit-message-agent-spec'
 import { isTuiAgent } from './tui-agent-config'
 import type { TuiAgent } from './tui-agent'
@@ -21,6 +25,7 @@ export type SourceControlActionRecipe = {
   agentId?: TuiAgent | CustomAgentId | null
   commandInputTemplate?: string
   agentArgs?: string
+  launchOptions?: AgentLaunchOptionSelection
 }
 
 export type SourceControlAiActionDefaults = Partial<
@@ -115,6 +120,13 @@ export function normalizeSourceControlActionRecipe(
   if (typeof value.agentArgs === 'string') {
     normalized.agentArgs = value.agentArgs
   }
+  const launchOptions = normalizeAgentLaunchOverrides(value.launchOptions)
+  if (launchOptions?.model || launchOptions?.optionValues) {
+    normalized.launchOptions = {
+      ...(launchOptions.model ? { model: launchOptions.model } : {}),
+      ...(launchOptions.optionValues ? { optionValues: launchOptions.optionValues } : {})
+    }
+  }
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
@@ -148,7 +160,8 @@ export function readSourceControlActionDefault(
     ...(typeof value?.commandInputTemplate === 'string'
       ? { commandInputTemplate: value.commandInputTemplate.trim() }
       : {}),
-    ...(typeof value?.agentArgs === 'string' ? { agentArgs: value.agentArgs.trim() } : {})
+    ...(typeof value?.agentArgs === 'string' ? { agentArgs: value.agentArgs.trim() } : {}),
+    ...(value?.launchOptions ? { launchOptions: structuredClone(value.launchOptions) } : {})
   }
 }
 

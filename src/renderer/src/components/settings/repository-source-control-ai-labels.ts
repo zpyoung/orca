@@ -1,3 +1,4 @@
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
@@ -30,6 +31,14 @@ export function readInheritedAgentArgs(
   actionId: SourceControlActionId
 ): string {
   return source.actions?.[actionId]?.agentArgs?.trim() ?? ''
+}
+
+export function readInheritedLaunchOptions(
+  source: SourceControlAiSettings,
+  actionId: SourceControlActionId
+): AgentLaunchOptionSelection {
+  const launchOptions = source.actions?.[actionId]?.launchOptions
+  return launchOptions ? structuredClone(launchOptions) : {}
 }
 
 export function actionAgentSelectValue(
@@ -65,7 +74,8 @@ export function completeRepoActionRecipe(
   return {
     agentId: recipe.agentId ?? null,
     commandInputTemplate,
-    ...(agentArgs ? { agentArgs } : {})
+    ...(agentArgs ? { agentArgs } : {}),
+    ...(recipe.launchOptions ? { launchOptions: structuredClone(recipe.launchOptions) } : {})
   }
 }
 

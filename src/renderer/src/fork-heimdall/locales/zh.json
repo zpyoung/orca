@@ -13,6 +13,7 @@
         "terminal": "已完成",
         "disabled": "已停止",
         "unreachable": "主机无法访问",
+        "tickError": "出错 · 正在重试",
         "lostContact": "主机无法访问 · 上次确认于 {{age}}",
         "phase": "当前阶段"
       },

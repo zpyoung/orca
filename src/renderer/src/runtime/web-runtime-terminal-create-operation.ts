@@ -156,7 +156,8 @@ export async function createWebRuntimeSessionTerminalResult(
                 )
               )
       const resumeHostAuthorityCapability =
-        args.agentSessionKind === 'resume' ? agentResumeHostAuthorityCapability(agent) : undefined
+        args.hostAuthorityCapability ??
+        (args.agentSessionKind === 'resume' ? agentResumeHostAuthorityCapability(agent) : undefined)
       const created = await runRemoteAgentSessionLaunch<{
         terminal: CreatedAgentTerminalIdentity
       }>({
