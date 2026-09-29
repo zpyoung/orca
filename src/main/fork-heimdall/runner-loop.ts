@@ -189,6 +189,22 @@ export class WatcherRunnerLoop {
         this.dependencies.leaseTtlMs ?? 90_000
       )
       if (lease.status !== 'held') {
+        if (lease.status === 'workspace-removed') {
+          this.resyncEnrollment(runner)
+          if (runner.stopped || runner.controlPending === 'delete') {
+            return
+          }
+          this.dispatchLifecycle.closeForWatcherStop(runner.enrollment.watcherId)
+          const interval = this.dependencies.budgetClock.owned(runner.enrollment.watcherId)
+          if (interval) {
+            this.dependencies.budgetClock.close(interval, 'shutdown')
+          }
+          this.statusLifecycle.workspaceRemoved(runner, this.dependencies.persistRemovedWorkspace)
+          this.controlLifecycle.disarm(runner)
+          runner.reconcileAgain = false
+          trace.exitPath = 'lifecycle-terminal'
+          return
+        }
         if (lease.status === 'configuration-error') {
           trace.exitPath = 'error'
           trace.error = { message: lease.reason }
