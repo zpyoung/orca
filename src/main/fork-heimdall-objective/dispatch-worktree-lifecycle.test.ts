@@ -6,7 +6,8 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {
   cleanupAppliedObjectiveDispatch,
   cleanupAppliedObjectiveDispatches,
-  reconcileObjectiveDispatchWorktrees
+  reconcileObjectiveDispatchWorktrees,
+  type ObjectiveDispatchWorkspaceState
 } from './dispatch-worktree-lifecycle'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
@@ -19,6 +20,7 @@ const lease: LeaseGuard = {
 }
 
 const workerSessionNotExited = async (): Promise<boolean> => false
+const workspaceUnmodified = async (): Promise<ObjectiveDispatchWorkspaceState> => 'unmodified'
 
 function bindingWithEnrollment(enrollment: Partial<WatcherEnrollment>): ObjectiveSnapshotBinding {
   return {
@@ -67,19 +69,6 @@ function removeWorktreeRuntime(
 ): OrcaRuntimeService {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only removeManagedWorktree is exercised.
   return { removeManagedWorktree } as unknown as OrcaRuntimeService
-}
-
-function listedWorktreeRuntime(
-  removeManagedWorktree: OrcaRuntimeService['removeManagedWorktree'],
-  listedWorkspaceIds: readonly string[]
-): OrcaRuntimeService {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only worktree listing and removal are exercised.
-  return {
-    removeManagedWorktree,
-    listManagedWorktrees: vi.fn(async () => ({
-      worktrees: listedWorkspaceIds.map((id) => ({ id, hostId: 'local' }))
-    }))
-  } as unknown as OrcaRuntimeService
 }
 
 function recordStore(
@@ -159,7 +148,8 @@ it('retains an unreleased dispatch worktree while cleaning a released sibling wo
     record: unsafe,
     lease,
     workerReleaseConfirmed,
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: workspaceUnmodified
   })
   await cleanupAppliedObjectiveDispatch({
     runtime,
@@ -167,7 +157,8 @@ it('retains an unreleased dispatch worktree while cleaning a released sibling wo
     record: released,
     lease,
     workerReleaseConfirmed,
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(removeManagedWorktree).toHaveBeenCalledOnce()
@@ -201,7 +192,8 @@ it('marks an absent cleanup-pending child cleaned after its worker session exits
     objectiveStore,
     lease,
     workerReleaseConfirmed: () => false,
-    workerSessionExited
+    workerSessionExited,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(workerSessionExited).toHaveBeenCalledWith(pending)
@@ -233,7 +225,8 @@ it('retains a whole lane workspace when an earlier sibling failed', async () => 
     record: current,
     lease,
     workerReleaseConfirmed: () => true,
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(removeManagedWorktree).not.toHaveBeenCalled()
@@ -264,7 +257,8 @@ it('requires release only from the latest owner of one warm terminal incarnation
     record: latest,
     lease,
     workerReleaseConfirmed: (dispatchId) => dispatchId === latest.dispatchId,
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(removeManagedWorktree).toHaveBeenCalledOnce()
@@ -288,7 +282,8 @@ it('waits for release of an older distinct terminal before cleaning its successo
     record: latest,
     lease,
     workerReleaseConfirmed: (dispatchId: string) => released.has(dispatchId),
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: workspaceUnmodified
   }
 
   await cleanupAppliedObjectiveDispatch(args)
@@ -332,7 +327,8 @@ it('never treats a same-id child on another execution host as the recorded works
     objectiveStore,
     lease,
     workerReleaseConfirmed: () => true,
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(removeManagedWorktree).not.toHaveBeenCalled()
@@ -355,7 +351,8 @@ it('removes an applied worktree when its unreleased worker session is proven exi
     record,
     lease,
     workerReleaseConfirmed: () => false,
-    workerSessionExited
+    workerSessionExited,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(removed).toBe(true)
@@ -377,7 +374,8 @@ it('keeps an applied worktree while its unreleased worker session is live', asyn
     record,
     lease,
     workerReleaseConfirmed: () => false,
-    workerSessionExited: async () => false
+    workerSessionExited: async () => false,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(removeManagedWorktree).not.toHaveBeenCalled()
@@ -399,7 +397,8 @@ it('keeps an applied worktree when its worker session exit probe throws', async 
       workerReleaseConfirmed: () => false,
       workerSessionExited: async () => {
         throw new Error('inspection unavailable')
-      }
+      },
+      inspectWorkspace: workspaceUnmodified
     })
   ).resolves.toBe(false)
 
@@ -434,12 +433,13 @@ it('selects only applied ready records and cleans only at lane end', async () =>
   const removeManagedWorktree = vi.fn(async () => ({}))
 
   const removed = await cleanupAppliedObjectiveDispatches({
-    runtime: listedWorktreeRuntime(removeManagedWorktree, ['workspace-lane-end']),
+    runtime: removeWorktreeRuntime(removeManagedWorktree),
     objectiveStore,
-    enrollment: { watcherId: 'watcher-1', repoId: 'repo-1', executionHostId: 'local' },
+    watcherId: 'watcher-1',
     lease,
     workerReleaseConfirmed: () => true,
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: workspaceUnmodified
   })
 
   expect(removed).toBe(true)
@@ -454,25 +454,48 @@ it('selects only applied ready records and cleans only at lane end', async () =>
   expect(records.get(failed.attemptFingerprint)?.setupState).toBe('ready')
 })
 
-it('leaves an applied dispatch whose worktree is already gone for reconcile to retain', async () => {
-  const vanished = appliedDispatch('vanished', 'workspace-vanished')
-  const records = new Map<string, ObjectiveDispatchRecord>([
-    [vanished.attemptFingerprint, vanished]
-  ])
-  const removeManagedWorktree = vi.fn(async () => {
-    throw new Error('Worktree not found')
-  })
+it.each(['missing', 'modified'] as const)(
+  'keeps an applied dispatch whose worktree is %s',
+  async (state) => {
+    const record = appliedDispatch('kept', 'workspace-kept')
+    const records = new Map<string, ObjectiveDispatchRecord>([[record.attemptFingerprint, record]])
+    const setParallelNote = vi.fn()
+    const removeManagedWorktree = vi.fn(async () => ({}))
+
+    const removed = await cleanupAppliedObjectiveDispatches({
+      runtime: removeWorktreeRuntime(removeManagedWorktree),
+      objectiveStore: recordStore(records, { setParallelNote }),
+      watcherId: 'watcher-1',
+      lease,
+      workerReleaseConfirmed: () => true,
+      workerSessionExited: workerSessionNotExited,
+      inspectWorkspace: async () => state
+    })
+
+    expect(removed).toBe(false)
+    expect(removeManagedWorktree).not.toHaveBeenCalled()
+    expect(records.get(record.attemptFingerprint)?.setupState).toBe('ready')
+    expect(setParallelNote).toHaveBeenCalledTimes(state === 'modified' ? 1 : 0)
+  }
+)
+
+it('keeps an applied dispatch when its worktree cannot be inspected', async () => {
+  const record = appliedDispatch('unreadable', 'workspace-unreadable')
+  const records = new Map<string, ObjectiveDispatchRecord>([[record.attemptFingerprint, record]])
+  const removeManagedWorktree = vi.fn(async () => ({}))
 
   const removed = await cleanupAppliedObjectiveDispatches({
-    runtime: listedWorktreeRuntime(removeManagedWorktree, []),
+    runtime: removeWorktreeRuntime(removeManagedWorktree),
     objectiveStore: recordStore(records),
-    enrollment: { watcherId: 'watcher-1', repoId: 'repo-1', executionHostId: 'local' },
+    watcherId: 'watcher-1',
     lease,
     workerReleaseConfirmed: () => true,
-    workerSessionExited: workerSessionNotExited
+    workerSessionExited: workerSessionNotExited,
+    inspectWorkspace: async () => {
+      throw new Error('ssh connection lost')
+    }
   })
 
   expect(removed).toBe(false)
   expect(removeManagedWorktree).not.toHaveBeenCalled()
-  expect(records.get(vanished.attemptFingerprint)?.setupState).toBe('ready')
 })

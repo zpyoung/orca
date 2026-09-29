@@ -282,19 +282,18 @@ export class WatcherRunnerLoop {
         createId: () => this.createId()
       })
       ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      const reconcilesThisTick =
+        snapshot.freshness === 'live' && runner.kind.concurrency?.reconcile !== undefined
       const workspacesCleaned = await runner.kind.concurrency?.cleanupWorkspaces?.(ledger, {
         enrollment: runner.enrollment,
         lease: lease.guard,
         workerReleaseConfirmed: (dispatchId) => workerReleaseConfirmed(ledger, dispatchId)
       })
-      if (
-        workspacesCleaned &&
-        (snapshot.freshness !== 'live' || !runner.kind.concurrency?.reconcile)
-      ) {
+      if (workspacesCleaned && !reconcilesThisTick) {
         snapshot = await this.readFreshSnapshot(runner, trace, lease.guard)
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       }
-      if (snapshot.freshness === 'live' && runner.kind.concurrency?.reconcile) {
+      if (reconcilesThisTick && runner.kind.concurrency?.reconcile) {
         await runner.kind.concurrency.reconcile(snapshot, ledger, {
           enrollment: runner.enrollment,
           lease: lease.guard,

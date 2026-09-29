@@ -232,6 +232,54 @@ describe('Heimdall settled worker release', () => {
     await world.service.stopForShutdown()
   })
 
+  it('reads fresh once when cleanup changes the world on a cached tick of a reconciling kind', async () => {
+    const reads: boolean[] = []
+    let cleanupCalls = 0
+    const reconcile = vi.fn(async () => undefined)
+    const registeredKind = kind({
+      read: async (_enrollment, { fresh }) => {
+        reads.push(fresh)
+        const revision = `snapshot-${reads.length}`
+        return {
+          freshness: fresh ? ('live' as const) : ('cached' as const),
+          contentIdentity: revision,
+          observedAtMs: reads.length,
+          world: { revision }
+        }
+      },
+      concurrency: {
+        canRunAlongside: () => true,
+        shouldDrainBudget: () => false,
+        preserveAttemptOnContentChange: () => false,
+        canRunWhenBudgetExhausted: () => false,
+        isIsolatedAttempt: () => false,
+        retainWorker: () => false,
+        cleanupWorkspaces: async () => {
+          cleanupCalls += 1
+          return cleanupCalls === 2
+        },
+        reconcile
+      }
+    })
+    const releaseWorker = vi.fn(async (_enrollment: WatcherEnrollment, dispatchId: string) => ({
+      dispatchId,
+      state: 'released' as const,
+      processAction: 'closed_agent_terminal' as const,
+      archive: null
+    }))
+    const world = await releaseWorld({ registeredKind, releaseWorker })
+
+    await world.service.reconcileForTesting(world.watcherId)
+    const readsAfterLiveTick = reads.length
+    expect(reconcile).toHaveBeenCalledOnce()
+
+    await world.service.reconcileForTesting(world.watcherId)
+
+    expect(reads.slice(readsAfterLiveTick)).toEqual([false, true])
+    expect(reconcile).toHaveBeenCalledOnce()
+    await world.service.stopForShutdown()
+  })
+
   it('recovers a durable accepted report, preserves earlier mail, and checkpoints its replay', async () => {
     let drains = 0
     const cursors: { previousDeliveryId: string | null; lastSequence: number }[] = []

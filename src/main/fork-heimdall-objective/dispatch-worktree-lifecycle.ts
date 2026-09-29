@@ -1,5 +1,4 @@
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
-import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { ObjectiveSnapshotBinding } from './execution-context'
@@ -7,6 +6,8 @@ import type { ObjectiveStore } from './objective-store'
 
 const DISPATCH_WORKTREE_MARKER_PREFIX = 'heimdall-objective-dispatch:'
 const PENDING_WORKSPACE_PREFIX = 'pending:'
+
+export type ObjectiveDispatchWorkspaceState = 'missing' | 'modified' | 'unmodified'
 
 function isPendingWorkspace(record: ObjectiveDispatchRecord): boolean {
   return (
@@ -77,7 +78,7 @@ export async function cleanupAppliedObjectiveDispatch(args: {
   lease: LeaseGuard
   workerReleaseConfirmed: (dispatchId: string) => boolean
   workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
-  workspaceListed?: (record: ObjectiveDispatchRecord) => Promise<boolean>
+  inspectWorkspace: (record: ObjectiveDispatchRecord) => Promise<ObjectiveDispatchWorkspaceState>
 }): Promise<boolean> {
   const laneEnded =
     args.record.laneTaskKeys.at(-1) === args.record.taskKey || args.record.sessionNodeCount >= 5
@@ -100,8 +101,18 @@ export async function cleanupAppliedObjectiveDispatch(args: {
   ) {
     return false
   }
-  // a vanished worktree is reconcile's to retain; removing it would throw and abort the tick
-  if (args.workspaceListed && !(await args.workspaceListed(args.record))) {
+  const workspace = isPendingWorkspace(args.record)
+    ? 'unmodified'
+    : await args.inspectWorkspace(args.record).catch(() => null)
+  if (workspace === 'modified') {
+    await args.lease.assertHeld()
+    args.objectiveStore.setParallelNote(
+      args.record.watcherId,
+      `Retained dispatch worktree ${args.record.workspacePath}: it has uncommitted changes.`
+    )
+  }
+  // a vanished or unreadable worktree is left for reconcile; removing it would throw and abort the tick
+  if (workspace !== 'unmodified') {
     return false
   }
   await args.lease.assertHeld()
@@ -118,34 +129,18 @@ export async function cleanupAppliedObjectiveDispatch(args: {
   return !isPendingWorkspace(cleanup)
 }
 
-async function listedDispatchWorkspaceIds(
-  runtime: OrcaRuntimeService,
-  enrollment: Pick<WatcherEnrollment, 'repoId' | 'executionHostId'>
-): Promise<Set<string>> {
-  const listed = await runtime.listManagedWorktrees(`id:${enrollment.repoId}`)
-  return new Set(
-    listed.worktrees
-      .filter((worktree) => !worktree.hostId || worktree.hostId === enrollment.executionHostId)
-      .map((worktree) => worktree.id)
-  )
-}
-
 /** Cleans eligible applied dispatches without depending on a world snapshot. */
 export async function cleanupAppliedObjectiveDispatches(args: {
   runtime: OrcaRuntimeService
   objectiveStore: ObjectiveStore
-  enrollment: Pick<WatcherEnrollment, 'watcherId' | 'repoId' | 'executionHostId'>
+  watcherId: string
   lease: LeaseGuard
   workerReleaseConfirmed: (dispatchId: string) => boolean
   workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
+  inspectWorkspace: (record: ObjectiveDispatchRecord) => Promise<ObjectiveDispatchWorkspaceState>
 }): Promise<boolean> {
-  let listedWorkspaceIds: Promise<Set<string>> | null = null
-  const workspaceListed = async (record: ObjectiveDispatchRecord): Promise<boolean> => {
-    listedWorkspaceIds ??= listedDispatchWorkspaceIds(args.runtime, args.enrollment)
-    return (await listedWorkspaceIds).has(record.workspaceId)
-  }
   let removed = false
-  for (const candidate of args.objectiveStore.listDispatches(args.enrollment.watcherId)) {
+  for (const candidate of args.objectiveStore.listDispatches(args.watcherId)) {
     const record = args.objectiveStore.getDispatch(candidate.attemptFingerprint)
     if (!record || record.state !== 'applied' || record.setupState !== 'ready') {
       continue
@@ -158,7 +153,7 @@ export async function cleanupAppliedObjectiveDispatches(args: {
         lease: args.lease,
         workerReleaseConfirmed: args.workerReleaseConfirmed,
         workerSessionExited: args.workerSessionExited,
-        workspaceListed
+        inspectWorkspace: args.inspectWorkspace
       })
     ) {
       removed = true
@@ -218,6 +213,7 @@ export async function reconcileObjectiveDispatchWorktrees(args: {
   lease: LeaseGuard
   workerReleaseConfirmed: (dispatchId: string) => boolean
   workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
+  inspectWorkspace: (record: ObjectiveDispatchRecord) => Promise<ObjectiveDispatchWorkspaceState>
 }): Promise<void> {
   const watcherId = args.binding.enrollment.watcherId
   const records = args.objectiveStore.listDispatches(watcherId)
@@ -343,7 +339,8 @@ export async function reconcileObjectiveDispatchWorktrees(args: {
       record,
       lease: args.lease,
       workerReleaseConfirmed: args.workerReleaseConfirmed,
-      workerSessionExited: args.workerSessionExited
+      workerSessionExited: args.workerSessionExited,
+      inspectWorkspace: args.inspectWorkspace
     })
   }
 }

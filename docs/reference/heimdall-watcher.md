@@ -714,7 +714,7 @@ with one commit at landing.
   those changes are always yours. The train resumes once the tree is clean.
 - **Cleanup.** An applied dispatch's worktree is removed on the tick after it applies, once its
   worker is released or its terminal has exited. If you took over its terminal, the worktree stays
-  until you close that terminal. A failed or conflict-retained worktree stays for inspection until
+  until you close that terminal, and a worktree with uncommitted changes is never removed. A failed or conflict-retained worktree stays for inspection until
   the watcher is deleted. Setup or cleanup interrupted by a restart is repaired on boot
   (`dispatch-worktree-lifecycle.ts`).
 - **Dispatch branches are never pushed.** Only the enrolled branch lands, through the ladder below.
