@@ -209,7 +209,10 @@ describe('HeimdallRemoteFleetMirrors.enroll newWorktree capability gating', () =
     await mirrors.enroll(input, REMOTE_OWNER)
 
     expect(environment.mutate).toHaveBeenCalledWith(REMOTE_IDENTITY, 'heimdall:enroll', {
-      input: { ...input, kindPayload: { roleAgents: {}, maxConcurrency: 1 } },
+      input: {
+        ...input,
+        kindPayload: { roleAgents: {}, maxConcurrency: 1, landingBar: 'files-on-disk' }
+      },
       owner: null
     })
   })
