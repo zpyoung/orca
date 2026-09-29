@@ -38,9 +38,9 @@ import { readObjectiveJudgmentReports } from '../fork-heimdall/judgment/report-p
 import { createObjectiveActionExecutor } from './action-executor'
 import { reconcileAmendedObjectiveDispatches } from './amendment-dispatch-reconciliation'
 import { createObjectiveConcurrencyPolicy } from './objective-concurrency'
-import { inspectObjectiveDispatchSession, shouldRetainObjectiveWorker } from './dispatch-session'
-import { cleanupAppliedObjectiveDispatches } from './dispatch-worktree-lifecycle'
+import { objectiveDispatchSessionExited, shouldRetainObjectiveWorker } from './dispatch-session'
 import {
+  cleanupAppliedObjectiveDispatches,
   purgeObjectiveDispatchWorktrees,
   reconcileObjectiveDispatchWorktrees
 } from './dispatch-worktree'
@@ -271,21 +271,15 @@ export function createObjectiveKind(args: {
         ledger,
         latestEnrollments.get(attempt.watcherId)
       ),
-    async cleanupWorkspaces(_ledger, context) {
-      const watcherId = context.enrollment.watcherId
-      if (args.objectiveStore.listDispatches(watcherId).length === 0) {
-        return false
-      }
-      return cleanupAppliedObjectiveDispatches({
+    cleanupWorkspaces: (_ledger, context) =>
+      cleanupAppliedObjectiveDispatches({
         runtime: args.runtime,
         objectiveStore: args.objectiveStore,
-        watcherId,
+        enrollment: context.enrollment,
         lease: context.lease,
         workerReleaseConfirmed: context.workerReleaseConfirmed,
-        workerSessionExited: async (owner) =>
-          (await inspectObjectiveDispatchSession(args.runtime, owner)).status === 'gone'
-      })
-    },
+        workerSessionExited: (owner) => objectiveDispatchSessionExited(args.runtime, owner)
+      }),
     async reconcile(snapshot, ledger, context) {
       await reconcileAmendedObjectiveDispatches({
         ledger,
@@ -301,8 +295,7 @@ export function createObjectiveKind(args: {
           objectiveStore: args.objectiveStore,
           lease: context.lease,
           workerReleaseConfirmed: context.workerReleaseConfirmed,
-          workerSessionExited: async (owner) =>
-            (await inspectObjectiveDispatchSession(args.runtime, owner)).status === 'gone'
+          workerSessionExited: (owner) => objectiveDispatchSessionExited(args.runtime, owner)
         })
       }
     }

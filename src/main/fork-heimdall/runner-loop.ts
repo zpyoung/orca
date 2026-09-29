@@ -287,7 +287,10 @@ export class WatcherRunnerLoop {
         lease: lease.guard,
         workerReleaseConfirmed: (dispatchId) => workerReleaseConfirmed(ledger, dispatchId)
       })
-      if (workspacesCleaned && snapshot.freshness !== 'live') {
+      if (
+        workspacesCleaned &&
+        (snapshot.freshness !== 'live' || !runner.kind.concurrency?.reconcile)
+      ) {
         snapshot = await this.readFreshSnapshot(runner, trace, lease.guard)
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       }

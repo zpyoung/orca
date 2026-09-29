@@ -1,4 +1,5 @@
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
+import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { ObjectiveSnapshotBinding } from './execution-context'
@@ -61,7 +62,7 @@ async function workspaceWorkersReleased(
         continue
       }
     } catch {
-      // Losing the ability to inspect a worker is not proof that its process exited.
+      // losing the ability to inspect a worker is not proof that its process exited
     }
     return false
   }
@@ -76,6 +77,7 @@ export async function cleanupAppliedObjectiveDispatch(args: {
   lease: LeaseGuard
   workerReleaseConfirmed: (dispatchId: string) => boolean
   workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
+  workspaceListed?: (record: ObjectiveDispatchRecord) => Promise<boolean>
 }): Promise<boolean> {
   const laneEnded =
     args.record.laneTaskKeys.at(-1) === args.record.taskKey || args.record.sessionNodeCount >= 5
@@ -98,6 +100,10 @@ export async function cleanupAppliedObjectiveDispatch(args: {
   ) {
     return false
   }
+  // a vanished worktree is reconcile's to retain; removing it would throw and abort the tick
+  if (args.workspaceListed && !(await args.workspaceListed(args.record))) {
+    return false
+  }
   await args.lease.assertHeld()
   const cleanup = { ...args.record, setupState: 'cleanup-pending' as const }
   args.objectiveStore.saveDispatch(cleanup)
@@ -112,25 +118,47 @@ export async function cleanupAppliedObjectiveDispatch(args: {
   return !isPendingWorkspace(cleanup)
 }
 
+async function listedDispatchWorkspaceIds(
+  runtime: OrcaRuntimeService,
+  enrollment: Pick<WatcherEnrollment, 'repoId' | 'executionHostId'>
+): Promise<Set<string>> {
+  const listed = await runtime.listManagedWorktrees(`id:${enrollment.repoId}`)
+  return new Set(
+    listed.worktrees
+      .filter((worktree) => !worktree.hostId || worktree.hostId === enrollment.executionHostId)
+      .map((worktree) => worktree.id)
+  )
+}
+
 /** Cleans eligible applied dispatches without depending on a world snapshot. */
 export async function cleanupAppliedObjectiveDispatches(args: {
   runtime: OrcaRuntimeService
   objectiveStore: ObjectiveStore
-  watcherId: string
+  enrollment: Pick<WatcherEnrollment, 'watcherId' | 'repoId' | 'executionHostId'>
   lease: LeaseGuard
   workerReleaseConfirmed: (dispatchId: string) => boolean
   workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
 }): Promise<boolean> {
+  let listedWorkspaceIds: Promise<Set<string>> | null = null
+  const workspaceListed = async (record: ObjectiveDispatchRecord): Promise<boolean> => {
+    listedWorkspaceIds ??= listedDispatchWorkspaceIds(args.runtime, args.enrollment)
+    return (await listedWorkspaceIds).has(record.workspaceId)
+  }
   let removed = false
-  for (const candidate of args.objectiveStore.listDispatches(args.watcherId)) {
+  for (const candidate of args.objectiveStore.listDispatches(args.enrollment.watcherId)) {
     const record = args.objectiveStore.getDispatch(candidate.attemptFingerprint)
     if (!record || record.state !== 'applied' || record.setupState !== 'ready') {
       continue
     }
     if (
       await cleanupAppliedObjectiveDispatch({
-        ...args,
-        record
+        runtime: args.runtime,
+        objectiveStore: args.objectiveStore,
+        record,
+        lease: args.lease,
+        workerReleaseConfirmed: args.workerReleaseConfirmed,
+        workerSessionExited: args.workerSessionExited,
+        workspaceListed
       })
     ) {
       removed = true

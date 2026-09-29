@@ -431,6 +431,7 @@ export async function prepareObjectiveDispatchWorkspace(args: {
   }
 }
 export {
+  cleanupAppliedObjectiveDispatches,
   purgeObjectiveDispatchWorktrees,
   reconcileObjectiveDispatchWorktrees
 } from './dispatch-worktree-lifecycle'

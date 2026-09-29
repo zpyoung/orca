@@ -69,6 +69,19 @@ function removeWorktreeRuntime(
   return { removeManagedWorktree } as unknown as OrcaRuntimeService
 }
 
+function listedWorktreeRuntime(
+  removeManagedWorktree: OrcaRuntimeService['removeManagedWorktree'],
+  listedWorkspaceIds: readonly string[]
+): OrcaRuntimeService {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only worktree listing and removal are exercised.
+  return {
+    removeManagedWorktree,
+    listManagedWorktrees: vi.fn(async () => ({
+      worktrees: listedWorkspaceIds.map((id) => ({ id, hostId: 'local' }))
+    }))
+  } as unknown as OrcaRuntimeService
+}
+
 function recordStore(
   records: Map<string, ObjectiveDispatchRecord>,
   overrides: Partial<ObjectiveStore> = {}
@@ -421,9 +434,9 @@ it('selects only applied ready records and cleans only at lane end', async () =>
   const removeManagedWorktree = vi.fn(async () => ({}))
 
   const removed = await cleanupAppliedObjectiveDispatches({
-    runtime: removeWorktreeRuntime(removeManagedWorktree),
+    runtime: listedWorktreeRuntime(removeManagedWorktree, ['workspace-lane-end']),
     objectiveStore,
-    watcherId: 'watcher-1',
+    enrollment: { watcherId: 'watcher-1', repoId: 'repo-1', executionHostId: 'local' },
     lease,
     workerReleaseConfirmed: () => true,
     workerSessionExited: workerSessionNotExited
@@ -439,4 +452,27 @@ it('selects only applied ready records and cleans only at lane end', async () =>
   expect(records.get(laneEnd.attemptFingerprint)?.setupState).toBe('cleaned')
   expect(records.get(pending.attemptFingerprint)?.setupState).toBe('pending')
   expect(records.get(failed.attemptFingerprint)?.setupState).toBe('ready')
+})
+
+it('leaves an applied dispatch whose worktree is already gone for reconcile to retain', async () => {
+  const vanished = appliedDispatch('vanished', 'workspace-vanished')
+  const records = new Map<string, ObjectiveDispatchRecord>([
+    [vanished.attemptFingerprint, vanished]
+  ])
+  const removeManagedWorktree = vi.fn(async () => {
+    throw new Error('Worktree not found')
+  })
+
+  const removed = await cleanupAppliedObjectiveDispatches({
+    runtime: listedWorktreeRuntime(removeManagedWorktree, []),
+    objectiveStore: recordStore(records),
+    enrollment: { watcherId: 'watcher-1', repoId: 'repo-1', executionHostId: 'local' },
+    lease,
+    workerReleaseConfirmed: () => true,
+    workerSessionExited: workerSessionNotExited
+  })
+
+  expect(removed).toBe(false)
+  expect(removeManagedWorktree).not.toHaveBeenCalled()
+  expect(records.get(vanished.attemptFingerprint)?.setupState).toBe('ready')
 })

@@ -119,6 +119,14 @@ export async function inspectObjectiveDispatchSession(
   })
 }
 
+/** True only when the dispatch's worker process is proven exited; unverifiable counts as live. */
+export async function objectiveDispatchSessionExited(
+  runtime: OrcaRuntimeService,
+  record: ObjectiveDispatchRecord
+): Promise<boolean> {
+  return (await inspectObjectiveDispatchSession(runtime, record)).status === 'gone'
+}
+
 function hasLiveRebind(
   objectiveStore: ObjectiveStore,
   record: ObjectiveDispatchRecord,

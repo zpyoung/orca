@@ -185,7 +185,7 @@ export type KindConcurrencyPolicy<TWorld, TAction extends KernelAction> = {
   ): Promise<void>
   /**
    * Runs every tick regardless of snapshot freshness; implementations must not depend on the
-   * snapshot.
+   * snapshot. Resolves true when it changed the world, so the tick re-reads a fresh snapshot.
    */
   cleanupWorkspaces?(
     ledger: WatcherLedger,
