@@ -11,7 +11,7 @@ import { ExecutionHostNotDispatchableError } from '../providers/execution-host-p
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { requireRuntimeGitProvider } from '../runtime/runtime-git-command-target'
 import { highestEpoch } from './lease-epoch-directory'
-import { isRemovedWorkspaceResolution, LeaseWorkspaceRemovedError } from './lease-workspace-absence'
+import { LeaseWorkspaceRemovedError } from './lease-workspace-absence'
 import {
   parseLeaseHolderRecord,
   type LeaseHolderReadResult,
@@ -263,15 +263,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
   }
 
   private async resolveLocation(key: WorkspaceKey): Promise<ResolvedLeaseLocation> {
-    let target: LeaseWorkspaceTarget
-    try {
-      target = await this.dependencies.resolveTarget(key)
-    } catch (error) {
-      if (isRemovedWorkspaceResolution(error, key)) {
-        throw new LeaseWorkspaceRemovedError('workspace-removed')
-      }
-      throw error
-    }
+    const target = await this.dependencies.resolveTarget(key)
     if (makeWorkspaceKey(target.executionHostId, target.workspacePath) !== key) {
       throw new LeaseConfigurationError('Lease target does not match its workspace key')
     }

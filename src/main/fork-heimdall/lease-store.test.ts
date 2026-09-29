@@ -7,13 +7,13 @@ import type { IFilesystemProvider } from '../providers/types'
 import type { SshGitProvider } from '../providers/ssh-git-provider'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
-import { OrchestrationError } from '../runtime/orchestration/orchestration-error'
 import {
   HostRoutedLeaseStore,
   LeaseLostError,
   makeWorkspaceKey,
   type LeaseWorkspaceTarget
 } from './lease-store'
+import { LeaseWorkspaceRemovedError } from './lease-workspace-absence'
 
 class MemoryFilesystem {
   readonly directories = new Set(['/workspace', '/workspace/.orca', '/workspace/.orca/heimdall'])
@@ -543,15 +543,10 @@ describe('host-routed epoch lease', () => {
     })
   })
 
-  it.each([
-    new Error('selector_not_found'),
-    new OrchestrationError('selector_not_found', 'selector unavailable'),
-    new OrchestrationError('worktree_not_found', 'worktree unavailable'),
-    new OrchestrationError('worktree_not_found_on_server', 'server has no worktree')
-  ])('answers an absent registered workspace as removed (%s)', async (absence) => {
+  it('answers confirmed host absence as a removed workspace', async () => {
     const store = new HostRoutedLeaseStore({
       resolveTarget: async () => {
-        throw absence
+        throw new LeaseWorkspaceRemovedError('workspace-removed')
       }
     })
     await expect(
@@ -559,22 +554,21 @@ describe('host-routed epoch lease', () => {
     ).resolves.toEqual({ status: 'workspace-removed', reason: 'workspace-removed' })
   })
 
-  it('accepts an explicit server absence for an SSH workspace', async () => {
+  it('keeps an unconfirmed local selector miss unverifiable', async () => {
     const store = new HostRoutedLeaseStore({
       resolveTarget: async () => {
-        throw new OrchestrationError('worktree_not_found_on_server', 'not on server')
+        throw new Error('selector_not_found')
       }
     })
     await expect(
-      store.acquireOrRenew(makeWorkspaceKey('ssh:host-a', '/workspace'), 'owner', 90_000)
-    ).resolves.toEqual({ status: 'workspace-removed', reason: 'workspace-removed' })
+      store.acquireOrRenew(makeWorkspaceKey('local', '/workspace'), 'owner', 90_000)
+    ).resolves.toEqual({ status: 'unverifiable', reason: 'selector_not_found' })
   })
 
   it.each([
     new Error('transport unavailable'),
     new Error('selector_not_found'),
     new Error('selector_ambiguous'),
-    new OrchestrationError('selector_ambiguous', 'ambiguous'),
     new Error('worktree_not_found_on_server')
   ])('keeps unconfirmed target failures unverifiable (%s)', async (failure) => {
     const store = new HostRoutedLeaseStore({

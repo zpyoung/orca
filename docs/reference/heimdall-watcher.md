@@ -445,13 +445,14 @@ The four lease outcomes look different in the UI:
   that an asynchronous effect failed or did not land.
 - **`configuration-error`** — the durable target resolves to a different enrolled workspace or
   authority. The watcher disables and parks with `park-configuration-error`.
-- **`workspace-removed`** — the runtime's registered workspace resolver affirmatively cannot find
-  the enrolled Git worktree or folder. The watcher records a `workspace-removed` terminal fact and
-  durable budget summary, closes active budget intervals for watcher shutdown, disables itself, and
-  stops scheduling without a lease or kind handoff. This ends supervision, not any still-running
-  worker process; pending attempts remain pinned. An untyped selector miss for an SSH workspace is
-  only client bookkeeping, so it remains `unverifiable` alongside transport failures, ambiguous
-  selectors, and lease filesystem errors. Explicit host-reported absence is terminal.
+- **`workspace-removed`** — a selector miss is confirmed against an authoritative workspace
+  catalog: a successful Git worktree scan omits the enrolled path, or the local folder registry no
+  longer contains it. An explicit server-reported absence also qualifies. The watcher records a
+  `workspace-removed` terminal fact and durable budget summary, closes active budget intervals for
+  watcher shutdown, disables itself, and stops scheduling without a lease or kind handoff. This
+  ends supervision, not any still-running worker process; pending attempts remain pinned. Failed
+  scans, untyped SSH selector misses, ambiguous selectors, transport failures, and lease filesystem
+  errors stay `unverifiable`.
 
 ## Kind: `hosted-review` (PR Sitter)
 

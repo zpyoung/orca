@@ -1,4 +1,10 @@
 import * as electron from 'electron'
+import {
+  getRepoExecutionHostId,
+  getRepoSshConnectionId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../shared/execution-host'
+import { isFolderRepo } from '../../shared/repo-kind'
 import type { WorkspaceKey, WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import {
@@ -7,6 +13,12 @@ import {
 } from '../runtime/runtime-file-command-target'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { runtimePathsEqual } from '../runtime/runtime-worktree-path-identity'
+import { LeaseWorkspaceRemovedError } from './lease-workspace-absence'
+import {
+  isServerReportedWorkspaceAbsence,
+  isWorkspaceAbsenceCandidate
+} from './orchestration/placement-absence'
 import { LeaseConfigurationError, type LeaseWorkspaceTarget } from './lease-store'
 
 type RuntimeGitTargetResolver = {
@@ -63,6 +75,23 @@ export class HeimdallKernelHost {
     if (!enrollment) {
       throw new LeaseConfigurationError(`Lease workspace is no longer enrolled: ${key}`)
     }
+    try {
+      return await this.resolveEnrolledTarget(enrollment)
+    } catch (error) {
+      if (
+        isWorkspaceAbsenceCandidate(error) &&
+        (isServerReportedWorkspaceAbsence(error) ||
+          (await this.confirmWorkspaceRemoved(enrollment)))
+      ) {
+        throw new LeaseWorkspaceRemovedError('workspace-removed')
+      }
+      throw error
+    }
+  }
+
+  private async resolveEnrolledTarget(
+    enrollment: WatcherEnrollment
+  ): Promise<LeaseWorkspaceTarget> {
     const folderWorktreeId =
       enrollment.worktreeId && parseWorkspaceKey(enrollment.worktreeId)?.type === 'folder'
         ? enrollment.worktreeId
@@ -91,6 +120,49 @@ export class HeimdallKernelHost {
       fileProvider: requireRuntimeFileProvider(gitTarget),
       gitTarget
     }
+  }
+
+  private async confirmWorkspaceRemoved(enrollment: WatcherEnrollment): Promise<boolean> {
+    const worktreeId = enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
+    const scope = parseWorkspaceKey(worktreeId)
+    if (scope?.type === 'folder') {
+      return (
+        enrollment.executionHostId === LOCAL_EXECUTION_HOST_ID &&
+        !this.runtime
+          .listFolderWorkspaces()
+          .some((workspace) => workspace.id === scope.folderWorkspaceId)
+      )
+    }
+    const repos = this.runtime
+      .listRepos()
+      .filter(
+        (repo) =>
+          repo.id === enrollment.repoId &&
+          getRepoExecutionHostId(repo) === enrollment.executionHostId
+      )
+    if (repos.length === 0) {
+      return enrollment.executionHostId === LOCAL_EXECUTION_HOST_ID
+    }
+    if (repos.length !== 1) {
+      return false
+    }
+    const repo = repos[0]
+    const folderRepo = isFolderRepo(repo)
+    if (enrollment.executionHostId !== LOCAL_EXECUTION_HOST_ID && folderRepo) {
+      return false
+    }
+    const detected = await this.runtime.listDetectedManagedWorktrees(
+      `id:${repo.id}`,
+      getRepoSshConnectionId(repo) ?? undefined
+    )
+    return (
+      detected.authoritative &&
+      !detected.worktrees.some(
+        (worktree) =>
+          worktree.id === worktreeId ||
+          (!folderRepo && runtimePathsEqual(worktree.path, enrollment.workspacePath))
+      )
+    )
   }
 
   attachPowerMonitor(): void {
