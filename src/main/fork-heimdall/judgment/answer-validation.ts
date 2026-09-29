@@ -148,11 +148,11 @@ function parseQuestionAnswer(
     return { unavailable: 'answer-shape' }
   }
 
-  const shape = OpenRouterAnswerSchema.safeParse(rawAnswer)
-  if (!shape.success) {
+  const transportParse = OpenRouterAnswerSchema.safeParse(rawAnswer)
+  if (!transportParse.success) {
     return { unavailable: 'answer-shape' }
   }
-  const transportAnswer = shape.data
+  const transportAnswer = transportParse.data
   if (transportAnswer.type !== question.type) {
     return { unavailable: 'answer-type' }
   }
