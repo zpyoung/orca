@@ -268,9 +268,7 @@ describe('Heimdall create input builder', () => {
   it('gates all-scope enrollment and omits required scope for legacy runtimes', () => {
     const workspace = { repoId: 'repo-1', worktreeId: 'wt-1', workspaceKind: 'git' as const }
     const allCandidate = buildHeimdallCreateCandidate(
-      new Map([
-        ['spec', JSON.stringify({ kindPayload: { mergeCheckScope: 'all' } })]
-      ]),
+      new Map([['spec', JSON.stringify({ kindPayload: { mergeCheckScope: 'all' } })]]),
       '/repo',
       'hosted-review'
     )
@@ -289,13 +287,15 @@ describe('Heimdall create input builder', () => {
     )
 
     const requiredCandidate = buildHeimdallCreateCandidate(
-      new Map([
-        ['spec', JSON.stringify({ kindPayload: { mergeCheckScope: 'required' } })]
-      ]),
+      new Map([['spec', JSON.stringify({ kindPayload: { mergeCheckScope: 'required' } })]]),
       '/repo',
       'hosted-review'
     )
-    const legacyInput = buildHeimdallEnrollInput(requiredCandidate, workspace, derivedPayloadRuntime)
+    const legacyInput = buildHeimdallEnrollInput(
+      requiredCandidate,
+      workspace,
+      derivedPayloadRuntime
+    )
     expect(legacyInput.kindPayload).toMatchObject({
       branchUpdateMode: 'merge-base-update',
       mergeMethod: null
@@ -365,7 +365,10 @@ describe('Heimdall create input builder', () => {
         worktreeId: 'wt-1',
         workspaceKind: 'git'
       },
-      [HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY]
+      [
+        HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
+        HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+      ]
     )
     expect(capableInput.kindPayload).not.toHaveProperty('branch')
     expect(() =>
@@ -474,5 +477,48 @@ describe('Heimdall create input builder', () => {
         }
       ]
     })
+  })
+
+  it('gates objective hosted-review handoffs on check-scope support', () => {
+    const workspace = {
+      repoId: 'repo-1',
+      worktreeId: 'wt-1',
+      workspaceKind: 'git'
+    } as const
+
+    for (const landingBar of ['hosted-review', 'merged'] as const) {
+      const candidate = buildHeimdallCreateCandidate(
+        new Map([
+          ['objective', 'Ship the report export'],
+          ['landing-bar', landingBar]
+        ]),
+        '/repo',
+        'objective'
+      )
+      if (candidate.kind !== 'objective') {
+        throw new Error('Expected an objective candidate')
+      }
+
+      let legacyFailure: unknown
+      try {
+        assertHeimdallCreateCapabilities(candidate, [])
+      } catch (error) {
+        legacyFailure = error
+      }
+      expect(legacyFailure).toMatchObject({
+        code: 'incompatible_runtime',
+        message: expect.stringContaining('all-check hosted-review handoffs')
+      })
+      expect(() =>
+        assertHeimdallCreateCapabilities(candidate, [
+          HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+        ])
+      ).not.toThrow()
+      expect(
+        buildHeimdallEnrollInput(candidate, workspace, [
+          HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+        ]).kindPayload
+      ).toMatchObject({ landingBar })
+    }
   })
 })

@@ -67,7 +67,10 @@ function createHandler(kind: WatcherKindId): CommandHandler {
     const candidate = buildHeimdallCreateCandidate(context.flags, context.cwd, kind)
     const status = await context.client.call<RuntimeStatus>('status.get')
     const runtimeCapabilities = status.result.capabilities ?? []
-    assertHeimdallCreateCapabilities(candidate, runtimeCapabilities)
+    // Hosted-review workspace validation must precede its scope capability check.
+    if (candidate.kind !== 'hosted-review') {
+      assertHeimdallCreateCapabilities(candidate, runtimeCapabilities)
+    }
     const selector = await resolveHeimdallWorkspaceSelector(
       candidate.worktreeSelector,
       context.cwd,

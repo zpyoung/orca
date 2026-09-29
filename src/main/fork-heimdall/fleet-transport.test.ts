@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
@@ -743,7 +744,7 @@ describe('HeimdallFleetTransport', () => {
   it('lets an ownerless enroll through a remote that has not negotiated owner support', async () => {
     const remote = environmentHarness([
       'heimdall.commands.v1',
-      'heimdall.hosted-review-check-scope.v1'
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
     ])
     remote.environment.mutate = vi.fn(async () =>
       successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
@@ -764,7 +765,7 @@ describe('HeimdallFleetTransport', () => {
     const remote = environmentHarness([
       'heimdall.commands.v1',
       'heimdall.enroll-owner.v1',
-      'heimdall.hosted-review-check-scope.v1'
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
     ])
     remote.environment.mutate = vi.fn(async () =>
       successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
@@ -804,7 +805,10 @@ describe('HeimdallFleetTransport', () => {
     })
     localTransport.dispose()
 
-    const remote = environmentHarness()
+    const remote = environmentHarness([
+      'heimdall.commands.v1',
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+    ])
     remote.environment.mutate = vi.fn(async () => ({
       id: 'heimdall:enroll',
       ok: false as const,
@@ -831,7 +835,10 @@ describe('HeimdallFleetTransport', () => {
   })
 
   it('rejects unallowlisted remote refusal fields without forwarding them', async () => {
-    const remote = environmentHarness()
+    const remote = environmentHarness([
+      'heimdall.commands.v1',
+      HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+    ])
     remote.environment.mutate = vi.fn(async () => ({
       id: 'heimdall:enroll',
       ok: false as const,

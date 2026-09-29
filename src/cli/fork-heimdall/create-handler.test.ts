@@ -5,6 +5,7 @@ import {
   heimdallEnrollmentRefusalError
 } from '../../shared/fork-heimdall/enrollment-refusal-error'
 import {
+  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
   HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
@@ -247,7 +248,10 @@ describe('Heimdall create handlers', () => {
         ['branch-update', 'rebase'],
         ['merge-method', 'squash']
       ],
-      [HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY],
+      [
+        HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
+        HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY
+      ],
       { id: 'repo-1::/repo/feature', repoId: 'repo-1' }
     )
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -281,26 +285,31 @@ describe('Heimdall create handlers', () => {
       /hosted-review watchers require a Git worktree/
     )
     expect(callMock).not.toHaveBeenCalledWith(HEIMDALL_CHANNELS.enroll, expect.anything())
-    const legacy = context([
+    const legacy = context(
       [
-        'spec',
-        JSON.stringify({
-          kindPayload: {
-            branch: 'feature/report',
-            provider: 'github',
-            reviewNumber: 17,
-            reviewUrl: 'https://github.com/acme/repo/pull/17'
-          }
-        })
-      ]
-    ])
+        ['worktree', 'id:repo-1::/repo/feature'],
+        [
+          'spec',
+          JSON.stringify({
+            kindPayload: {
+              branch: 'feature/report',
+              provider: 'github',
+              reviewNumber: 17,
+              reviewUrl: 'https://github.com/acme/repo/pull/17'
+            }
+          })
+        ]
+      ],
+      [],
+      { id: 'repo-1::/repo/feature', repoId: 'repo-1' }
+    )
     await expect(
       HEIMDALL_CREATE_HANDLERS['heimdall create hosted-review'](legacy)
     ).rejects.toMatchObject({
       code: 'incompatible_runtime',
       message: expect.stringContaining('host-derived hosted-review enrollment')
     })
-    expect(callMock.mock.calls.map(([method]) => method)).toEqual(['status.get'])
+    expect(callMock).not.toHaveBeenCalledWith(HEIMDALL_CHANNELS.enroll, expect.anything())
   })
 
   it('surfaces thrown refusal fields through CLI JSON and text errors', async () => {

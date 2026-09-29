@@ -5,6 +5,7 @@ import {
   HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
   HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE,
   HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,
+  HEIMDALL_OBJECTIVE_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
 import {
@@ -209,6 +210,18 @@ export function assertHeimdallCreateCapabilities(
   }
 
   if (
+    candidate.kind === 'objective' &&
+    (candidate.kindPayload.landingBar === 'hosted-review' ||
+      candidate.kindPayload.landingBar === 'merged') &&
+    !runtimeCapabilities.includes(HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY)
+  ) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      HEIMDALL_OBJECTIVE_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE
+    )
+  }
+
+  if (
     candidate.kind === 'hosted-review' &&
     !runtimeCapabilities.includes(HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY)
   ) {
@@ -234,6 +247,12 @@ export function buildHeimdallEnrollInput(
   workspace: HeimdallCreateWorkspace,
   runtimeCapabilities: readonly string[]
 ): EnrollInput {
+  if (candidate.kind === 'hosted-review' && workspace.workspaceKind === 'folder') {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'workspace: hosted-review watchers require a Git worktree.'
+    )
+  }
   assertHeimdallCreateCapabilities(candidate, runtimeCapabilities)
   let kindPayload: unknown
   if (candidate.kind === 'objective') {
@@ -257,12 +276,6 @@ export function buildHeimdallEnrollInput(
       'kindPayload'
     )
   } else {
-    if (workspace.workspaceKind === 'folder') {
-      throw new RuntimeClientError(
-        'invalid_argument',
-        'workspace: hosted-review watchers require a Git worktree.'
-      )
-    }
     const {
       branch: _branch,
       provider: _provider,
