@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown, GitBranchPlus } from 'lucide-react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { Button } from '@/components/ui/button'
 import { Command, CommandGroup, CommandInput, CommandList } from '@/components/ui/command'
@@ -221,7 +221,12 @@ export function ObjectiveWorkspacePicker({
                       )}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">{workspace.label}</span>
+                      <span className="flex items-center gap-1.5 truncate text-sm">
+                        {workspace.createsWorktree ? (
+                          <GitBranchPlus className="size-3.5 shrink-0" aria-hidden="true" />
+                        ) : null}
+                        <span className="truncate">{workspace.label}</span>
+                      </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
                         {objectiveWorkspaceKindLabel(workspace.workspaceKind)} · {workspace.detail}
                         {workspace.branch ? ` · ${workspace.branch}` : ''}

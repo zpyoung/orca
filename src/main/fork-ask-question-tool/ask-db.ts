@@ -1,6 +1,9 @@
 import { chmodSync, existsSync } from 'node:fs'
 import Database from '../sqlite/sync-database'
-import { isTerminalAskStatus, type PersistedAskStatus } from '../../shared/fork-ask-question-tool/ask-answer-envelope'
+import {
+  isTerminalAskStatus,
+  type PersistedAskStatus
+} from '../../shared/fork-ask-question-tool/ask-answer-envelope'
 
 const TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000
 const DEFAULT_PURGE_INTERVAL_MS = 60 * 60 * 1000
@@ -174,13 +177,17 @@ export class AskDb {
    * existing row (`created: false`) rather than inserting a second one. Atomic — never a
    * caller-side select-then-insert race.
    */
-  registerAsk(params: RegisterAskParams, createdAt: string = new Date().toISOString()): RegisterAskResult {
+  registerAsk(
+    params: RegisterAskParams,
+    createdAt: string = new Date().toISOString()
+  ): RegisterAskResult {
     const seq = this.nextSeq()
     // C2: registry methods never throw for domain outcomes, so an absurd timeoutMs (e.g. MAX_SAFE_INTEGER)
     // is clamped to the latest representable deadline rather than overflowing Date and throwing, or
     // silently becoming "no deadline" (null).
+    // a hand-off's deadline is enforced by its wait against timeout_ms, never the registry's expiry timer.
     const expiresAt =
-      params.timeoutMs === null
+      params.timeoutMs === null || params.handoff
         ? null
         : new Date(Math.min(Date.parse(createdAt) + params.timeoutMs, MAX_DATE_MS)).toISOString()
     const handoff = params.handoff
@@ -249,7 +256,9 @@ export class AskDb {
 
   updatePartial(askId: string, partialJson: string | null): AskRow {
     const seq = this.nextSeq()
-    this.db.prepare('UPDATE asks SET partial_json = ?, seq = ? WHERE ask_id = ?').run(partialJson, seq, askId)
+    this.db
+      .prepare('UPDATE asks SET partial_json = ?, seq = ? WHERE ask_id = ?')
+      .run(partialJson, seq, askId)
     return this.requireAsk(askId)
   }
 
@@ -261,7 +270,9 @@ export class AskDb {
   ): AskRow {
     const seq = this.nextSeq()
     this.db
-      .prepare('UPDATE asks SET status = ?, answers_json = ?, resolved_at = ?, seq = ? WHERE ask_id = ?')
+      .prepare(
+        'UPDATE asks SET status = ?, answers_json = ?, resolved_at = ?, seq = ? WHERE ask_id = ?'
+      )
       .run(params.status, params.answersJson, resolvedAt, seq, askId)
     return this.requireAsk(askId)
   }

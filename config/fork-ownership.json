@@ -372,7 +372,8 @@
         "  HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,",
         "  HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,",
         "  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,",
-        "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY",
+        "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY",
         "} from './fork-heimdall/capability'",
         "  HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,",
         "  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,",
@@ -381,7 +382,8 @@
         "  HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,",
         "  HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,",
         "  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,",
-        "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,"
+        "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -2729,6 +2731,24 @@
       "lines": [
         "import { sessionInfoService } from '../../fork-session-info/session-info-service'",
         "    sessionInfoService.clearPane(resolvedPaneKey)"
+      ]
+    },
+    {
+      "path": "src/main/claude/claude-structured-inbound-control.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { bridgeClaudeAsk } from '../fork-ask-question-tool/native-bridge/claude-native-ask-bridge'",
+        "  return { canUseTool: bridgeClaudeAsk(deps.sessionId, canUseTool), onUserDialog }"
+      ]
+    },
+    {
+      "path": "src/main/codex/codex-structured-provider-events.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { bridgeCodexUserInput } from '../fork-ask-question-tool/native-bridge/codex-native-ask-bridge'",
+        "  if (!session || bridgeCodexUserInput(sessionId, session, request)) {"
       ]
     },
     {
@@ -6550,9 +6570,17 @@
       "added": 9,
       "removed": 3
     },
+    "src/main/claude/claude-structured-inbound-control.ts": {
+      "added": 2,
+      "removed": 1
+    },
     "src/main/claude/hook-service.ts": {
       "added": 6,
       "removed": 2
+    },
+    "src/main/codex/codex-structured-provider-events.ts": {
+      "added": 2,
+      "removed": 1
     },
     "src/main/ipc/native-chat-subscribe-lifecycle.test.ts": {
       "added": 7,
@@ -7723,7 +7751,7 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 26,
+      "added": 28,
       "removed": 0
     },
     "src/shared/remote-runtime-client-capabilities.ts": {

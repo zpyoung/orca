@@ -1,3 +1,4 @@
+import { bridgeCodexUserInput } from '../fork-ask-question-tool/native-bridge/codex-native-ask-bridge'
 import type { CodexAppServerServerRequest } from './codex-app-server-connection'
 import { disposeCodexServerRequest } from './codex-server-request-disposition'
 import type { CodexJournalTranslationAdmission } from './codex-structured-journal-translation'
@@ -70,7 +71,7 @@ export function deliverCodexServerRequest(
   request: CodexAppServerServerRequest,
   emit: EmitCodexEvent
 ): CodexJournalTranslationAdmission {
-  if (!session) {
+  if (!session || bridgeCodexUserInput(sessionId, session, request)) {
     return { accepted: true }
   }
   const disposition = disposeCodexServerRequest(session.prompts, session.connection, request)
