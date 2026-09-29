@@ -35,6 +35,23 @@ export function requiresOwnerForCheckRecovery(
     : check.checkId.startsWith('status-check:')
 }
 
+export function groupRequiresOwnerForRecovery(
+  review: HostedReviewSnapshot,
+  group: FailedCheckGroup,
+  scope: HostedReviewMergeCheckScope
+): boolean {
+  return group.checks.some((check) => requiresOwnerForCheckRecovery(review, check, scope))
+}
+
+/** The failure the sitter recovers first: one it can act on itself, else the first in order. */
+export function primaryFailedCheckGroup(
+  review: HostedReviewSnapshot,
+  scope: HostedReviewMergeCheckScope
+): FailedCheckGroup | undefined {
+  const groups = failedCheckGroups(review, scope)
+  return groups.find((group) => !groupRequiresOwnerForRecovery(review, group, scope)) ?? groups[0]
+}
+
 /** Checks selected for the current head, ignoring stale optional carry-over. */
 export function currentHeadChecks(
   review: HostedReviewSnapshot,

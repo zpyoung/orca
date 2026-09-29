@@ -3,6 +3,7 @@ import {
   HEIMDALL_OBJECTIVE_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE
 } from '../../shared/fork-heimdall/capability'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
+import type { HeimdallCommandSupport } from './fleet-projection'
 
 /** Strips `roleLaunch` from an objective enrollment when the remote host has not negotiated it. */
 export function enrollmentWithoutUnsupportedRoleLaunch(
@@ -28,8 +29,9 @@ export function enrollmentWithoutUnsupportedRoleLaunch(
 /** Only explicit `required` can degrade to a legacy host; missing scope means `all`. */
 export function enrollmentForMergeCheckScopeCompatibility(
   input: EnrollInput,
-  mergeCheckScopeSupported: boolean
+  mergeCheckScopeSupport: HeimdallCommandSupport
 ): EnrollInput {
+  const mergeCheckScopeSupported = mergeCheckScopeSupport === 'supported'
   if (
     typeof input.kindPayload !== 'object' ||
     input.kindPayload === null ||
@@ -55,6 +57,10 @@ export function enrollmentForMergeCheckScopeCompatibility(
     input.kindPayload.mergeCheckScope !== 'required'
   ) {
     throw new Error(HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_UPDATE_REQUIRED_MESSAGE)
+  }
+  // stripping for a host that may be current would let its `all` default override the choice
+  if (mergeCheckScopeSupport === 'unknown') {
+    return input
   }
 
   const { mergeCheckScope: _mergeCheckScope, ...legacyKindPayload } = input.kindPayload

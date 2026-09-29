@@ -224,7 +224,11 @@ export function normalizePipelineJobs(
     if (required && !stringValue(job.pipeline?.sha)) {
       complete = false
     }
-    const rawState = gitlabJobState(job.status)
+    // an optional manual job never runs unless someone plays it, so waiting on it would never end
+    const rawState =
+      !required && stringValue(job.status).toLowerCase() === 'manual'
+        ? 'skipped'
+        : gitlabJobState(job.status)
     const state = rawState === 'skipped' && allowSkippedPipeline ? 'passed' : rawState
     const checkKey = [pipelinePath, stage, identity.checkKey].filter(Boolean).join('/')
     return {
@@ -316,10 +320,19 @@ export async function loadExternalStatusChecks(
       })
     }
     return { checks, complete: true }
-  } catch {
+  } catch (error) {
     throwIfAborted(signal)
-    return { checks: [], complete: false }
+    // tiers without external status checks reject the endpoint; that absence is not missing evidence
+    return { checks: [], complete: !required && isStatusCheckEndpointUnavailable(error) }
   }
+}
+
+function isStatusCheckEndpointUnavailable(error: unknown): boolean {
+  const text = [
+    error instanceof Error ? error.message : String(error),
+    isRecord(error) ? stringValue(error.stderr) : ''
+  ].join('\n')
+  return isNotFound(error) || /(?:HTTP\s+40[13]|40[13]\s+(?:Forbidden|Unauthorized))/i.test(text)
 }
 
 export async function attachGitLabFailureSignatures(

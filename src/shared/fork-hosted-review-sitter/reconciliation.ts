@@ -80,20 +80,16 @@ function checkFailureDrafts(
   review: HostedReviewSnapshot,
   scope: HostedReviewMergeCheckScope
 ): readonly DiscrepancyDraft[] {
-  const unique = new Map<string, HostedReviewCheckSnapshot>()
+  const unique = new Map<string, { check: HostedReviewCheckSnapshot; requiresOwner: boolean }>()
   for (const check of currentHeadChecks(review, scope).filter((item) => item.state === 'failed')) {
-    const identity = checkFailureEvidenceKey(
-      check,
-      requiresOwnerForCheckRecovery(review, check, scope)
-    )
-    const previous = unique.get(identity)
-    if (!previous || check.observationId.localeCompare(previous.observationId) < 0) {
-      unique.set(identity, check)
-    }
-  }
-  return [...unique.values()].map((check) => {
     const requiresOwner = requiresOwnerForCheckRecovery(review, check, scope)
     const evidenceKey = checkFailureEvidenceKey(check, requiresOwner)
+    const previous = unique.get(evidenceKey)
+    if (!previous || check.observationId.localeCompare(previous.check.observationId) < 0) {
+      unique.set(evidenceKey, { check, requiresOwner })
+    }
+  }
+  return [...unique].map(([evidenceKey, { check, requiresOwner }]) => {
     return {
       kind: 'check-failure',
       evidenceKey,

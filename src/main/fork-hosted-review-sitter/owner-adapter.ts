@@ -15,8 +15,8 @@ import {
 } from '../../shared/fork-hosted-review-sitter/decision-action-builders'
 import {
   deterministicFailureChecks,
-  failedCheckGroups,
-  requiresOwnerForCheckRecovery
+  groupRequiresOwnerForRecovery,
+  primaryFailedCheckGroup
 } from '../../shared/fork-hosted-review-sitter/decision-check-groups'
 import {
   describeHostedReviewInterventions,
@@ -55,7 +55,7 @@ function isHostedReviewSitterSpecificIntervention(
 }
 
 function firstFailedGroup(review: HostedReviewSnapshot, scope: HostedReviewMergeCheckScope) {
-  const group = failedCheckGroups(review, scope)[0]
+  const group = primaryFailedCheckGroup(review, scope)
   if (!group) {
     throw new Error('No failing check in scope to act on')
   }
@@ -146,23 +146,13 @@ export function createHostedReviewOwnerAdapter(): OwnerAdapter<
         (intervention.kind === 'retry-rung' && intervention.rung === 'rerun-check') ||
         (intervention.kind === 'skip-capability' && intervention.capability === 'fixChecks')
       if (requestsRerun) {
-        const [group] = failedCheckGroups(
-          snapshot.world.review,
-          snapshot.world.definition.mergeCheckScope
-        )
-        if (
-          group?.checks.some((check) =>
-            requiresOwnerForCheckRecovery(
-              snapshot.world.review,
-              check,
-              snapshot.world.definition.mergeCheckScope
-            )
-          )
-        ) {
+        const scope = snapshot.world.definition.mergeCheckScope
+        const group = primaryFailedCheckGroup(snapshot.world.review, scope)
+        if (group && groupRequiresOwnerForRecovery(snapshot.world.review, group, scope)) {
           return {
             gate: 'sitter-overrides',
             reason:
-              'This optional status check has no provider rerun endpoint; resolve it through its check provider or request a fix instead.'
+              'This failed check has no provider rerun endpoint; resolve it through its check provider or request a fix instead.'
           }
         }
       }

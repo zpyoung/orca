@@ -108,7 +108,7 @@ export class HeimdallRemoteFleetMirrors {
     }
     const scopeCompatibleInput = enrollmentForMergeCheckScopeCompatibility(
       input,
-      mirror.mergeCheckScopeSupport === 'supported'
+      mirror.mergeCheckScopeSupport
     )
     return enrollRemoteWatcher(
       this.environments,
