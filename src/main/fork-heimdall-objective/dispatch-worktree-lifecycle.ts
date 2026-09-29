@@ -26,11 +26,13 @@ async function removeDispatchWorktree(
     hostId: record.executionHostId
   })
 }
-function workspaceWorkersReleased(
+
+async function workspaceWorkersReleased(
   objectiveStore: ObjectiveStore,
   record: ObjectiveDispatchRecord,
-  workerReleaseConfirmed: (dispatchId: string) => boolean
-): boolean {
+  workerReleaseConfirmed: (dispatchId: string) => boolean,
+  workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
+): Promise<boolean> {
   const owners = new Map<string, ObjectiveDispatchRecord>()
   for (const candidate of objectiveStore.listDispatches(record.watcherId)) {
     if (candidate.workspaceId !== record.workspaceId || candidate.setupState === 'cleaned') {
@@ -50,9 +52,91 @@ function workspaceWorkersReleased(
       owners.set(incarnation, candidate)
     }
   }
-  return [...owners.values()].every(
-    (owner) => owner.dispatchId !== null && workerReleaseConfirmed(owner.dispatchId)
-  )
+  for (const owner of owners.values()) {
+    if (owner.dispatchId !== null && workerReleaseConfirmed(owner.dispatchId)) {
+      continue
+    }
+    try {
+      if (await workerSessionExited(owner)) {
+        continue
+      }
+    } catch {
+      // Losing the ability to inspect a worker is not proof that its process exited.
+    }
+    return false
+  }
+  return true
+}
+
+/** Removes an applied, conflict-free dispatch only after the final node in its lane session. */
+export async function cleanupAppliedObjectiveDispatch(args: {
+  runtime: OrcaRuntimeService
+  objectiveStore: ObjectiveStore
+  record: ObjectiveDispatchRecord
+  lease: LeaseGuard
+  workerReleaseConfirmed: (dispatchId: string) => boolean
+  workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
+}): Promise<boolean> {
+  const laneEnded =
+    args.record.laneTaskKeys.at(-1) === args.record.taskKey || args.record.sessionNodeCount >= 5
+  if (
+    args.record.state !== 'applied' ||
+    !laneEnded ||
+    args.record.conflictPaths.length > 0 ||
+    args.record.setupState === 'cleaned' ||
+    workspaceMustBeRetained(args.objectiveStore, args.record)
+  ) {
+    return false
+  }
+  if (
+    !(await workspaceWorkersReleased(
+      args.objectiveStore,
+      args.record,
+      args.workerReleaseConfirmed,
+      args.workerSessionExited
+    ))
+  ) {
+    return false
+  }
+  await args.lease.assertHeld()
+  const cleanup = { ...args.record, setupState: 'cleanup-pending' as const }
+  args.objectiveStore.saveDispatch(cleanup)
+  await args.lease.assertHeld()
+  await removeDispatchWorktree(args.runtime, cleanup)
+  for (const record of args.objectiveStore.listDispatches(args.record.watcherId)) {
+    await args.lease.assertHeld()
+    if (record.workspaceId === cleanup.workspaceId) {
+      args.objectiveStore.saveDispatch({ ...record, setupState: 'cleaned' })
+    }
+  }
+  return !isPendingWorkspace(cleanup)
+}
+
+/** Cleans eligible applied dispatches without depending on a world snapshot. */
+export async function cleanupAppliedObjectiveDispatches(args: {
+  runtime: OrcaRuntimeService
+  objectiveStore: ObjectiveStore
+  watcherId: string
+  lease: LeaseGuard
+  workerReleaseConfirmed: (dispatchId: string) => boolean
+  workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
+}): Promise<boolean> {
+  let removed = false
+  for (const candidate of args.objectiveStore.listDispatches(args.watcherId)) {
+    const record = args.objectiveStore.getDispatch(candidate.attemptFingerprint)
+    if (!record || record.state !== 'applied' || record.setupState !== 'ready') {
+      continue
+    }
+    if (
+      await cleanupAppliedObjectiveDispatch({
+        ...args,
+        record
+      })
+    ) {
+      removed = true
+    }
+  }
+  return removed
 }
 
 function workspaceMustBeRetained(
@@ -66,39 +150,6 @@ function workspaceMustBeRetained(
         candidate.workspaceId === record.workspaceId &&
         (candidate.state === 'failed' || candidate.conflictPaths.length > 0)
     )
-}
-
-/** Removes an applied, conflict-free dispatch only after the final node in its lane session. */
-export async function cleanupAppliedObjectiveDispatch(args: {
-  runtime: OrcaRuntimeService
-  objectiveStore: ObjectiveStore
-  record: ObjectiveDispatchRecord
-  lease: LeaseGuard
-  workerReleaseConfirmed: (dispatchId: string) => boolean
-}): Promise<void> {
-  const laneEnded =
-    args.record.laneTaskKeys.at(-1) === args.record.taskKey || args.record.sessionNodeCount >= 5
-  if (
-    args.record.state !== 'applied' ||
-    !laneEnded ||
-    args.record.conflictPaths.length > 0 ||
-    args.record.setupState === 'cleaned' ||
-    workspaceMustBeRetained(args.objectiveStore, args.record) ||
-    !workspaceWorkersReleased(args.objectiveStore, args.record, args.workerReleaseConfirmed)
-  ) {
-    return
-  }
-  await args.lease.assertHeld()
-  const cleanup = { ...args.record, setupState: 'cleanup-pending' as const }
-  args.objectiveStore.saveDispatch(cleanup)
-  await args.lease.assertHeld()
-  await removeDispatchWorktree(args.runtime, cleanup)
-  for (const record of args.objectiveStore.listDispatches(args.record.watcherId)) {
-    await args.lease.assertHeld()
-    if (record.workspaceId === cleanup.workspaceId) {
-      args.objectiveStore.saveDispatch({ ...record, setupState: 'cleaned' })
-    }
-  }
 }
 
 /** Watcher deletion is the only path that removes failed or conflict-retained worktrees. */
@@ -138,6 +189,7 @@ export async function reconcileObjectiveDispatchWorktrees(args: {
   objectiveStore: ObjectiveStore
   lease: LeaseGuard
   workerReleaseConfirmed: (dispatchId: string) => boolean
+  workerSessionExited: (owner: ObjectiveDispatchRecord) => Promise<boolean>
 }): Promise<void> {
   const watcherId = args.binding.enrollment.watcherId
   const records = args.objectiveStore.listDispatches(watcherId)
@@ -215,7 +267,14 @@ export async function reconcileObjectiveDispatchWorktrees(args: {
       if (workspaceMustBeRetained(args.objectiveStore, record)) {
         continue
       }
-      if (!workspaceWorkersReleased(args.objectiveStore, record, args.workerReleaseConfirmed)) {
+      if (
+        !(await workspaceWorkersReleased(
+          args.objectiveStore,
+          record,
+          args.workerReleaseConfirmed,
+          args.workerSessionExited
+        ))
+      ) {
         continue
       }
       if (listedWorkspaceIds.has(record.workspaceId)) {
@@ -255,7 +314,8 @@ export async function reconcileObjectiveDispatchWorktrees(args: {
       objectiveStore: args.objectiveStore,
       record,
       lease: args.lease,
-      workerReleaseConfirmed: args.workerReleaseConfirmed
+      workerReleaseConfirmed: args.workerReleaseConfirmed,
+      workerSessionExited: args.workerSessionExited
     })
   }
 }

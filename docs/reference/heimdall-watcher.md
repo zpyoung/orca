@@ -694,9 +694,11 @@ with one commit at landing.
 - **Operator edits.** Uncommitted changes in the enrolled worktree pause the train with the note
   `Merge train paused by operator edits: …`. A parallel run never leaves that tree dirty itself, so
   those changes are always yours. The train resumes once the tree is clean.
-- **Cleanup.** An applied dispatch's worktree is removed. A failed or conflict-retained worktree
-  stays for inspection until the watcher is deleted. Setup or cleanup interrupted by a restart is
-  repaired on boot (`dispatch-worktree-lifecycle.ts`).
+- **Cleanup.** An applied dispatch's worktree is removed on the tick after it applies, once its
+  worker is released or its terminal has exited. If you took over its terminal, the worktree stays
+  until you close that terminal. A failed or conflict-retained worktree stays for inspection until
+  the watcher is deleted. Setup or cleanup interrupted by a restart is repaired on boot
+  (`dispatch-worktree-lifecycle.ts`).
 - **Dispatch branches are never pushed.** Only the enrolled branch lands, through the ladder below.
   On a parallel run, `committed-local-branch` records the enrolled head, which already holds the
   per-node commits, plus one final commit for anything left uncommitted.

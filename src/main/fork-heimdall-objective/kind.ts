@@ -38,7 +38,8 @@ import { readObjectiveJudgmentReports } from '../fork-heimdall/judgment/report-p
 import { createObjectiveActionExecutor } from './action-executor'
 import { reconcileAmendedObjectiveDispatches } from './amendment-dispatch-reconciliation'
 import { createObjectiveConcurrencyPolicy } from './objective-concurrency'
-import { shouldRetainObjectiveWorker } from './dispatch-session'
+import { inspectObjectiveDispatchSession, shouldRetainObjectiveWorker } from './dispatch-session'
+import { cleanupAppliedObjectiveDispatches } from './dispatch-worktree-lifecycle'
 import {
   purgeObjectiveDispatchWorktrees,
   reconcileObjectiveDispatchWorktrees
@@ -270,6 +271,21 @@ export function createObjectiveKind(args: {
         ledger,
         latestEnrollments.get(attempt.watcherId)
       ),
+    async cleanupWorkspaces(_ledger, context) {
+      const watcherId = context.enrollment.watcherId
+      if (args.objectiveStore.listDispatches(watcherId).length === 0) {
+        return false
+      }
+      return cleanupAppliedObjectiveDispatches({
+        runtime: args.runtime,
+        objectiveStore: args.objectiveStore,
+        watcherId,
+        lease: context.lease,
+        workerReleaseConfirmed: context.workerReleaseConfirmed,
+        workerSessionExited: async (owner) =>
+          (await inspectObjectiveDispatchSession(args.runtime, owner)).status === 'gone'
+      })
+    },
     async reconcile(snapshot, ledger, context) {
       await reconcileAmendedObjectiveDispatches({
         ledger,
@@ -284,7 +300,9 @@ export function createObjectiveKind(args: {
           binding: requireObjectiveSnapshotBinding(snapshotBindings, snapshot),
           objectiveStore: args.objectiveStore,
           lease: context.lease,
-          workerReleaseConfirmed: context.workerReleaseConfirmed
+          workerReleaseConfirmed: context.workerReleaseConfirmed,
+          workerSessionExited: async (owner) =>
+            (await inspectObjectiveDispatchSession(args.runtime, owner)).status === 'gone'
         })
       }
     }
