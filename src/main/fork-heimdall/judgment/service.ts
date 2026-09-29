@@ -451,15 +451,9 @@ export class JudgmentService {
           requests.length,
           response.unavailable
         )
-        const recordedReason = withStateNotices(reason, notices)
-        this.dependencies.store.recordOutcome(
-          input.watcherId,
-          identity,
-          'unavailable',
-          recordedReason
-        )
+        this.dependencies.store.recordOutcome(input.watcherId, identity, 'unavailable', reason)
         const recorded = this.dependencies.store.history(input.watcherId, identity)
-        return snapshot(identity, 'unavailable', recorded.answers, recordedReason, notices)
+        return snapshot(identity, 'unavailable', recorded.answers, reason, notices)
       }
 
       this.dependencies.store.recordOutcome(
@@ -478,15 +472,9 @@ export class JudgmentService {
       )
     } catch (error) {
       const reason = evaluationFailureReason(error)
-      const recordedReason = withStateNotices(reason, notices)
-      this.dependencies.store.recordOutcome(
-        input.watcherId,
-        identity,
-        'unavailable',
-        recordedReason
-      )
+      this.dependencies.store.recordOutcome(input.watcherId, identity, 'unavailable', reason)
       const failedHistory = this.dependencies.store.history(input.watcherId, identity)
-      return snapshot(identity, 'unavailable', failedHistory.answers, recordedReason, notices)
+      return snapshot(identity, 'unavailable', failedHistory.answers, reason, notices)
     }
   }
 }

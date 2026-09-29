@@ -438,6 +438,10 @@ describe('durable judgment evaluation', () => {
     expect(first.answers['failure:dispatch-2']).toBeUndefined()
     expect(first.reason).toContain('valid=1/2')
     expect(first.reason).toContain('missing-confidence=1')
+    expect(first.notices.some((notice) => notice.includes('observed'))).toBe(true)
+    for (const notice of first.notices) {
+      expect(first.reason).not.toContain(notice)
+    }
 
     const replay = await new JudgmentService(dependencies).evaluate(input)
     expect(replay.status).toBe('unavailable')
