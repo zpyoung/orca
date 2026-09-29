@@ -1,3 +1,4 @@
+import { activeObjectiveRevision } from '../../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/detail-types'
 import {
   numberField,
@@ -99,11 +100,7 @@ function reportWasConsumed(candidate: SubjectGroup, world: ObjectiveWorld): bool
 }
 
 function isObsoletePlannerHistory(candidate: SubjectGroup, world: ObjectiveWorld): boolean {
-  const activeNumber = world.plan.revisions.reduce(
-    (highest, revision) =>
-      revision.status === 'approved' ? Math.max(highest, revision.number) : highest,
-    0
-  )
+  const activeNumber = activeObjectiveRevision(world)?.number ?? 0
   if (
     activeNumber === 0 ||
     candidate.attempts.some(
@@ -131,10 +128,7 @@ export function buildOmissionUnits(
 ): OmissionUnit[] {
   const units: OmissionUnit[] = []
   let ordinal = 0
-  if (
-    world.contract.existingPlan !== undefined &&
-    world.plan.revisions.some((revision) => revision.status === 'approved')
-  ) {
+  if (world.contract.existingPlan !== undefined && world.plan.revisions.length > 0) {
     units.push({ ...emptyUnit(ordinal++), existingPlan: true })
   }
 
@@ -143,11 +137,11 @@ export function buildOmissionUnits(
   const claimedJudgmentReports = new Set<number>()
   const escalation = activeEscalationIds(ledger)
   const protectedRevisionSubjects = new Set<string>()
-  const superseded = [...world.plan.revisions]
-    .filter((revision) => revision.status === 'superseded')
+  const historicalRevisions = [...world.plan.revisions]
+    .filter((revision) => revision.status === 'superseded' || revision.status === 'rejected')
     .sort((left, right) => left.number - right.number)
 
-  for (const revision of superseded) {
+  for (const revision of historicalRevisions) {
     const subjects = new Set<string>()
     if (revision.createdByDispatchId) {
       subjects.add(revision.createdByDispatchId)
