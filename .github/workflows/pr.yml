@@ -110,7 +110,7 @@ jobs:
           DIFF_BASE="$(node config/scripts/git-pull-request-diff-base.mjs "$BASE_SHA")"
           # Why --no-renames: name-only rename detection can report only the destination.
           # A code file moved under docs/ must still expose its code-side deletion.
-          git diff --name-only --no-renames --diff-filter=ACDMR --merge-base "$BASE_SHA" "$HEAD_SHA" \
+          git diff --name-only --no-renames --diff-filter=ACDMR "$DIFF_BASE" HEAD \
             > "$RUNNER_TEMP/changed-paths.txt"
           echo "Changed paths:"
           cat "$RUNNER_TEMP/changed-paths.txt"
@@ -129,9 +129,9 @@ jobs:
         run: |
           set -euo pipefail
           BASE="${{ github.event.pull_request.base.sha }}"
-          HEAD="${{ github.event.pull_request.head.sha }}"
+          DIFF_BASE="$(node config/scripts/git-pull-request-diff-base.mjs "$BASE")"
           # Use a file here too so sync-sized diffs cannot exhaust Node's stdin pipe buffer.
-          git diff --name-only --diff-filter=AMCR --merge-base "$BASE" "$HEAD" \
+          git diff --name-only --diff-filter=AMCR "$DIFF_BASE" HEAD \
             > "$RUNNER_TEMP/e2e-changed-paths.txt"
           # Source routes are executable contracts so a test can prove exact
           # authorities, exclusions, and sentinels without evaluating workflow shell.
@@ -228,6 +228,7 @@ jobs:
         if: needs.code_paths.outputs.mobile_dependencies == 'true'
 
       - name: Enforce changed-code quality
+        id: changed-code-quality
         if: fromJSON(needs.code_paths.outputs.changed_count) <= 500
         run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha }}"
 

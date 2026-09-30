@@ -8,6 +8,10 @@ import type { RuntimeTerminalWaitBlockedReason } from '../../shared/runtime-type
 import type { TuiAgent } from '../../shared/tui-agent'
 import { findAntigravityReadyPromptIndex } from './antigravity-terminal-readiness'
 import {
+  findCodexScreenReadyPromptIndex,
+  isCodexComposerReadyScreen
+} from './codex-terminal-readiness'
+import {
   isTerminalWaitWhitespace,
   startOfLastLines,
   startOfLastNonBlankLines

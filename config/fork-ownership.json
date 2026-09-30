@@ -6024,12 +6024,6 @@
       "ledger": "docs/fork-upstreaming.md#bug-2-relay-and-ssh-environment-dependent-failures"
     },
     {
-      "path": "config/scripts/hourly-build-version.test.mjs",
-      "reason": "Resolves the unpublished-release base explicitly instead of through getHourlyBuildIdentity, which reads this repo's package.json and pins the case to a tree at or below 1.4.203 — upstream's own v1.4.206 tag fails it too.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
-    },
-    {
       "path": "config/scripts/ci-dependency-download-cache.test.mjs",
       "reason": "Contracts for the fork-owned PR job graph. Upstream asserts its Windows lane still carries the addon checks; this fork removed the Windows PR lanes, so the case asserts the removal instead.",
       "status": "permanent"

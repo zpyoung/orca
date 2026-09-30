@@ -5,8 +5,8 @@ import type {
 import { hasAntigravityTerminalHeader } from './antigravity-terminal-readiness'
 import {
   detectTerminalWaitBlockedReason,
-  isKnownReadyPromptPreview,
-  isMuseReadyPromptPreview,
+  isKnownReadyPromptBody,
+  isQuietReadyScreenBody,
   tuiIdleNeedsVisibleScreenProbe
 } from './terminal-wait-detection'
 import {
