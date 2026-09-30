@@ -728,7 +728,9 @@ body:has([data-slot='dialog-overlay'], [data-slot='sheet-overlay']) [data-sonner
   mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 100%);
 }
 
-.terminal-tab-strip--fade-end:not(.terminal-tab-strip--fade-start) {
+/* Why: the status bar's usage cluster reuses the end fade so a clipped cluster never cuts a glyph. */
+.terminal-tab-strip--fade-end:not(.terminal-tab-strip--fade-start),
+.status-bar-usage-cluster[data-overflowing='true'] {
   -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1.5rem), transparent);
   mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1.5rem), transparent);
 }
@@ -2867,6 +2869,10 @@ html.native-shell .app-layout {
   max-width: 420px;
 }
 
+/* Why: embedded card in the diff flow, not a floating popup — use the
+   documented "subtle lift" tier (shadow-xs) rather than a hand-rolled shadow.
+   Restated under `.dark` (same value) so this still outranks the base
+   `.orca-diff-comment-popover` dark shadow at equal selector specificity. */
 .orca-diff-comment-inline > .orca-diff-comment-draft-card {
   position: relative;
   left: auto;
@@ -2874,15 +2880,11 @@ html.native-shell .app-layout {
   width: 100%;
   max-width: 420px;
   z-index: 1;
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.08),
-    0 4px 12px rgba(0, 0, 0, 0.08);
+  @apply shadow-xs;
 }
 
 .dark .orca-diff-comment-inline > .orca-diff-comment-draft-card {
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.35),
-    0 4px 14px rgba(0, 0, 0, 0.28);
+  @apply shadow-xs;
 }
 
 .orca-diff-comment-draft-margin {

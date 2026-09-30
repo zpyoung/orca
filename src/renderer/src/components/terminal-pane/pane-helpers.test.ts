@@ -70,6 +70,8 @@ describe('fitAndFocusPanes', () => {
       )
     }
 
+    matches = vi.fn(() => false)
+
     closest: (selector: string) => Element | null
   }
 

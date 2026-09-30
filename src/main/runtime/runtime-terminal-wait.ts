@@ -34,6 +34,7 @@ type RuntimeTerminalWaitDependencies = {
   quiescenceMs: number
   getPaneAgent(ptyId: string | null | undefined): TuiAgent | null
   getFirstPartyAgentStatus(ptyId: string | null | undefined): FirstPartyAgentStatus
+  readScreenLines(ptyId: string | null | undefined): readonly string[] | null
   startVisibleReadProbe(
     waiter: TerminalWaiter,
     waiterTimeoutMs: number,
@@ -51,24 +52,30 @@ export class RuntimeTerminalWait {
   /** Why one helper per record kind: every satisfaction site must rank the same way,
    *  or the immediate check and the poll disagree about the same pane. */
   private ptySatisfied(pty: RuntimePtyWorktreeRecord, waitText: string): boolean {
+    const agent = this.deps.getPaneAgent(pty.ptyId)
     return isTuiIdleSatisfied({
       record: pty,
       readPositiveBodyEvidence: () =>
-        this.deps.getAdoptedPtyIdleStatus(pty) === 'idle' || isKnownReadyPromptPreview(waitText),
-      readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
-      agent: this.deps.getPaneAgent(pty.ptyId),
+        this.deps.getAdoptedPtyIdleStatus(pty) === 'idle' ||
+        isKnownReadyPromptBody(waitText, agent, () => this.deps.readScreenLines(pty.ptyId)),
+      readQuietReadyBodyEvidence: () =>
+        isQuietReadyScreenBody(waitText, agent, () => this.deps.readScreenLines(pty.ptyId)),
+      agent,
       firstPartyStatus: this.deps.getFirstPartyAgentStatus(pty.ptyId),
       quiescenceMs: this.deps.quiescenceMs
     })
   }
 
   private leafSatisfied(leaf: RuntimeLeafRecord, waitText: string): boolean {
+    const agent = this.deps.getPaneAgent(leaf.ptyId)
     return isTuiIdleSatisfied({
       record: leaf,
       rendererTitle: leaf.paneTitle ?? this.deps.getTabTitle(leaf.tabId),
-      readPositiveBodyEvidence: () => isKnownReadyPromptPreview(waitText),
-      readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
-      agent: this.deps.getPaneAgent(leaf.ptyId),
+      readPositiveBodyEvidence: () =>
+        isKnownReadyPromptBody(waitText, agent, () => this.deps.readScreenLines(leaf.ptyId)),
+      readQuietReadyBodyEvidence: () =>
+        isQuietReadyScreenBody(waitText, agent, () => this.deps.readScreenLines(leaf.ptyId)),
+      agent,
       firstPartyStatus: this.deps.getFirstPartyAgentStatus(leaf.ptyId),
       quiescenceMs: this.deps.quiescenceMs
     })

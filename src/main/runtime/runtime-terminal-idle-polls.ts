@@ -2,8 +2,8 @@ import { isShellProcess, type AgentStatus } from '../../shared/agent-detection'
 import type { RuntimeTerminalWait } from '../../shared/runtime-types'
 import {
   detectTerminalWaitBlockedReason,
-  isKnownReadyPromptPreview,
-  isMuseReadyPromptPreview
+  isKnownReadyPromptBody,
+  isQuietReadyScreenBody
 } from './terminal-wait-detection'
 import {
   buildPtyTerminalWaitBlockedResult,
@@ -42,6 +42,7 @@ type RuntimeTerminalIdlePollDependencies = {
   getAdoptedPtyIdleStatus(pty: RuntimePtyWorktreeRecord): AgentStatus | null
   getPaneAgent(ptyId: string | null | undefined): TuiAgent | null
   getFirstPartyAgentStatus(ptyId: string | null | undefined): FirstPartyAgentStatus
+  readScreenLines(ptyId: string | null | undefined): readonly string[] | null
   /** Re-read the record the waiter registered against; see `liveLeaf` below. */
   getLiveLeaf(leaf: RuntimeLeafRecord): RuntimeLeafRecord
   resolve(waiter: TerminalWaiter, result: RuntimeTerminalWait): void
@@ -128,8 +129,10 @@ export class RuntimeTerminalIdlePolls {
         isTuiIdleSatisfied({
           record: leaf,
           rendererTitle: leaf.paneTitle ?? this.deps.getTabTitle(leaf.tabId),
-          readPositiveBodyEvidence: () => isKnownReadyPromptPreview(waitText),
-          readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
+          readPositiveBodyEvidence: () =>
+            isKnownReadyPromptBody(waitText, agent, () => this.deps.readScreenLines(leaf.ptyId)),
+          readQuietReadyBodyEvidence: () =>
+            isQuietReadyScreenBody(waitText, agent, () => this.deps.readScreenLines(leaf.ptyId)),
           agent,
           firstPartyStatus: this.deps.getFirstPartyAgentStatus(leaf.ptyId),
           quiescenceMs: this.deps.quiescenceMs
@@ -196,8 +199,9 @@ export class RuntimeTerminalIdlePolls {
           record: pty,
           readPositiveBodyEvidence: () =>
             this.deps.getAdoptedPtyIdleStatus(pty) === 'idle' ||
-            isKnownReadyPromptPreview(waitText),
-          readMuseReadyBodyEvidence: () => isMuseReadyPromptPreview(waitText),
+            isKnownReadyPromptBody(waitText, agent, () => this.deps.readScreenLines(pty.ptyId)),
+          readQuietReadyBodyEvidence: () =>
+            isQuietReadyScreenBody(waitText, agent, () => this.deps.readScreenLines(pty.ptyId)),
           agent,
           firstPartyStatus: this.deps.getFirstPartyAgentStatus(pty.ptyId),
           quiescenceMs: this.deps.quiescenceMs
