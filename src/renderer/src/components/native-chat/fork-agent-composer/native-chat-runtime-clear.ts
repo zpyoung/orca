@@ -41,7 +41,7 @@ export function clearUnsubmittedAgentInput(
   const [first = '', ...rest] = splitClearBurst(
     options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
   )
-  sendRuntimePtyInput(settings, ptyId, first)
+  sendRuntimePtyInput(settings, ptyId, first, 'driving')
   return new Promise<void>((resolve) => {
     if (rest.length === 0) {
       resolve()
@@ -50,7 +50,7 @@ export function clearUnsubmittedAgentInput(
     rest.forEach((chunk, index) => {
       delay((index + 1) * NATIVE_CHAT_CLEAR_CHUNK_GAP_MS, () => {
         try {
-          sendRuntimePtyInput(settings, ptyId, chunk)
+          sendRuntimePtyInput(settings, ptyId, chunk, 'driving')
         } finally {
           if (index === rest.length - 1) {
             resolve()
@@ -75,12 +75,15 @@ function sendClearBurstAccepted(
         accepted
           ? new Promise<boolean>((resolve, reject) => {
               delay(NATIVE_CHAT_CLEAR_CHUNK_GAP_MS, () => {
-                sendRuntimePtyInputAcceptance(settings, ptyId, chunk).then(resolve, reject)
+                sendRuntimePtyInputAcceptance(settings, ptyId, chunk, 'driving').then(
+                  resolve,
+                  reject
+                )
               })
             })
           : false
       ),
-    sendRuntimePtyInputAcceptance(settings, ptyId, first)
+    sendRuntimePtyInputAcceptance(settings, ptyId, first, 'driving')
   )
 }
 

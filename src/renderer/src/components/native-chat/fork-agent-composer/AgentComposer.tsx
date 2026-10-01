@@ -57,6 +57,7 @@ export type AgentComposerCoreState = {
   imeEnterGesture: ReturnType<typeof useImeEnterGestureOwnership>
   draft: string
   setDraft: (next: string | ((previous: string) => string)) => void
+  flushDraftAppends: () => void
   caret: number
   setCaret: Dispatch<SetStateAction<number>>
   history: HistoryState
@@ -89,12 +90,15 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     onStop,
     onOptimisticSendCanceled
   } = props
-  const { draft, setDraft } = useAgentComposerDraft(paneKey)
+  const imeEnterGesture = useImeEnterGestureOwnership()
+  const { draft, setDraft, flushDraftAppends } = useAgentComposerDraft(
+    paneKey,
+    imeEnterGesture.isComposing
+  )
   const [caret, setCaret] = useState(draft.length)
   const { history, setHistory } = useAgentComposerHistory(paneKey)
   const [activeSuggestion, setActiveSuggestion] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
-  const imeEnterGesture = useImeEnterGestureOwnership()
   // Why: v1.4.200 widened the app-menu ref to NativeChatComposerInput for upstream's
   // contenteditable editor. This composer's field is a real <textarea>, so the ref
   // only ever holds one, and the overlay and scroll sync need the element itself.
@@ -156,7 +160,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     if (!target) {
       return
     }
-    sendRuntimePtyInput(target.settings, target.ptyId, ESC)
+    sendRuntimePtyInput(target.settings, target.ptyId, ESC, 'driving')
   }, [cancelPendingSends, isWorking, onStop, resolveTarget])
 
   return {
@@ -164,6 +168,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     imeEnterGesture,
     draft,
     setDraft,
+    flushDraftAppends,
     caret,
     setCaret,
     history,
@@ -370,6 +375,7 @@ export function useAgentComposerCompose(
       if (element.value !== core.draft) {
         handleDraftChange(element.value, element)
       }
+      core.flushDraftAppends()
       bridges?.flushPendingAttachments?.()
     },
     onPaste: (event) => handlePasteEvent(event),

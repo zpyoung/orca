@@ -95,7 +95,12 @@ export function useNativeChatInteractiveSend(
       if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
         return
       }
-      sendRuntimePtyInput(getSettingsForAgentTabRuntimeOwner(terminalTabId), targetPtyId, raw)
+      sendRuntimePtyInput(
+        getSettingsForAgentTabRuntimeOwner(terminalTabId),
+        targetPtyId,
+        raw,
+        'driving'
+      )
     },
     [terminalTabId, targetPtyId]
   )

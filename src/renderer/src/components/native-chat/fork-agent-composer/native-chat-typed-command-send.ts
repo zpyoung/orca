@@ -49,6 +49,7 @@ export async function typeNativeChatCommand(
           target.settings,
           target.ptyId,
           key,
+          'driving',
           () => invalidated || signal?.aborted === true
         ))
           ? 'accepted'
@@ -92,6 +93,7 @@ export function sendNativeChatTypedCommand(
             target.settings,
             target.ptyId,
             key,
+            'driving',
             () => isCancelled() || controller.signal.aborted
           ))
             ? 'accepted'

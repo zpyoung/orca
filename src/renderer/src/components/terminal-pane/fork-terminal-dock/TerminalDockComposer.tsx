@@ -7,6 +7,7 @@ import type { SendOutcome } from '../../native-chat/fork-agent-composer/native-c
 import type { AgentComposerHandle } from '../../native-chat/fork-agent-composer/agent-composer-types'
 import { NativeChatComposer } from '../../native-chat/NativeChatComposer'
 import { NativeChatInteractiveCard } from '../../native-chat/NativeChatInteractiveCard'
+import { useNativeChatInteractivePromptCard } from '../../native-chat/use-native-chat-interactive-prompt-card'
 import { selectNativeChatRuntimeEnvironmentId } from '../../native-chat/native-chat-runtime-owner'
 import {
   useNativeChatInteractiveSend,
@@ -87,16 +88,19 @@ function TerminalDockCardComposer({
     [session.messages, status]
   )
   const [cardActive, setCardActive] = useState(false)
+  const promptCard = useNativeChatInteractivePromptCard({
+    paneKey: props.paneKey,
+    messages: session.messages,
+    transcriptSettled: session.readPhase === 'ready'
+  })
 
   return (
     <>
       <div className="absolute inset-x-0 bottom-full z-30" data-terminal-dock-card-overlay="">
         <NativeChatInteractiveCard
-          paneKey={props.paneKey}
+          card={promptCard}
           send={interactiveSend}
           canSend={props.canSend}
-          messages={session.messages}
-          transcriptSettled={session.readPhase === 'ready'}
           onShowingCardChange={setCardActive}
           answerInputRef={answerInputRef}
         />

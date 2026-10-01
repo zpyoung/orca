@@ -125,7 +125,7 @@ describe('native-chat runtime quarantine boundary', () => {
     sendNativeChatAskAnswer(TARGET, [{ raw: '1' }, { raw: '2' }], onSettled)
     await vi.advanceTimersByTimeAsync(0)
     expect(verifiedWriteBytes()).toEqual(['1'])
-    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[3]
+    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[4]
     expect(typeof isCancelled).toBe('function')
 
     armTerminalInputQuarantine(TAB)
@@ -144,7 +144,7 @@ describe('native-chat runtime quarantine boundary', () => {
     sendRuntimePtyInputVerified.mockReturnValueOnce(body.promise)
     const pending = sendNativeChatMessageVerified(TARGET, '/model sonnet')
     await vi.advanceTimersByTimeAsync(0)
-    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[3]
+    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[4]
     expect(typeof isCancelled).toBe('function')
 
     armTerminalInputQuarantine(TAB)

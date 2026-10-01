@@ -45,28 +45,6 @@ recorded with `config/scripts/capture-agent-pty-transcript.mjs` against Claude C
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Structured preamble waits for admitted settlement
-
-**What:** `sendStructuredWorkerPreamble` in
-`src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts` waits on
-`host.waitForSendSettlement` when the preamble submission comes back `pending`, then judges the
-settled submission. A wait that times out or fails still reports `operation_unknown`.
-
-**Why upstream, not isolated:** since the settle-on-admission change (#19863), a Claude structured
-send returns `admitted` as soon as the frame is written, and the submission stays `pending` until
-the provider echo. The preamble check accepts only `accepted`, so every Claude structured worker
-start settles `outcome_unknown` although the worker is running, and Heimdall's owner turns, which
-use the same function, are never recorded as sent (ledger bug-194). The host already exposes the
-settlement wait for clients that predate admitted pending replies; the preamble sender is one of
-those clients. The defect is in upstream's shared function, so a fork copy would only move it.
-
-**Paths:**
-
-- `src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts`
-- `src/main/runtime/rpc/methods/orchestration-structured-worker-session.test.ts`
-
-**Status:** pending-upstream. Not yet submitted.
-
 ## Folder workspace scheduler authority
 
 **What:** exposes the existing execution-host-to-scheduler-owner mapping independently of a
@@ -653,54 +631,28 @@ remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Hourly base case is pinned to the repo's own package version
+## Mobile workflow tests ahead of their release
 
-**Defect:** `config/scripts/hourly-build-version.test.mjs`'s case *stays on the already-shipped
-hourly base after a buggy main release is unpublished* calls `getHourlyBuildIdentity`, which reads
-the repo's own `package.json`, and then asserts a hardcoded `1.4.203` base. The case therefore only
-holds while the tree sits at or below 1.4.203. It is not a fork problem: upstream's own v1.4.206 tag
-carries `"version": "1.4.206"` and fails the same assertion with `1.4.206-hourly.202609142000`.
-Upstream does not see it because its unit matrix runs on `main`, whose `package.json` is still
-`1.4.197` — the test and both implementation modules are byte-identical between `upstream/main` and
-the v1.4.206 tag.
+**Defect:** the v1.4.218 cut synced `.github/workflows/mobile.yml` from `main` (`4e93d96e4e`),
+which already carried #23732's workflow change, but left the release branch's tests at the older
+shape. The tag therefore fails its own suite: `mobile-recording-pin-checkout.test.mjs` reads a
+`recording-pin` job the synced workflow no longer has, and `mobile-release-check-scope.test.mjs`
+does not expect the newly gated `Summarize RPC recording changes` step.
 
-**Fork change:** resolve the base through `resolveDevChannelBaseVersion('1.4.203', publishedVersions)`
-and assert `createHourlyBuildVersion` and `nextHourlyBuildNumber` against it. Every assertion stays
-exact and the same three behaviours are covered; only the accidental dependency on whatever version
-the tree happens to carry is removed.
+**Fork change:** none of its own. Mirrors `e594cb06af` (#23732) for the tests only: delete the
+recording-pin checkout test and exclude the summary step from the gated-step assertion. The
+workflow itself stays exactly as tagged.
 
-**Why upstream, not isolated:** the case belongs to upstream's own suite and the fix is a one-scenario
-repair of its fixture. A fork copy would have to be replayed every sync for a file the fork has no
-stake in.
-
-**Paths:** `config/scripts/hourly-build-version.test.mjs`.
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Focused Playwright file selection
-
-**Defect:** Playwright 1.63, which v1.4.215 adopted, reads the `--` that `pnpm run test:e2e --
-<spec>` forwards as the end of file selection. The real-IME workflow's deterministic step therefore
-runs all 841 e2e tests instead of `terminal-ime-exact-byte.spec.ts`, and the job times out at 25
-minutes. The golden-e2e workflow and the native IBus runner have the same shape.
-
-**Fork change:** none of its own. It is upstream's fix, #23270 (`dffb3498e2`), cherry-picked whole:
-drop the forwarded `--` from each focused command and add upstream's contract test for it.
-
-**Why upstream, not isolated:** it already is upstream, on `main`. Neither v1.4.215 nor v1.4.216
-carries it, and without an exception the next sync resets these files to a tag that still has the
-bug.
+**Why upstream, not isolated:** both are upstream's own contract tests for an upstream workflow;
+the fix already exists on `main`.
 
 **Paths:**
 
-- `.github/workflows/terminal-ime-e2e.yml`
-- `.github/workflows/golden-e2e-experiment.yml`
-- `config/scripts/run-terminal-ibus-hangul-e2e.mjs`
-- `config/scripts/terminal-ime-e2e-workflow.test.mjs`
-- `config/scripts/playwright-focused-workflow-selection.test.mjs`
+- `config/scripts/mobile-recording-pin-checkout.test.mjs` (deleted)
+- `config/scripts/mobile-release-check-scope.test.mjs`
 
-**Status:** merged upstream, awaiting a stable tag. Drop these exceptions at the first sync whose tag
-contains `dffb3498e2`.
+**Status:** merged upstream, awaiting a stable tag. Drop both exceptions at the first sync whose
+tag contains `e594cb06af`.
 
 ## Repeatable CLI flags are not globally exclusive
 

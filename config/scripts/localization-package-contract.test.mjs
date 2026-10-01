@@ -14,7 +14,10 @@ describe('localization package scripts', () => {
   it('keeps the runtime-required English subset generated and checked', () => {
     expect(scripts['verify:localization-runtime-catalog']).toBeDefined()
     expect(scripts['sync:localization-runtime-catalog']).toBeDefined()
-    expect(scripts.lint).toContain('verify:localization-runtime-catalog')
+    expect(scripts['verify:localization-catalogs']).toBe(
+      'pnpm run verify:localization-catalog && pnpm run verify:localization-runtime-catalog'
+    )
+    expect(scripts.lint).toContain('verify:localization-catalogs')
   })
 
   it('does not expose whole-catalog translation and repair commands', () => {

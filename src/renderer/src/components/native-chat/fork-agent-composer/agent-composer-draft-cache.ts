@@ -6,6 +6,11 @@
 // mirrors agent-composer-history-cache's subscribe/notify shape, since the dock
 // and native-chat view can both hold a live mount against the same pane.
 
+import {
+  clearNativeChatDraftCacheForTests,
+  readNativeChatDraftCache,
+  writeNativeChatDraftCache
+} from '../native-chat-draft-cache'
 import { createSubscribableScopeCache } from './agent-composer-scope-cache'
 
 const draftCache = createSubscribableScopeCache<string>({
@@ -14,7 +19,27 @@ const draftCache = createSubscribableScopeCache<string>({
 })
 
 export const readAgentComposerDraftCache = draftCache.read
-export const writeAgentComposerDraftCache = draftCache.write
+
+/**
+ * Also mirrors the draft into upstream's native-chat draft cache, which is where a
+ * withdrawn structured send is appended back (`appendNativeChatDraftCache`), so that
+ * append lands after what is actually typed.
+ */
+export function writeAgentComposerDraftCache(scopeKey: string, draft: string): void {
+  writeNativeChatDraftCache(scopeKey, draft)
+  draftCache.write(scopeKey, draft)
+}
+
+/**
+ * Adopts text appended to the native-chat cache while no composer for `scopeKey`
+ * was mounted to hear it. Every fork write mirrors there, so the two differ only then.
+ */
+export function adoptNativeChatDraftAppends(scopeKey: string): void {
+  const appended = readNativeChatDraftCache(scopeKey)
+  if (appended !== '' && appended !== draftCache.read(scopeKey)) {
+    draftCache.write(scopeKey, appended)
+  }
+}
 
 /**
  * Subscribes to writes for `scopeKey`. Fires once immediately with the
@@ -24,4 +49,7 @@ export const writeAgentComposerDraftCache = draftCache.write
  */
 export const subscribeAgentComposerDraftCache = draftCache.subscribe
 
-export const clearAgentComposerDraftCacheForTests = draftCache.clearForTests
+export function clearAgentComposerDraftCacheForTests(): void {
+  draftCache.clearForTests()
+  clearNativeChatDraftCacheForTests()
+}

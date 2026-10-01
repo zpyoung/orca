@@ -41,6 +41,7 @@ export function sendNativeChatMessageVerifiedQueued(
           target.settings,
           target.ptyId,
           buildNativeChatPasteBytes(text),
+          'driving',
           () => isCancelled() || signal?.aborted === true
         )
           .then((bodyAccepted) => {
@@ -57,6 +58,7 @@ export function sendNativeChatMessageVerifiedQueued(
                 target.settings,
                 target.ptyId,
                 NATIVE_CHAT_SUBMIT,
+                'driving',
                 () => isCancelled() || signal?.aborted === true
               )
                 .then((sent) => {

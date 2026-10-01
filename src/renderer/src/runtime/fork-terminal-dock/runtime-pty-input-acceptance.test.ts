@@ -65,7 +65,8 @@ describe('runtime terminal input acceptance', () => {
         sendRuntimePtyInputAcceptance(
           { activeRuntimeEnvironmentId: 'env-2' },
           'remote:env-1@@terminal-stale',
-          'x'
+          'x',
+          'driving'
         )
       ).resolves.toBe(false)
 
@@ -83,7 +84,8 @@ describe('runtime terminal input acceptance', () => {
         sendRuntimePtyInputAcceptance(
           { activeRuntimeEnvironmentId: 'env-2' },
           'remote:env-1@@terminal-1',
-          'x'
+          'x',
+          'driving'
         )
       ).resolves.toBe(false)
 
@@ -106,7 +108,8 @@ describe('runtime terminal input acceptance', () => {
         const accepted = sendRuntimePtyInputAcceptance(
           { activeRuntimeEnvironmentId: 'env-2' },
           'remote:env-1@@terminal-1',
-          text
+          text,
+          'driving'
         )
 
         await vi.runAllTimersAsync()
@@ -141,7 +144,8 @@ describe('runtime terminal input acceptance', () => {
         sendRuntimePtyInputAcceptance(
           { activeRuntimeEnvironmentId: 'env-2' },
           'remote:env-1@@terminal-1',
-          'x'
+          'x',
+          'driving'
         )
       ).resolves.toBe(true)
 
@@ -165,10 +169,15 @@ describe('runtime terminal input acceptance', () => {
       })
 
       await expect(
-        sendRuntimePtyInputAcceptance({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x')
+        sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: null },
+          'local-pty',
+          'x',
+          'driving'
+        )
       ).resolves.toBe(true)
 
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
       expect(localWrite).not.toHaveBeenCalled()
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
         expect.any(Number)
@@ -179,17 +188,24 @@ describe('runtime terminal input acceptance', () => {
       localWriteInputAccepted.mockResolvedValue(false)
 
       await expect(
-        sendRuntimePtyInputAcceptance({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x')
+        sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: null },
+          'local-pty',
+          'x',
+          'driving'
+        )
       ).resolves.toBe(false)
 
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey).toEqual({})
     })
 
     it('leaves the fire-and-forget local write path untouched', async () => {
-      expect(sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x')).toBe(true)
+      expect(
+        sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x', 'driving')
+      ).toBe(true)
 
-      expect(localWrite).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWrite).toHaveBeenCalledWith('local-pty', 'x', 'driving')
       expect(localWriteInputAccepted).not.toHaveBeenCalled()
     })
 
@@ -202,6 +218,7 @@ describe('runtime terminal input acceptance', () => {
           { activeRuntimeEnvironmentId: null },
           'local-pty',
           text,
+          'driving',
           () => cancelled
         )
         cancelled = true
@@ -224,6 +241,7 @@ describe('runtime terminal input acceptance', () => {
           { activeRuntimeEnvironmentId: 'env-2' },
           'remote:env-1@@terminal-1',
           text,
+          'driving',
           () => cancelled
         )
         cancelled = true
@@ -245,10 +263,11 @@ describe('runtime terminal input acceptance', () => {
           { activeRuntimeEnvironmentId: null },
           'local-pty',
           'x',
+          'driving',
           () => false
         )
       ).resolves.toBe(true)
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
     })
   })
 })

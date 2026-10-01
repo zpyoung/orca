@@ -291,3 +291,17 @@ export function restoreNativeChatAttachmentCache(
   writeNativeChatAttachmentCache(scopeKey, restored)
   return restored
 }
+
+/** Puts settled images back after whatever is attached, and shows them in a mounted composer. */
+export function appendNativeChatAttachmentCache(
+  scopeKey: string,
+  appended: readonly AgentComposerImageAttachment[]
+): void {
+  if (appended.length === 0) {
+    return
+  }
+  writeNativeChatAttachmentCache(scopeKey, [
+    ...readNativeChatAttachmentCache(scopeKey),
+    ...appended
+  ])
+}

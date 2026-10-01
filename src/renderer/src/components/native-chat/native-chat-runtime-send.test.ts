@@ -194,7 +194,8 @@ describe('sendNativeChatMessage', () => {
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
-      NATIVE_CHAT_SUBMIT
+      NATIVE_CHAT_SUBMIT,
+      'driving'
     )
     expect(mergedWriteBytes()).toHaveLength(6)
   })
@@ -245,7 +246,7 @@ describe('sendNativeChatMessage', () => {
     const bodyCall = sendRuntimePtyInputAcceptance.mock.calls.find(
       (call) => call[2] === buildNativeChatPasteBytes('hi')
     )
-    const isCancelled = bodyCall?.[3] as (() => boolean) | undefined
+    const isCancelled = bodyCall?.[4] as (() => boolean) | undefined
     expect(isCancelled).toBeInstanceOf(Function)
     expect(isCancelled?.()).toBe(false)
 
@@ -543,6 +544,7 @@ describe('sendNativeChatMessageVerified', () => {
       SETTINGS,
       PTY,
       buildNativeChatPasteBytes('/model sonnet'),
+      'driving',
       expect.any(Function)
     )
 
@@ -553,6 +555,7 @@ describe('sendNativeChatMessageVerified', () => {
       SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
+      'driving',
       expect.any(Function)
     )
     expect(
@@ -594,6 +597,7 @@ describe('sendNativeChatMessageVerified', () => {
       SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
+      'driving',
       expect.any(Function)
     )
   })
@@ -638,13 +642,14 @@ describe('sendNativeChatMessageVerified', () => {
       SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
+      'driving',
       expect.any(Function)
     )
 
     // Only once the option command's CR has landed does the card's queued
     // selector write fire.
     await vi.runAllTimersAsync()
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving')
   })
 })
 
@@ -742,6 +747,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
       SETTINGS,
       PTY,
       buildNativeChatPasteBytes('what do you see?'),
+      'driving',
       expect.any(Function)
     )
 
@@ -749,7 +755,8 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
-      NATIVE_CHAT_SUBMIT
+      NATIVE_CHAT_SUBMIT,
+      'driving'
     )
     expect(totalWriteCalls()).toBe(4)
   })
@@ -775,7 +782,8 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
-      NATIVE_CHAT_SUBMIT
+      NATIVE_CHAT_SUBMIT,
+      'driving'
     )
   })
 
@@ -825,7 +833,8 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledWith(
       SETTINGS,
       PTY,
-      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      'driving'
     )
     expect(
       sendRuntimePtyInputAcceptance.mock.calls.some(
@@ -860,7 +869,7 @@ describe('empty prompt submit', () => {
   it('submits an empty prompt with a bare Enter', () => {
     submitNativeChatPrompt(TARGET)
     expect(sendRuntimePtyInput).toHaveBeenCalledOnce()
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT, 'driving')
   })
 })
 
@@ -895,16 +904,17 @@ describe('sendNativeChatAskAnswer', () => {
     )
 
     vi.advanceTimersByTime(0)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '1')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '1', 'driving')
 
     vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving')
 
     vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
     expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
-      buildNativeChatPasteBytes('custom answer')
+      buildNativeChatPasteBytes('custom answer'),
+      'driving'
     )
   })
 
@@ -949,6 +959,7 @@ describe('sendNativeChatAskAnswer', () => {
       SETTINGS,
       PTY,
       '2',
+      'driving',
       expect.any(Function)
     )
     expect(onSettled).not.toHaveBeenCalled()

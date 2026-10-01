@@ -55,7 +55,9 @@ export async function sendWorkerPrompt(
     throw new WorkerPromptUndeliverableError(dispatchId, `worker terminal is ${observation.status}`)
   }
   try {
-    await runtime.sendTerminalAgentPrompt(handle, `${HEIMDALL_OWNER_REPLY_PREFIX} ${text.trim()}`)
+    await runtime.sendTerminalAgentPrompt(handle, `${HEIMDALL_OWNER_REPLY_PREFIX} ${text.trim()}`, {
+      inputKind: 'driving'
+    })
   } catch (error) {
     throw new WorkerPromptUndeliverableError(
       dispatchId,

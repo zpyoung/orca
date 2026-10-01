@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
+// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
@@ -16,7 +16,7 @@ import {
   replaceList
 } from '../../../../../shared/native-chat-merge'
 import { startNativeChatSeedRead } from './native-chat-read-retry'
-import { mergeNativeChatLiveSession } from './native-chat-live-status'
+import { mergeNativeChatLiveSession, nativeChatHookAwaitsInput } from './native-chat-live-status'
 import { useNativeChatAssembledTranscript } from './use-native-chat-assembled-transcript'
 import {
   hasMoreBeforeNativeChatPage,
@@ -47,6 +47,9 @@ export type UseNativeChatLiveSessionArgs = {
 export type NativeChatLiveSession = NativeChatSession & {
   /** Latest provider turn boundary, used to settle orphaned running tool rows. */
   transcriptLifecycle?: NativeChatTurnLifecycle
+  /** The pane's hook says the agent stopped mid-turn for the reader, and the transcript
+   *  has not since ended that turn. */
+  hookAwaitingInput?: boolean
   /** True when an older page may still exist (the last read filled the window). */
   hasMore: boolean
   /** Whether an older-history page is currently loading. */
@@ -394,6 +397,11 @@ export function useNativeChatLiveSession(
     })
     return {
       ...session,
+      hookAwaitingInput: nativeChatHookAwaitsInput(
+        hookState,
+        hookStateStartedAt,
+        transcriptCompanion?.lifecycle
+      ),
       hasMore,
       loadingEarlier,
       olderHistoryGeneration,

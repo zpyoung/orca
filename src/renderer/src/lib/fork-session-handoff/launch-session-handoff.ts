@@ -8,7 +8,7 @@ import {
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
-import { TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
+import { TUI_AGENT_CONFIG, type TuiAgentConfig } from '../../../../shared/tui-agent-config'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
@@ -48,7 +48,7 @@ export type LaunchForkSessionHandoffResult =
   | { ok: false; reason: 'agent-unavailable' | 'launch-failed' }
 
 type StoreState = ReturnType<typeof useAppStore.getState>
-type AgentTrustPreset = 'cursor' | 'copilot' | 'codex' | 'antigravity'
+type AgentTrustPreset = NonNullable<TuiAgentConfig['preflightTrust']>
 
 export type LaunchForkSessionHandoffCollaborators = {
   getState?: () => StoreState

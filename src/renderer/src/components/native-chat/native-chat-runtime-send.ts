@@ -193,7 +193,7 @@ export function sendNativeChatMessageWithImageAttachments(
  *  composer is empty. */
 export function submitNativeChatPrompt(target: NativeChatResolvedTarget): void {
   if (!isTerminalInputQuarantined(target.terminalTabId)) {
-    sendRuntimePtyInput(target.settings, target.ptyId, NATIVE_CHAT_SUBMIT)
+    sendRuntimePtyInput(target.settings, target.ptyId, NATIVE_CHAT_SUBMIT, 'driving')
   }
 }
 
