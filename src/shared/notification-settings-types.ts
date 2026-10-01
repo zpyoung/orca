@@ -1,4 +1,5 @@
 import type { AgentStatusState, AgentType } from './agent-status-types'
+import type { AgentJournalTurnOutcome } from './agent-turn-outcome'
 
 export type NotificationSettings = {
   enabled: boolean

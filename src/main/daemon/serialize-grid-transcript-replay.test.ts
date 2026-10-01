@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -123,6 +124,7 @@ describe('serialize round trip over captured PTY transcripts', () => {
     async (_name, transcript) => {
       const counts: Partial<Record<Verdict | 'checks', number>> = {}
       const blocking: string[] = []
+      const failureSignatures: string[] = []
       for (const schedule of SCHEDULES) {
         for (const conpty of [false, true]) {
           for (let seed = 1; seed <= SEEDS; seed++) {
@@ -135,6 +137,14 @@ describe('serialize round trip over captured PTY transcripts', () => {
                 const d = check.gridDiff.new
                 console.log(
                   `  ${transcript.name} ${schedule} conpty=${conpty} seed=${seed}: ${d.stage} row=${d.row} ${JSON.stringify(d.expected)?.slice(0, 160)} -> ${JSON.stringify(d.actual)?.slice(0, 160)}`
+                )
+              }
+              if (check.gridDiff.new) {
+                const signature = createHash('sha256')
+                  .update(JSON.stringify(check.gridDiff.new))
+                  .digest('hex')
+                failureSignatures.push(
+                  `${schedule}/${conpty}/${seed}/${check.stepIndex}:${signature}`
                 )
               }
               for (const verdict of verdicts(check, serializers.length > 1)) {
@@ -153,7 +163,9 @@ describe('serialize round trip over captured PTY transcripts', () => {
         console.log(`${transcript.name} ${JSON.stringify(counts)}`)
       }
       expect(blocking).toEqual([])
-      if (!OLD_ADDON_PATH && SEEDS === 2) {
+      if (SEEDS === 2 && transcript.name.startsWith('freebuff-')) {
+        expect(failureSignatures).toEqual(FREEBUFF_BASELINE[transcript.name] ?? [])
+      } else if (!OLD_ADDON_PATH && SEEDS === 2) {
         expect(counts['new-fail'] ?? 0).toBe(KNOWN_PREEXISTING_I2_FAILURES[transcript.name] ?? 0)
       }
     },

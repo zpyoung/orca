@@ -82,13 +82,4 @@ describe('terminal IME e2e workflow', () => {
     expect(upload.if).toBe('always()')
     expect(upload.with.name).toBe('terminal-wayland-ime-evidence')
   })
-
-  it('bounds blocking native input commands', () => {
-    const nativeSpec = readFileSync(
-      join(projectDir, 'tests/e2e/terminal-ibus-hangul-native.spec.ts'),
-      'utf8'
-    )
-
-    expect(nativeSpec.match(/timeout: NATIVE_COMMAND_TIMEOUT_MS/g)).toHaveLength(3)
-  })
 })

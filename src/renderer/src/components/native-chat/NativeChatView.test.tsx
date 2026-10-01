@@ -35,6 +35,8 @@ function renderResolution(
   )
 }
 
+const notComposing = (): boolean => false
+
 function DraftProbe({ paneKey, sessionId }: { paneKey: string; sessionId: string | null }) {
   const { draft, setDraft } = useAgentComposerDraft(paneKey)
   return (

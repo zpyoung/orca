@@ -24,6 +24,7 @@ export type {
   ClientOnlyUnverifiableInspection,
   ClientOnlyUnverifiableReason
 } from '../../../shared/terminal-process-inspection'
+import type { TerminalInputKind } from '../../../shared/terminal-input-kind'
 
 export type RuntimeTerminalProcessInspection = TerminalProcessInspection
 
@@ -220,7 +221,8 @@ export async function confirmRuntimeTerminalForegroundProcess(
 export function sendRuntimePtyInput(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
-  data: string
+  data: string,
+  inputKind: TerminalInputKind
 ): boolean {
   const tooLarge = isRuntimePtyInputTooLarge(data)
   if (tooLarge === true) {
@@ -232,13 +234,13 @@ export function sendRuntimePtyInput(
     void tooLarge
       .then((resolvedTooLarge) => {
         if (!resolvedTooLarge) {
-          sendRuntimePtyInputWithinLimit(settings, ptyId, data)
+          sendRuntimePtyInputWithinLimit(settings, ptyId, data, inputKind)
         }
       })
       .catch(() => {})
     return true
   }
-  return sendRuntimePtyInputWithinLimit(settings, ptyId, data)
+  return sendRuntimePtyInputWithinLimit(settings, ptyId, data, inputKind)
 }
 
 function resolveRuntimeSendTarget(
@@ -255,11 +257,12 @@ function resolveRuntimeSendTarget(
 function sendRuntimePtyInputWithinLimit(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
-  data: string
+  data: string,
+  inputKind: TerminalInputKind
 ): boolean {
   const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
   if (target.kind !== 'environment' || !terminal) {
-    window.api.pty.write(ptyId, data)
+    window.api.pty.write(ptyId, data, inputKind)
     recordRuntimeTerminalInputForPtyId(ptyId)
     return true
   }
@@ -352,7 +355,7 @@ export async function sendRuntimePtyInputVerified(
   }
   const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
   if (target.kind !== 'environment' || !terminal) {
-    const accepted = await window.api.pty.writeAccepted(ptyId, data)
+    const accepted = await window.api.pty.writeAccepted(ptyId, data, inputKind)
     if (!accepted) {
       if (isCancelled?.()) {
         return false

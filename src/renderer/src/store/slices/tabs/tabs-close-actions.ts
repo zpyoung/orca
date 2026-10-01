@@ -65,7 +65,6 @@ export function createTabsCloseActions(
             activeRuntimeEnvironmentId: getRuntimeEnvironmentIdForWorktree(state, worktreeId)
           }),
           worktreeId,
-          tabId: tab.id,
           sessionId: tab.entityId,
           provisional
         })

@@ -13,7 +13,6 @@ import {
 import { TERMINAL_MULTIPLEX_PENDING_MAX_BYTES } from '../../../../../shared/terminal-multiplex-flow-control'
 import { measureTerminalStreamByteLength } from '../../terminal-stream-byte-length'
 import { createTerminalOutputBatcher, type TerminalOutputBatcher } from './terminal-output-batcher'
-import { watchSubscriptionLifetime } from './terminal-input-delivery'
 import { trimPendingOutputToBudget } from './terminal-stream-replay'
 import { allocateTerminalSubscriptionStreamId } from './terminal-subscription-stream-id'
 import type {
@@ -27,8 +26,7 @@ import { registerLegacyBinaryControlFrames } from './terminal-legacy-binary-cont
 import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 const TERMINAL_QUERY_REPLAY_MAX_CHARS = 16 * 1024
 export async function runTerminalBinarySubscription(args: TerminalSubscriptionArgs): Promise<void> {
-  const { params, runtime, connectionId, sendBinary, signal, emit, ptyId, clientId, isMobile } =
-    args
+  const { runtime, registration, sendBinary, ptyId, clientId, isMobile } = args
   if (!sendBinary) {
     throw new Error('binary_terminal_stream_required')
   }
@@ -54,7 +52,6 @@ export async function runTerminalBinarySubscription(args: TerminalSubscriptionAr
   let unsubscribeFit = (): void => {}
   let unregisterBinaryHandler = (): void => {}
   let abortRendererMountWait = (): void => {}
-  let stopWatchingLifetime = (): void => {}
   let lateRendererReadyPromise: Promise<boolean> | null = null
   let outputBatcher: TerminalOutputBatcher | null = null
   let resolveStream = (): void => {}
@@ -270,19 +267,13 @@ export async function runTerminalBinarySubscription(args: TerminalSubscriptionAr
       registeredRemoteDesktopDriver = value
     },
     displayMode: 'auto',
-    registration,
     streamClosed,
     sendFrame
   }
-  try {
-    await publishLegacyBinaryInitialSnapshot(args, state)
-    if (state.closed || signal?.aborted) {
-      return
-    }
-    activateLegacyBinarySubscription(args, state)
-  } catch (error) {
-    registration.releaseIfCurrent()
-    throw error
+  await publishLegacyBinaryInitialSnapshot(args, state)
+  if (registration.released) {
+    return
   }
+  activateLegacyBinarySubscription(args, state)
   await streamClosed
 }

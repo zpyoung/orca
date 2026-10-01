@@ -23,6 +23,7 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       killPtys?: boolean
       authorizedPty?: RuntimePtyWorktreeRecord
       force?: boolean
+      reason?: RuntimeSessionTabCloseReason
     } = {}
   ): Promise<void> {
     const closedParentTabId = tab.parentTabId
@@ -38,10 +39,14 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       return proof ? [proof] : []
     })
     const acknowledgeRetirement = this.captureTerminalTabRetirement(worktreeId, closedParentTabId)
-    const projectedPtyIds = await this.commitHeadlessTerminalTabRetirement(
+    const projectedPtyIds = await this.closeTerminalSurface(
       worktreeId,
-      closedParentTabId,
-      { allowMissing: options.allowMissingPersistedTab, force: options.force }
+      { kind: 'tab', tabId: closedParentTabId },
+      {
+        allowMissing: options.allowMissingPersistedTab,
+        force: options.force,
+        reason: options.reason
+      }
     )
     if (!acknowledgeRetirement().matches) {
       throw new Error('terminal_pane_owner_changed')

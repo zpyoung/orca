@@ -57,6 +57,11 @@ export function buildClaudePermissionCallbacks(deps: ClaudePermissionCallbackDep
 } {
   const canUseTool: CanUseTool = (toolName, input, options) =>
     new Promise<PermissionResult | null>((resolve) => {
+      let cancel = (): void => {}
+      const settle = (response: PermissionResult | null): void => {
+        options.signal.removeEventListener('abort', cancel)
+        resolve(response)
+      }
       // Classify first so later permission-mode policy cannot swallow a plan proposal.
       const subject = claudePermissionSubject(toolName, input)
       const prompt = deps.prompts.register({
@@ -67,14 +72,14 @@ export function buildClaudePermissionCallbacks(deps: ClaudePermissionCallbackDep
         toolUseId: options.toolUseID,
         input,
         suggestions: options.suggestions ?? [],
-        settle: resolve,
+        settle,
         turnId: deps.currentTurnId?.() ?? null
       })
       if (!prompt) {
-        resolve(denySafeResult(options.toolUseID))
+        settle(denySafeResult(options.toolUseID))
         return
       }
-      const cancel = (): void => {
+      cancel = (): void => {
         if (deps.prompts.forgetIfPending(prompt)) {
           deps.emit({
             type: 'prompt-cancelled',
@@ -83,7 +88,7 @@ export function buildClaudePermissionCallbacks(deps: ClaudePermissionCallbackDep
           })
           // Null is the SDK's "no response written" sentinel: a cancelled request must not
           // be answered, only forgotten.
-          resolve(null)
+          settle(null)
         }
       }
       if (options.signal.aborted) {

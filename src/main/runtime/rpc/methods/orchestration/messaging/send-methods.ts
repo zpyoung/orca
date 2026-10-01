@@ -7,6 +7,7 @@ import { resolveMessageRun } from '../routing'
 import {
   assertDispatchMailboxDeliverable,
   resolveBareOrchestrationRecipient,
+  resolveRunBoundDispatchRecipient,
   type SendRecipientWarning
 } from './recipient-routing'
 import {
@@ -131,6 +132,10 @@ export const ORCHESTRATION_SEND_METHODS = [
       const sendWarnings: SendRecipientWarning[] = []
       let messageRunId = routing.run?.id
       if (!isGroupAddress(to) && !to.startsWith('run:') && !to.startsWith('dispatch:')) {
+        if (mayNameSession(to)) {
+          // Recipient routing reads the session record store, which the host opens lazily.
+          await runtime.ensureStructuredAgentSessionHost().catch(() => undefined)
+        }
         const recipient = resolveBareOrchestrationRecipient({
           runtime,
           db,
@@ -162,7 +167,18 @@ export const ORCHESTRATION_SEND_METHODS = [
             : undefined
         // Federated targets perform their own liveness check before relaying.
         if (addressedDispatchId && !federatedTarget) {
-          assertDispatchMailboxDeliverable(db, addressedDispatchId)
+          assertDispatchMailboxDeliverable(runtime, db, addressedDispatchId)
+          const runBound = resolveRunBoundDispatchRecipient(
+            runtime,
+            db,
+            addressedDispatchId,
+            params.run
+          )
+          if (runBound) {
+            to = runBound.to
+            messageRunId = runBound.runId
+            sendWarnings.push(runBound.warning)
+          }
         }
         const federatedControl = sendFederatedControlMail({
           params,

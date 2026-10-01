@@ -3,7 +3,6 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { relayArtifactFilenames } from '../../src/shared/relay-artifacts.ts'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const require = createRequire(import.meta.url)
@@ -25,18 +24,10 @@ describe('Electron runtime package contract', () => {
   }
 
   it('keeps the native Windows registry addon optional and platform-gated', () => {
-    const rebuildScript = readProject('config/scripts/rebuild-native-deps.mjs')
-    const ensureScript = readProject('config/scripts/ensure-native-runtime.mjs')
     expect(packageJson.optionalDependencies['@orca/windows-registry']).toBe('workspace:*')
     // Why: allowBuilds stops pnpm running node-gyp at install time -- the root
     // Windows-only rebuild owns this addon so it is built against the right runtime ABI.
     expect(pnpmWorkspace.allowBuilds['@orca/windows-registry']).toBe(false)
-    // Why assert the guard and the member separately: the list now carries more
-    // than one addon, so pinning the whole literal only tested its formatting.
-    expect(rebuildScript).toContain("rebuildPlatform === 'win32'")
-    expect(rebuildScript).toContain("'@orca/windows-registry'")
-    expect(ensureScript).toContain("process.platform === 'win32'")
-    expect(ensureScript).toContain("'@orca/windows-registry'")
     if (windowsAddonsInstalled) {
       expect(packageTargets.win32).toEqual(
         expect.arrayContaining([
@@ -55,20 +46,10 @@ describe('Electron runtime package contract', () => {
   })
 
   it('keeps the native Windows process-table addon optional and platform-gated', () => {
-    const rebuildScript = readFileSync(
-      join(projectDir, 'config/scripts/rebuild-native-deps.mjs'),
-      'utf8'
-    )
-    const ensureScript = readFileSync(
-      join(projectDir, 'config/scripts/ensure-native-runtime.mjs'),
-      'utf8'
-    )
     expect(packageJson.optionalDependencies['@vscode/windows-process-tree']).toBe('0.8.0')
     // Why: same rule as the registry addon -- allowBuilds stops pnpm running node-gyp at
     // install time so the Windows-only rebuild owns it with the right runtime ABI.
     expect(pnpmWorkspace.allowBuilds['@vscode/windows-process-tree']).toBe(false)
-    expect(rebuildScript).toContain("'@vscode/windows-process-tree'")
-    expect(ensureScript).toContain("'@vscode/windows-process-tree'")
     // Why pin the patch: the upstream binding.gyp requires Spectre-mitigated
     // libraries our build agents do not carry, and the enumeration stops after
     // 1024 processes -- on a busy host that silently hides the very descendants

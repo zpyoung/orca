@@ -860,7 +860,7 @@ describe('empty prompt submit', () => {
   it('submits an empty prompt with a bare Enter', () => {
     submitNativeChatPrompt(TARGET)
     expect(sendRuntimePtyInput).toHaveBeenCalledOnce()
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT, 'driving')
   })
 })
 
@@ -895,16 +895,17 @@ describe('sendNativeChatAskAnswer', () => {
     )
 
     vi.advanceTimersByTime(0)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '1')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '1', 'driving')
 
     vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving')
 
     vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
     expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
-      buildNativeChatPasteBytes('custom answer')
+      buildNativeChatPasteBytes('custom answer'),
+      'driving'
     )
   })
 
