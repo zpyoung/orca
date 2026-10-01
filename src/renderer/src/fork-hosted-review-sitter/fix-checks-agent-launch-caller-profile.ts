@@ -5,11 +5,6 @@ import type { AgentLaunchCallerProfile } from '@/lib/agent-launch-caller-profile
 export const HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE: AgentLaunchCallerProfile = {
   id: 'hosted-review-fix-checks',
   caller: 'src/renderer/src/fork-hosted-review-sitter/fix-checks-agent-launch.ts',
-  sourceMarkers: [
-    'agentArgs: recipe.agentArgs',
-    "promptDelivery: 'submit-after-ready'",
-    'beforeSurfaceOpen: () => {'
-  ],
   args: {
     agent: 'codex',
     worktreeId: 'wt-1',
@@ -19,9 +14,5 @@ export const HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE: AgentLaunchCallerProfile =
     promptDelivery: 'submit-after-ready',
     launchPlatform: 'darwin',
     launchSource: 'task_page'
-  },
-  passesBeforeSurfaceOpen: true,
-  passesLaunchPlan: false,
-  passesOnPromptDelivered: false,
-  readsBack: ['surface-tab-id']
+  }
 }
