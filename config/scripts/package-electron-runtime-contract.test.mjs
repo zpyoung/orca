@@ -95,7 +95,9 @@ describe('Electron runtime package contract', () => {
     expect(macDispatchStep.env.RELEASE_MAC_BUILD_WORKFLOW).toBe('release-mac-build.yml')
     expect(macDispatchStep.env.RELEASE_MAC_BUILD_TAG).toBe('${{ needs.cut.outputs.tag }}')
     expect(buildMatrixRunners).not.toContain('blacksmith-6vcpu-macos-15')
-    expect(releaseWorkflow.jobs['publish-release'].needs).toContain('build')
+    // Fork is macOS-only: the Windows/Linux `build` job is disabled, so publishing
+    // must not depend on it (a skipped dependency would cascade-skip publish-release).
+    expect(releaseWorkflow.jobs['publish-release'].needs).not.toContain('build')
     expect(releaseWorkflow.jobs['publish-release'].needs).toContain('build-mac')
   })
 })

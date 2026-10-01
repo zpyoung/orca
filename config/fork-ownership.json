@@ -5610,6 +5610,11 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
+      "reason": "Tests the fork's own packaged Electron runtime contract.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/release-rc-history.test.mjs",
       "reason": "Tests for the fork's release-tooling delta above.",
       "status": "permanent"
@@ -6402,6 +6407,19 @@
       "reason": "Removes an invalid global assertion that CLI flags are exclusive; Heimdall create commands legitimately use repeatable flags.",
       "status": "pending-upstream",
       "ledger": "bug-253"
+    },
+    {
+      "path": "config/scripts/mobile-recording-pin-checkout.test.mjs",
+      "reason": "v1.4.218's mobile.yml (synced from main for the cut) has no recording-pin job, so its own contract test fails; upstream deleted the test in e594cb06af.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#mobile-workflow-tests-ahead-of-their-release",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/mobile-release-check-scope.test.mjs",
+      "reason": "v1.4.218's mobile.yml gates 'Summarize RPC recording changes', which the tag's test does not expect; aligned with upstream's e594cb06af.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#mobile-workflow-tests-ahead-of-their-release"
     }
   ],
   "residuals": {
