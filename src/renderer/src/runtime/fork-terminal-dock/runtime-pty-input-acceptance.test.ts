@@ -177,7 +177,7 @@ describe('runtime terminal input acceptance', () => {
         )
       ).resolves.toBe(true)
 
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
       expect(localWrite).not.toHaveBeenCalled()
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
         expect.any(Number)
@@ -196,7 +196,7 @@ describe('runtime terminal input acceptance', () => {
         )
       ).resolves.toBe(false)
 
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey).toEqual({})
     })
 
@@ -205,7 +205,7 @@ describe('runtime terminal input acceptance', () => {
         sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x', 'driving')
       ).toBe(true)
 
-      expect(localWrite).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWrite).toHaveBeenCalledWith('local-pty', 'x', 'driving')
       expect(localWriteInputAccepted).not.toHaveBeenCalled()
     })
 
@@ -267,7 +267,7 @@ describe('runtime terminal input acceptance', () => {
           () => false
         )
       ).resolves.toBe(true)
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
     })
   })
 })

@@ -65,7 +65,7 @@ describe('verified runtime input cancellation', () => {
       () => cancelled
     )
     await vi.waitFor(() =>
-      expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'stale input')
+      expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'stale input', 'driving')
     )
 
     cancelled = true

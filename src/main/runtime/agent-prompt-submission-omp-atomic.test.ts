@@ -197,7 +197,9 @@ describe('OMP agent prompt submission', () => {
     }
     const pastePayload = `${AGENT_PROMPT_BRACKETED_PASTE_START}bundled${AGENT_PROMPT_BRACKETED_PASTE_END}`
 
-    await runtime.writeTerminalAgentPrompt('handle', PTY_ID, 1, pastePayload)
+    await runtime.writeTerminalAgentPrompt('handle', PTY_ID, 1, pastePayload, {
+      inputKind: 'driving'
+    })
 
     expect(writes).toEqual([pastePayload + AGENT_PROMPT_SUBMIT])
     expect(Buffer.from(writes[0]!).at(-1)).toBe(0x0d)
