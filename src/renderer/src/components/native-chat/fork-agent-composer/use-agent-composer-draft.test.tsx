@@ -6,6 +6,7 @@ import {
   clearAgentComposerDraftCacheForTests,
   subscribeAgentComposerDraftCache
 } from './agent-composer-draft-cache'
+import { appendNativeChatDraftCache, readNativeChatDraftCache } from '../native-chat-draft-cache'
 import { useAgentComposerDraft } from './use-agent-composer-draft'
 
 afterEach(() => {
@@ -79,5 +80,57 @@ describe('useAgentComposerDraft', () => {
 
     expect(mountA.result.current.draft).toBe('from B + from A')
     expect(mountB.result.current.draft).toBe('from B + from A')
+  })
+})
+
+// The withdrawn-message restore is upstream code that appends through the native-chat cache.
+describe('useAgentComposerDraft with text put back from outside the composer', () => {
+  it('shows appended text after the draft, once across every mount', () => {
+    const mountA = renderHook(() => useAgentComposerDraft('pane-append'))
+    const mountB = renderHook(() => useAgentComposerDraft('pane-append'))
+    act(() => mountA.result.current.setDraft('typed'))
+
+    act(() => appendNativeChatDraftCache('pane-append', 'withdrawn'))
+
+    expect(mountA.result.current.draft).toBe('typed\n\nwithdrawn')
+    expect(mountB.result.current.draft).toBe('typed\n\nwithdrawn')
+  })
+
+  it('holds text appended mid-composition until the composition is flushed', () => {
+    let composing = true
+    const mount = renderHook(() => useAgentComposerDraft('pane-ime', () => composing))
+    act(() => mount.result.current.setDraft('ab'))
+
+    act(() => appendNativeChatDraftCache('pane-ime', 'withdrawn'))
+    act(() => mount.result.current.setDraft('ab가'))
+    expect(mount.result.current.draft).toBe('ab가')
+
+    composing = false
+    act(() => mount.result.current.flushDraftAppends())
+    act(() => mount.result.current.flushDraftAppends())
+    expect(mount.result.current.draft).toBe('ab가\n\nwithdrawn')
+    expect(readNativeChatDraftCache('pane-ime')).toBe('ab가\n\nwithdrawn')
+  })
+
+  it('keeps held text when the composer unmounts mid-composition', () => {
+    const mount = renderHook(() => useAgentComposerDraft('pane-ime-unmount', () => true))
+    act(() => mount.result.current.setDraft('ab'))
+    act(() => appendNativeChatDraftCache('pane-ime-unmount', 'withdrawn'))
+
+    mount.unmount()
+
+    const next = renderHook(() => useAgentComposerDraft('pane-ime-unmount'))
+    expect(next.result.current.draft).toBe('ab\n\nwithdrawn')
+  })
+
+  it('adopts text appended while no composer was mounted', () => {
+    const first = renderHook(() => useAgentComposerDraft('pane-away'))
+    act(() => first.result.current.setDraft('typed'))
+    first.unmount()
+
+    appendNativeChatDraftCache('pane-away', 'withdrawn')
+
+    const second = renderHook(() => useAgentComposerDraft('pane-away'))
+    expect(second.result.current.draft).toBe('typed\n\nwithdrawn')
   })
 })
