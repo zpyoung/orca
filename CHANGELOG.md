@@ -1,6 +1,6 @@
 ---
-last_released_commit: 4406450a91fdef86b8bf83014646ae80f5db6cca
-upstream_synced: v1.4.215
+last_released_commit: 5586e1662a927cffb84db1ca4dac96797c24c1b6
+upstream_synced: v1.4.218
 ---
 
 # Changelog
@@ -11,6 +11,15 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.219-rc.0.zy01] - 2026-10-01
+
+Synced to upstream [v1.4.218](https://github.com/stablyai/orca/releases/tag/v1.4.218).
+
+### Fixed
+- Stopping a structured agent session before it picks up a message puts that message back in the
+  composer again, including while an IME composition is in progress. Text put back while the
+  composer was closed appears when it reopens.
 
 ## [1.4.216-rc.0.zy03] - 2026-09-29
 
