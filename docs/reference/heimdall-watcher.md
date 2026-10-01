@@ -104,8 +104,9 @@ replacement for its field filtering or latest-ledger-entry folding.
 If the normalized state still exceeds 32 KiB, the projection drops the oldest historical groups
 until it fits, normalizing each candidate again. Once any revision exists, the original plan seed
 can be omitted; rejected and superseded revisions are also eligible with their nodes and settled
-attempt/report history. Patches and plan reviews for omitted revisions leave with them, while gate
-attempts remain. Questions about omitted historical subjects are not sent. The live plan,
+attempt/report history. Patches and plan reviews for omitted revisions leave with them. Completed
+gate attempts for content other than the current identity or its landing-lineage base are eligible
+too, oldest first; live and in-flight gate attempts remain. Questions about omitted historical subjects are not sent. The live plan,
 pending/running work, and open escalation evidence remain. Only if all eligible history is
 insufficient does the projection clip retained criterion bodies and check commands to the largest
 per-string cap that fits, between 256 and 8,192 code units, with an ellipsis. Counts and notices

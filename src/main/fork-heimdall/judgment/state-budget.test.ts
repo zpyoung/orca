@@ -679,6 +679,39 @@ describe('judgment state budget', () => {
     expect(state.ledger.attempts).toMatchObject([{ attemptId: 'unresolved-rejected' }])
   })
 
+  it('keeps a rejected revision pinned by an unresolved plan-review dispatch', () => {
+    const current = world()
+    current.plan.revisions = [planRevision('revision-rejected', 1, 'rejected', 1)]
+    current.plan.planReviews = [
+      {
+        id: 'review-rejected',
+        targetKind: 'revision',
+        targetId: 'revision-rejected',
+        round: 1,
+        dispatchId: 'plan-review',
+        verdict: 'revise',
+        reportDigest: 'report-rejected',
+        createdAtMs: 2
+      }
+    ]
+    // no revisionId on the action, so only the plan review's dispatch ties it to the revision
+    const unresolved = attempt({
+      id: 'unresolved-plan-review',
+      evidenceKey: 'unresolved-plan-review',
+      dispatchId: 'plan-review',
+      state: 'running',
+      atMs: 3
+    })
+    const full = computeJudgmentIdentity('content-1', current, ledger([unresolved]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([unresolved]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const plan = projectedPlan(expanded(bounded))
+
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-rejected'])
+    expect(plan.planReviews?.map((review) => review.id)).toEqual(['review-rejected'])
+  })
+
   it('keeps a rejected revision pinned by an active escalation', () => {
     const current = world()
     current.plan.revisions = [
@@ -897,7 +930,7 @@ describe('judgment state budget', () => {
       patches: 1,
       planReviews: 2,
       clippedCriterionStrings: 0,
-      clippedCodeUnits: 0
+      criterionCodeUnitCap: 0
     })
   })
 
@@ -935,24 +968,24 @@ describe('judgment state budget', () => {
     })
     const plan = projectedPlan(expanded(bounded))
     const retainedCriterion = plan.nodes[0]?.criteria[0]
-    const clippedCodeUnits = bounded.truncation?.omitted.clippedCodeUnits ?? 0
+    const criterionCap = bounded.truncation?.omitted.criterionCodeUnitCap ?? 0
 
     expect(bounded.fitsStateBudget).toBe(true)
     expect(bounded.truncation?.version).toBe(2)
     expect(bounded.truncation?.omitted.clippedCriterionStrings).toBe(2)
-    expect(clippedCodeUnits).toBeGreaterThanOrEqual(256)
-    expect(clippedCodeUnits).toBeLessThan(8_192)
+    expect(criterionCap).toBeGreaterThanOrEqual(256)
+    expect(criterionCap).toBeLessThan(8_192)
     expect(bounded.truncationNotice).toContain(
-      `clipped 2 criterion string(s) to ${clippedCodeUnits} code units`
+      `clipped 2 criterion string(s) to ${criterionCap} code units`
     )
     expect(retainedCriterion).toMatchObject({
       id: 'criterion-live',
-      body: `${body.slice(0, clippedCodeUnits)}…`,
-      checkCommand: `${checkCommand.slice(0, clippedCodeUnits)}…`,
+      body: `${body.slice(0, criterionCap)}…`,
+      checkCommand: `${checkCommand.slice(0, criterionCap)}…`,
       lastCheck: { contentIdentity: 'content-1', exitCode: 0, timedOut: false }
     })
-    expect(retainedCriterion?.body).toHaveLength(clippedCodeUnits + 1)
-    expect(retainedCriterion?.checkCommand).toHaveLength(clippedCodeUnits + 1)
+    expect(retainedCriterion?.body).toHaveLength(criterionCap + 1)
+    expect(retainedCriterion?.checkCommand).toHaveLength(criterionCap + 1)
   })
 
   it('does not clip a live draft when omitting a rejected revision makes the state fit', () => {
@@ -972,7 +1005,7 @@ describe('judgment state budget', () => {
     expect(retainedCriterion?.body).toBe(body)
     expect(retainedCriterion?.checkCommand).toBe(checkCommand)
     expect(bounded.truncation?.omitted.clippedCriterionStrings).toBe(0)
-    expect(bounded.truncation?.omitted.clippedCodeUnits).toBe(0)
+    expect(bounded.truncation?.omitted.criterionCodeUnitCap).toBe(0)
   })
 
   it('keeps the 256-code-unit clipping floor even when the mandatory state still overflows', () => {
@@ -993,7 +1026,7 @@ describe('judgment state budget', () => {
 
     expect(bounded.fitsStateBudget).toBe(false)
     expect(bounded.truncation?.omitted.clippedCriterionStrings).toBe(2)
-    expect(bounded.truncation?.omitted.clippedCodeUnits).toBe(256)
+    expect(bounded.truncation?.omitted.criterionCodeUnitCap).toBe(256)
     expect(retainedCriterion).toMatchObject({
       id: 'criterion-live',
       body: `${body.slice(0, 256)}…`,
@@ -1002,5 +1035,17 @@ describe('judgment state budget', () => {
     })
     expect(retainedCriterion?.body).toHaveLength(257)
     expect(retainedCriterion?.checkCommand).toHaveLength(257)
+  })
+
+  it('never splits a surrogate pair at the clipping cap', () => {
+    // 255 ASCII units put the emoji's high surrogate exactly at code unit 256
+    const body = `${'b'.repeat(255)}${'😀'.repeat(4_000)}`
+    const current = worldWithDraftCriterion({ body, checkCommand: 'c'.repeat(8_192) })
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: 256
+    })
+    const retainedBody = projectedPlan(expanded(bounded)).nodes[0]?.criteria[0]?.body
+
+    expect(retainedBody).toBe(`${'b'.repeat(255)}…`)
   })
 })

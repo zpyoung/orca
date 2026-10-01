@@ -28,6 +28,7 @@ export type JudgmentTruncationCounts = {
   nodes: number
   verdicts: number
   landing: number
+  gateAttempts: number
   judgmentReports: number
   attempts: number
   approvals: number
@@ -35,7 +36,7 @@ export type JudgmentTruncationCounts = {
   reports: number
   questionSubjects: number
   clippedCriterionStrings: number
-  clippedCodeUnits: number
+  criterionCodeUnitCap: number
 }
 
 export type JudgmentTruncation = {
@@ -79,6 +80,7 @@ type DropSelection = {
   escalationKeys: Set<string>
   reportKeys: Set<string>
   judgmentReportIndexes: Set<number>
+  gateAttemptIndexes: Set<number>
   subjectIds: Set<string>
 }
 
@@ -91,6 +93,7 @@ function selectionForPrefix(units: readonly OmissionUnit[], count: number): Drop
     escalationKeys: new Set(),
     reportKeys: new Set(),
     judgmentReportIndexes: new Set(),
+    gateAttemptIndexes: new Set(),
     subjectIds: new Set()
   }
   for (const unit of units.slice(0, count)) {
@@ -113,6 +116,9 @@ function selectionForPrefix(units: readonly OmissionUnit[], count: number): Drop
     for (const index of unit.judgmentReportIndexes) {
       selected.judgmentReportIndexes.add(index)
     }
+    for (const index of unit.gateAttemptIndexes) {
+      selected.gateAttemptIndexes.add(index)
+    }
     for (const id of unit.subjectIds) {
       selected.subjectIds.add(id)
     }
@@ -134,6 +140,7 @@ function truncationNotice(truncation: JudgmentTruncation): string {
     nodes: 'node(s)',
     verdicts: 'verdict(s)',
     landing: 'landing record(s)',
+    gateAttempts: 'stale gate attempt(s)',
     judgmentReports: 'judgment report(s)',
     attempts: 'attempt(s)',
     approvals: 'approval(s)',
@@ -141,18 +148,19 @@ function truncationNotice(truncation: JudgmentTruncation): string {
     reports: 'ledger report(s)',
     questionSubjects: 'historical question subject(s)',
     clippedCriterionStrings: 'criterion string(s)',
-    clippedCodeUnits: 'code units'
+    criterionCodeUnitCap: 'criterion code-unit cap'
   }
   const summary = typedEntries(truncation.omitted)
     .filter(
-      ([key, count]) => key !== 'clippedCriterionStrings' && key !== 'clippedCodeUnits' && count > 0
+      ([key, count]) =>
+        key !== 'clippedCriterionStrings' && key !== 'criterionCodeUnitCap' && count > 0
     )
     .map(([key, count]) => `${count} ${labels[key]}`)
     .join(', ')
   const clipped = truncation.omitted.clippedCriterionStrings
   const clippingNotice =
     clipped > 0
-      ? `; clipped ${clipped} criterion string(s) to ${truncation.omitted.clippedCodeUnits} code units`
+      ? `; clipped ${clipped} criterion string(s) to ${truncation.omitted.criterionCodeUnitCap} code units`
       : ''
   return `Judgment state bounded by ${truncation.policy} v${truncation.version}; omitted ${summary || 'nothing'}${clippingNotice}.`
 }
@@ -232,7 +240,7 @@ export function projectBoundedJudgmentState(
   const reports = sanitized(world.reports)
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: sanitized() is generically typed unknown -> unknown; world.judgmentReports is always an array.
   const allJudgmentReports = sanitized(world.judgmentReports ?? []) as unknown[]
-  const units = buildOmissionUnits(world, ledger)
+  const units = buildOmissionUnits(world, ledger, contentIdentity)
   const project = (prefix: number, criterionCap?: number): JudgmentStateBudgetResult => {
     const drop = selectionForPrefix(units, prefix)
     const revisions = world.plan.revisions.flatMap((item, index) =>
@@ -244,7 +252,9 @@ export function projectBoundedJudgmentState(
         return text
       }
       clippedCriterionStrings++
-      return `${text.slice(0, criterionCap)}…`
+      const lastKept = text.charCodeAt(criterionCap - 1)
+      const end = lastKept >= 0xd800 && lastKept <= 0xdbff ? criterionCap - 1 : criterionCap
+      return `${text.slice(0, end)}…`
     }
     const nodes = world.plan.nodes.flatMap((item, index) => {
       if (drop.revisionIds.has(item.revisionId)) {
@@ -284,6 +294,9 @@ export function projectBoundedJudgmentState(
       (item.targetKind === 'patch' && droppedPatchIds.has(item.targetId))
         ? []
         : [plan.planReviews?.[index]]
+    )
+    const gateAttempts = plan.gateAttempts?.filter(
+      (_, index) => !drop.gateAttemptIndexes.has(index)
     )
     const judgmentReports = allJudgmentReports.filter(
       (_, index) => !drop.judgmentReportIndexes.has(index)
@@ -331,6 +344,7 @@ export function projectBoundedJudgmentState(
         nodes: world.plan.nodes.length - nodes.length,
         verdicts: world.plan.verdicts.length - verdicts.length,
         landing: world.plan.landing.length - landing.length,
+        gateAttempts: (world.plan.gateAttempts?.length ?? 0) - (gateAttempts?.length ?? 0),
         judgmentReports: (world.judgmentReports ?? []).length - judgmentReports.length,
         attempts: ledger.attempts.filter((item) => drop.attemptKeys.has(item.key)).length,
         approvals: ledger.approvals.filter((item) => drop.approvalKeys.has(item.key)).length,
@@ -338,7 +352,7 @@ export function projectBoundedJudgmentState(
         reports: ledger.reports.filter((item) => drop.reportKeys.has(item.key)).length,
         questionSubjects: omittedQuestionSubjectIds.length,
         clippedCriterionStrings,
-        clippedCodeUnits: clippedCriterionStrings > 0 ? (criterionCap ?? 0) : 0
+        criterionCodeUnitCap: clippedCriterionStrings > 0 ? (criterionCap ?? 0) : 0
       }
     }
     const state: JudgmentState = {
@@ -355,7 +369,8 @@ export function projectBoundedJudgmentState(
           verdicts,
           landing,
           ...(patches === undefined ? {} : { patches }),
-          ...(planReviews === undefined ? {} : { planReviews })
+          ...(planReviews === undefined ? {} : { planReviews }),
+          ...(gateAttempts === undefined ? {} : { gateAttempts })
         },
         reports,
         landingContext: world.landingContext
@@ -393,7 +408,7 @@ export function projectBoundedJudgmentState(
     return floor
   }
   let low = 256
-  let high = 8_192
+  let high = 8_191
   let best = floor
   while (low < high) {
     const middle = Math.ceil((low + high) / 2)
