@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx
-// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
+// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
 
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'

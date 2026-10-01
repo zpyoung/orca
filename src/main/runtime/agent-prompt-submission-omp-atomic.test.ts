@@ -220,7 +220,9 @@ describe('OMP agent prompt submission', () => {
     )
     runtime = created.runtime
 
-    await expect(runtime.sendTerminalAgentPrompt(created.handle, prompt)).resolves.toMatchObject({
+    await expect(
+      runtime.sendTerminalAgentPrompt(created.handle, prompt, { inputKind: 'driving' })
+    ).resolves.toMatchObject({
       accepted: true
     })
 
@@ -236,6 +238,7 @@ describe('OMP agent prompt submission', () => {
 
     await expect(
       created.runtime.sendTerminalAgentPrompt(created.handle, 'inspect the receipt', {
+        inputKind: 'driving',
         acceptQueued: true,
         requestId: 'omp-atomic-receipt'
       })
@@ -255,6 +258,7 @@ describe('OMP agent prompt submission', () => {
     const cancelledRuntime = await createAgentPromptSubmissionRuntime(() => undefined, 'omp')
     await expect(
       cancelledRuntime.runtime.sendTerminalAgentPrompt(cancelledRuntime.handle, 'cancel me', {
+        inputKind: 'driving',
         signal: cancelled.signal,
         beforeWrite: () => cancelled.abort()
       })
@@ -264,6 +268,7 @@ describe('OMP agent prompt submission', () => {
     const permissionRuntime = await createAgentPromptSubmissionRuntime(() => undefined, 'omp')
     await expect(
       permissionRuntime.runtime.sendTerminalAgentPrompt(permissionRuntime.handle, 'do not paste', {
+        inputKind: 'driving',
         beforeWrite: () => {
           permissionRuntime.runtime.onPtyData(
             PTY_ID,
@@ -281,6 +286,7 @@ describe('OMP agent prompt submission', () => {
 
     await expect(
       created.runtime.sendTerminalAgentPrompt(created.handle, 'stay on this process', {
+        inputKind: 'driving',
         beforeWrite: () => {
           created.runtime.synchronizePtyOutputSequenceFromProvider(
             PTY_ID,
@@ -310,7 +316,9 @@ describe('OMP agent prompt submission', () => {
     // The startup shell emits this before the agent settles, so it races every dispatch preamble.
     runtime.emitDaemonPtyTransientFact(PTY_ID, { kind: 'command-finished', exitCode: 0 })
 
-    await expect(runtime.sendTerminalAgentPrompt(created.handle, prompt)).resolves.toMatchObject({
+    await expect(
+      runtime.sendTerminalAgentPrompt(created.handle, prompt, { inputKind: 'driving' })
+    ).resolves.toMatchObject({
       accepted: true
     })
 
@@ -336,7 +344,9 @@ describe('OMP agent prompt submission', () => {
       Buffer.byteLength(buildAgentPromptPasteBytes(prompt), 'utf8')
     )
 
-    const submission = created.runtime.sendTerminalAgentPrompt(created.handle, prompt)
+    const submission = created.runtime.sendTerminalAgentPrompt(created.handle, prompt, {
+      inputKind: 'driving'
+    })
     await vi.advanceTimersByTimeAsync(delayMs - 1)
     expect(created.writes).toEqual([buildAgentPromptPasteBytes(prompt)])
 

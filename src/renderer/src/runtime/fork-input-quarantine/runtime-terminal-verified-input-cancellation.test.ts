@@ -36,6 +36,7 @@ describe('verified runtime input cancellation', () => {
       { activeRuntimeEnvironmentId: null },
       'local-pty',
       'a'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1),
+      'driving',
       () => cancelled
     )
     cancelled = true
@@ -60,6 +61,7 @@ describe('verified runtime input cancellation', () => {
       { activeRuntimeEnvironmentId: null },
       'local-pty',
       'stale input',
+      'driving',
       () => cancelled
     )
     await vi.waitFor(() =>

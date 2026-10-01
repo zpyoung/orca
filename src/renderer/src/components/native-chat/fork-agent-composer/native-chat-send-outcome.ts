@@ -118,7 +118,7 @@ export async function submitAndObserve(
 ): Promise<void> {
   let sent = true
   try {
-    sent = await sendRuntimePtyInputAcceptance(settings, ptyId, NATIVE_CHAT_SUBMIT)
+    sent = await sendRuntimePtyInputAcceptance(settings, ptyId, NATIVE_CHAT_SUBMIT, 'driving')
   } catch {
     sent = false
   } finally {

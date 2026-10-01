@@ -156,7 +156,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     if (!target) {
       return
     }
-    sendRuntimePtyInput(target.settings, target.ptyId, ESC)
+    sendRuntimePtyInput(target.settings, target.ptyId, ESC, 'driving')
   }, [cancelPendingSends, isWorking, onStop, resolveTarget])
 
   return {
