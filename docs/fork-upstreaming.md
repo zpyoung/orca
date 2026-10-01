@@ -631,6 +631,29 @@ remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.
 
+## Mobile workflow tests ahead of their release
+
+**Defect:** the v1.4.218 cut synced `.github/workflows/mobile.yml` from `main` (`4e93d96e4e`),
+which already carried #23732's workflow change, but left the release branch's tests at the older
+shape. The tag therefore fails its own suite: `mobile-recording-pin-checkout.test.mjs` reads a
+`recording-pin` job the synced workflow no longer has, and `mobile-release-check-scope.test.mjs`
+does not expect the newly gated `Summarize RPC recording changes` step.
+
+**Fork change:** none of its own. Mirrors `e594cb06af` (#23732) for the tests only: delete the
+recording-pin checkout test and exclude the summary step from the gated-step assertion. The
+workflow itself stays exactly as tagged.
+
+**Why upstream, not isolated:** both are upstream's own contract tests for an upstream workflow;
+the fix already exists on `main`.
+
+**Paths:**
+
+- `config/scripts/mobile-recording-pin-checkout.test.mjs` (deleted)
+- `config/scripts/mobile-release-check-scope.test.mjs`
+
+**Status:** merged upstream, awaiting a stable tag. Drop both exceptions at the first sync whose
+tag contains `e594cb06af`.
+
 ## Repeatable CLI flags are not globally exclusive
 
 **Orca ledger:** `bug-253`.
