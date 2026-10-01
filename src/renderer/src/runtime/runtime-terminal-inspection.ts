@@ -254,6 +254,8 @@ function resolveRuntimeSendTarget(
   return { target, terminal: getRemoteRuntimeTerminalHandle(ptyId) }
 }
 
+// Why the kind reaches only the local write: terminal.send has no launch kind, and its query-reply
+// kind is for mobile clients, so the host classifies a desktop's environment write by its bytes.
 function sendRuntimePtyInputWithinLimit(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
@@ -304,6 +306,7 @@ export async function sendRuntimePtyInputAcceptance(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
+  inputKind: TerminalInputKind,
   isCancelled?: () => boolean
 ): Promise<boolean> {
   const tooLarge = isRuntimePtyInputTooLarge(data)
@@ -317,7 +320,7 @@ export async function sendRuntimePtyInputAcceptance(
   if (target.kind !== 'environment' || !terminal) {
     // Why: fire-and-forget `write` can't observe a PTY-gone or mobile-lease
     // rejection; the acceptance path needs main's real answer.
-    const accepted = await window.api.pty.writeInputAccepted(ptyId, data)
+    const accepted = await window.api.pty.writeInputAccepted(ptyId, data, inputKind)
     if (accepted) {
       recordRuntimeTerminalInputForPtyId(ptyId)
     }
@@ -344,6 +347,7 @@ export async function sendRuntimePtyInputVerified(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
+  inputKind: TerminalInputKind,
   isCancelled?: () => boolean
 ): Promise<boolean> {
   const tooLarge = isRuntimePtyInputTooLarge(data)
@@ -360,7 +364,7 @@ export async function sendRuntimePtyInputVerified(
       if (isCancelled?.()) {
         return false
       }
-      window.api.pty.write(ptyId, data)
+      window.api.pty.write(ptyId, data, inputKind)
       // Why: SSH/local fallback writes are fire-and-forget. Callers use this
       // boolean to continue UX flow, while hook telemetry confirms real turns.
       recordRuntimeTerminalInputForPtyId(ptyId)

@@ -13,23 +13,9 @@ import { agentNoUpdateLabel } from '@/lib/agent-row-decay-state'
 import { useAgentRowConversationName } from '@/components/dashboard/use-agent-row-conversation-name'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
+import { formatShortTimeAgo } from '@/lib/short-time-ago'
+import { agentVerdictDisplayMark } from '../../../../shared/agent-main-agent-verdict'
 import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'
-
-function formatShortTimeAgo(ts: number, now: number): string {
-  const delta = now - ts
-  if (delta < 60_000) {
-    return 'now'
-  }
-  const minutes = Math.floor(delta / 60_000)
-  if (minutes < 60) {
-    return `${minutes}m`
-  }
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) {
-    return `${hours}h`
-  }
-  return `${Math.floor(hours / 24)}d`
-}
 
 function getCompactAgentPrimary(
   agent: DashboardAgentRowData,

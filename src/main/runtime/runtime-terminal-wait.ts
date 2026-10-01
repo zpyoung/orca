@@ -3,12 +3,7 @@ import type {
   RuntimeTerminalWaitCondition
 } from '../../shared/runtime-types'
 import { hasAntigravityTerminalHeader } from './antigravity-terminal-readiness'
-import {
-  detectTerminalWaitBlockedReason,
-  isKnownReadyPromptPreview,
-  isMuseReadyPromptPreview,
-  tuiIdleNeedsVisibleScreenProbe
-} from './terminal-wait-detection'
+import { tuiIdleNeedsVisibleScreenProbe } from './terminal-wait-detection'
 import {
   buildPtyTerminalWaitBlockedResult,
   buildPtyTerminalWaitResult,

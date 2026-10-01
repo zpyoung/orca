@@ -28,10 +28,52 @@ const OLD_ADDON_PATH = process.env.ORCA_OLD_SERIALIZE_ADDON
 const SEEDS = Math.max(1, Number(process.env.SERIALIZE_TRANSCRIPT_SEEDS) || 2)
 
 // Checkpoints (default seeds) whose new replay diverges exactly as the previous
-// build's did — pre-existing upstream limitations, not regressions (verified
-// with ORCA_OLD_SERIALIZE_ADDON). Shrink when one is fixed.
-const KNOWN_PREEXISTING_I2_FAILURES: Record<string, number> = { less: 6, nano: 2, opencode: 5 }
+// build's did — pre-existing serializer limitations, not regressions (verified
+// with ORCA_OLD_SERIALIZE_ADDON): the live SGR pen leaks into the alt buffer, and
+// an alt buffer first entered after a shrink keeps hidden scrollback. Shrink when one is fixed.
+const KNOWN_PREEXISTING_I2_FAILURES: Record<string, number> = {
+  less: 6,
+  nano: 2,
+  opencode: 5,
+  // Shrink leaves the cursor one column short; also present in the pre-Qoder serializer.
+  'qoder-no-account': 2,
+  'qoder-ready': 2,
+  // Codex 0.157 header border restores with an extra attribute bit (STA-8628 fixtures).
+  'codex-0157-config-override-embedded-warning': 22,
+  'codex-0157-effort-override-embedded-warning': 4,
+  'codex-0157-no-daemon-effort-override': 16,
+  'codex-0157-plain-ready': 18,
+  // Fresh-home 0.157/0.158 captures: the live pen's true-colour fg/bg leaks onto restored cells.
+  'codex-0157-fresh-home-daemon-install': 48,
+  'codex-0158-fresh-home-greeting': 9,
+  'codex-0158-model-announcement-dialog': 8,
+  // Codex 0.157/0.158 startup-dialog captures: the same live-pen true-colour leak onto restored cells.
+  'codex-0157-update-available-dialog': 26,
+  'codex-0158-update-available-dialog': 8,
+  'codex-0157-hooks-review-dialog': 24,
+  'codex-0158-hooks-review-dialog': 8,
+  'codex-0157-model-retired-dialog': 22,
+  'codex-0158-model-retired-dialog': 6,
+  // Same extra dim bit on the 0.157/0.158 header row (STA-8834 fixtures).
+  'codex-0-157-1-update-dialog': 16,
+  'codex-0-157-1-timed-sleep-turn': 6,
+  'codex-0-158-0-approval': 12,
+  'codex-0-158-0-timed-turn': 20,
+  'codex-0-158-0-trustprompt': 36,
+  'claude-dialog-trust-workspace-answered': 13,
+  // DSH-TUI's whale intro paints whole rows of 24-bit background, and every one of this
+  // transcript's divergences is the same shape: `visible-grid row=0`, a true-colour
+  // background that the round trip does not restore to default. Verified as upstream, not a
+  // regression, by replaying it against the previous build
+  // (`build-serialize-addon-at-ref.mjs --ref origin/main`): I1 and I3 both hold.
+  'dsh-tui-ready-no-key': 10
+}
 KNOWN_PREEXISTING_I2_FAILURES['claude-code-ready-cold-start'] = 8
+
+// Exact resize checkpoints and full GridDiff hashes from base 6835b9b4e3ea, not this branch.
+const FREEBUFF_BASELINE: Record<string, readonly string[]> = JSON.parse(
+  readFileSync(join(__dirname, '__fixtures__/freebuff-serialize-baseline.json'), 'utf8')
+)
 
 type Transcript = { name: string; data: string; cols: number; rows: number }
 type Schedule = 'none' | 'shrink' | 'shrink-grow' | 'jitter'

@@ -172,11 +172,7 @@ export const AGENT_LAUNCH_CALLER_PROFILES: readonly AgentLaunchCallerProfile[] =
       prompt: PROMPT,
       launchSource: 'quick_command',
       quickCommandLabel: 'Review'
-    },
-    passesBeforeSurfaceOpen: false,
-    passesLaunchPlan: false,
-    passesOnPromptDelivered: false,
-    readsBack: ['surface-tab-id']
+    }
   },
   HOSTED_REVIEW_FIX_CHECKS_CALLER_PROFILE
 ]

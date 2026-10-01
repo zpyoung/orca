@@ -12,6 +12,7 @@ import { appendRetiredTerminalSurfaceProofs } from './mobile-session-terminal-re
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
 import type { TerminalPaneLayoutNode } from '../../shared/terminal-tab-types'
 import type { TerminalDockPropsPatch } from './fork-terminal-dock/terminal-dock-session-tab-props'
+import type { RuntimeSessionTabCloseReason } from '../../shared/runtime-session-contracts'
 
 export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWithCloseStructuredAgentSessionTab {
   protected async closeHeadlessMobileTerminalTab(

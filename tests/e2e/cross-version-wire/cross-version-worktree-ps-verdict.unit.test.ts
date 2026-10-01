@@ -16,7 +16,7 @@ import {
  * The pre-change ref is pinned rather than derived: a newer baseline would carry the new reader,
  * and every "old reader" cell would then pair the change against itself.
  */
-const PRE_CHANGE_REF = 'v1.4.212'
+const PRE_CHANGE_REF = 'v1.4.216-rc.0.zy01'
 const SUITE_TIMEOUT_MS = 180_000
 // Both builds load a copy in the checkout cache, out of reach of `mobile/tsconfig.json`.
 const PHONE_ROW_READER = 'mobile/src/worktree/agent-row-display.ts'

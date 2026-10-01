@@ -9,6 +9,13 @@ import type { RuntimeTerminalWaitBlockedReason } from '../../shared/runtime-type
 import type { TuiAgent } from '../../shared/tui-agent'
 import { findAntigravityReadyPromptIndex } from './antigravity-terminal-readiness'
 import {
+  findCodexHeaderIndex,
+  findCodexScreenReadyPromptIndex,
+  isCodexComposerReadyScreen,
+  isCodexProvisionalStartupText
+} from './codex-terminal-readiness'
+import { findStartupDialogBlockedSignals } from './startup-dialog-blocked-signals'
+import {
   isTerminalWaitWhitespace,
   startOfLastLines,
   startOfLastNonBlankLines

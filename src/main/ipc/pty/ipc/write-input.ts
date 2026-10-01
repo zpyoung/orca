@@ -243,9 +243,7 @@ export function createPtyWriteInput(deps: {
       return false
     }
     try {
-      const now = performance.now()
-      lastInputAtByPty.set(args.id, now)
-      interactiveOutputCharsByPty.set(args.id, 0)
+      noteRendererPtyInput(args)
       return writePtyProviderInputAcknowledged(provider, args.id, args.data)
     } catch {
       return false

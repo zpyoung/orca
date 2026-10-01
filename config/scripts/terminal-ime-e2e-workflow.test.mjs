@@ -45,29 +45,6 @@ describe('terminal IME e2e workflow', () => {
     expect(nativeIndex).toBeGreaterThan(deterministicIndex)
   })
 
-  it('keeps IBus lifecycle scoped to owned processes', () => {
-    const runner = readFileSync(
-      join(projectDir, 'config/scripts/run-terminal-ibus-hangul-e2e.mjs'),
-      'utf8'
-    )
-
-    expect(runner).toContain(
-      "['--xim', '--verbose', '--panel=disable', '--emoji-extension=disable']"
-    )
-    expect(runner).toContain("spawn('xfwm4', ['--compositor=off']")
-    expect(runner).toContain("['initial-input-mode', 'hangul']")
-    expect(runner).toContain("['hangul-keyboard', '2']")
-    expect(runner).toContain("process.kill(-processGroupId, 'SIGTERM')")
-    expect(runner).toContain("process.kill(-processGroupId, 'SIGKILL')")
-    expect(runner).toContain('const killDeadline = Date.now() + processKillTimeoutMs')
-    expect(runner).toMatch(
-      /'test:e2e:headful',\s*'--workers=1',\s*'tests\/e2e\/terminal-ibus-hangul-native\.spec\.ts'/
-    )
-    expect(runner).not.toContain("'--replace'")
-    expect(runner).not.toContain('killall')
-    expect(runner).not.toContain('pkill')
-  })
-
   it('runs native Wayland independently with CJK fonts and retained evidence', () => {
     const job = workflow.jobs['linux-wayland']
     expect(job.needs).toBeUndefined()

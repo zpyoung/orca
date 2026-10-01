@@ -227,6 +227,7 @@ export const MessageRow = memo(function MessageRow({
         'group relative max-w-full select-text text-sm leading-relaxed text-foreground',
         // Reasoning is the agent thinking aloud — quieter, italic, like an aside.
         isReasoning && nativeChatReasoningClassName(),
+        subagentName !== null && !isReasoning && 'border-l-2 border-border/60 pl-3',
         isSystem && 'text-xs text-muted-foreground'
       )}
     >

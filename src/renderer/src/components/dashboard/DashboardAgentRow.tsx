@@ -16,6 +16,10 @@ import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { useAgentRowConversationName } from './use-agent-row-conversation-name'
 import { lastEnteredDoneAt } from './agent-finished-timestamp'
 import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'
+import {
+  agentChildRowMessageLine,
+  agentChildRowNoUpdateLabel
+} from '@/components/agent-child-row-text'
 
 function formatTimeAgo(ts: number, now: number): string {
   const delta = now - ts

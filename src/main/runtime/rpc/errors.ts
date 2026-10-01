@@ -176,6 +176,9 @@ export function mapRuntimeError(id: string, meta: RpcEnvelopeMeta, error: unknow
   if (error instanceof LedgerError) {
     return errorResponse(id, meta, error.code, message, error.details)
   }
+  if (isAgentSessionRefusalError(error)) {
+    return agentSessionRefusalErrorResponse(id, meta, error)
+  }
   if (
     error instanceof Error &&
     'code' in error &&

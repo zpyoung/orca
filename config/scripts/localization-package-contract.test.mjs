@@ -15,7 +15,7 @@ describe('localization package scripts', () => {
     expect(scripts['verify:localization-runtime-catalog']).toBeDefined()
     expect(scripts['sync:localization-runtime-catalog']).toBeDefined()
     expect(scripts['verify:localization-catalogs']).toBe(
-      'node config/scripts/verify-localization-catalogs.mjs'
+      'pnpm run verify:localization-catalog && pnpm run verify:localization-runtime-catalog'
     )
     expect(scripts.lint).toContain('verify:localization-catalogs')
   })

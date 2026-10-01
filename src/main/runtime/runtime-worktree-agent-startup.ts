@@ -5,7 +5,6 @@ import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOverrides
 } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import { tuiAgentToAgentKind } from '../../shared/agent-kind'
 import type { Repo } from '../../shared/repo-types'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
@@ -143,7 +142,11 @@ export function buildWorktreeStartupForAgent(
       preferences?: AgentLaunchPreferences
     ) => Parameters<typeof buildAgentStartupPlan>[0]['sessionOptions'] | undefined
   }
-): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
+): {
+  agent: TuiAgent
+  startup: AttributedWorktreeStartupLaunch
+  followup?: WorktreeStartupFollowup
+} {
   const { agent, repo, settings, launchOverrides } = environment
   if (!isTuiAgentEnabled(agent, settings.disabledTuiAgents)) {
     throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')

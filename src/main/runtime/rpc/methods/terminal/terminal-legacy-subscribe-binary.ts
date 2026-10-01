@@ -23,7 +23,6 @@ import type { TerminalOutputChunk } from './terminal-stream-types'
 import { publishLegacyBinaryInitialSnapshot } from './terminal-legacy-subscribe-snapshot'
 import { activateLegacyBinarySubscription } from './terminal-legacy-subscribe-live'
 import { registerLegacyBinaryControlFrames } from './terminal-legacy-binary-control-frames'
-import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 const TERMINAL_QUERY_REPLAY_MAX_CHARS = 16 * 1024
 export async function runTerminalBinarySubscription(args: TerminalSubscriptionArgs): Promise<void> {
   const { runtime, registration, sendBinary, ptyId, clientId, isMobile } = args
@@ -58,34 +57,22 @@ export async function runTerminalBinarySubscription(args: TerminalSubscriptionAr
   const streamClosed = new Promise<void>((resolve) => {
     resolveStream = resolve
   })
-  // Why: register cleanup before any await so a mid-subscribe disconnect still removes mobile presence; client-scoped ids also allow parallel desktop subscribers.
-  const subscriptionId = clientId ? `${params.terminal}:${clientId}` : params.terminal
-  const registration = runtime.registerOwnedSubscriptionCleanup(
-    subscriptionId,
-    () => {
-      stopWatchingLifetime()
-      outputBatcher?.flush()
-      outputBatcher?.dispose()
-      closed = true
-      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
-      unsubscribeData()
-      unsubscribeResize()
-      unsubscribeFit()
-      unregisterBinaryHandler()
-      abortRendererMountWait()
-      if (isMobile && clientId) {
-        runtime.handleMobileUnsubscribe(ptyId, clientId)
-      } else if (registeredRemoteDesktopDriver && clientId) {
-        runtime.unregisterRemoteDesktopViewer(ptyId, remoteDesktopSubscriptionKey)
-      }
-      emit({ type: 'end' })
-      resolveStream()
-    },
-    connectionId
-  )
-  stopWatchingLifetime = watchSubscriptionLifetime(runtime, ptyId, signal, registration)
-  if (closed) {
-    // Why: an already-exited pty releases synchronously, so cleanup ran before this setup registers anything.
+  registration.setTeardown(() => {
+    outputBatcher?.flush()
+    outputBatcher?.dispose()
+    closed = true
+    unsubscribeData()
+    unsubscribeResize()
+    unsubscribeFit()
+    unregisterBinaryHandler()
+    abortRendererMountWait()
+    // Why: phone presence belongs to the registration; only a desktop viewer owns a width floor here.
+    if (!isMobile && registeredRemoteDesktopDriver && clientId) {
+      runtime.unregisterRemoteDesktopViewer(ptyId, remoteDesktopSubscriptionKey)
+    }
+    resolveStream()
+  })
+  if (registration.released) {
     return
   }
   const sendFrame = (

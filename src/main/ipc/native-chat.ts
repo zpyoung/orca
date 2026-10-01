@@ -12,6 +12,7 @@ import {
   type NativeChatTranscriptSubscription,
   type SubscribeNativeChatTranscriptArgs
 } from '../native-chat/transcript-watch'
+import { abortWhenRendererGone } from './renderer-lifetime-abort'
 import {
   readSshNativeChatTranscript,
   subscribeSshNativeChatForSender
@@ -201,7 +202,9 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
   const limit = args.limit && args.limit > 0 ? Math.floor(args.limit) : DESKTOP_READ_WINDOW
   // Replace any prior subscription under the same id (session change/resubscribe).
   const pending = beginPendingSubscription(sender.id, subscriptionId)
-  registerSenderCleanup(sender)
+  const rendererSignal = registerSenderCleanup(sender)
+  const canPublish = (): boolean =>
+    !sender.isDestroyed() && !rendererSignal.aborted && !pending.controller.signal.aborted
   if (args.sshConnectionId) {
     const subscription = subscribeSshNativeChatForSender({
       sender,
@@ -241,7 +244,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
       sender.send('nativeChat:appended', payload)
     },
     onInitialSnapshot: (messages, hasMore, beforeOffset, error, companion) => {
-      if (sender.isDestroyed()) {
+      if (!canPublish()) {
         return
       }
       // Forward an initial-drain error so a watching client's first frame carries it
@@ -260,7 +263,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
       sender.send('nativeChat:appended', payload)
     },
     onReplace: (messages, hasMore, beforeOffset, companion) => {
-      if (sender.isDestroyed()) {
+      if (!canPublish()) {
         return
       }
       sender.send('nativeChat:appended', {
@@ -275,7 +278,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
       } satisfies NativeChatAppendedPayload)
     },
     onAppend: (messages, companion) => {
-      if (sender.isDestroyed()) {
+      if (!canPublish()) {
         return
       }
       const payload: NativeChatAppendedPayload = {

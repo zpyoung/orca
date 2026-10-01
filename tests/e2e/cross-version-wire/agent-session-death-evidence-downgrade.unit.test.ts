@@ -11,7 +11,7 @@ import { agentSessionStorePath } from '../../../src/main/runtime/agent-session-r
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
 // The last release before a proof of death named its owner and its last proof of life.
-const BASELINE_REF = 'v1.4.211'
+const BASELINE_REF = 'v1.4.208-rc.0.zy01'
 const SESSION = 'session-alpha-1'
 
 test('an older build loads a proof of death that names its owner and its last proof of life', async () => {

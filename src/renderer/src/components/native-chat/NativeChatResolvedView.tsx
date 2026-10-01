@@ -7,6 +7,7 @@ import { isNativeChatTranscriptUnsettled } from './fork-native-chat-relay/use-na
 import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
 import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
 import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
+import { useNativeChatLaunchPromptDeliveryNotice } from './use-native-chat-launch-prompt-delivery-notice'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
@@ -404,13 +405,13 @@ export function NativeChatResolvedView({
           <NativeChatConversation
             session={sessionWithPending}
             isVisible={isVisible}
-            isWorking={isWorking}
+            isWorking={turnActive}
             fontScale={fontScale.scale}
             {...turnTiming}
             awaitingInput={awaitingInput}
             onLinkClick={onLinkClick}
             allowFileUriLinks={fileLinkContext !== null}
-            failedDeliveryMessageIds={failedLaunchPromptMessageIds}
+            deliveryNotices={launchPromptDeliveryNotices}
             readError={viewState.error}
           />
         )}

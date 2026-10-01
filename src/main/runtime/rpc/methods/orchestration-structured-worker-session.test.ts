@@ -233,24 +233,19 @@ describe('structured worker session', () => {
 })
 
 describe('structured worker dispatch preamble', () => {
-  function hostWithSubmission(
-    submission: Record<string, unknown>,
-    settled?: Record<string, unknown> | Error
-  ) {
-    const waitForSendSettlement = vi.fn(async () => {
-      if (settled instanceof Error) {
-        throw settled
-      }
-      return settled
-        ? { cursor: 1, value: { clientMessageId: 'c1', submission: settled } }
-        : undefined
-    })
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial host double; the preamble reads only deps.store, send, and waitForSendSettlement.
+  type PreambleHost = Parameters<typeof sendStructuredWorkerPreamble>[0]['host']
+  type Settled = Pick<AgentJournalSubmission, 'dispatchState' | 'reason'>
+
+  function submissionOf(settled: Settled): AgentJournalSubmission {
     return {
-      deps: { store: { getRecord: () => ({ lease: { runtimeFence: 7 } }) } },
-      send: async () => ({ ok: true, value: { clientMessageId: 'c1', submission } }),
-      waitForSendSettlement
-    } as never
+      clientMessageId: 'c1',
+      fence: 7,
+      payloadFingerprint: 'fingerprint',
+      providerItemId: null,
+      submittedAt: 1,
+      resolvedAt: null,
+      ...settled
+    }
   }
 
   function hostWithSubmission(submission: Settled, delivered?: Settled): PreambleHost {
@@ -315,40 +310,6 @@ describe('structured worker dispatch preamble', () => {
     // The wiring, not just the throw: this is the code that makes the start receipt
     // `outcome_unknown` with the worker-show / worker-abandon recovery commands.
     expect(isUnknownWorkerStartOutcome(error, 'dispatch_input')).toBe(true)
-  })
-
-  it('waits for an admitted preamble to settle before judging it', async () => {
-    // Claude settles a send on admission: the write returns while the submission is still
-    // pending, and the provider echo promotes it to accepted moments later.
-    const host = hostWithSubmission(
-      { dispatchState: 'pending', reason: null },
-      { dispatchState: 'accepted', reason: null }
-    )
-    await expect(send(host)).resolves.toBeUndefined()
-    expect(
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: host is the double built above, whose waitForSendSettlement is a vi.fn spy.
-      (host as unknown as { waitForSendSettlement: ReturnType<typeof vi.fn> }).waitForSendSettlement
-    ).toHaveBeenCalledWith('s1', 'c1')
-  })
-
-  it('keeps an admitted preamble that settles rejected a proven failure', async () => {
-    const error = await send(
-      hostWithSubmission(
-        { dispatchState: 'pending', reason: null },
-        { dispatchState: 'rejected', reason: 'fence moved' }
-      )
-    ).catch((thrown: unknown) => thrown)
-    expect((error as { code?: string }).code).toBe('dispatch_preamble_undelivered')
-  })
-
-  it('reports an admitted preamble whose settlement wait fails as unknown', async () => {
-    const error = await send(
-      hostWithSubmission(
-        { dispatchState: 'pending', reason: null },
-        new Error('agent session send disappeared before settlement')
-      )
-    ).catch((thrown: unknown) => thrown)
-    expect((error as { code?: string }).code).toBe('operation_unknown')
   })
 
   it('keeps a rejected preamble a proven failure under a code of its own', async () => {

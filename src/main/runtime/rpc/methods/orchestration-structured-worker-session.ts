@@ -244,17 +244,19 @@ export async function sendStructuredWorkerPreamble(args: {
   if (!result.ok) {
     throw new Error(`The dispatch preamble was refused: ${result.refusal.message}`)
   }
-  // claude settles a send on admission, so a fresh preamble is pending until the provider echo
+  // Accepted is not delivered: the worker's agent may still be starting.
   const submission =
     result.value.submission.dispatchState === 'pending'
       ? ((
           await args.host
-            .waitForSendSettlement(args.sessionId, result.value.clientMessageId)
+            .waitForSendSettlement(args.sessionId, result.value.clientMessageId, {
+              budgetMs: ORCHESTRATION_READINESS_TIMEOUT_MS
+            })
             .catch(() => undefined)
         )?.value.submission ?? result.value.submission)
       : result.value.submission
-  if (submission.dispatchState === 'accepted') {
-    return
+  if (submission.dispatchState === 'accepted' || submission.dispatchState === 'pending') {
+    return submission.dispatchState
   }
   if (submission.dispatchState === 'rejected') {
     // A rejection is a verdict, not a mystery: the preamble provably did not happen.

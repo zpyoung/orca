@@ -15,7 +15,7 @@ import { AgentSessionRecoveryCapsule } from '../../../src/main/runtime/agent-ses
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
 // A release whose marker parser still requires the chat's newest message id.
-const BASELINE_REF = 'v1.4.211'
+const BASELINE_REF = 'v1.4.216-rc.0.zy03'
 
 test('an older build reads the restart offer this build records at quit', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'orca-resume-marker-downgrade-'))

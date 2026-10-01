@@ -11,7 +11,7 @@ import {
 import { withTimeout } from './runtime-async-boundaries'
 import {
   detectTerminalWaitBlockedReason,
-  isKnownReadyPromptPreview,
+  isKnownReadyPromptSettled,
   tuiIdleNeedsVisibleScreenProbe
 } from './terminal-wait-detection'
 import type {

@@ -7,7 +7,11 @@ import {
   runTerminalLeaseSubscription
 } from './terminal-legacy-simple-subscriptions'
 import type { TerminalSubscriptionArgs } from './terminal-legacy-subscription-types'
-import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
+import {
+  trackAskSurfacePaneSubscription,
+  untrackAskSurfacePaneSubscription
+} from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
+import { registerTerminalSubscription } from './terminal-subscription-registration'
 
 export const TERMINAL_SUBSCRIBE_METHODS = [
   // Streams live terminal output over WebSocket; mobile clients pass client+viewport for server-side auto-fit.
@@ -69,32 +73,58 @@ export const TERMINAL_SUBSCRIBE_METHODS = [
           return
         }
 
-      const ptyId = leaf.ptyId
-      trackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
-      const clientId = params.client?.id
-      const missingHeadlessStateBeforeMobileFit =
-        isMobile &&
-        (rendererMountRequestedBeforePty || runtime.hasHeadlessTerminalState?.(ptyId) === false)
-      const args: TerminalSubscriptionArgs = {
-        params,
-        runtime,
-        connectionId,
-        sendBinary,
-        registerBinaryStreamHandler,
-        signal,
-        emit,
-        ptyId,
-        clientId,
-        isMobile,
-        supportsDesktopViewportClaims: params.capabilities?.desktopViewportClaims === 1,
-        supportsWriteUnavailable: params.capabilities?.writeUnavailable === 1,
-        rendererMountRequestedBeforePty,
-        missingHeadlessStateBeforeMobileFit,
-        serializerGenerationBeforeMobileFit: missingHeadlessStateBeforeMobileFit
-          ? rendererMountRequestedBeforePty
-            ? serializerGenerationBeforeAnyMount
-            : runtime.getRendererTerminalSerializerGeneration(ptyId)
-          : 0
+        const ptyId = leaf.ptyId
+        registration.releaseOnPtyExit(ptyId)
+        if (registration.released) {
+          return
+        }
+        trackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
+        registration.signal.addEventListener(
+          'abort',
+          () => untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal),
+          { once: true }
+        )
+        const missingHeadlessStateBeforeMobileFit =
+          isMobile &&
+          (rendererMountRequestedBeforePty || runtime.hasHeadlessTerminalState?.(ptyId) === false)
+        const args: TerminalSubscriptionArgs = {
+          params,
+          runtime,
+          registration,
+          sendBinary,
+          registerBinaryStreamHandler,
+          emit,
+          ptyId,
+          clientId,
+          isMobile,
+          supportsDesktopViewportClaims: params.capabilities?.desktopViewportClaims === 1,
+          supportsWriteUnavailable: params.capabilities?.writeUnavailable === 1,
+          rendererMountRequestedBeforePty,
+          missingHeadlessStateBeforeMobileFit,
+          serializerGenerationBeforeMobileFit: missingHeadlessStateBeforeMobileFit
+            ? rendererMountRequestedBeforePty
+              ? serializerGenerationBeforeAnyMount
+              : runtime.getRendererTerminalSerializerGeneration(ptyId)
+            : 0
+        }
+        if (isMobile && params.capabilities?.mobileInputLeaseOnly === 1 && Boolean(clientId)) {
+          await runTerminalLeaseSubscription(args)
+          return
+        }
+        if (!useBinaryStream) {
+          await runTerminalJsonSubscription(args)
+          return
+        }
+        await runTerminalBinarySubscription(args)
+      } catch (error) {
+        // Why: a released stream already sent `end`; an error frame after it would contradict it.
+        if (registration.released) {
+          return
+        }
+        registration.releaseSilently()
+        throw error
+      } finally {
+        registration.release()
       }
     }
   })

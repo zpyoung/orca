@@ -5,7 +5,6 @@ import { serializeBudgetedMobileSnapshot } from './terminal-snapshot-publication
 import { updateViewportForClient } from './terminal-viewport-update'
 import type { TerminalSubscriptionArgs } from './terminal-legacy-subscription-types'
 import { allocateTerminalSubscriptionStreamId } from './terminal-subscription-stream-id'
-import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export async function runTerminalLeaseSubscription(args: TerminalSubscriptionArgs): Promise<void> {
   const { registration, emit, ptyId, clientId } = args
@@ -18,21 +17,9 @@ export async function runTerminalLeaseSubscription(args: TerminalSubscriptionArg
   })
   registration.setTeardown(resolveStream)
   // Why: chat needs the input-floor ack without registering a view subscriber or transporting duplicate PTY output.
-  const registration = runtime.registerOwnedSubscriptionCleanup(
-    subscriptionId,
-    () => {
-      stopWatchingLifetime()
-      closed = true
-      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
-      runtime.handleMobileUnsubscribe(ptyId, clientId)
-      emit({ type: 'end' })
-      resolveStream()
-    },
-    connectionId
-  )
-  stopWatchingLifetime = watchSubscriptionLifetime(runtime, ptyId, signal, registration)
-  if (closed) {
-    // Why: an already-exited pty releases synchronously, so cleanup ran before this setup registers anything.
+  // A lease-only subscriber has no terminal view, so its cached viewport must never phone-fit the PTY.
+  await registration.addMobilePresence(ptyId, clientId, undefined)
+  if (registration.released) {
     return
   }
   emit({ type: 'subscribed', streamId: null, lines: [], truncated: false })
@@ -52,28 +39,30 @@ export async function runTerminalJsonSubscription(args: TerminalSubscriptionArgs
   const streamClosed = new Promise<void>((resolve) => {
     resolveStream = resolve
   })
-  // Why: register before viewport/snapshot awaits so a socket close can't orphan the stream listeners or its remote-desktop width floor.
-  const registration = runtime.registerOwnedSubscriptionCleanup(
-    subscriptionId,
-    () => {
-      stopWatchingLifetime()
-      closed = true
-      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
-      outputBatcher?.flush()
-      outputBatcher?.dispose()
-      unsubscribeData()
-      unsubscribeFit()
-      if (registeredRemoteDesktopDriver && clientId) {
-        runtime.unregisterRemoteDesktopViewer(ptyId, remoteDesktopSubscriptionKey)
-      }
-      emit({ type: 'end' })
-      resolveStream()
-    },
-    connectionId
-  )
-  stopWatchingLifetime = watchSubscriptionLifetime(runtime, ptyId, signal, registration)
-  if (closed) {
-    // Why: an already-exited pty releases synchronously, so cleanup ran before this setup registers anything.
+  registration.setTeardown(() => {
+    outputBatcher?.flush()
+    outputBatcher?.dispose()
+    unsubscribeData()
+    unsubscribeFit()
+    if (registeredRemoteDesktopDriver && clientId) {
+      runtime.unregisterRemoteDesktopViewer(ptyId, remoteDesktopSubscriptionKey)
+    }
+    resolveStream()
+  })
+  if (clientId && params.client && params.viewport) {
+    registeredRemoteDesktopDriver = true
+    await updateViewportForClient(
+      runtime,
+      ptyId,
+      remoteDesktopSubscriptionKey,
+      params.client,
+      params.viewport,
+      'desktop',
+      'register',
+      !supportsDesktopViewportClaims
+    )
+  }
+  if (registration.released) {
     return
   }
   const read = await runtime.readTerminal(params.terminal)

@@ -75,10 +75,10 @@ export const ptySessionControlApi = {
   write: (id: string, data: string, inputKind: TerminalInputKind): void => {
     ipcRenderer.send('pty:write', { id, data, inputKind })
   },
-  writeAccepted: (id: string, data: string): Promise<boolean> =>
-    ipcRenderer.invoke('pty:writeAccepted', { id, data }),
-  writeInputAccepted: (id: string, data: string): Promise<boolean> =>
-    ipcRenderer.invoke('pty:writeInputAccepted', { id, data }),
+  writeAccepted: (id: string, data: string, inputKind: TerminalInputKind): Promise<boolean> =>
+    ipcRenderer.invoke('pty:writeAccepted', { id, data, inputKind }),
+  writeInputAccepted: (id: string, data: string, inputKind: TerminalInputKind): Promise<boolean> =>
+    ipcRenderer.invoke('pty:writeInputAccepted', { id, data, inputKind }),
   onWriteUnavailable: (callback: (payload: { id: string }) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: { id: string }): void =>
       callback(payload)
