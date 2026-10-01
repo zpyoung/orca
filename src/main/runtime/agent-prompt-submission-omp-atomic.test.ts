@@ -73,7 +73,8 @@ type BundledWriter = {
     handle: string,
     ptyId: string,
     generation: number,
-    pastePayload: string
+    pastePayload: string,
+    options: { inputKind: 'driving' }
   ): Promise<unknown>
 }
 
