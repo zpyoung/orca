@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi, type Mock } from 'vitest'
 import { pipelineContentHash } from '../../../shared/fork-heimdall-pipeline/pipeline-canonical-hash'
 import {
   PipelineDocumentSchema,
@@ -205,15 +205,25 @@ export function ledgerForRun(view: PipelineRunView): WatcherLedger {
   })
 }
 
-export const canvasRunApi = { command: vi.fn() }
+export const canvasRunApi: { command: Mock } = { command: vi.fn() }
 
 export function installCanvasRunApi(
   rows: readonly WatcherFleetEntryReader[],
-  views: ReadonlyMap<string, PipelineRunView>
-): void {
+  views: ReadonlyMap<string, PipelineRunView>,
+  beforeRunView: (watcherId: string) => Promise<void> = async () => undefined
+): { fleet: Mock; pipelineRunView: Mock } {
   const snapshot = HeimdallFleetSnapshotReaderSchema.parse({ entries: rows, generatedAtMs: 100 })
   const ledgers = new Map([...views.values()].map((view) => [view.watcherId, ledgerForRun(view)]))
   canvasRunApi.command.mockReset().mockResolvedValue({ status: 'applied', appliedAtMs: 100 })
+  const fleet = vi.fn(async () => snapshot)
+  const pipelineRunView = vi.fn(async ({ watcherId }: { watcherId: string }) => {
+    await beforeRunView(watcherId)
+    const view = views.get(watcherId)
+    if (!view) {
+      throw new Error(`Run ${watcherId} is missing.`)
+    }
+    return view
+  })
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
@@ -238,14 +248,8 @@ export function installCanvasRunApi(
             }
           ]
         }),
-        fleet: async () => snapshot,
-        pipelineRunView: async ({ watcherId }: { watcherId: string }) => {
-          const view = views.get(watcherId)
-          if (!view) {
-            throw new Error(`Run ${watcherId} is missing.`)
-          }
-          return view
-        },
+        fleet,
+        pipelineRunView,
         detail: async ({ watcherId }: { watcherId: string }) => ({
           ledger: ledgers.get(watcherId)
         }),
@@ -253,4 +257,5 @@ export function installCanvasRunApi(
       }
     }
   })
+  return { fleet, pipelineRunView }
 }

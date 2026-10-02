@@ -9,7 +9,6 @@ import { DESKTOP_RENDERER_CLIENT_ID } from '../runtime/rpc/methods/fork-artifact
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { closeTestStores, createStore, testState } from '../persistence-test-harness'
 import { bindHeimdallTransport } from '../runtime/rpc/methods/fork-heimdall/kernel-binding'
-import type { HeimdallFleetTransport } from '../fork-heimdall/fleet-transport'
 import { bindHeimdallPipeline } from './pipeline-binding'
 import type { PipelineProfileStore } from './pipeline-files'
 import { createInMemoryPipelineStore } from './pipeline-store-test-fixtures'
@@ -156,7 +155,8 @@ describe('pipeline run view ownership', () => {
       ok: false as const,
       error: { code: 'refused', message: 'stub' }
     }))
-    bindHeimdallTransport(runtime, { readRemote } as unknown as HeimdallFleetTransport)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double covers only readRemote, the one HeimdallFleetTransport method pipelineRunView calls.
+    bindHeimdallTransport(runtime, { readRemote } as never)
     return { runtime, readRemote }
   }
 
