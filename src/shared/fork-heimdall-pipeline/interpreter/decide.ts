@@ -17,7 +17,7 @@ import {
   pipelineOutputs
 } from './decision-prompts'
 import { buildNextLandAction, buildPipelineSwarmExpansionAction } from './decision-executors'
-import { derivePipelineHistory } from './state-history'
+import { derivePipelineHistory, pipelineSendBackComment } from './state-history'
 import { childTaskIdFromInstanceId, nodeInstanceId, pipelineNodeIdentity } from './node-instance'
 import { derivePipelineRunState } from './run-state'
 import { readySwarmChildren } from './swarm-rules'
@@ -264,7 +264,7 @@ function decidePipelineTickInternal(
             attempt: childState.attempt,
             outputs,
             task: { id: task.id, title: task.title, spec: task.spec },
-            sendBackComment: history.sendBackComments.get(childId)
+            sendBackComment: pipelineSendBackComment(history, childId, childState.epoch)
           })
           if (action !== null) {
             addCandidate(
@@ -320,7 +320,7 @@ function decidePipelineTickInternal(
         epoch: nodeState.epoch,
         attempt: nodeState.attempt,
         outputs,
-        sendBackComment: history.sendBackComments.get(node.id)
+        sendBackComment: pipelineSendBackComment(history, node.id, nodeState.epoch)
       })
       if (action !== null) {
         addCandidate(candidates, world, ledger, action, 2, order)
