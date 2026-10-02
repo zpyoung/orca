@@ -66,6 +66,7 @@ const SHELL_CONTRACT_SPECS = [
   'src/main/providers/local-pty-shell-ready-zsh-launch-environment.test.ts',
   'src/main/providers/__tests__/shell-ready-framework-example.test.ts',
   'src/main/pty/codex-shell-launch-preflight.test.ts',
+  'src/main/pty/codex-shell-no-daemon.test.ts',
   'src/main/pty/omp-shell-wrapper-alias-safety.test.ts',
   'src/main/pty/omp-shell-wrapper.node-pty.test.ts',
   'src/main/shell-startup-feature-channel.test.ts',
@@ -73,6 +74,7 @@ const SHELL_CONTRACT_SPECS = [
   'src/main/zsh-scoped-histfile.live-shell.test.ts',
   'src/main/zsh-startup-hook-user-config-equivalence.live-shell.test.ts',
   'src/main/zsh-wrapper-version-mismatch.live-shell.test.ts',
+  'src/main/runtime/structured-session-cli-login-shell.live-shell.test.ts',
   'src/renderer/src/components/terminal-pane/fish-color-scheme-child-stdin.node-pty.test.ts',
   'src/shared/fish-query-reply-child-stdin.node-pty.test.ts',
   'src/shared/pty-reply-echo-shapes.node-pty.test.ts',
@@ -80,16 +82,8 @@ const SHELL_CONTRACT_SPECS = [
   'src/shared/posix-command-path-lookup.test.ts'
 ]
 
-/** The preflight suite also runs in CI's unit lane; every other shell contract is excluded there. */
-const UNIT_EXCLUDES = [
-  ...SHELL_CONTRACT_SPECS.filter(
-    (spec) => spec !== 'src/main/pty/codex-shell-launch-preflight.test.ts'
-  ),
-  'tests/e2e/cross-version-wire/**',
-  // Region pairing drives real relay endpoints, which the sandbox container cannot reach.
-  'tests/e2e/relay-region-compatibility.unit.test.ts',
-  'tests/e2e/relay-region-correction.unit.test.ts'
-]
+/** CI's unit shards set this so the vitest config applies UNIT_EXCLUDE (shell contracts, relay regions, cross-version). */
+const UNIT_SHARD_ENV = 'ORCA_BALANCE_UNIT_SHARDS=1'
 
 const LANES = new Set(['unit', 'shell', 'e2e', 'wire'])
 
@@ -592,7 +586,10 @@ function runShard({ item, options, imageTag, sourceTarPath, dockerEnv }) {
   })
 }
 
-function laneEnvArgs(lane) {
+export function laneEnvArgs(lane) {
+  if (lane === 'unit') {
+    return ['--env', UNIT_SHARD_ENV]
+  }
   if (lane === 'shell') {
     // Otherwise the fish tests skip themselves and the lane reports green having run nothing.
     return ['--env', 'ORCA_REQUIRE_FISH=1']
@@ -657,7 +654,6 @@ export function laneCommand(options, shard) {
     'run',
     '--config',
     'config/vitest.config.ts',
-    ...UNIT_EXCLUDES.map((spec) => `--exclude=${spec}`),
     `--shard=${shard}/${options.shardTotal}`,
     ...options.extraArgs
   ]
@@ -675,8 +671,7 @@ function selectionLaneCommand(vitestSubcommand, tailArgs) {
     'vitest',
     vitestSubcommand,
     '--config',
-    'config/vitest.config.ts',
-    ...UNIT_EXCLUDES.map((spec) => `--exclude=${spec}`)
+    'config/vitest.config.ts'
   ]
   const head = headArgs.map(shellSingleQuote).join(' ')
   const tail = tailArgs.map(shellSingleQuote).join(' ')

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
-// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
+// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
 // Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
 import { toast } from 'sonner'
@@ -14,7 +14,7 @@ import { planAgentCliArgsSuffix } from '@/lib/tui-agent-startup'
 import {
   pickSourceControlLaunchAgent,
   readSourceControlLaunchRecipeAgentId
-} from '@/lib/source-control-launch-agent-selection'
+} from '../../../shared/source-control-launch-agent-selection'
 import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-platform'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { useAppStore } from '@/store'

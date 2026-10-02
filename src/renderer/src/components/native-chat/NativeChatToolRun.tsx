@@ -59,7 +59,6 @@ export function NativeChatToolRun({
   activeTurnIsWorking,
   trailing,
   expandOverride,
-  structuredActivityUi = true,
   disclosureId,
   onLinkClick
 }: {
@@ -82,7 +81,6 @@ export function NativeChatToolRun({
    *  the agent has already moved past reads as settled even mid-call. Left
    *  unset, a working turn's run is taken to be its last. */
   trailing?: boolean
-  structuredActivityUi?: boolean
   /** Message this run belongs to. Windowing unmounts rows, so a run the reader
    *  opened has to be remembered somewhere that outlives the row. */
   disclosureId?: string
@@ -131,10 +129,9 @@ export function NativeChatToolRun({
   // caller with no turn state, or a turn blocked on the reader's answer, falls
   // back to the calls themselves.
   const live =
-    structuredActivityUi &&
-    (activeTurnIsWorking === true && !askIsActive
+    activeTurnIsWorking === true && !askIsActive
       ? trailing !== false
-      : selectActiveToolCall(headerBlocks, { activeTurnIsWorking }) !== null)
+      : selectActiveToolCall(headerBlocks, { activeTurnIsWorking }) !== null
   // One sentence for the whole run, or the command itself when the run is one
   // call — the reader recognizes `git push` faster than "Ran 1 command".
   const runSentence = nativeChatToolRunSentence(headerBlocks, { live })
@@ -200,7 +197,6 @@ export function NativeChatToolRun({
   // the grouped row visible here made a failed child command look like the
   // whole response was still running (or had failed) even while collapsed.
   if (
-    structuredActivityUi &&
     expandOverride === false &&
     !(revealedDiff && open) &&
     !live &&
@@ -218,7 +214,13 @@ export function NativeChatToolRun({
     <div className="mt-3">
       {standaloneRows}
       {hasAskCall ? (
-        <NativeChatAwaitingInputRow subject={askSubject} pending={askIsActive} />
+        <NativeChatAwaitingInputRow
+          subject={askSubject}
+          pending={askIsActive}
+          disclosureKey={disclosureId === undefined ? undefined : `ask:${disclosureId}`}
+          // A grouped ask here still names only its count.
+          listsQuestions={false}
+        />
       ) : null}
       {!showsHeader ? null : (
         // One element for the run's whole life. Live and settled are states of
@@ -232,7 +234,7 @@ export function NativeChatToolRun({
           aria-live="polite"
           data-native-chat-tool-run-state={live ? 'live' : 'settled'}
         >
-          {structuredActivityUi && settledHeaderIcon ? (
+          {settledHeaderIcon ? (
             <NativeChatToolRunIcon iconName={settledHeaderIcon} className="text-muted-foreground" />
           ) : null}
           <NativeChatToolCategoryDots blocks={blocks} />
@@ -274,7 +276,7 @@ export function NativeChatToolRun({
           {/* Only a stated success is marked done — see nativeChatToolRunOutcome —
               and never while live: between two calls nothing is running, and a
               mark that appeared then would flash on every call. */}
-          {structuredActivityUi && !live && runSucceeded ? (
+          {!live && runSucceeded ? (
             <Check aria-hidden className="size-3 shrink-0 text-muted-foreground" />
           ) : null}
           {latestCallLabel ? (

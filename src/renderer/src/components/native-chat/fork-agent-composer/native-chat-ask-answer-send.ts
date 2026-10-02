@@ -43,11 +43,12 @@ export function sendNativeChatAskAnswer(
               target.settings,
               target.ptyId,
               bytes,
+              'driving',
               () => cancelled
             ).catch(() => false)
           )
         } else {
-          sendRuntimePtyInput(target.settings, target.ptyId, bytes)
+          sendRuntimePtyInput(target.settings, target.ptyId, bytes, 'driving')
         }
       }, index * NATIVE_CHAT_QUESTION_STEP_MS)
     )

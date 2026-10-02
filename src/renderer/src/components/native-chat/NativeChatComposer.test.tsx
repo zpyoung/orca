@@ -97,7 +97,7 @@ vi.mock('@/lib/native-chat-telemetry', () => ({
 vi.mock('./fork-agent-composer/use-agent-composer-draft', () => ({
   useAgentComposerDraft: (scopeKey: string) => {
     mocks.draftScopeKeys.push(scopeKey)
-    return { draft: mocks.draft, setDraft: mocks.setDraft }
+    return { draft: mocks.draft, setDraft: mocks.setDraft, flushDraftAppends: () => {} }
   }
 }))
 vi.mock('./fork-agent-composer/agent-composer-draft-cache', () => ({

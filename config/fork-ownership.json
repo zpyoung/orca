@@ -537,12 +537,6 @@
       "lines": ["  | 'heimdall'"]
     },
     {
-      "path": "src/renderer/src/lib/agent-launch-routing-caller-census.test.ts",
-      "feature": "hosted-review-sitter",
-      "kind": "registration",
-      "lines": ["  'src/renderer/src/fork-hosted-review-sitter/fix-checks-agent-launch.ts',"]
-    },
-    {
       "path": "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts",
       "feature": "hosted-review-sitter",
       "kind": "registration",
@@ -927,14 +921,6 @@
       "lines": ["      if (job === 'code_paths' || job === 'fork_ownership_guard') {"]
     },
     {
-      "path": "src/shared/pane-agent-identity-inventory.test.ts",
-      "feature": "session-handoff",
-      "kind": "registration",
-      "lines": [
-        "        'src/renderer/src/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog.tsx',"
-      ]
-    },
-    {
       "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -1199,7 +1185,9 @@
       "path": "src/preload/api/pty-api.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["  writeInputAccepted: (id: string, data: string) => Promise<boolean>"]
+      "lines": [
+        "  writeInputAccepted: (id: string, data: string, inputKind: TerminalInputKind) => Promise<boolean>"
+      ]
     },
     {
       "path": "src/preload/api/ui-command-event-api.ts",
@@ -1224,7 +1212,9 @@
       "path": "src/preload/api/pty-bridge-session-control.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["  writeInputAccepted: (id: string, data: string): Promise<boolean> =>"]
+      "lines": [
+        "  writeInputAccepted: (id: string, data: string, inputKind: TerminalInputKind): Promise<boolean> =>"
+      ]
     },
     {
       "path": "src/relay/relay-runtime-services.ts",
@@ -3066,25 +3056,6 @@
       ]
     },
     {
-      "path": "src/main/runtime/rpc/methods/terminal/terminal-legacy-simple-subscriptions.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
-        "      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)",
-        "      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
-      ]
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/terminal/terminal-legacy-subscribe-binary.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
-        "      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
-      ]
-    },
-    {
       "path": "src/main/runtime/rpc/methods/terminal/terminal-multiplex-cleanup.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -3108,8 +3079,10 @@
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
-        "import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
-        "      trackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
+        "  trackAskSurfacePaneSubscription,",
+        "  untrackAskSurfacePaneSubscription",
+        "        trackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)",
+        "          () => untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal),"
       ]
     },
     {
@@ -4358,12 +4331,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/lib/agent-launch-caller-profile-census.test.ts",
-      "feature": "hosted-review-sitter",
-      "kind": "registration",
-      "lines": ["    expect(ids.length).toBe(13)", "      'hosted-review-fix-checks',"]
-    },
-    {
       "path": "src/main/ipc/filesystem-download-lifetime.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -5293,81 +5260,36 @@
       "lines": ["        launchOptions: SourceControlLaunchOptions.nullable().optional()"]
     },
     {
-      "path": "src/main/automations/precheck-runner.ts",
-      "feature": "heimdall-pipeline",
+      "path": "tests/e2e/cross-version-wire/agent-session-death-evidence-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const BASELINE_REF = 'v1.4.208-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/agent-session-resume-marker-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const BASELINE_REF = 'v1.4.216-rc.0.zy03'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-worktree-ps-verdict.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const PRE_CHANGE_REF = 'v1.4.216-rc.0.zy01'"]
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["        specifier: 12.5.1", "        version: 12.5.1"]
+    },
+    {
+      "path": "config/scripts/localization-package-contract.test.mjs",
+      "feature": "fork-infra",
       "kind": "passthrough",
       "lines": [
-        "      extraEnv?: NodeJS.ProcessEnv",
-        "      env: target.extraEnv ? { ...process.env, ...target.extraEnv } : process.env,"
+        "      'pnpm run verify:localization-catalog && pnpm run verify:localization-runtime-catalog'"
       ]
-    },
-    {
-      "path": "src/main/ipc/hooks/register-worktree-hook-file-handlers.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { gitignoreAlreadyCoversOrcaDir } from '../../fork-heimdall-pipeline/orca-gitignore-rules'",
-        "          if (!result.isBinary && !gitignoreAlreadyCoversOrcaDir(result.content)) {"
-      ]
-    },
-    {
-      "path": "src/main/issue-command-file.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { gitignoreAlreadyCoversOrcaDir } from './fork-heimdall-pipeline/orca-gitignore-rules'",
-        "      if (gitignoreAlreadyCoversOrcaDir(content)) {"
-      ]
-    },
-    {
-      "path": "src/main/providers/filesystem-provider-contract.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "passthrough",
-      "lines": ["  readlink?(filePath: string): Promise<string>"]
-    },
-    {
-      "path": "src/main/providers/ssh-filesystem-provider.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { attachPipelineLinkReader } from '../fork-heimdall-pipeline/ssh-link-reader'",
-        "    attachPipelineLinkReader(this, mux, createSftp)"
-      ]
-    },
-    {
-      "path": "src/main/runtime/runtime-repository-issue-command.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { gitignoreAlreadyCoversOrcaDir } from '../fork-heimdall-pipeline/orca-gitignore-rules'",
-        "  if (result.isBinary || gitignoreAlreadyCoversOrcaDir(result.content)) {"
-      ]
-    },
-    {
-      "path": "src/relay/fs-handler.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { readRelayLinkTarget } from './fork-heimdall-pipeline/link-target-request'",
-        "    this.dispatcher.onRequest('fs.readlink', readRelayLinkTarget)"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/editor/EditorContent.tsx",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { PipelineCanvasTab } from '@/fork-heimdall-pipeline/PipelineCanvasTab'",
-        "  if (activeFile.mode === 'pipeline') {",
-        "    return <PipelineCanvasTab file={activeFile} />",
-        "  }"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/editor/EditorPanel.tsx",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": ["    if (activeFile.mode === 'check-details' || activeFile.mode === 'pipeline') {"]
     },
     {
       "path": "src/renderer/src/components/editor/EditorPanelHeaderPath.tsx",
@@ -5378,22 +5300,12 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/editor/editor-autosave-controller.ts",
+      "path": "src/main/runtime/runtime-repository-issue-command.ts",
       "feature": "heimdall-pipeline",
       "kind": "registration",
       "lines": [
-        "import { savePipelineDraftForClose } from '@/fork-heimdall-pipeline/pipeline-tab-save'",
-        "    if (file.mode === 'pipeline' && !(await savePipelineDraftForClose(fileId))) {",
-        "      return",
-        "    }"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/editor/editor-header.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "  return !isCombinedDiff && file.mode !== 'check-details' && file.mode !== 'pipeline'"
+        "import { gitignoreAlreadyCoversOrcaDir } from '../fork-heimdall-pipeline/orca-gitignore-rules'",
+        "  if (result.isBinary || gitignoreAlreadyCoversOrcaDir(result.content)) {"
       ]
     },
     {
@@ -5407,23 +5319,21 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/editor/editor-save-queue.ts",
+      "path": "src/renderer/src/components/editor/closed-editor-tab-disposal.ts",
       "feature": "heimdall-pipeline",
       "kind": "registration",
       "lines": [
-        "import { savePipelineDraftForEditor } from '@/fork-heimdall-pipeline/pipeline-tab-save'",
-        "        if (liveFile.mode === 'pipeline') {",
-        "          return savePipelineDraftForEditor(file.id, trigger)",
-        "        }"
+        "import { disposePipelineMode } from '@/fork-heimdall-pipeline/pipeline-tab-lifecycle'",
+        "    if (!isStillClosed(closedFile) || disposePipelineMode(closedFile.id, closedFile.mode)) {"
       ]
     },
     {
-      "path": "src/renderer/src/store/slices/editor/types/open-file.ts",
+      "path": "src/relay/fs-handler.ts",
       "feature": "heimdall-pipeline",
-      "kind": "passthrough",
+      "kind": "registration",
       "lines": [
-        "  pipeline?: OpenPipelineTabState",
-        "  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details' | 'pipeline'"
+        "import { readRelayLinkTarget } from './fork-heimdall-pipeline/link-target-request'",
+        "    this.dispatcher.onRequest('fs.readlink', readRelayLinkTarget)"
       ]
     },
     {
@@ -5438,6 +5348,15 @@
       ]
     },
     {
+      "path": "src/main/automations/precheck-runner.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "passthrough",
+      "lines": [
+        "      extraEnv?: NodeJS.ProcessEnv",
+        "      env: target.extraEnv ? { ...process.env, ...target.extraEnv } : process.env,"
+      ]
+    },
+    {
       "path": "src/shared/protocol-version.ts",
       "feature": "heimdall-pipeline",
       "kind": "registration",
@@ -5446,6 +5365,46 @@
         "  ...heimdallPipelineCapability.HEIMDALL_PIPELINE_CLIENT_CAPABILITIES,",
         "  ...heimdallPipelineCapability.HEIMDALL_PIPELINE_RUNTIME_CAPABILITIES,"
       ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-header.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "  return !isCombinedDiff && file.mode !== 'check-details' && file.mode !== 'pipeline'"
+      ]
+    },
+    {
+      "path": "src/main/ipc/hooks/register-worktree-hook-file-handlers.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { gitignoreAlreadyCoversOrcaDir } from '../../fork-heimdall-pipeline/orca-gitignore-rules'",
+        "          if (!result.isBinary && !gitignoreAlreadyCoversOrcaDir(result.content)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/EditorContent.tsx",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { PipelineCanvasTab } from '@/fork-heimdall-pipeline/PipelineCanvasTab'",
+        "  if (activeFile.mode === 'pipeline') {",
+        "    return <PipelineCanvasTab file={activeFile} />",
+        "  }"
+      ]
+    },
+    {
+      "path": "src/main/providers/filesystem-provider-contract.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "passthrough",
+      "lines": ["  readlink?(filePath: string): Promise<string>"]
+    },
+    {
+      "path": "src/renderer/src/components/editor/EditorPanel.tsx",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": ["    if (activeFile.mode === 'check-details' || activeFile.mode === 'pipeline') {"]
     },
     {
       "path": "src/main/ipc/desktop-renderer-runtime-capabilities.ts",
@@ -5457,12 +5416,52 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/editor/closed-editor-tab-disposal.ts",
+      "path": "src/main/providers/ssh-filesystem-provider.ts",
       "feature": "heimdall-pipeline",
       "kind": "registration",
       "lines": [
-        "import { disposePipelineMode } from '@/fork-heimdall-pipeline/pipeline-tab-lifecycle'",
-        "    if (!isStillClosed(closedFile) || disposePipelineMode(closedFile.id, closedFile.mode)) {"
+        "import { attachPipelineLinkReader } from '../fork-heimdall-pipeline/ssh-link-reader'",
+        "    attachPipelineLinkReader(this, mux, createSftp)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-autosave-controller.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { savePipelineDraftForClose } from '@/fork-heimdall-pipeline/pipeline-tab-save'",
+        "    if (file.mode === 'pipeline' && !(await savePipelineDraftForClose(fileId))) {",
+        "      return",
+        "    }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-save-queue.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { savePipelineDraftForEditor } from '@/fork-heimdall-pipeline/pipeline-tab-save'",
+        "        if (liveFile.mode === 'pipeline') {",
+        "          return savePipelineDraftForEditor(file.id, trigger)",
+        "        }"
+      ]
+    },
+    {
+      "path": "src/main/issue-command-file.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { gitignoreAlreadyCoversOrcaDir } from './fork-heimdall-pipeline/orca-gitignore-rules'",
+        "      if (gitignoreAlreadyCoversOrcaDir(content)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/editor/types/open-file.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "passthrough",
+      "lines": [
+        "  pipeline?: OpenPipelineTabState",
+        "  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details' | 'pipeline'"
       ]
     }
   ],
@@ -5484,18 +5483,6 @@
       "reason": "Defend generic Git mutation classification across global options and read-only remote operations.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#git-exec-mutation-cache-invalidation"
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts",
-      "reason": "Wait for an admitted structured preamble to settle before judging it, so Claude worker and owner starts are not misreported as unknown.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#structured-preamble-waits-for-admitted-settlement"
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/orchestration-structured-worker-session.test.ts",
-      "reason": "Defend preamble settlement for admitted, rejected, and unsettled Claude sends.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#structured-preamble-waits-for-admitted-settlement"
     },
     {
       "path": "src/main/runtime/terminal-wait-detection.ts",
@@ -5794,11 +5781,6 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
-      "reason": "Tests the fork's own packaged Electron runtime contract.",
-      "status": "permanent"
-    },
-    {
       "path": "config/scripts/release-cut-token-permissions.test.mjs",
       "status": "permanent",
       "reason": "Asserts upstream's release-cut job matrix and github.repository == 'stablyai/orca'; the fork publishes macOS-only arm64 artifacts from zpyoung/orca, so upstream's version can never describe this pipeline."
@@ -5806,6 +5788,11 @@
     {
       "path": "config/scripts/release-rc-history.mjs",
       "reason": "Fork release-tooling delta for the fork's own RC history.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
+      "reason": "Tests the fork's own packaged Electron runtime contract.",
       "status": "permanent"
     },
     {
@@ -5990,12 +5977,6 @@
       "status": "permanent",
       "deleted": true,
       "reason": "Upstream's chat-only PTY send hook; fork-agent-composer's useAgentComposerSend already serves both the chat pane and the terminal dock."
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-draft.ts",
-      "reason": "Superseded by useAgentComposerDraft, which serves both the chat pane and the dock.",
-      "status": "permanent",
-      "deleted": true
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
@@ -6198,12 +6179,6 @@
       "reason": "Replaces bug-2 disk-heavy GC stage fixture with a bounded synthetic listing through the real POSIX pipeline.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#bug-2-relay-and-ssh-environment-dependent-failures"
-    },
-    {
-      "path": "config/scripts/hourly-build-version.test.mjs",
-      "reason": "Resolves the unpublished-release base explicitly instead of through getHourlyBuildIdentity, which reads this repo's package.json and pins the case to a tree at or below 1.4.203 — upstream's own v1.4.206 tag fails it too.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
     },
     {
       "path": "config/scripts/ci-dependency-download-cache.test.mjs",
@@ -6604,45 +6579,23 @@
       "ledger": "bug-1"
     },
     {
-      "path": ".github/workflows/terminal-ime-e2e.yml",
-      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
-    },
-    {
-      "path": ".github/workflows/golden-e2e-experiment.yml",
-      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
-    },
-    {
-      "path": "config/scripts/run-terminal-ibus-hangul-e2e.mjs",
-      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
-    },
-    {
-      "path": "config/scripts/terminal-ime-e2e-workflow.test.mjs",
-      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
-    },
-    {
-      "path": "config/scripts/playwright-focused-workflow-selection.test.mjs",
-      "reason": "Upstream's #23270 (dffb3498e2), not yet in a stable tag: Playwright 1.63 reads a forwarded `--` as ending file selection, so focused e2e steps run the whole suite.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#focused-playwright-file-selection"
-    },
-    {
       "path": "src/cli/specs/search.test.ts",
       "reason": "Removes an invalid global assertion that CLI flags are exclusive; Heimdall create commands legitimately use repeatable flags.",
       "status": "pending-upstream",
       "ledger": "bug-253"
     },
     {
-      "path": "pnpm-lock.yaml",
-      "reason": "Records fork-added dependencies (@xyflow/react) that package.json (a permanent exception) declares; resetting it to the upstream tag de-syncs --frozen-lockfile CI.",
-      "status": "permanent"
+      "path": "config/scripts/mobile-recording-pin-checkout.test.mjs",
+      "reason": "v1.4.218's mobile.yml (synced from main for the cut) has no recording-pin job, so its own contract test fails; upstream deleted the test in e594cb06af.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#mobile-workflow-tests-ahead-of-their-release",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/mobile-release-check-scope.test.mjs",
+      "reason": "v1.4.218's mobile.yml gates 'Summarize RPC recording changes', which the tag's test does not expect; aligned with upstream's e594cb06af.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#mobile-workflow-tests-ahead-of-their-release"
     },
     {
       "path": "config/scripts/generate-rpc-params-catalog.mjs",
@@ -6655,6 +6608,11 @@
       "reason": "Limits native-file drop interception to native file drags so internal application drag types can reach their own targets.",
       "status": "pending-upstream",
       "ledger": "bug-283"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "reason": "Records fork-added dependencies (@xyflow/react) that package.json (a permanent exception) declares; resetting it to the upstream tag de-syncs --frozen-lockfile CI.",
+      "status": "permanent"
     }
   ],
   "residuals": {
@@ -6737,10 +6695,6 @@
     "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx": {
       "added": 4,
       "removed": 7
-    },
-    "src/renderer/src/lib/agent-launch-routing-caller-census.test.ts": {
-      "added": 1,
-      "removed": 0
     },
     "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts": {
       "added": 2,
@@ -6879,7 +6833,7 @@
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write-input.ts": {
-      "added": 82,
+      "added": 80,
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write.ts": {
@@ -7054,14 +7008,6 @@
       "added": 2,
       "removed": 1
     },
-    "src/main/runtime/rpc/methods/terminal/terminal-legacy-simple-subscriptions.ts": {
-      "added": 3,
-      "removed": 0
-    },
-    "src/main/runtime/rpc/methods/terminal/terminal-legacy-subscribe-binary.ts": {
-      "added": 2,
-      "removed": 0
-    },
     "src/main/runtime/rpc/methods/terminal/terminal-multiplex-cleanup.ts": {
       "added": 3,
       "removed": 1
@@ -7071,7 +7017,7 @@
       "removed": 0
     },
     "src/main/runtime/rpc/methods/terminal/terminal-subscribe-method.ts": {
-      "added": 2,
+      "added": 10,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/worktree.ts": {
@@ -7308,7 +7254,7 @@
     },
     "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
       "added": 4,
-      "removed": 4
+      "removed": 6
     },
     "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
       "added": 2,
@@ -7355,8 +7301,8 @@
       "removed": 3
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 98,
-      "removed": 47
+      "added": 93,
+      "removed": 72
     },
     "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
       "added": 4,
@@ -7507,8 +7453,8 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
-      "added": 18,
-      "removed": 1
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-drag-units.ts": {
       "added": 8,
@@ -8022,10 +7968,6 @@
       "added": 5,
       "removed": 2
     },
-    "src/shared/pane-agent-identity-inventory.test.ts": {
-      "added": 4,
-      "removed": 0
-    },
     "src/shared/persisted-ui-state-types.ts": {
       "added": 4,
       "removed": 1
@@ -8418,10 +8360,6 @@
       "added": 3,
       "removed": 1
     },
-    "src/renderer/src/lib/agent-launch-caller-profile-census.test.ts": {
-      "added": 2,
-      "removed": 1
-    },
     "src/main/ipc/filesystem-download-lifetime.test.ts": {
       "added": 7,
       "removed": 1
@@ -8481,10 +8419,6 @@
     "src/cli/runtime/websocket-transport.test.ts": {
       "added": 3,
       "removed": 1
-    },
-    "src/main/ipc/desktop-renderer-runtime-capabilities.ts": {
-      "added": 2,
-      "removed": 0
     },
     "src/main/ipc/desktop-renderer-runtime-capabilities.test.ts": {
       "added": 4,
@@ -8930,71 +8864,95 @@
       "added": 15,
       "removed": 2
     },
-    "src/main/automations/precheck-runner.ts": {
-      "added": 2,
+    "tests/e2e/cross-version-wire/agent-session-death-evidence-downgrade.unit.test.ts": {
+      "added": 1,
       "removed": 1
     },
-    "src/main/ipc/hooks/register-worktree-hook-file-handlers.ts": {
-      "added": 2,
+    "tests/e2e/cross-version-wire/agent-session-resume-marker-downgrade.unit.test.ts": {
+      "added": 1,
       "removed": 1
+    },
+    "tests/e2e/cross-version-wire/cross-version-worktree-ps-verdict.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "pnpm-lock.yaml": {
+      "added": 94,
+      "removed": 37
+    },
+    "config/scripts/localization-package-contract.test.mjs": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/editor/types/open-file.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/main/ipc/desktop-renderer-runtime-capabilities.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/main/issue-command-file.ts": {
       "added": 2,
       "removed": 1
     },
-    "src/main/providers/filesystem-provider-contract.ts": {
+    "src/renderer/src/components/editor/EditorPanel.tsx": {
       "added": 1,
-      "removed": 0
+      "removed": 1
     },
-    "src/main/providers/ssh-filesystem-provider.ts": {
-      "added": 2,
+    "src/renderer/src/components/editor/editor-save-queue.ts": {
+      "added": 4,
       "removed": 0
     },
     "src/main/runtime/runtime-repository-issue-command.ts": {
       "added": 2,
       "removed": 1
     },
-    "src/relay/fs-handler.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/editor/EditorContent.tsx": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/components/editor/EditorPanel.tsx": {
-      "added": 1,
-      "removed": 1
-    },
     "src/renderer/src/components/editor/EditorPanelHeaderPath.tsx": {
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/editor/editor-autosave-controller.ts": {
-      "added": 4,
+    "src/relay/fs-handler.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/providers/ssh-filesystem-provider.ts": {
+      "added": 2,
       "removed": 0
     },
     "src/renderer/src/components/editor/editor-header.ts": {
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/editor/editor-labels.ts": {
-      "added": 3,
-      "removed": 0
-    },
-    "src/renderer/src/components/editor/editor-save-queue.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/store/slices/editor/types/open-file.ts": {
-      "added": 3,
+    "src/renderer/src/components/editor/closed-editor-tab-disposal.ts": {
+      "added": 2,
       "removed": 1
     },
     "src/renderer/src/store/slices/tabs-hydration.ts": {
       "added": 4,
       "removed": 0
     },
-    "src/renderer/src/components/editor/closed-editor-tab-disposal.ts": {
+    "src/renderer/src/components/editor/EditorContent.tsx": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/editor/editor-labels.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/main/automations/precheck-runner.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/editor-autosave-controller.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/providers/filesystem-provider-contract.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/ipc/hooks/register-worktree-hook-file-handlers.ts": {
       "added": 2,
       "removed": 1
     }

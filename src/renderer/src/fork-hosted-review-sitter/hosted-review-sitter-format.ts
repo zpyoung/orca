@@ -252,11 +252,7 @@ export function hostedReviewSitterLedgerEntrySummary(
   switch (entry.kind) {
     case 'attempt':
       return {
-        title: translate(
-          `fork.hostedReviewSitter.ledger.${entry.state}`,
-          `${entry.state === 'settled' ? 'Finished' : entry.state === 'running' ? 'Running' : 'Attempted'} {{action}}`,
-          { action: hostedReviewSitterKernelActionLabel(entry.action.kind) }
-        ),
+        title: attemptTitle(entry.state, hostedReviewSitterKernelActionLabel(entry.action.kind)),
         detail:
           entry.reason ??
           resultDetail(entry.result) ??
@@ -383,5 +379,21 @@ export function hostedReviewSitterLedgerEntrySummary(
         title: translate('fork.hostedReviewSitter.ledger.terminal', 'Watcher completed'),
         detail: `${entry.state}: ${entry.reason}`
       }
+  }
+}
+
+function attemptTitle(
+  state: Extract<LedgerEntry, { kind: 'attempt' }>['state'],
+  action: string
+): string {
+  switch (state) {
+    case 'settled':
+      return translate('fork.hostedReviewSitter.ledger.settled', 'Finished {{action}}', { action })
+    case 'running':
+      return translate('fork.hostedReviewSitter.ledger.running', 'Running {{action}}', { action })
+    case 'attempted':
+      return translate('fork.hostedReviewSitter.ledger.attempted', 'Attempted {{action}}', {
+        action
+      })
   }
 }

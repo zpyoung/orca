@@ -84,12 +84,14 @@ describe('useAgentComposerSend (tier-independent retention)', () => {
       {},
       'pty-native-chat',
       buildNativeChatPasteBytes('plain send'),
+      'driving',
       expect.any(Function)
     )
     expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledWith(
       {},
       'pty-native-chat',
-      NATIVE_CHAT_SUBMIT
+      NATIVE_CHAT_SUBMIT,
+      'driving'
     )
     expect(result.current.core.draft).toBe('')
   })

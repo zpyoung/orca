@@ -1,13 +1,13 @@
+import { markQoderWorkspaceTrusted } from '../qoder/workspace-trust'
+import { agentStartedTelemetry } from '../agent-launch/agent-started-telemetry'
 import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
 import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOverrides
 } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import { tuiAgentToAgentKind } from '../../shared/agent-kind'
 import type { Repo } from '../../shared/repo-types'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
-import { launchSourceSchema } from '../../shared/telemetry-property-schemas'
 import { repoIsRemote } from '../../shared/agent-launch-remote'
 import { getRepoSshConnectionId } from '../../shared/execution-host'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
@@ -20,6 +20,7 @@ import {
   markCopilotFolderTrusted,
   markCursorWorkspaceTrusted
 } from '../agent-trust-presets'
+import { awaitAgentTrustWriteWithinDeadline } from '../agent-trust-write-deadline'
 import {
   detectInstalledAgentsWithShellPathHydration,
   detectRemoteAgents
@@ -29,6 +30,11 @@ import type { RuntimeStore } from './runtime-store-contract'
 
 export type WorktreeStartupDraftPaste = { agent: TuiAgent; content: string }
 export type WorktreeStartupFollowup = { expectedProcess: string; prompt: string }
+
+/** A fresh agent the host builds always carries its `agent_started` record; dropping it fails to compile. */
+type AttributedWorktreeStartupLaunch = WorktreeStartupLaunch & {
+  telemetry: NonNullable<WorktreeStartupLaunch['telemetry']>
+}
 
 type StartupEnvironment = {
   repo: Repo
@@ -44,7 +50,7 @@ export async function buildWorktreeStartupForDraft(
   environment: StartupEnvironment & { draft: string; requestedAgent?: TuiAgent }
 ): Promise<{
   agent: TuiAgent
-  startup: WorktreeStartupLaunch
+  startup: AttributedWorktreeStartupLaunch
   draftPaste?: WorktreeStartupDraftPaste
 } | null> {
   const content = environment.draft.trim()
@@ -87,6 +93,7 @@ export async function buildWorktreeStartupForDraft(
     isRemote: repoIsRemote(repo),
     ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {})
   })
+  const telemetry = agentStartedTelemetry(agent, environment.launchSource)
   const draftPlan = buildAgentDraftLaunchPlan({ ...launchArgs, draft: content })
   if (draftPlan) {
     return {
@@ -97,7 +104,8 @@ export async function buildWorktreeStartupForDraft(
         ...(draftPlan.startupCommandDelivery
           ? { startupCommandDelivery: draftPlan.startupCommandDelivery }
           : {}),
-        ...(draftPlan.env ? { env: draftPlan.env } : {})
+        ...(draftPlan.env ? { env: draftPlan.env } : {}),
+        telemetry
       }
     }
   }
@@ -117,7 +125,8 @@ export async function buildWorktreeStartupForDraft(
       ...(startupPlan.startupCommandDelivery
         ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
         : {}),
-      ...(startupPlan.env ? { env: startupPlan.env } : {})
+      ...(startupPlan.env ? { env: startupPlan.env } : {}),
+      telemetry
     },
     draftPaste: { agent, content }
   }
@@ -133,7 +142,11 @@ export function buildWorktreeStartupForAgent(
       preferences?: AgentLaunchPreferences
     ) => Parameters<typeof buildAgentStartupPlan>[0]['sessionOptions'] | undefined
   }
-): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
+): {
+  agent: TuiAgent
+  startup: AttributedWorktreeStartupLaunch
+  followup?: WorktreeStartupFollowup
+} {
   const { agent, repo, settings, launchOverrides } = environment
   if (!isTuiAgentEnabled(agent, settings.disabledTuiAgents)) {
     throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
@@ -160,7 +173,6 @@ export function buildWorktreeStartupForAgent(
   if (!startupPlan) {
     throw new Error(`Could not build launch command for ${agent}.`)
   }
-  const telemetry = agentLaunchTelemetry(agent, environment.launchSource)
   return {
     agent,
     startup: {
@@ -170,7 +182,7 @@ export function buildWorktreeStartupForAgent(
         ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
         : {}),
       ...(startupPlan.env ? { env: startupPlan.env } : {}),
-      ...(telemetry ? { telemetry } : {})
+      telemetry: agentStartedTelemetry(agent, environment.launchSource)
     },
     ...(startupPlan.followupPrompt
       ? {
@@ -183,20 +195,6 @@ export function buildWorktreeStartupForAgent(
   }
 }
 
-function agentLaunchTelemetry(
-  agent: TuiAgent,
-  launchSource: string | undefined
-): WorktreeStartupLaunch['telemetry'] | undefined {
-  const parsed = launchSourceSchema.safeParse(launchSource)
-  return parsed.success
-    ? {
-        agent_kind: tuiAgentToAgentKind(agent),
-        launch_source: parsed.data,
-        request_kind: 'new'
-      }
-    : undefined
-}
-
 export async function markLocalWorktreeTrusted(
   agent: TuiAgent,
   workspacePath: string
@@ -206,13 +204,18 @@ export async function markLocalWorktreeTrusted(
     return
   }
   try {
-    if (preset === 'cursor') {
+    if (preset === 'qoder') {
+      markQoderWorkspaceTrusted(workspacePath)
+    } else if (preset === 'cursor') {
       markCursorWorkspaceTrusted(workspacePath)
     } else if (preset === 'copilot') {
       markCopilotFolderTrusted(workspacePath)
     } else if (preset === 'codex') {
-      // Why: the Codex write queues behind any in-flight hook grant, so the agent must not launch until it lands.
-      await markCodexProjectTrusted(workspacePath)
+      // Why: the Codex write queues behind any in-flight hook grant, so the agent must not launch until it lands. Bounded so a wedged lane degrades to the agent's own prompt instead of stalling the launch.
+      await awaitAgentTrustWriteWithinDeadline(markCodexProjectTrusted(workspacePath), {
+        preset,
+        workspacePath
+      })
     } else if (preset === 'antigravity') {
       markAntigravityWorkspaceTrusted(workspacePath)
     }

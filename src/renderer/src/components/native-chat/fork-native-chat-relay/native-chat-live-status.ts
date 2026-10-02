@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-live-status.ts
-// FORK-COPY-SHA: 083f583a53e4c74a65acf420eee4ca2e0efa9df1
+// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
 // Pure merge of live hook turn-state into a NativeChatSession status override.
 // Kept separate from the React hook so the precedence rule (live 'working'
 // surfaces before the transcript flushes its explicit terminal record, then is
@@ -61,14 +61,15 @@ export function mergeNativeChatLiveSession(input: NativeChatLiveMergeInput): Nat
   }
 
   const status = liveStatusOverride(
+    agent,
     hookState,
     sources,
     stateStartedAt,
     transcriptLifecycle,
     hookHasWorkingSubagents ?? false
   )
-  // Why live work still wins: 'working' is what drives Stop-vs-Send, the typing
-  // indicator and the streaming preview, so forcing 'loading' over it renders an
+  // Why live work still wins: 'working' is what drives Stop-vs-Send, the turn
+  // status and the streaming preview, so forcing 'loading' over it renders an
   // idle pane while the agent works. A known session with nothing to show yet is
   // held on the loading surface by selectNativeChatViewState instead.
   if (loading && status !== 'working') {
@@ -82,10 +83,36 @@ export function mergeNativeChatLiveSession(input: NativeChatLiveMergeInput): Nat
   })
 }
 
+/**
+ * Whether the agent stopped mid-turn for the reader (`blocked` and `waiting` both mean a human
+ * must decide). Reconciled like 'working': an interrupt at the prompt fires no hook, so only the
+ * transcript's terminal marker can end a wait the hook never cleared.
+ */
+export function nativeChatHookAwaitsInput(
+  hookState: AgentStatusState | null,
+  stateStartedAt: number | null | undefined,
+  transcriptLifecycle: NativeChatTurnLifecycle | undefined
+): boolean {
+  return (
+    (hookState === 'blocked' || hookState === 'waiting') &&
+    !lifecycleTerminatesCurrentTurn(transcriptLifecycle, stateStartedAt)
+  )
+}
+
 /** Slack for comparing transcript timestamps to hook receipt times across hosts. */
 export const LIFECYCLE_CLOCK_SKEW_SLACK_MS = 2_000
 
+/**
+ * Agents whose own runtime reports the turn end: omp posts `agent_end` from inside the agent,
+ * retried until the host takes it and held back while the run continues. Their hook 'working'
+ * is never a dropped Stop, so a trailing assistant row (a tool call mid-run) cannot end it.
+ */
+function hookDeliversTurnEnd(agent: AgentType): boolean {
+  return agent === 'omp'
+}
+
 function liveStatusOverride(
+  agent: AgentType,
   hookState: AgentStatusState | null,
   sources: NativeChatSources,
   stateStartedAt: number | null | undefined,
@@ -119,6 +146,7 @@ function liveStatusOverride(
   // do not settle early on capable providers.
   if (
     transcriptLifecycle?.state !== 'working' &&
+    !hookDeliversTurnEnd(agent) &&
     trailingAssistantPostDates(sources, stateStartedAt)
   ) {
     return undefined

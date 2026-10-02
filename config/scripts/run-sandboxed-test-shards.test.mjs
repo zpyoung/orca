@@ -8,6 +8,7 @@ import {
   RELATED_SINGLE_CONTAINER_MAX,
   buildSelectionTar,
   laneCommand,
+  laneEnvArgs,
   parseSelectMode,
   readSelectionList,
   resolveSelectionBuckets
@@ -20,12 +21,11 @@ const workflow = (name) =>
 const shellRun = workflow('pr').jobs.shell_contracts.steps.find(
   (step) => step.name === 'Test real shell contracts'
 ).run
-const unitRun = workflow('unit-tests').jobs.test.steps.find(
+const unitShardEnv = workflow('unit-tests').jobs.test.steps.find(
   (step) => step.name === 'Test shard'
-).run
+).env
 
 const shellSpecs = shellRun.match(/src\/\S+\.test\.ts/g)
-const unitExcludes = unitRun.match(/--exclude=\S+/g)
 
 describe('sandbox lane selection', () => {
   it('runs the CI shell contracts serially without stale spec paths', () => {
@@ -42,9 +42,9 @@ describe('sandbox lane selection', () => {
   it('keeps the same shell contracts out of parallel shards as CI', () => {
     const command = laneCommand({ lane: 'unit', shardTotal: 16, extraArgs: [] }, 3)
 
-    expect(command.filter((arg) => arg.startsWith('--exclude=')).sort()).toEqual(
-      unitExcludes.sort()
-    )
+    expect(unitShardEnv.ORCA_BALANCE_UNIT_SHARDS).toBe('1')
+    expect(laneEnvArgs('unit')).toEqual(['--env', 'ORCA_BALANCE_UNIT_SHARDS=1'])
+    expect(command.some((arg) => arg.startsWith('--exclude='))).toBe(false)
     expect(command).toContain('--shard=3/16')
   })
 
@@ -58,7 +58,6 @@ describe('sandbox lane selection', () => {
       '--config',
       'config/vitest.config.ts'
     ])
-    expect(unit.filter((arg) => arg.startsWith('--exclude=')).sort()).toEqual(unitExcludes.sort())
     expect(unit).toContain('--shard=5/16')
     expect(unit).toContain('--bail=1')
     expect(unit[0]).not.toBe('sh')
@@ -113,9 +112,7 @@ describe('related and files selection modes', () => {
     expect(command[2]).toContain('.orca-sandbox/selection.txt')
     expect(command[2]).toContain('--run')
     expect(command[2]).toContain('--bail=1')
-    for (const exclude of unitExcludes) {
-      expect(command[2]).toContain(exclude)
-    }
+    expect(command[2]).not.toContain('--exclude=')
   })
 
   it('builds a files-mode command with "run", no "--run" flag, still reading the selection file', () => {

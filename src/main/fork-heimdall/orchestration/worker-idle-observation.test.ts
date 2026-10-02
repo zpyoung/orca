@@ -164,7 +164,8 @@ describe('sendWorkerPrompt', () => {
     await sendWorkerPrompt(runtime, db(), run, 'dispatch-1', '  Keep both.  ')
     expect(sendTerminalAgentPrompt).toHaveBeenCalledWith(
       'term_1',
-      '[Heimdall owner reply] Keep both.'
+      '[Heimdall owner reply] Keep both.',
+      { inputKind: 'driving' }
     )
   })
 

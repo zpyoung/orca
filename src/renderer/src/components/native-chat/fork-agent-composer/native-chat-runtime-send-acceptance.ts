@@ -25,7 +25,7 @@ export function sendBodyAccepted(
         if (!ok || isCancelled()) {
           return false
         }
-        return sendRuntimePtyInputAcceptance(settings, ptyId, bytes, isCancelled)
+        return sendRuntimePtyInputAcceptance(settings, ptyId, bytes, 'driving', isCancelled)
       }),
     Promise.resolve(true)
   )
