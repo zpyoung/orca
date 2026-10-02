@@ -138,6 +138,14 @@ export function validatePipelineNodeDetails(
             `Node ${parts.nodeId} does not declare output ${parts.outputName}`
           )
         }
+        if (node.type === 'decision' && output !== undefined && !isBranchableOutput(output)) {
+          addError(
+            node.id,
+            index,
+            'invalid-output-ref',
+            `Decision cannot branch on ${output.type} output ${parts.outputName}`
+          )
+        }
         if (node.type !== 'loop' && !ancestors.has(parts.nodeId)) {
           addError(
             node.id,
@@ -302,10 +310,10 @@ function outputDefinitions(node: PipelineNode): Readonly<Record<string, Pipeline
   switch (node.type) {
     case 'agent':
       return node.outputs ?? {}
-    case 'swarm':
-      return node.child.outputs ?? {}
     case 'script':
       return node.outputs?.stdout === undefined ? {} : { stdout: { type: 'text' as const } }
+    // swarm child outputs are keyed per task instance at runtime, so the swarm itself exposes none
+    case 'swarm':
     case 'check':
     case 'decision':
     case 'loop':
@@ -316,6 +324,10 @@ function outputDefinitions(node: PipelineNode): Readonly<Record<string, Pipeline
     case 'pr-sitter':
       return {}
   }
+}
+
+function isBranchableOutput(output: PipelineOutputType): boolean {
+  return output.type !== 'json' && output.type !== 'file' && output.type !== 'taskList'
 }
 
 function declaredOutput(node: PipelineNode, outputName: string): PipelineOutputType | undefined {
