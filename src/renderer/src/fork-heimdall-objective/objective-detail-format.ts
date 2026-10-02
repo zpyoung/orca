@@ -40,9 +40,12 @@ export function objectivePlanLintCodeLabel(code: PlanLintCode): string {
     case 'conflict-pair':
       return translate('fork.heimdallObjective.detail.lintCode.conflictPair', 'Territory conflict')
     case 'duplicates-gate':
-      return translate('fork.heimdallObjective.detail.lintCode.duplicatesGate', 'Duplicates a gate')
+      return translate(
+        'fork.heimdallObjective.detail.lintCode.duplicatesGate',
+        'Duplicates a check'
+      )
     case 'no-gate-declared':
-      return translate('fork.heimdallObjective.detail.lintCode.noGateDeclared', 'No gate declared')
+      return translate('fork.heimdallObjective.detail.lintCode.noGateDeclared', 'No check declared')
     case 'missing-assumptions':
       return translate(
         'fork.heimdallObjective.detail.lintCode.missingAssumptions',

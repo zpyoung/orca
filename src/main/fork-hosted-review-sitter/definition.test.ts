@@ -219,6 +219,7 @@ describe('hosted review merge-check scope', () => {
       kindPayload: legacyKindPayload
     })
     expect(definition.mergeCheckScope).toBe('all')
+    expect(definition.repeatFixLimit).toBe(3)
   })
 
   it('preserves explicit scope and defaults legacy candidates during authorization', async () => {
@@ -226,7 +227,18 @@ describe('hosted review merge-check scope', () => {
     const legacy = await authorize(legacyKindPayload)
 
     expect(required.kindPayload).toMatchObject({ mergeCheckScope: 'required' })
-    expect(legacy.kindPayload).toMatchObject({ mergeCheckScope: 'all' })
+    expect(legacy.kindPayload).toEqual({ ...legacyKindPayload, mergeCheckScope: 'all' })
+  })
+
+  it('carries an explicit repeat-failure limit through authorization and definition parsing', async () => {
+    const authorized = await authorize({ ...legacyKindPayload, repeatFixLimit: 5 })
+
+    expect(authorized.kindPayload).toEqual({
+      ...legacyKindPayload,
+      mergeCheckScope: 'all',
+      repeatFixLimit: 5
+    })
+    expect(hostedReviewDefinitionFromEnrollment(authorized).repeatFixLimit).toBe(5)
   })
 })
 

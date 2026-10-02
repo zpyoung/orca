@@ -6,6 +6,13 @@ import {
   HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
+import {
+  HEIMDALL_PIPELINE_NODE_CAPABILITY,
+  HEIMDALL_PIPELINE_RUNTIME_CAPABILITY
+} from '../../shared/fork-heimdall-pipeline/capability'
+import { PIPELINE_NODE_TYPES } from '../../shared/fork-heimdall-pipeline/document-schema'
+import { BUILTIN_OBJECTIVE_PIPELINE_TEXT } from '../../shared/fork-heimdall-pipeline/builtin-pipelines'
+import type { WatcherFleetEntry } from '../../shared/fork-heimdall/fleet-types'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { EnrollInput, WatcherListEntry } from '../../shared/fork-heimdall/watcher-types'
@@ -56,6 +63,39 @@ function watcherEntry(): WatcherListEntry {
     }
   }
 }
+function pipelineFleetEntry(): WatcherFleetEntry {
+  const entry = watcherEntry()
+  entry.name = 'Pipeline run'
+  entry.enrollment.kind = 'pipeline'
+  entry.status.phase = 'executing pipeline'
+  return {
+    target: { watcherId: 'watcher-1', connectionId: null, pairingRevision: null },
+    entry,
+    ownerFence: {
+      executionHostId: 'local',
+      schedulerOwner: 'local_host_service',
+      workspaceKey: 'local::/repo',
+      revision: 3
+    },
+    observedAtMs: 1,
+    contact: 'live',
+    readOnlyReason: null,
+    capabilityNotes: ['host capability note'],
+    paused: false,
+    workflowPhase: 'stale objective phase',
+    parallel: { runningCount: 2, effectiveMaxConcurrency: 3, note: 'objective-only note' }
+  }
+}
+function futureKindFleetEntry(): unknown {
+  const entry = pipelineFleetEntry()
+  return {
+    ...entry,
+    entry: {
+      ...entry.entry,
+      enrollment: { ...entry.entry.enrollment, kind: 'future-execution-kind' }
+    }
+  }
+}
 
 function runtimeStatus(capabilities: string[]): RuntimeRpcResponse<RuntimeStatus> {
   return {
@@ -78,12 +118,16 @@ function successful<T>(id: string, result: T): RuntimeRpcResponse<T> {
   return { id, ok: true, result, _meta: { runtimeId: 'runtime-remote' } }
 }
 
-function environmentHarness(capabilities: string[]): FleetEnvironmentTransport {
+function environmentHarness(
+  capabilities: string[],
+  entries: unknown[] = []
+): FleetEnvironmentTransport {
   return {
     list: () => [REMOTE_IDENTITY],
     availability: () => 'available',
+    displayName: () => 'buildbox',
     status: vi.fn(async () => runtimeStatus(capabilities)),
-    read: vi.fn(async () => successful('heimdall:fleet', { entries: [], generatedAtMs: 1 })),
+    read: vi.fn(async () => successful('heimdall:fleet', { entries, generatedAtMs: 1 })),
     mutate: vi.fn(async () =>
       successful('heimdall:enroll', { status: 'enrolled', entry: watcherEntry() })
     ),
@@ -105,6 +149,62 @@ function objectiveEnrollInput(
       roleAgents: {},
       roleLaunch: { planner: { model: 'opus', effort: 'high' } }
     }
+  }
+}
+function pipelineEnrollInput(): EnrollInput {
+  return {
+    kind: 'pipeline',
+    repoId: 'repo-1',
+    worktreeId: 'worktree-1',
+    capabilities: {},
+    budget: { wallClockActiveMs: null, turns: null },
+    kindPayload: {
+      schemaVersion: 1,
+      pin: {
+        ref: 'repo:swarm-demo',
+        scope: 'repo',
+        id: 'swarm-demo',
+        contentHash: `sha256:${'a'.repeat(64)}`,
+        documentVersion: 1
+      },
+      document: {
+        version: 1,
+        id: 'swarm-demo',
+        name: 'Swarm demo',
+        nodes: [
+          {
+            id: 'planner',
+            type: 'agent',
+            harness: 'claude',
+            prompt: 'Plan the work.',
+            outputs: { tasks: { type: 'taskList' } }
+          },
+          {
+            id: 'swarm',
+            type: 'swarm',
+            after: ['planner'],
+            from: '$planner.outputs.tasks',
+            child: { harness: 'claude', prompt: '$task.spec' }
+          }
+        ]
+      },
+      sourceText: 'version: 1',
+      runInputs: { task: 'Fix the issue' },
+      workspaceKind: 'git'
+    }
+  }
+}
+function customObjectiveSourceInput(): EnrollInput {
+  return {
+    ...objectiveEnrollInput(),
+    pipelinePin: {
+      ref: 'repo:objective',
+      scope: 'repo',
+      id: 'objective',
+      contentHash: `sha256:${'0'.repeat(64)}`,
+      documentVersion: 1
+    },
+    pipelineSource: { sourceText: BUILTIN_OBJECTIVE_PIPELINE_TEXT }
   }
 }
 
@@ -215,6 +315,144 @@ describe('HeimdallRemoteFleetMirrors.enroll newWorktree capability gating', () =
       },
       owner: null
     })
+  })
+})
+describe('HeimdallRemoteFleetMirrors answer-pipeline-choice capability gating', () => {
+  it('refuses a host without pipeline support before the command reaches the transport', async () => {
+    const environment = environmentHarness([HEIMDALL_COMMANDS_RUNTIME_CAPABILITY])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    await mirrors.enroll(objectiveEnrollInput(), REMOTE_OWNER)
+    vi.mocked(environment.mutate).mockClear()
+
+    const result = await mirrors.command({
+      target: { watcherId: 'watcher-1', connectionId: REMOTE_IDENTITY.id, pairingRevision: 7 },
+      expectedOwner: {
+        executionHostId: 'local',
+        schedulerOwner: 'local_host_service',
+        workspaceKey: 'local::/repo',
+        revision: 1
+      },
+      command: {
+        kind: 'answer-pipeline-choice',
+        scope: {
+          actionKind: 'pipeline-pass-gate',
+          contentIdentity: 'pipeline:sha256:content',
+          evidenceKey: 'pipeline-choice'
+        },
+        choice: 'approve'
+      }
+    })
+
+    expect(result).toEqual({
+      status: 'refused',
+      reason: 'unsupported-capability',
+      detail:
+        'The owning runtime does not support Heimdall pipelines. Update the host and try again.'
+    })
+    expect(environment.mutate).not.toHaveBeenCalled()
+  })
+})
+describe('HeimdallRemoteFleetMirrors pipeline row projection', () => {
+  it('uses the runner phase and removes objective-only parallel data from a remote pipeline', async () => {
+    const mirrors = new HeimdallRemoteFleetMirrors(
+      environmentHarness([HEIMDALL_COMMANDS_RUNTIME_CAPABILITY], [pipelineFleetEntry()]),
+      () => undefined
+    )
+    await mirrors.enroll(objectiveEnrollInput(), REMOTE_OWNER)
+    const projected = mirrors.entries()[0]
+
+    expect(projected).toMatchObject({
+      workflowPhase: 'executing pipeline',
+      capabilityNotes: ['host capability note']
+    })
+    expect(projected).not.toHaveProperty('parallel')
+  })
+})
+describe('HeimdallRemoteFleetMirrors unknown watcher kind compatibility', () => {
+  it('retains a future-kind row as read-only and refuses its controls', async () => {
+    const environment = environmentHarness(
+      [HEIMDALL_COMMANDS_RUNTIME_CAPABILITY],
+      [futureKindFleetEntry()]
+    )
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+    await mirrors.enroll(objectiveEnrollInput(), REMOTE_OWNER)
+    const [entry] = mirrors.entries()
+
+    expect(entry?.entry.enrollment.kind).toBe('unknown')
+    expect(entry?.readOnlyReason).toBe('This watcher kind is not supported by this Orca version.')
+    vi.mocked(environment.mutate).mockClear()
+
+    const result = await mirrors.command({
+      target: { watcherId: 'watcher-1', connectionId: REMOTE_IDENTITY.id, pairingRevision: 7 },
+      expectedOwner: {
+        executionHostId: 'local',
+        schedulerOwner: 'local_host_service',
+        workspaceKey: 'local::/repo',
+        revision: 3
+      },
+      command: { kind: 'pause' }
+    })
+
+    expect(result).toEqual({
+      status: 'refused',
+      reason: 'unsupported-capability',
+      detail: 'This watcher kind is not supported by this Orca version.'
+    })
+    expect(environment.mutate).not.toHaveBeenCalled()
+  })
+})
+describe('HeimdallRemoteFleetMirrors.enroll pipeline capability gating', () => {
+  it('refuses a pipeline before enrolling on a host without pipeline support', async () => {
+    const environment = environmentHarness([HEIMDALL_COMMANDS_RUNTIME_CAPABILITY])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+
+    await expect(mirrors.enroll(pipelineEnrollInput(), REMOTE_OWNER)).rejects.toThrow(
+      'The owning runtime does not support Heimdall pipelines. Update the host and try again.'
+    )
+    expect(environment.mutate).not.toHaveBeenCalled()
+  })
+
+  it('names the host and missing node types when refusing an unsupported pipeline node', async () => {
+    const capabilities = [
+      HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+      HEIMDALL_PIPELINE_RUNTIME_CAPABILITY,
+      ...PIPELINE_NODE_TYPES.filter((type) => type !== 'swarm').map(
+        HEIMDALL_PIPELINE_NODE_CAPABILITY
+      )
+    ]
+    const environment = environmentHarness(capabilities)
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+
+    await expect(mirrors.enroll(pipelineEnrollInput(), REMOTE_OWNER)).rejects.toThrow(
+      'Update Orca on buildbox to run this pipeline (needs: Swarm)'
+    )
+    expect(environment.mutate).not.toHaveBeenCalled()
+  })
+  it('refuses a source-bearing custom run instead of stripping its snapshot for an old host', async () => {
+    const environment = environmentHarness([HEIMDALL_COMMANDS_RUNTIME_CAPABILITY])
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+
+    await expect(mirrors.enroll(customObjectiveSourceInput(), REMOTE_OWNER)).rejects.toThrow(
+      'The owning runtime does not support Heimdall pipelines. Update the host and try again.'
+    )
+    expect(environment.mutate).not.toHaveBeenCalled()
+  })
+
+  it('refuses a source-bearing run when the host lacks the Objective node capability', async () => {
+    const capabilities = [
+      HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+      HEIMDALL_PIPELINE_RUNTIME_CAPABILITY,
+      ...PIPELINE_NODE_TYPES.filter((type) => type !== 'objective').map(
+        HEIMDALL_PIPELINE_NODE_CAPABILITY
+      )
+    ]
+    const environment = environmentHarness(capabilities)
+    const mirrors = new HeimdallRemoteFleetMirrors(environment, () => undefined)
+
+    await expect(mirrors.enroll(customObjectiveSourceInput(), REMOTE_OWNER)).rejects.toThrow(
+      'Update Orca on buildbox to run this pipeline (needs: Objective)'
+    )
+    expect(environment.mutate).not.toHaveBeenCalled()
   })
 })
 

@@ -12,6 +12,7 @@ import { defineMethod } from '../../core'
 import { requireHeimdallKernel } from './kernel-binding'
 import { projectHeimdallLedgerForClient } from './dispatch-result-wire'
 import { projectWatcherListEntryForClient } from './park-reason-wire'
+import { projectPipelineListForClient } from './pipeline-kind-wire'
 
 export const LEGACY_HEIMDALL_CHANNELS = {
   list: 'heimdall:list',
@@ -80,9 +81,10 @@ export const LEGACY_HEIMDALL_METHODS = [
     name: LEGACY_HEIMDALL_CHANNELS.list,
     params: z.object({}).strict(),
     handler: async (_params, context) =>
-      (await requireHeimdallKernel(context.runtime).list()).map((entry) =>
-        projectLegacyListEntry(projectWatcherListEntryForClient(entry, context))
-      )
+      projectPipelineListForClient(
+        await requireHeimdallKernel(context.runtime).list(),
+        context
+      ).map((entry) => projectLegacyListEntry(projectWatcherListEntryForClient(entry, context)))
   }),
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.disarm,

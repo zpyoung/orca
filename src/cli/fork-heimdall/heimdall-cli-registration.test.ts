@@ -70,6 +70,27 @@ describe('orca heimdall CLI registration', () => {
         fields: {}
       },
       {
+        argv: [
+          'heimdall',
+          'create',
+          '--pipeline',
+          '.orca/pipelines/bugfix.yaml',
+          '--spec',
+          'Fix the bug',
+          '--input',
+          'priority=2',
+          '--cap',
+          'push=on'
+        ],
+        key: 'heimdall create',
+        fields: {
+          pipeline: '.orca/pipelines/bugfix.yaml',
+          spec: 'Fix the bug',
+          input: 'priority=2',
+          cap: 'push=on'
+        }
+      },
+      {
         argv: ['heimdall', 'pause', 'watcher-1'],
         key: 'heimdall pause',
         fields: { 'watcher-id': 'watcher-1' }
@@ -93,6 +114,25 @@ describe('orca heimdall CLI registration', () => {
         argv: ['heimdall', 'approve', 'watcher-1', 'escalation-1'],
         key: 'heimdall approve',
         fields: { 'watcher-id': 'watcher-1', 'escalation-id': 'escalation-1' }
+      },
+      {
+        argv: [
+          'heimdall',
+          'approve',
+          'watcher-1',
+          'escalation-1',
+          '--choice',
+          'extend',
+          '--extend-minutes',
+          '15'
+        ],
+        key: 'heimdall approve',
+        fields: {
+          'watcher-id': 'watcher-1',
+          'escalation-id': 'escalation-1',
+          choice: 'extend',
+          'extend-minutes': '15'
+        }
       },
       {
         argv: ['heimdall', 'answer', 'watcher-1', 'message-1', '--body', 'yes'],
@@ -126,6 +166,23 @@ describe('orca heimdall CLI registration', () => {
     }
     expect(isCommandGroup(COMMAND_SPECS, ['heimdall'])).toBe(true)
     expect(isCommandGroup(COMMAND_SPECS, ['heimdall', 'create'])).toBe(true)
+  })
+
+  it('shows the create subcommands when no pipeline flag is supplied', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const context: HandlerContext = {
+      flags: new Map(),
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this group-help route must not call the runtime client.
+      client: { call: vi.fn() } as unknown as HandlerContext['client'],
+      cwd: '/workspace',
+      json: false
+    }
+
+    await dispatch(['heimdall', 'create'], context)
+
+    expect(logSpy).toHaveBeenCalledOnce()
+    expect(logSpy.mock.calls[0]?.[0]).toContain('objective')
+    expect(logSpy.mock.calls[0]?.[0]).toContain('hosted-review')
   })
 
   it('dispatches debug to the watcher owner selected from the fleet', async () => {

@@ -1,1 +1,37 @@
-{}
+{
+  "fork": {
+    "heimdallObjective": {
+      "enrollment": {
+        "gatesHelpLabel": "チェックのヘルプ",
+        "gatesHelpSummary": "プランの各ノードが統合ブランチにマージされた後、レビューとランディングの前にカーネルが実行する、名前付きの全ツリーコマンドです。",
+        "gatesHelp": {
+          "whenLabel": "実行時期",
+          "when": "最後のプランノードがマージされた後、レビューとランディングの前。",
+          "whatLabel": "含めるもの",
+          "what": "完全なテストスイートやその他の全ツリーチェックです。ノードごとのチェックではありません。"
+        },
+        "removeGate": "チェック {{n}} を削除",
+        "gates": "チェック",
+        "gatesHelpLine": "チェックは、プランの各ノードが統合ブランチにマージされた後、レビューとランディングの前に実行されます。完全なテストスイートやその他の全ツリーチェックをここに指定し、プランノードには指定しないでください。",
+        "addGate": "チェックを追加",
+        "gatesUnsupportedHost": "このホストの Orca バージョンではチェックを利用できません。続行するには下のチェックを削除してください。"
+      },
+      "validation": {
+        "gateNameInvalid": "チェック名 {{name}} は小文字、数字、ハイフンのみを使用し、英字または数字で始まる40文字以内にしてください。",
+        "gateCommandInvalid": "チェックコマンドは8,192文字以内で入力してください。",
+        "gateTimeoutInvalid": "チェックのタイムアウトは10〜14,400秒の整数にしてください。",
+        "gateNameDuplicate": "チェック名は重複できません。",
+        "gatesTooMany": "Objectiveで宣言できるチェックは最大8件です。",
+        "gatesUnsupportedHost": "このホストの Orca バージョンではチェックを利用できません。続行するにはすべてのチェックを削除してください。"
+      },
+      "detail": {
+        "noGateDeclared": "Objectiveのチェックは宣言されていません。",
+        "checks": "チェック",
+        "lintCode": {
+          "duplicatesGate": "チェックが重複しています",
+          "noGateDeclared": "チェックは宣言されていません"
+        }
+      }
+    }
+  }
+}

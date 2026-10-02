@@ -240,10 +240,10 @@ export function objectiveCapabilityModesHelp(): ObjectiveEnrollmentHelpCopy {
 
 export function objectiveGatesHelp(): ObjectiveEnrollmentHelpCopy {
   return {
-    label: translate('fork.heimdallObjective.enrollment.gatesHelpLabel', 'Gates help'),
+    label: translate('fork.heimdallObjective.enrollment.gatesHelpLabel', 'Checks help'),
     summary: translate(
       'fork.heimdallObjective.enrollment.gatesHelpSummary',
-      'Named whole-tree commands the kernel runs on the integrated branch after every plan node has merged, before review and landing.'
+      'Named whole-tree checks the kernel runs on the integrated branch after every plan node has merged, before review and landing.'
     ),
     values: [
       {

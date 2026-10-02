@@ -5,7 +5,6 @@ import { registerRendererRestartIpcRelays } from './renderer-restart-wiring'
 import { createUpdaterQuitAbortRelay } from '../shared/renderer-restart-preparation'
 import { ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT } from '../shared/updater-renderer-events'
 import {
-  ORCA_INTERNAL_FILE_DRAG_TYPE,
   createNativeFileDropPayload,
   createRejectedNativeFileDropPayload,
   hasNativeFileDragTypes,
@@ -111,7 +110,7 @@ export function installNativeFileDropHandlers(): void {
   document.addEventListener(
     'drop',
     (event) => {
-      if (event.dataTransfer?.types.includes(ORCA_INTERNAL_FILE_DRAG_TYPE)) {
+      if (!event.dataTransfer || !hasNativeFileDragTypes(event.dataTransfer.types)) {
         return
       }
       event.preventDefault()

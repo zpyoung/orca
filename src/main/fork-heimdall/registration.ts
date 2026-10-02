@@ -6,9 +6,8 @@ import {
 } from '../runtime/rpc/methods/fork-heimdall/kernel-binding'
 import { bindHeimdallObjectiveStore } from '../runtime/rpc/methods/fork-heimdall-objective/objective-binding'
 import { getCanonicalUserDataPath } from '../persistence/loading-store/user-data-path'
-import { registerHostedReviewKind } from '../fork-hosted-review-sitter/kind'
+import { registerPipelineEngineKinds } from '../fork-heimdall-pipeline/registration'
 import { registerHostedReviewAgentIpcHandlers } from '../fork-hosted-review-sitter/registration'
-import { registerObjectiveKind } from '../fork-heimdall-objective/registration'
 import { HeimdallKernelServiceImpl, type HeimdallKernelService } from './kernel-service'
 import { HeimdallFleetTransport } from './fleet-transport'
 
@@ -19,15 +18,14 @@ export function startHeimdall(
 ): HeimdallKernelService {
   const storageAuthority = isServeMode ? 'runtime' : 'desktop'
   const kernel = new HeimdallKernelServiceImpl({ runtime, store, storageAuthority })
-  registerHostedReviewKind(kernel, runtime, store, storageAuthority)
-  const objective = registerObjectiveKind(
+  const registration = registerPipelineEngineKinds(
     kernel,
     runtime,
     store,
     storageAuthority,
     kernel.judgmentPersistence()
   )
-  bindHeimdallObjectiveStore(runtime, objective.store)
+  bindHeimdallObjectiveStore(runtime, registration.objective.store)
   registerHostedReviewAgentIpcHandlers(runtime, store)
   bindHeimdallKernel(runtime, kernel)
   const transport = new HeimdallFleetTransport({
@@ -37,6 +35,7 @@ export function startHeimdall(
   })
   bindHeimdallTransport(runtime, transport)
   kernel.onShutdown(() => transport.dispose())
-  kernel.onShutdown(() => objective.dispose(), 'drained')
+  kernel.onShutdown(() => registration.dispose(), 'drained')
+  kernel.onShutdown(() => registration.objective.dispose(), 'drained')
   return kernel
 }

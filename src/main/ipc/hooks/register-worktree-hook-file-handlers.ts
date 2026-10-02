@@ -12,6 +12,7 @@ import {
   readIssueCommand,
   writeIssueCommand
 } from '../../issue-command-file'
+import { gitignoreAlreadyCoversOrcaDir } from '../../fork-heimdall-pipeline/orca-gitignore-rules'
 import { resolveRepoForExecutionHost } from '../worktrees/repo-host-ownership'
 import type { WorktreeIpcContext } from '../worktrees/worktree-ipc-context'
 
@@ -120,7 +121,7 @@ export function registerWorktreeHookFileHandlers(context: WorktreeIpcContext): v
         const gitignorePath = joinWorktreeRelativePath(repo.path, '.gitignore')
         try {
           const result = await fsProvider.readFile(gitignorePath)
-          if (!result.isBinary && !/^\.orca\/?$/m.test(result.content)) {
+          if (!result.isBinary && !gitignoreAlreadyCoversOrcaDir(result.content)) {
             const separator = result.content.endsWith('\n') ? '' : '\n'
             await fsProvider.writeFile(gitignorePath, `${result.content}${separator}.orca\n`)
           }

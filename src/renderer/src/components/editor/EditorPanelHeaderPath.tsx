@@ -58,7 +58,7 @@ export function EditorPanelHeaderPath({
   const headerCopyState = getEditorHeaderCopyState(activeFile)
   const displayPath = splitPathForDisplay(headerCopyState.pathLabel)
   const canCopyHeaderPath = headerCopyState.copyText !== null
-  const isVirtualEditorTab = activeFile.mode === 'check-details'
+  const isVirtualEditorTab = activeFile.mode === 'check-details' || activeFile.mode === 'pipeline'
   const markdownPreviewShortcutLabel = useShortcutLabel('editor.markdownPreview')
   const {
     canRename,

@@ -1,15 +1,14 @@
-import {
-  HEIMDALL_CHANNELS,
-  type EnrollSuccess,
-  type HeimdallRemoteOwner
-} from '../../shared/fork-heimdall/api'
+import { HEIMDALL_CHANNELS, type HeimdallRemoteOwner } from '../../shared/fork-heimdall/api'
 import { HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
-import { HeimdallSubscriptionEventReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
+import {
+  HeimdallSubscriptionEventReaderSchema,
+  type EnrollSuccessReader,
+  type WatcherDetailReader,
+  type WatcherFleetEntryReader
+} from '../../shared/fork-heimdall/remote-reader-schemas'
 import type {
   WatcherCommandRequest,
   WatcherCommandResult,
-  WatcherDetail,
-  WatcherFleetEntry,
   WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
@@ -25,6 +24,7 @@ import {
 } from './fleet-environment-transport'
 import {
   enrollmentForMergeCheckScopeCompatibility,
+  enrollmentForPipelineCompatibility,
   enrollmentWithoutUnsupportedRoleLaunch
 } from './fleet-remote-enrollment-capabilities'
 import {
@@ -80,7 +80,7 @@ export class HeimdallRemoteFleetMirrors {
     void this.drainSync(plan).catch(() => undefined)
   }
 
-  entries(): WatcherFleetEntry[] {
+  entries(): WatcherFleetEntryReader[] {
     return Array.from(this.mirrors.values()).flatMap((mirror) => {
       let ownerAvailable = false
       try {
@@ -99,7 +99,7 @@ export class HeimdallRemoteFleetMirrors {
     })
   }
 
-  async enroll(input: EnrollInput, owner: HeimdallRemoteOwner): Promise<EnrollSuccess> {
+  async enroll(input: EnrollInput, owner: HeimdallRemoteOwner): Promise<EnrollSuccessReader> {
     const identity = { id: owner.connectionId, pairingRevision: owner.pairingRevision }
     const mirror = await this.ensureOwner(identity)
     if (mirror.commandSupport === 'unsupported') {
@@ -119,8 +119,10 @@ export class HeimdallRemoteFleetMirrors {
     ) {
       throw new HeimdallCommandCapabilityError(HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY)
     }
+    mirror.hostLabel = this.environments.displayName?.(identity)
+    const pipelineCompatibleInput = enrollmentForPipelineCompatibility(input, mirror)
     const scopeCompatibleInput = enrollmentForMergeCheckScopeCompatibility(
-      input,
+      pipelineCompatibleInput,
       mirror.mergeCheckScopeSupport
     )
     return enrollRemoteWatcher(
@@ -136,7 +138,7 @@ export class HeimdallRemoteFleetMirrors {
     )
   }
 
-  async detail(target: WatcherTarget): Promise<WatcherDetail> {
+  async detail(target: WatcherTarget): Promise<WatcherDetailReader> {
     const identity = { id: target.connectionId!, pairingRevision: target.pairingRevision! }
     const mirror = this.mirrors.get(identity.id)
     const cached = mirror?.details.get(remoteDetailKey(target))

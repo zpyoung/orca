@@ -10,6 +10,7 @@ type AutomationPrecheckExecutionTarget =
   | {
       type: 'local'
       cwd: string
+      extraEnv?: NodeJS.ProcessEnv
     }
   | {
       type: 'ssh'
@@ -146,7 +147,7 @@ function runLocalPrecheck(
     const child = spawn(precheck.command, {
       cwd: target.cwd,
       detached: process.platform !== 'win32',
-      env: process.env,
+      env: target.extraEnv ? { ...process.env, ...target.extraEnv } : process.env,
       shell: true,
       windowsHide: true
     })

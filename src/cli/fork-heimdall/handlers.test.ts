@@ -1,5 +1,5 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { hostname, tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
@@ -10,7 +10,9 @@ import {
   HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
+import { HEIMDALL_PIPELINE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall-pipeline/capability'
 import type { WatcherFleetEntry } from '../../shared/fork-heimdall/fleet-types'
+import type { ApprovalScope } from '../../shared/fork-heimdall/ledger-types'
 import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../../shared/fork-heimdall/owner/intervention'
 import type { HandlerContext } from '../dispatch'
 import { HEIMDALL_HANDLERS } from './handlers'
@@ -33,6 +35,11 @@ const COMMAND_CAPABILITIES = [
   HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 ]
+const PIPELINE_CHOICE_SCOPE = {
+  actionKind: 'pipeline-apply-choice',
+  contentIdentity: 'pipeline:sha256:abc',
+  evidenceKey: '["node","fix",0,0,"choice:gate"]'
+} satisfies ApprovalScope
 
 function fleetRow(overrides: Partial<WatcherFleetEntry> = {}): WatcherFleetEntry {
   return {
@@ -652,6 +659,91 @@ describe('orca heimdall mutation handlers', () => {
       expectedOwner: OWNER_FENCE,
       command: { kind: 'approve', scope: currentScope }
     })
+  })
+  it('routes pipeline choices with CLI attribution and exits 1 on an already-resolved refusal', async () => {
+    const row = fleetRow()
+    const ledgerEntries = [
+      {
+        kind: 'escalation',
+        escalationId: 'pipeline-approval',
+        escalationKind: 'awaiting-approval',
+        status: 'open',
+        foldCount: 1,
+        approvalScope: PIPELINE_CHOICE_SCOPE
+      }
+    ]
+    primeCommand(row, [...COMMAND_CAPABILITIES, HEIMDALL_PIPELINE_RUNTIME_CAPABILITY])
+    callMock.mockResolvedValueOnce(detailResponse(row, ledgerEntries)).mockResolvedValueOnce({
+      id: 'command-1',
+      ok: true,
+      result: {
+        status: 'refused',
+        reason: 'already-resolved',
+        detail: 'Already answered by owner@buildbox from canvas-run at 2026-10-01T10:00:00.000Z',
+        resolvedBy: {
+          actor: { user: 'owner', host: 'buildbox' },
+          surface: 'canvas-run',
+          atMs: 1
+        }
+      }
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await HEIMDALL_HANDLERS['heimdall approve'](
+      context([
+        ['watcher-id', WATCHER_ID],
+        ['escalation-id', 'pipeline-approval'],
+        ['choice', 'send-back'],
+        ['comment', 'split step 6']
+      ])
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(4, HEIMDALL_CHANNELS.command, {
+      target: TARGET,
+      expectedOwner: OWNER_FENCE,
+      command: {
+        kind: 'answer-pipeline-choice',
+        scope: PIPELINE_CHOICE_SCOPE,
+        choice: 'send-back',
+        comment: 'split step 6',
+        attribution: {
+          actor: { user: userInfo().username, host: hostname() },
+          surface: 'cli',
+          atMs: expect.any(Number)
+        }
+      }
+    })
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Already answered by owner@buildbox from canvas-run')
+    )
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('refuses to send pipeline choices through a runtime without pipeline support', async () => {
+    const row = fleetRow()
+    const ledgerEntries = [
+      {
+        kind: 'escalation',
+        escalationId: 'pipeline-approval',
+        escalationKind: 'awaiting-approval',
+        status: 'open',
+        foldCount: 1,
+        approvalScope: PIPELINE_CHOICE_SCOPE
+      }
+    ]
+    primeCommand(row)
+    callMock.mockResolvedValueOnce(detailResponse(row, ledgerEntries))
+
+    await expect(
+      HEIMDALL_HANDLERS['heimdall approve'](
+        context([
+          ['watcher-id', WATCHER_ID],
+          ['escalation-id', 'pipeline-approval'],
+          ['choice', 'abort']
+        ])
+      )
+    ).rejects.toMatchObject({ code: 'incompatible_runtime' })
+    expect(callMock).toHaveBeenCalledTimes(3)
   })
 
   it.each([

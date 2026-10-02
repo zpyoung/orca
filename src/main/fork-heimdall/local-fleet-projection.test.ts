@@ -128,4 +128,29 @@ describe('local Heimdall fleet projection', () => {
 
     expect(projected.parallel).toEqual({ runningCount: 2, effectiveMaxConcurrency: 1 })
   })
+  it('uses runner phase and omits objective parallel data for a pipeline run', () => {
+    const entry = objectiveEntry()
+    entry.enrollment.kind = 'pipeline'
+    entry.status.phase = 'executing pipeline'
+    const trace = createTickTrace(1, 70, {
+      consecutiveErrors: 0,
+      lastFullResyncAtMs: 70,
+      reconcileAgain: false
+    })
+    trace.snapshot = { phase: 'objective-only phase' }
+
+    const projected = localFleetEntry(entry, 90, true, {
+      ledger: { watcherId: entry.enrollment.watcherId, entries: [] },
+      traces: [trace],
+      workspaceLabel: 'Pipeline run',
+      parallel: {
+        runningCount: 2,
+        effectiveMaxConcurrency: 3,
+        note: 'objective-only parallel state'
+      }
+    })
+
+    expect(projected.workflowPhase).toBe('executing pipeline')
+    expect(projected.parallel).toBeUndefined()
+  })
 })

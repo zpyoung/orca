@@ -195,6 +195,7 @@ The existing suite should remain the single source of coverage.
 **Paths:** `src/shared/posix-command-path-lookup.test.ts`.
 
 **Orca ledger:** `bug-3`.
+
 ## Git multiline diagnostics
 
 **Ledger:** bug-47.
@@ -519,6 +520,7 @@ fork copy would duplicate the suite without a seam.
 **Status:** pending-upstream. Not yet submitted. `bug-2` stays open: this closes the POSIX GC
 failure only. The `git-handler` upstreamStatus failure is `bug-47`, and the two
 `agent-exec-handler` spawn-arg failures are host `GIT_CONFIG_*` bleed, still unaddressed.
+
 ## Git diff request cancellation
 
 **Ledger:** `bug-12`.
@@ -579,6 +581,7 @@ retains the correct submodule diff route.
 **Compatibility:** reuse existing RPC cancellation and stream teardown; do not add a wire
 opcode or require a new field from older peers. Cancellation of host subprocesses requires
 the host-side fix as well as the caller-side signal.
+
 ## bug-35
 
 **What:** the macOS press-and-hold startup routine treated only `com.stablyai.orca` and its
@@ -607,6 +610,7 @@ namespace remains accepted, and only exact roots or dot-delimited children quali
 
 **Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
 continue to use `com.stablyai.orca` or a dot-suffixed child.
+
 ## Draft RC recovery recognizes fork tags
 
 **What:** the interrupted-release publisher accepts both upstream RC tags
@@ -627,6 +631,7 @@ the fork's release identifier.
 
 - `config/scripts/publish-complete-draft-releases.mjs`
 - `config/scripts/publish-complete-draft-releases.test.mjs`
+
 ## Reattach input quarantine
 
 **Ledger:** `bug-1`.
@@ -655,8 +660,8 @@ remain under the `agent-composer` feature.
 
 ## Hourly base case is pinned to the repo's own package version
 
-**Defect:** `config/scripts/hourly-build-version.test.mjs`'s case *stays on the already-shipped
-hourly base after a buggy main release is unpublished* calls `getHourlyBuildIdentity`, which reads
+**Defect:** `config/scripts/hourly-build-version.test.mjs`'s case _stays on the already-shipped
+hourly base after a buggy main release is unpublished_ calls `getHourlyBuildIdentity`, which reads
 the repo's own `package.json`, and then asserts a hardcoded `1.4.203` base. The case therefore only
 holds while the tree sits at or below 1.4.203. It is not a fork problem: upstream's own v1.4.206 tag
 carries `"version": "1.4.206"` and fails the same assertion with `1.4.206-hourly.202609142000`.
@@ -715,5 +720,45 @@ adding fork behavior. Keeping the deletion in-tree prevents stable-tag sync from
 assertion that conflicts with valid repeatable command flags.
 
 **Paths:** `src/cli/specs/search.test.ts`.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## RPC parameter schemas in registered method collections
+
+**What:** the parameter catalog follows visited method-collection imports from the host registry,
+including registered collections outside `src/main/runtime/rpc`, and indexes their shared schema
+exports. One registry-and-schema bundle still supplies the object identity used by the catalog.
+Tests, the generated catalog itself, and unrelated main-process helpers remain excluded.
+
+**Why upstream, not isolated:** registered methods need not live in the RPC directory. The old
+inventory omitted valid shared schemas imported by an off-directory collection and reported those
+methods as uncatalogued. A separate fork catalog would create a second contract instead of fixing
+the generic discovery rule.
+
+**Evidence:** the five Pipeline methods bound shared request schemas but appeared in
+`RPC_METHODS_WITHOUT_SHARED_PARAMS`, failing the node parameter-parity gate (Orca ledger bug-280).
+
+**Paths:**
+
+- `config/scripts/generate-rpc-params-catalog.mjs`
+
+**Excluded when preparing the upstream PR:** Pipeline handlers, schemas and generated catalog
+entries; only the generic discovery correction belongs in this change.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Native file-drop capture preserves internal application drags
+
+**What:** preload intercepts drops only when `hasNativeFileDragTypes` identifies native files,
+matching its existing dragover boundary. Other application drag types reach their own targets.
+
+**Why upstream, not isolated:** the document-capture listener stopped unrelated application drops
+before their handlers could run. This is a generic event-routing correction, not a pipeline MIME
+exception.
+
+**Evidence:** hidden Electron canvas capture observed a valid palette drag cancelled before the
+canvas listener, with no draft update (Orca ledger bug-283).
+
+**Paths:** `src/preload/preload-runtime-support.ts`.
 
 **Status:** pending-upstream. Not yet submitted.

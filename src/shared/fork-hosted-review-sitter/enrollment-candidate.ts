@@ -13,7 +13,8 @@ export const HostedReviewEnrollmentCandidateSchema = z.object({
     .optional(),
   branchUpdateMode: z.enum(['merge-base-update', 'rebase']),
   mergeMethod: z.enum(['merge', 'squash', 'rebase']).nullable(),
-  mergeCheckScope: z.enum(['required', 'all']).default('all')
+  mergeCheckScope: z.enum(['required', 'all']).default('all'),
+  repeatFixLimit: z.number().int().min(1).max(10).optional()
 })
 
 export type HostedReviewEnrollmentCandidate = z.infer<typeof HostedReviewEnrollmentCandidateSchema>

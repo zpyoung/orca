@@ -2,17 +2,17 @@ import { useMemo } from 'react'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 import { useAppStore } from '@/store'
-import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
 import type {
-  WatcherKindId,
-  WatcherListEntry,
-  WatcherStatusState
-} from '../../../shared/fork-heimdall/watcher-types'
+  WatcherFleetEntryReader,
+  WatcherKindIdReader,
+  WatcherListEntryReader
+} from '../../../shared/fork-heimdall/remote-reader-schemas'
+import type { WatcherStatusState } from '../../../shared/fork-heimdall/watcher-types'
 import { isHeimdallAttentionRow } from './fleet-selectors'
 
 export type ActiveHeimdallWatcherState = {
   watcherId: string
-  kind: WatcherKindId
+  kind: WatcherKindIdReader
   state: WatcherStatusState
   phase: string
   contact: 'live' | 'unverifiable'
@@ -21,7 +21,7 @@ export type ActiveHeimdallWatcherState = {
 }
 
 /** A watcher still owns its workspace until it is explicitly disabled or terminal. */
-export function isActiveHeimdallWatcher(entry: WatcherListEntry): boolean {
+export function isActiveHeimdallWatcher(entry: WatcherListEntryReader): boolean {
   return (
     entry.enrollment.enabled &&
     entry.status.enabled &&
@@ -30,7 +30,7 @@ export function isActiveHeimdallWatcher(entry: WatcherListEntry): boolean {
   )
 }
 
-function indicatorPriority(row: WatcherFleetEntry): number {
+function indicatorPriority(row: WatcherFleetEntryReader): number {
   if (isHeimdallAttentionRow(row)) {
     return 0
   }
@@ -41,9 +41,9 @@ function indicatorPriority(row: WatcherFleetEntry): number {
 }
 
 function indexWorktreeWatchers(
-  entries: readonly WatcherFleetEntry[]
-): ReadonlyMap<string, WatcherFleetEntry> {
-  const selected = new Map<string, WatcherFleetEntry>()
+  entries: readonly WatcherFleetEntryReader[]
+): ReadonlyMap<string, WatcherFleetEntryReader> {
+  const selected = new Map<string, WatcherFleetEntryReader>()
   for (const row of entries) {
     const worktreeId = row.entry.enrollment.worktreeId
     if (
@@ -61,8 +61,8 @@ function indexWorktreeWatchers(
 }
 
 type WorktreeWatcherIndex = {
-  entries: readonly WatcherFleetEntry[] | undefined
-  byWorktree: ReadonlyMap<string, WatcherFleetEntry>
+  entries: readonly WatcherFleetEntryReader[] | undefined
+  byWorktree: ReadonlyMap<string, WatcherFleetEntryReader>
 }
 
 // Why a separate store: one app-store listener per sidebar card is O(cards) work on every app

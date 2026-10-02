@@ -13,6 +13,22 @@ import {
 } from './fleet-types'
 import { EnrollInputSchema, WatcherListEntrySchema, type EnrollInput } from './watcher-types'
 import type { ObjectiveDetail } from '../fork-heimdall-objective/detail-types'
+import type {
+  PipelineEnsureTrackedRequest,
+  PipelineEnsureTrackedResponse,
+  PipelineListRequest,
+  PipelineListResponse,
+  PipelinePersonalRequest,
+  PipelinePersonalResponse,
+  PipelineResolveRequest,
+  PipelineResolveResponse,
+  PipelineRunViewResponse
+} from '../fork-heimdall-pipeline/rpc-schemas'
+import type {
+  EnrollSuccessReader,
+  HeimdallFleetSnapshotReader,
+  WatcherDetailReader
+} from './remote-reader-schemas'
 
 export const HEIMDALL_CHANNELS = {
   enroll: 'heimdall:enroll',
@@ -22,9 +38,13 @@ export const HEIMDALL_CHANNELS = {
   command: 'heimdall:command',
   debugReport: 'heimdall:debugReport',
   subscribe: 'heimdall:subscribe',
-  unsubscribe: 'heimdall:unsubscribe'
+  unsubscribe: 'heimdall:unsubscribe',
+  pipelineList: 'heimdall:pipelineList',
+  pipelineResolve: 'heimdall:pipelineResolve',
+  pipelinePersonal: 'heimdall:pipelinePersonal',
+  pipelineEnsureTracked: 'heimdall:pipelineEnsureTracked',
+  pipelineRunView: 'heimdall:pipelineRunView'
 } as const
-
 export const HeimdallRemoteOwnerSchema = z
   .object({
     connectionId: WatcherTargetSchema.shape.connectionId.unwrap(),
@@ -83,11 +103,18 @@ export type {
 
 /** Refused enrollment rejects with a message ending in its typed reason. */
 export type HeimdallApi = {
-  enroll(input: EnrollInput, owner?: HeimdallRemoteOwner): Promise<EnrollSuccess>
-  fleet(): Promise<HeimdallFleetSnapshot>
-  detail(target: WatcherTarget): Promise<WatcherDetail>
+  enroll(input: EnrollInput, owner?: HeimdallRemoteOwner): Promise<EnrollSuccessReader>
+  fleet(): Promise<HeimdallFleetSnapshotReader>
+  detail(target: WatcherTarget): Promise<WatcherDetailReader>
   objectiveDetail?(target: WatcherTarget): Promise<ObjectiveDetail>
+  pipelineList?(request: PipelineListRequest): Promise<PipelineListResponse>
+  pipelineResolve?(request: PipelineResolveRequest): Promise<PipelineResolveResponse>
+  pipelinePersonal?(request: PipelinePersonalRequest): Promise<PipelinePersonalResponse>
+  pipelineEnsureTracked?(
+    request: PipelineEnsureTrackedRequest
+  ): Promise<PipelineEnsureTrackedResponse>
+  pipelineRunView?(target: WatcherTarget): Promise<PipelineRunViewResponse>
   command(request: WatcherCommandRequest): Promise<WatcherCommandResult>
   debugReport(target: WatcherTarget): Promise<unknown>
-  onFleetChanged(listener: (snapshot: HeimdallFleetSnapshot) => void): () => void
+  onFleetChanged(listener: (snapshot: HeimdallFleetSnapshotReader) => void): () => void
 }

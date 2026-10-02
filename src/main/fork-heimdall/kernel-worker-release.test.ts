@@ -217,17 +217,18 @@ describe('Heimdall settled worker release', () => {
 
     expect(events).toEqual(['release', 'cleanup'])
     expect(cleanupCalls).toEqual([{ releaseConfirmed: true, releaseEvidenceCount: 1 }])
-    expect(reads).toEqual([true])
+    // the second fresh read follows the worker completion the mailbox delivered this tick
+    expect(reads).toEqual([true, true])
 
     await world.service.reconcileForTesting(world.watcherId)
 
-    expect(reads).toEqual([true, false])
+    expect(reads).toEqual([true, true, false])
     expect(cleanupCalls).toHaveLength(2)
 
     await world.service.reconcileForTesting(world.watcherId)
 
     expect(cleanupCalls).toHaveLength(3)
-    expect(reads).toEqual([true, false, false, true])
+    expect(reads).toEqual([true, true, false, false, true])
     expect(events).toEqual(['release', 'cleanup', 'cleanup', 'cleanup'])
     await world.service.stopForShutdown()
   })

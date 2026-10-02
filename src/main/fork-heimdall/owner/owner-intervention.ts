@@ -1,5 +1,9 @@
 import type { ZodError, ZodIssue } from 'zod'
-import type { KernelAction, OwnerAdapter } from '../../../shared/fork-heimdall/kind-contract'
+import type {
+  KernelAction,
+  OwnerAdapter,
+  OwnerInterventionRejection
+} from '../../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
 import {
@@ -16,7 +20,7 @@ export type OwnerInterventionOutcome<TAction extends KernelAction> =
   | { status: 'applied'; action: TAction }
   | {
       status: 'rejected'
-      gate: 'write-territory' | 'landing-bar' | 'sitter-overrides'
+      gate: OwnerInterventionRejection['gate']
       reason: string
     }
   | { status: 'malformed'; reason: string }

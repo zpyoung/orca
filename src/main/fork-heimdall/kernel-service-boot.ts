@@ -4,7 +4,6 @@ import { HeimdallBudgetClock } from './budget-clock'
 import { HeimdallDatabase } from './database'
 import { WatcherControlPlane } from './control-plane'
 import {
-  HeimdallEnrollmentStore,
   isMalformedKindPayloadEnrollment,
   type EnrollmentRecord,
   type EnrollmentStore
@@ -12,6 +11,11 @@ import {
 import { authorizeKindEnrollment, runnableEnrollment } from './kernel-enrollment'
 import { HeimdallKernelHost } from './kernel-host'
 import { KernelReadModel } from './kernel-read-model'
+import { PipelineAwareEnrollmentStore } from '../fork-heimdall-pipeline/pipeline-aware-enrollment-store'
+import {
+  createPipelineBootConflictParker,
+  parkClaimedPipelineRows
+} from '../fork-heimdall-pipeline/pipeline-boot-conflicts'
 import type { HeimdallKernelServiceDependencies } from './kernel-service-dependencies'
 import { runnerLedgerStore } from './kernel-service-dependencies'
 import { KernelTerminalTransition } from './kernel-terminal-transition'
@@ -19,6 +23,7 @@ import { HeimdallLedgerStore } from './ledger-store'
 import { HostRoutedLeaseStore, type LeaseStore } from './lease-store'
 import { MalformedEnrollmentLifecycle } from './malformed-enrollment'
 import { notifyWatcher } from './notification'
+import { approvalNotificationCopy } from '../fork-heimdall-pipeline/approval-notification-copy'
 import { mintCoordinatorIdentity } from './orchestration/coordinator-identity'
 import { RuntimeHeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { RegisteredWatcherKind, WatcherKindRegistry } from './registry'
@@ -82,7 +87,7 @@ export function bootHeimdallKernelService(
   const database =
     dependencies.database ??
     new HeimdallDatabase(() => dependencies.store.getProfileStorageDirectory())
-  const enrollments = dependencies.enrollmentStore ?? new HeimdallEnrollmentStore(database)
+  const enrollments = dependencies.enrollmentStore ?? new PipelineAwareEnrollmentStore(database)
   const ledgerStore = dependencies.ledgerStore ?? new HeimdallLedgerStore(database)
   const budgetClock = dependencies.budgetClock ?? new HeimdallBudgetClock(ledgerStore)
   const host = new HeimdallKernelHost(
@@ -170,20 +175,31 @@ export function bootHeimdallKernelService(
       }
       return record
     },
-    notifyApproval: (enrollment, action) =>
+    notifyApproval: (enrollment, action) => {
+      const copy = approvalNotificationCopy(enrollment, action)
       notifyWatcher(
         dependencies.store,
         enrollment,
-        'Watcher approval requested',
-        `${action.kind} is waiting for approval`,
+        copy.title,
+        copy.body,
         `approval:${enrollment.watcherId}:${action.kind}`
-      ),
+      )
+    },
     ...(dependencies.now ? { now: dependencies.now } : {}),
     ...(dependencies.createId ? { createId: dependencies.createId } : {}),
     ...(dependencies.setTimer ? { setTimer: dependencies.setTimer } : {}),
     ...(dependencies.clearTimer ? { clearTimer: dependencies.clearTimer } : {}),
     holderId: dependencies.holderId ?? `process-${process.pid}-${randomUUID()}`
   })
+  if (enrollments instanceof PipelineAwareEnrollmentStore && !database.isReadOnly()) {
+    const parkForConfigurationError = createPipelineBootConflictParker({
+      enrollments,
+      ledger: runnerLedger,
+      now: context.now,
+      createId: context.createId
+    })
+    parkClaimedPipelineRows(enrollments, parkForConfigurationError)
+  }
   const controlPlane = new WatcherControlPlane({
     enrollments,
     ledger: ledgerStore,

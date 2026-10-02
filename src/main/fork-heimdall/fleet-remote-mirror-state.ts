@@ -10,12 +10,17 @@ import {
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
 import {
-  HeimdallFleetSnapshotSchema,
-  type HeimdallFleetSnapshot,
-  type WatcherDetail,
-  type WatcherFleetEntry,
-  type WatcherTarget
-} from '../../shared/fork-heimdall/fleet-types'
+  HEIMDALL_PIPELINE_RUNTIME_CAPABILITY,
+  hostPipelineNodeTypes
+} from '../../shared/fork-heimdall-pipeline/capability'
+import type { NodeType } from '../../shared/fork-heimdall-pipeline/document-schema'
+import type { WatcherTarget } from '../../shared/fork-heimdall/fleet-types'
+import {
+  HeimdallFleetSnapshotReaderSchema,
+  type HeimdallFleetSnapshotReader,
+  type WatcherDetailReader,
+  type WatcherFleetEntryReader
+} from '../../shared/fork-heimdall/remote-reader-schemas'
 import type { RuntimeCapability } from '../../shared/protocol-version'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
@@ -48,10 +53,13 @@ export class RemoteFleetMirrorState {
   roleLaunchSupport: HeimdallCommandSupport = 'unknown'
   mergeCheckScopeSupport: HeimdallCommandSupport = 'unknown'
   newWorktreeSupport: HeimdallCommandSupport = 'unknown'
+  pipelineSupport: HeimdallCommandSupport = 'unknown'
+  pipelineNodeTypes: ReadonlySet<NodeType> = new Set()
+  hostLabel: string | undefined = undefined
   ownerGeneratedAtMs = -1
-  entries: WatcherFleetEntry[] = []
-  readonly details = new Map<string, WatcherDetail>()
-  readonly notificationDetails = new Map<string, WatcherDetail>()
+  entries: WatcherFleetEntryReader[] = []
+  readonly details = new Map<string, WatcherDetailReader>()
+  readonly notificationDetails = new Map<string, WatcherDetailReader>()
   subscription: { close(): void } | null = null
   subscriptionStarting = false
   subscriptionUnsupported = false
@@ -80,6 +88,9 @@ export class RemoteFleetMirrorState {
     this.roleLaunchSupport = 'unknown'
     this.mergeCheckScopeSupport = 'unknown'
     this.newWorktreeSupport = 'unknown'
+    this.pipelineSupport = 'unknown'
+    this.pipelineNodeTypes = new Set()
+    this.hostLabel = undefined
     this.ownerGeneratedAtMs = -1
     this.subscriptionUnsupported = false
     this.eventProcessing = Promise.resolve()
@@ -113,6 +124,7 @@ export class RemoteFleetMirrorState {
     const previousRoleLaunchSupport = this.roleLaunchSupport
     const previousMergeCheckScopeSupport = this.mergeCheckScopeSupport
     const previousNewWorktreeSupport = this.newWorktreeSupport
+    const previousPipelineSupport = this.pipelineSupport
     this.commandSupport = statusCapabilitySupport(status, HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
     this.deleteSupport = statusCapabilitySupport(status, HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY)
     this.answerEscalationSupport = statusCapabilitySupport(
@@ -139,6 +151,11 @@ export class RemoteFleetMirrorState {
       status,
       HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
     )
+    this.pipelineSupport = statusCapabilitySupport(status, HEIMDALL_PIPELINE_RUNTIME_CAPABILITY)
+    this.pipelineNodeTypes =
+      status.status === 'fulfilled' && status.value.ok === true
+        ? hostPipelineNodeTypes(status.value.result.capabilities ?? [])
+        : new Set<NodeType>()
     const supportChanged = (): boolean =>
       previousSupport !== this.commandSupport ||
       previousDeleteSupport !== this.deleteSupport ||
@@ -147,9 +164,10 @@ export class RemoteFleetMirrorState {
       previousParallelExecutionSupport !== this.parallelExecutionSupport ||
       previousRoleLaunchSupport !== this.roleLaunchSupport ||
       previousMergeCheckScopeSupport !== this.mergeCheckScopeSupport ||
-      previousNewWorktreeSupport !== this.newWorktreeSupport
+      previousNewWorktreeSupport !== this.newWorktreeSupport ||
+      previousPipelineSupport !== this.pipelineSupport
     if (fleet.status === 'fulfilled' && fleet.value.ok === true) {
-      const parsed = HeimdallFleetSnapshotSchema.safeParse(fleet.value.result)
+      const parsed = HeimdallFleetSnapshotReaderSchema.safeParse(fleet.value.result)
       if (parsed.success) {
         if (parsed.data.generatedAtMs <= this.ownerGeneratedAtMs) {
           const contactChanged = !this.reachable
@@ -170,11 +188,11 @@ export class RemoteFleetMirrorState {
     }
   }
 
-  applySnapshot(snapshot: HeimdallFleetSnapshot): boolean {
+  applySnapshot(snapshot: HeimdallFleetSnapshotReader): boolean {
     if (snapshot.generatedAtMs <= this.ownerGeneratedAtMs) {
       return false
     }
-    let entries: WatcherFleetEntry[]
+    let entries: WatcherFleetEntryReader[]
     try {
       entries = snapshot.entries.map((entry) => routeRemoteFleetEntry(entry, this.identity))
     } catch {

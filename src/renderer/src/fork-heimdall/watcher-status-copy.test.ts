@@ -3,7 +3,7 @@ import { buildWatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-test
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
 import type { WatcherStatus } from '../../../shared/fork-heimdall/watcher-types'
 import { sortHeimdallFleetRows } from './fleet-selectors'
-import { watcherStatusLabel, watcherStatusTone } from './watcher-status-copy'
+import { watcherKindLabel, watcherStatusLabel, watcherStatusTone } from './watcher-status-copy'
 
 function rowWithStatus(watcherId: string, status: Partial<WatcherStatus>): WatcherFleetEntry {
   const row = buildWatcherFleetEntry(1, 1, watcherId)
@@ -39,5 +39,13 @@ describe('watcher status copy for a failing tick', () => {
       'held',
       'watching'
     ])
+  })
+})
+describe('watcher kind labels', () => {
+  it('keeps future watcher kinds unknown and labels pipeline and built-ins distinctly', () => {
+    expect(watcherKindLabel('unknown')).toBe('Unknown watcher')
+    expect(watcherKindLabel('pipeline')).toBe('Pipeline')
+    expect(watcherKindLabel('objective')).toBe('Objective v1')
+    expect(watcherKindLabel('hosted-review')).toBe('PR sitter v1')
   })
 })

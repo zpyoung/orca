@@ -82,9 +82,13 @@ function GateRow({
         variant="ghost"
         size="icon-sm"
         disabled={disabled}
-        aria-label={translate('fork.heimdallObjective.enrollment.removeGate', 'Remove gate {{n}}', {
-          n: index + 1
-        })}
+        aria-label={translate(
+          'fork.heimdallObjective.enrollment.removeGate',
+          'Remove check {{n}}',
+          {
+            n: index + 1
+          }
+        )}
         onClick={onRemove}
       >
         <Trash2 aria-hidden className="size-3.5" />
@@ -110,21 +114,21 @@ export function ObjectiveEnrollmentGateFields({
     <section className="space-y-3">
       <div className="flex items-center gap-1">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-          {translate('fork.heimdallObjective.enrollment.gates', 'Gates')}
+          {translate('fork.heimdallObjective.enrollment.gates', 'Checks')}
         </h3>
         <ObjectiveEnrollmentFieldHelp {...objectiveGatesHelp()} />
       </div>
       <p className="text-[11px] text-muted-foreground">
         {translate(
           'fork.heimdallObjective.enrollment.gatesHelpLine',
-          'Gates run on the integrated branch after every plan node has merged, before review and landing. Put the full test suite and other whole-tree checks here, not in plan nodes.'
+          'Checks run on the integrated branch after every plan node has merged, before review and landing. Put the full test suite and other whole-tree checks here, not in plan nodes.'
         )}
       </p>
       {parallelUnsupported ? (
         <p className="text-[11px] text-destructive" role="status">
           {translate(
             'fork.heimdallObjective.enrollment.gatesUnsupportedHost',
-            "Gates are unavailable on this host's Orca version. Remove any gates below to continue."
+            "Checks are unavailable on this host's Orca version. Remove any checks below to continue."
           )}
         </p>
       ) : null}
@@ -167,7 +171,7 @@ export function ObjectiveEnrollmentGateFields({
         }
       >
         <Plus aria-hidden className="size-3.5" />
-        {translate('fork.heimdallObjective.enrollment.addGate', 'Add gate')}
+        {translate('fork.heimdallObjective.enrollment.addGate', 'Add check')}
       </Button>
     </section>
   )

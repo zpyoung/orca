@@ -12,10 +12,12 @@ import {
 import type {
   WatcherCommand,
   WatcherCommandResult,
-  WatcherDetail,
-  WatcherFleetEntry,
   WatcherWorker
 } from '../../../shared/fork-heimdall/fleet-types'
+import type {
+  WatcherDetailReader,
+  WatcherFleetEntryReader
+} from '../../../shared/fork-heimdall/remote-reader-schemas'
 import { formatHeimdallAge, formatHeimdallTime } from './fleet-format'
 import { openHeimdallWorker } from './heimdall-worker-navigation'
 import { getHeimdallControlApi } from './heimdall-control-api'
@@ -30,8 +32,9 @@ import { HeimdallKindDetail } from './HeimdallKindDetail'
 import { HeimdallStatusPill } from './HeimdallStatusPill'
 import { HeimdallWorkers } from './HeimdallWorkers'
 import { watcherHostLabel, watcherKindLabel } from './watcher-status-copy'
+import type { PipelineChoiceCommand } from '../fork-heimdall-pipeline/PipelineGateDialog'
 
-function targetKey(row: WatcherFleetEntry): string {
+function targetKey(row: WatcherFleetEntryReader): string {
   return `${row.target.connectionId ?? 'local'}:${row.target.pairingRevision ?? 'local'}:${row.target.watcherId}`
 }
 type HeimdallCommandNotice = {
@@ -68,7 +71,7 @@ function commandNotice(result: WatcherCommandResult): HeimdallCommandNotice {
 }
 
 export type HeimdallDetailPaneProps = {
-  row: WatcherFleetEntry
+  row: WatcherFleetEntryReader
   onBack: () => void
 }
 
@@ -78,7 +81,7 @@ export function HeimdallDetailPane(props: HeimdallDetailPaneProps): React.JSX.El
 
 function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): React.JSX.Element {
   const hydrateFleet = useAppStore((state) => state.hydrateHeimdallFleet)
-  const [detail, setDetail] = useState<WatcherDetail | null>(null)
+  const [detail, setDetail] = useState<WatcherDetailReader | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
@@ -141,7 +144,7 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
       (activeDetail.watcher.ownerFence.revision === row.ownerFence.revision &&
         activeDetail.watcher.observedAtMs >= row.observedAtMs))
   const ownerSnapshotRow = detailOwnsNewerState && activeDetail ? activeDetail.watcher : row
-  const displayedRow: WatcherFleetEntry = {
+  const displayedRow: WatcherFleetEntryReader = {
     ...ownerSnapshotRow,
     target: row.target,
     contact: row.contact,
@@ -166,7 +169,9 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
       )
     })
   }, [activeDetail])
+  const unsupportedKind = displayedRow.entry.enrollment.kind === 'unknown'
   const readOnly =
+    unsupportedKind ||
     Boolean(displayedRow.readOnlyReason) ||
     displayedRow.contact === 'unverifiable' ||
     displayedRow.entry.status.state === 'unreachable'
@@ -182,6 +187,7 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
   ): Promise<WatcherCommandResult | null> => {
     const api = getHeimdallControlApi()
     const requiresDetailEvidence =
+      command.kind === 'answer-pipeline-choice' ||
       command.kind === 'approve' ||
       command.kind === 'adjust-budget' ||
       command.kind === 'answer-question' ||
@@ -227,6 +233,10 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
     }
   }
 
+  const answerPipelineChoice = (
+    command: PipelineChoiceCommand
+  ): Promise<WatcherCommandResult | null> =>
+    runCommand(`pipeline-choice:${command.scope.actionKind}:${command.scope.evidenceKey}`, command)
   const answerWorker = async (worker: WatcherWorker, body: string): Promise<void> => {
     if (!worker.question) {
       return
@@ -339,139 +349,159 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
           ) : null}
         </section>
 
-        <section aria-labelledby="heimdall-controls-title">
-          <h3
-            id="heimdall-controls-title"
-            className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
-          >
-            {translate('fork.heimdall.controls.title', 'Owner controls')}
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {pausedOrParked ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={readOnly || busyKey !== null || resumeBlockedByBudget}
-                onClick={() => void runCommand('resume', { kind: 'resume' })}
+        {!unsupportedKind ? (
+          <>
+            <section aria-labelledby="heimdall-controls-title">
+              <h3
+                id="heimdall-controls-title"
+                className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
               >
-                {busyKey === 'resume' ? <Loader2 className="animate-spin" /> : <Play />}
-                {translate('fork.heimdall.controls.resume', 'Resume')}
-              </Button>
-            ) : status.enabled && status.state !== 'terminal' ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={readOnly || busyKey !== null}
-                onClick={() => void runCommand('pause', { kind: 'pause' })}
-              >
-                {busyKey === 'pause' ? <Loader2 className="animate-spin" /> : <Pause />}
-                {translate('fork.heimdall.controls.pause', 'Pause')}
-              </Button>
-            ) : null}
-            {status.state !== 'terminal' && status.state !== 'disabled' ? (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                disabled={readOnly || busyKey !== null}
-                onClick={() => void runCommand('disarm', { kind: 'disarm' })}
-              >
-                {busyKey === 'disarm' ? <Loader2 className="animate-spin" /> : <StopCircle />}
-                {translate('fork.heimdall.controls.disarm', 'Disarm')}
-              </Button>
-            ) : null}
-            <HeimdallDeleteWatcherAction
-              watcherName={displayedRow.entry.name}
-              disabled={readOnly || busyKey !== null}
-              deleting={busyKey === 'delete'}
-              onCommand={runCommand}
-            />
-          </div>
-          <HeimdallConcurrencyControl
-            enrollment={displayedRow.entry.enrollment}
-            readOnly={readOnly}
-            busy={busyKey !== null}
-            supported={
-              !displayedRow.capabilityNotes.includes(HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE)
-            }
-            updating={busyKey === 'set-concurrency'}
-            onChange={(maxConcurrency) => {
-              void runCommand('set-concurrency', { kind: 'set-concurrency', maxConcurrency })
-            }}
-          />
-          {pausedOrParked && resumeBlockedByBudget ? (
-            <p className="mt-2 text-xs text-status-warning">
-              {translate(
-                'fork.heimdall.controls.budgetResumeWarning',
-                'This watcher exhausted its budget. Increase the limit before resuming or it will park again.'
-              )}
-            </p>
-          ) : null}
-          {notice ? (
-            <p
-              className={
-                notice.tone === 'applied'
-                  ? 'mt-3 rounded-md border border-status-success-border bg-status-success-background px-3 py-2 text-xs text-status-success'
-                  : notice.tone === 'refused'
-                    ? 'mt-3 rounded-md border border-status-warning-border bg-status-warning-background px-3 py-2 text-xs text-status-warning-foreground'
-                    : 'mt-3 rounded-md border border-border bg-muted px-3 py-2 text-xs text-foreground'
-              }
-              role="status"
-            >
-              {notice.text}
-            </p>
-          ) : null}
-        </section>
+                {translate('fork.heimdall.controls.title', 'Owner controls')}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {pausedOrParked ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={readOnly || busyKey !== null || resumeBlockedByBudget}
+                    onClick={() => void runCommand('resume', { kind: 'resume' })}
+                  >
+                    {busyKey === 'resume' ? <Loader2 className="animate-spin" /> : <Play />}
+                    {translate('fork.heimdall.controls.resume', 'Resume')}
+                  </Button>
+                ) : status.enabled && status.state !== 'terminal' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={readOnly || busyKey !== null}
+                    onClick={() => void runCommand('pause', { kind: 'pause' })}
+                  >
+                    {busyKey === 'pause' ? <Loader2 className="animate-spin" /> : <Pause />}
+                    {translate('fork.heimdall.controls.pause', 'Pause')}
+                  </Button>
+                ) : null}
+                {status.state !== 'terminal' && status.state !== 'disabled' ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={readOnly || busyKey !== null}
+                    onClick={() => void runCommand('disarm', { kind: 'disarm' })}
+                  >
+                    {busyKey === 'disarm' ? <Loader2 className="animate-spin" /> : <StopCircle />}
+                    {translate('fork.heimdall.controls.disarm', 'Disarm')}
+                  </Button>
+                ) : null}
+                <HeimdallDeleteWatcherAction
+                  watcherName={displayedRow.entry.name}
+                  disabled={readOnly || busyKey !== null}
+                  deleting={busyKey === 'delete'}
+                  onCommand={runCommand}
+                />
+              </div>
+              <HeimdallConcurrencyControl
+                enrollment={displayedRow.entry.enrollment}
+                readOnly={readOnly}
+                busy={busyKey !== null}
+                supported={
+                  !displayedRow.capabilityNotes.includes(
+                    HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE
+                  )
+                }
+                updating={busyKey === 'set-concurrency'}
+                onChange={(maxConcurrency) => {
+                  void runCommand('set-concurrency', { kind: 'set-concurrency', maxConcurrency })
+                }}
+              />
+              {pausedOrParked && resumeBlockedByBudget ? (
+                <p className="mt-2 text-xs text-status-warning">
+                  {translate(
+                    'fork.heimdall.controls.budgetResumeWarning',
+                    'This watcher exhausted its budget. Increase the limit before resuming or it will park again.'
+                  )}
+                </p>
+              ) : null}
+              {notice ? (
+                <p
+                  className={
+                    notice.tone === 'applied'
+                      ? 'mt-3 rounded-md border border-status-success-border bg-status-success-background px-3 py-2 text-xs text-status-success'
+                      : notice.tone === 'refused'
+                        ? 'mt-3 rounded-md border border-status-warning-border bg-status-warning-background px-3 py-2 text-xs text-status-warning-foreground'
+                        : 'mt-3 rounded-md border border-border bg-muted px-3 py-2 text-xs text-foreground'
+                  }
+                  role="status"
+                >
+                  {notice.text}
+                </p>
+              ) : null}
+            </section>
 
-        <HeimdallBudgetCard
-          policy={displayedRow.entry.enrollment.budget}
-          usage={status.budget}
-          disabled={readOnly || detailEvidenceStale}
-          busy={busyKey !== null}
-          applying={busyKey === 'adjust-budget'}
-          onApply={async (budget) => {
-            const result = await runCommand('adjust-budget', { kind: 'adjust-budget', budget })
-            return result?.status === 'applied'
-          }}
-        />
+            <HeimdallBudgetCard
+              policy={displayedRow.entry.enrollment.budget}
+              usage={status.budget}
+              disabled={readOnly || detailEvidenceStale}
+              busy={busyKey !== null}
+              applying={busyKey === 'adjust-budget'}
+              onApply={async (budget) => {
+                const result = await runCommand('adjust-budget', { kind: 'adjust-budget', budget })
+                return result?.status === 'applied'
+              }}
+            />
+          </>
+        ) : null}
 
         <HeimdallEscalations
           entries={openEscalations}
           traces={activeDetail?.traces ?? []}
           readOnly={readOnly || detailEvidenceStale}
           busyKey={busyKey}
+          row={displayedRow}
+          ledger={activeDetail?.ledger ?? null}
           onApprove={(key, scope) => void runCommand(key, { kind: 'approve', scope })}
+          onAnswerChoice={answerPipelineChoice}
         />
-        <HeimdallKindDetail row={displayedRow} ledger={activeDetail?.ledger ?? null} />
+        <HeimdallKindDetail
+          row={displayedRow}
+          ledger={activeDetail?.ledger ?? null}
+          readOnly={readOnly || detailEvidenceStale}
+          busy={busyKey !== null}
+          onAnswer={answerPipelineChoice}
+          onApprove={(scope) =>
+            runCommand('approve:pipeline-run-graph', { kind: 'approve', scope })
+          }
+        />
 
-        <section aria-labelledby="heimdall-workers-title">
-          <h3
-            id="heimdall-workers-title"
-            className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
-          >
-            {translate('fork.heimdall.workers.title', 'Live workers')}
-          </h3>
-          {activeDetail ? (
-            <HeimdallWorkers
-              workers={activeDetail.workers}
-              disabled={readOnly || detailEvidenceStale}
-              busyKey={busyKey}
-              ownerConnectionId={displayedRow.target.connectionId}
-              onOpen={openHeimdallWorker}
-              onAnswer={answerWorker}
-              onStop={async (worker) => {
-                await runCommand(`stop-worker:${worker.dispatchId}`, {
-                  kind: 'stop-worker',
-                  dispatchId: worker.dispatchId
-                })
-              }}
-            />
-          ) : (
-            <p className="text-xs text-muted-foreground">{detailFallback}</p>
-          )}
-        </section>
+        {!unsupportedKind ? (
+          <section aria-labelledby="heimdall-workers-title">
+            <h3
+              id="heimdall-workers-title"
+              className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+            >
+              {translate('fork.heimdall.workers.title', 'Live workers')}
+            </h3>
+            {activeDetail ? (
+              <HeimdallWorkers
+                workers={activeDetail.workers}
+                disabled={readOnly || detailEvidenceStale}
+                busyKey={busyKey}
+                ownerConnectionId={displayedRow.target.connectionId}
+                onOpen={openHeimdallWorker}
+                onAnswer={answerWorker}
+                onStop={async (worker) => {
+                  await runCommand(`stop-worker:${worker.dispatchId}`, {
+                    kind: 'stop-worker',
+                    dispatchId: worker.dispatchId
+                  })
+                }}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">{detailFallback}</p>
+            )}
+          </section>
+        ) : null}
         <section aria-labelledby="heimdall-trace-title">
           <h3
             id="heimdall-trace-title"

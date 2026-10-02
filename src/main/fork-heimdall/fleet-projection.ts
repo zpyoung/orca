@@ -1,9 +1,10 @@
 import { HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE } from '../../shared/fork-heimdall/capability'
+import type { WatcherFleetEntry } from '../../shared/fork-heimdall/fleet-types'
 import type {
-  HeimdallFleetSnapshot,
-  WatcherDetail,
-  WatcherFleetEntry
-} from '../../shared/fork-heimdall/fleet-types'
+  HeimdallFleetSnapshotReader,
+  WatcherDetailReader,
+  WatcherFleetEntryReader
+} from '../../shared/fork-heimdall/remote-reader-schemas'
 import { isWatcherTickErrorStatus } from '../../shared/fork-heimdall/watcher-tick-error'
 import type { FleetEnvironmentIdentity } from './fleet-environment-transport'
 
@@ -24,9 +25,9 @@ export type RemoteFleetProjection = {
 }
 
 export function routeRemoteFleetEntry(
-  entry: WatcherFleetEntry,
+  entry: WatcherFleetEntryReader,
   identity: FleetEnvironmentIdentity
-): WatcherFleetEntry {
+): WatcherFleetEntryReader {
   if (entry.target.connectionId !== null || entry.target.pairingRevision !== null) {
     throw new Error('A Heimdall owner published a non-local fleet target')
   }
@@ -41,38 +42,46 @@ export function routeRemoteFleetEntry(
 }
 
 export function projectRemoteFleetEntry(
-  entry: WatcherFleetEntry,
+  entry: WatcherFleetEntryReader,
   projection: RemoteFleetProjection
-): WatcherFleetEntry {
+): WatcherFleetEntryReader {
   const targetsCurrentPairing =
     entry.target.connectionId === projection.identity.id &&
     entry.target.pairingRevision === projection.identity.pairingRevision
   const ownerReachable = projection.reachable && targetsCurrentPairing
   const readOnlyReason = !ownerReachable
     ? HEIMDALL_OWNER_UNREACHABLE_DETAIL
-    : projection.commandSupport === 'unsupported'
-      ? HEIMDALL_COMMANDS_UNSUPPORTED_DETAIL
-      : projection.commandSupport === 'unknown'
-        ? HEIMDALL_COMMANDS_UNVERIFIED_DETAIL
-        : entry.readOnlyReason
+    : entry.entry.enrollment.kind === 'unknown'
+      ? 'This watcher kind is not supported by this Orca version.'
+      : projection.commandSupport === 'unsupported'
+        ? HEIMDALL_COMMANDS_UNSUPPORTED_DETAIL
+        : projection.commandSupport === 'unknown'
+          ? HEIMDALL_COMMANDS_UNVERIFIED_DETAIL
+          : entry.readOnlyReason
   const capabilityNotes =
     entry.entry.enrollment.kind === 'objective' &&
     projection.parallelExecutionSupport === 'unsupported' &&
     !entry.capabilityNotes.includes(HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE)
       ? [...entry.capabilityNotes, HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE]
       : entry.capabilityNotes
-  return {
-    ...entry,
-    contact: ownerReachable ? entry.contact : 'unverifiable',
-    readOnlyReason,
-    capabilityNotes
+  const contact = ownerReachable ? entry.contact : 'unverifiable'
+  if (entry.entry.enrollment.kind === 'pipeline') {
+    const { parallel: _parallel, ...pipelineEntry } = entry
+    return {
+      ...pipelineEntry,
+      contact,
+      readOnlyReason,
+      capabilityNotes,
+      workflowPhase: entry.entry.status.phase
+    }
   }
+  return { ...entry, contact, readOnlyReason, capabilityNotes }
 }
 
 export function routeRemoteDetail(
-  detail: WatcherDetail,
-  routedWatcher: WatcherFleetEntry
-): WatcherDetail {
+  detail: WatcherDetailReader,
+  routedWatcher: WatcherFleetEntryReader
+): WatcherDetailReader {
   if (
     detail.watcher.target.connectionId !== null ||
     detail.watcher.target.pairingRevision !== null ||
@@ -83,7 +92,7 @@ export function routeRemoteDetail(
   return { ...detail, watcher: routedWatcher }
 }
 
-function attentionRank(entry: WatcherFleetEntry): number {
+function attentionRank(entry: WatcherFleetEntryReader): number {
   if (
     entry.contact === 'unverifiable' ||
     entry.entry.status.state === 'unreachable' ||
@@ -116,7 +125,7 @@ function attentionRank(entry: WatcherFleetEntry): number {
   return 7
 }
 
-export function sortFleetEntries(entries: WatcherFleetEntry[]): WatcherFleetEntry[] {
+export function sortFleetEntries(entries: WatcherFleetEntryReader[]): WatcherFleetEntryReader[] {
   return entries.sort((left, right) => {
     const attention = attentionRank(left) - attentionRank(right)
     if (attention !== 0) {
@@ -137,11 +146,9 @@ export function sortFleetEntries(entries: WatcherFleetEntry[]): WatcherFleetEntr
 
 export function buildFleetSnapshot(
   localEntries: readonly WatcherFleetEntry[],
-  remoteEntries: Iterable<WatcherFleetEntry>,
+  remoteEntries: Iterable<WatcherFleetEntryReader>,
   generatedAtMs: number
-): HeimdallFleetSnapshot {
-  return {
-    entries: sortFleetEntries([...localEntries, ...remoteEntries]),
-    generatedAtMs
-  }
+): HeimdallFleetSnapshotReader {
+  const entries: WatcherFleetEntryReader[] = [...localEntries, ...remoteEntries]
+  return { entries: sortFleetEntries(entries), generatedAtMs }
 }

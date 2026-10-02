@@ -2,7 +2,10 @@
   "fork": {
     "heimdall": {
       "kind": {
-        "objective": "Observateur d’objectif"
+        "objectiveV1": "Objective v1",
+        "prSitterV1": "Sitter de PR v1",
+        "pipeline": "Pipeline",
+        "unknown": "Observateur inconnu"
       },
       "status": {
         "watching": "Surveillance",
@@ -44,7 +47,8 @@
         "title": "Flotte Heimdall",
         "summary": "{{active}} actifs · {{attention}} nécessitent votre attention",
         "refresh": "Actualiser la flotte",
-        "staleError": "Échec de l’actualisation de la flotte ; affichage du dernier instantané confirmé : {{error}}"
+        "staleError": "Échec de l’actualisation de la flotte ; affichage du dernier instantané confirmé : {{error}}",
+        "newRun": "Nouvelle exécution"
       },
       "fleet": {
         "title": "Flotte d’observateurs",

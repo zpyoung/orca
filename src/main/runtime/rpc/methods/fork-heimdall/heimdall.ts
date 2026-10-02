@@ -1,16 +1,21 @@
-import { defineMethod, defineStreamingMethod } from '../../core'
+import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core'
 import {
   EmptyHeimdallRequestSchema,
   HEIMDALL_CHANNELS,
   HeimdallEnrollRequestSchema,
   HeimdallUnsubscribeRequestSchema,
   WatcherCommandRequestSchema,
-  WatcherTargetSchema,
-  type HeimdallFleetSnapshot,
-  type WatcherDetail
+  WatcherTargetSchema
 } from '../../../../../shared/fork-heimdall/api'
+import type {
+  HeimdallFleetSnapshotReader,
+  WatcherDetailReader
+} from '../../../../../shared/fork-heimdall/remote-reader-schemas'
 import { heimdallEnrollmentRefusalError } from '../../../../../shared/fork-heimdall/enrollment-refusal-error'
+import { stampPipelineAnswerAttribution } from '../../../../fork-heimdall-pipeline/answer-attribution'
+import { PIPELINE_RPC_METHODS } from '../../../../fork-heimdall-pipeline/pipeline-rpc-methods'
 import { requireHeimdallKernel, requireHeimdallTransport } from './kernel-binding'
+import { isLocalArtifactPasswordCaller } from '../fork-artifact-passwords/artifact-password-local-caller'
 import { HEIMDALL_OBJECTIVE_METHODS } from '../fork-heimdall-objective/objective-detail-method'
 import {
   LEGACY_HEIMDALL_METHODS,
@@ -19,7 +24,7 @@ import {
   projectLegacyDebugReport,
   projectLegacyEnrollResult
 } from './legacy-wire'
-import { projectHeimdallDetailForClient } from './dispatch-result-wire'
+import { projectHeimdalDetailForClient } from './dispatch-result-wire'
 import {
   projectHeimdallDetailParkReasonForClient,
   projectHeimdallFleetSnapshotForClient,
@@ -37,9 +42,16 @@ function assertLocalTarget(target: {
   }
 }
 
+/** Keep paired runtimes host-local; the trusted desktop renderer shares their `runtime` clientKind. */
+
+function isPairedRuntimeForwarder(caller: Pick<RpcContext, 'clientKind' | 'clientId'>): boolean {
+  return caller.clientKind === 'runtime' && !isLocalArtifactPasswordCaller(caller)
+}
+
 export const HEIMDALL_METHODS = [
   ...LEGACY_HEIMDALL_METHODS,
   ...HEIMDALL_OBJECTIVE_METHODS,
+  ...PIPELINE_RPC_METHODS,
   defineMethod({
     name: HEIMDALL_CHANNELS.enroll,
     params: HeimdallEnrollRequestSchema.or(LegacyHeimdallEnrollRequestSchema),
@@ -73,11 +85,10 @@ export const HEIMDALL_METHODS = [
     name: HEIMDALL_CHANNELS.fleet,
     params: EmptyHeimdallRequestSchema,
     handler: async (_params, context) => {
-      const { runtime, clientKind } = context
-      const snapshot =
-        clientKind === 'runtime'
-          ? await requireHeimdallKernel(runtime).fleet()
-          : await requireHeimdallTransport(runtime).fleet()
+      const { runtime } = context
+      const snapshot = isPairedRuntimeForwarder(context)
+        ? await requireHeimdallKernel(runtime).fleet()
+        : await requireHeimdallTransport(runtime).fleet()
       return projectHeimdallFleetSnapshotForClient(snapshot, context)
     }
   }),
@@ -85,15 +96,15 @@ export const HEIMDALL_METHODS = [
     name: HEIMDALL_CHANNELS.detail,
     params: WatcherTargetSchema,
     handler: async (target, context) => {
-      const { runtime, clientKind } = context
-      let detail: WatcherDetail
-      if (clientKind === 'runtime') {
+      const { runtime } = context
+      let detail: WatcherDetailReader
+      if (isPairedRuntimeForwarder(context)) {
         assertLocalTarget(target)
         detail = await requireHeimdallKernel(runtime).detail(target)
       } else {
         detail = await requireHeimdallTransport(runtime).detail(target)
       }
-      return projectHeimdallDetailForClient(
+      return projectHeimdalDetailForClient(
         projectHeimdallDetailParkReasonForClient(detail, context),
         context
       )
@@ -102,12 +113,18 @@ export const HEIMDALL_METHODS = [
   defineMethod({
     name: HEIMDALL_CHANNELS.command,
     params: WatcherCommandRequestSchema,
-    handler: (request, { runtime, clientKind }) => {
-      if (clientKind === 'runtime') {
-        assertLocalTarget(request.target)
-        return requireHeimdallKernel(runtime).command(request)
+    handler: (request, context) => {
+      const { runtime } = context
+      const attributedRequest =
+        request.command.kind === 'answer-pipeline-choice' &&
+        request.command.attribution === undefined
+          ? stampPipelineAnswerAttribution(request, context, Date.now())
+          : request
+      if (isPairedRuntimeForwarder(context)) {
+        assertLocalTarget(attributedRequest.target)
+        return requireHeimdallKernel(runtime).command(attributedRequest)
       }
-      return requireHeimdallTransport(runtime).command(request)
+      return requireHeimdallTransport(runtime).command(attributedRequest)
     }
   }),
   defineMethod({
@@ -130,7 +147,9 @@ export const HEIMDALL_METHODS = [
     name: HEIMDALL_CHANNELS.subscribe,
     params: EmptyHeimdallRequestSchema,
     handler: async (_params, context, emit) => {
-      const { runtime, clientKind, connectionId, signal } = context
+      const { runtime, connectionId, signal } = context
+
+      const hostLocalRuntimeForwarder = isPairedRuntimeForwarder(context)
       await new Promise<void>((resolve) => {
         let closed = false
         let emission = Promise.resolve()
@@ -151,7 +170,7 @@ export const HEIMDALL_METHODS = [
         }
         const emitSnapshot = (
           type: 'ready' | 'snapshot',
-          supplied?: HeimdallFleetSnapshot
+          supplied?: HeimdallFleetSnapshotReader
         ): void => {
           emission = emission
             .then(async () => {
@@ -160,7 +179,7 @@ export const HEIMDALL_METHODS = [
               }
               const snapshot = projectHeimdallFleetSnapshotForClient(
                 supplied ??
-                  (clientKind === 'runtime'
+                  (hostLocalRuntimeForwarder
                     ? await requireHeimdallKernel(runtime).fleet()
                     : await requireHeimdallTransport(runtime).fleet()),
                 context
@@ -171,12 +190,11 @@ export const HEIMDALL_METHODS = [
             })
             .catch(() => cleanup())
         }
-        unsubscribe =
-          clientKind === 'runtime'
-            ? requireHeimdallKernel(runtime).subscribe(() => emitSnapshot('snapshot'))
-            : requireHeimdallTransport(runtime).subscribe((snapshot) =>
-                emitSnapshot('snapshot', snapshot)
-              )
+        unsubscribe = hostLocalRuntimeForwarder
+          ? requireHeimdallKernel(runtime).subscribe(() => emitSnapshot('snapshot'))
+          : requireHeimdallTransport(runtime).subscribe((snapshot) =>
+              emitSnapshot('snapshot', snapshot)
+            )
         runtime.registerSubscriptionCleanup(subscriptionId, cleanup, connectionId)
         signal?.addEventListener('abort', cleanup, { once: true })
         if (signal?.aborted) {

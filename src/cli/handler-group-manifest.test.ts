@@ -56,6 +56,10 @@ describe('handler group manifest', () => {
     }
     expect(drift).toEqual([])
   })
+  it('registers the Heimdall pipeline create command', () => {
+    const heimdall = HANDLER_GROUPS.find((group) => group.name === 'heimdall')
+    expect(heimdall?.keys).toContain('heimdall create')
+  })
 
   it('exposes every declared key as a callable handler', async () => {
     const notCallable: string[] = []

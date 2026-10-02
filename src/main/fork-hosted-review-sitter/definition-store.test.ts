@@ -30,9 +30,9 @@ describe('hosted review enrollment payload', () => {
   it('allows identity-free candidates without relaxing persisted enrollment requirements', () => {
     const candidate = { branchUpdateMode: 'rebase', mergeMethod: null }
 
-    expect(HostedReviewEnrollmentCandidateSchema.safeParse(candidate)).toMatchObject({
+    expect(HostedReviewEnrollmentCandidateSchema.safeParse(candidate)).toEqual({
       success: true,
-      data: candidate
+      data: { ...candidate, mergeCheckScope: 'all' }
     })
     expect(enrollmentPayloadSchema.safeParse(candidate).success).toBe(false)
     expect(parseHostedReviewEnrollmentPayload(candidate)).toBeNull()
@@ -43,9 +43,27 @@ describe('hosted review enrollment payload', () => {
       ...legacyPayload,
       mergeCheckScope: 'all'
     })
+    expect(parseHostedReviewEnrollmentPayload(legacyPayload)).not.toHaveProperty('repeatFixLimit')
     expect(
       parseHostedReviewEnrollmentPayload({ ...legacyPayload, mergeCheckScope: 'required' })
     ).toEqual({ ...legacyPayload, mergeCheckScope: 'required' })
+  })
+
+  it('preserves configured repeat limits and rejects values outside the supported range', () => {
+    const candidate = { branchUpdateMode: 'rebase', mergeMethod: null }
+    const withLimit = { ...payload, repeatFixLimit: 5 }
+
+    expect(parseHostedReviewEnrollmentPayload(withLimit)).toEqual(withLimit)
+    expect(enrollmentPayloadSchema.parse(withLimit)).toEqual(withLimit)
+    expect(
+      HostedReviewEnrollmentCandidateSchema.parse({ ...candidate, repeatFixLimit: 5 })
+    ).toEqual({ ...candidate, mergeCheckScope: 'all', repeatFixLimit: 5 })
+    for (const repeatFixLimit of [0, 11]) {
+      expect(enrollmentPayloadSchema.safeParse({ ...payload, repeatFixLimit }).success).toBe(false)
+      expect(
+        HostedReviewEnrollmentCandidateSchema.safeParse({ ...candidate, repeatFixLimit }).success
+      ).toBe(false)
+    }
   })
 
   it('rejects incomplete, non-http and unknown-provider payloads', () => {

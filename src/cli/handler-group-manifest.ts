@@ -34,6 +34,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'heimdall list',
       'heimdall show',
       'heimdall objective',
+      'heimdall create',
       'heimdall create objective',
       'heimdall create hosted-review',
       'heimdall pause',

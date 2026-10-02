@@ -72,6 +72,9 @@ function fakeEnrollments(initial: WatcherEnrollment) {
     deleteWatcher: () => {
       throw new Error('not used in this test')
     },
+    rollbackInserted: () => {
+      throw new Error('not used in this test')
+    },
     pendingKindPurges: () => [],
     completeKindPurge: () => {},
     setEnabled: (_watcherId: string, enabled: boolean) => {

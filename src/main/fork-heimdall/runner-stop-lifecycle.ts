@@ -34,6 +34,7 @@ export class WatcherRunnerStopLifecycle {
       if (this.deletePending(runner)) {
         return 'quiesced'
       }
+      runner.kind.persistTerminalProjection?.(snapshot, ledger)
       try {
         await this.status.terminal(runner, fired)
       } catch (error) {

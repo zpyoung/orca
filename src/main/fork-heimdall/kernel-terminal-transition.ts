@@ -85,9 +85,11 @@ function hasSourceWorkspaceAuthority(
 }
 
 function isDuplicateWorkspace(error: unknown): boolean {
+  const detail = errorDetail(error)
   return (
     getErrorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE' &&
-    errorDetail(error).includes('heimdall_enrollment.workspace_key')
+    (detail.includes('heimdall_enrollment.workspace_key') ||
+      detail.includes('heimdall_pipeline_enrollment.workspace_key'))
   )
 }
 

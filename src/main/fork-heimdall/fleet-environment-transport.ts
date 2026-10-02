@@ -14,6 +14,7 @@ import {
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
+import { HEIMDALL_PIPELINE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall-pipeline/capability'
 import { isRuntimeEnvironmentManuallyDisconnected } from '../ipc/runtime-environment-manual-disconnect'
 import {
   callRuntimeEnvironment,
@@ -39,6 +40,7 @@ export type FleetEnvironmentSubscriptionCallbacks = {
 export type FleetEnvironmentTransport = {
   list(): FleetEnvironmentIdentity[]
   availability(identity: FleetEnvironmentIdentity): FleetEnvironmentAvailability
+  displayName?(identity: FleetEnvironmentIdentity): string | undefined
   status(identity: FleetEnvironmentIdentity): Promise<RuntimeRpcResponse<RuntimeStatus>>
   read(
     identity: FleetEnvironmentIdentity,
@@ -53,6 +55,7 @@ export type FleetEnvironmentTransport = {
       | typeof HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
       | typeof HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
       | typeof HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_PIPELINE_RUNTIME_CAPABILITY
   ): Promise<RuntimeRpcResponse<unknown>>
   subscribe(
     identity: FleetEnvironmentIdentity,
@@ -68,7 +71,8 @@ export class HeimdallCommandCapabilityError extends Error {
       | typeof HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
       | typeof HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
       | typeof HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
-      | typeof HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY = HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_PIPELINE_RUNTIME_CAPABILITY = HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
   ) {
     super(
       requiredCapability === HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
@@ -77,7 +81,9 @@ export class HeimdallCommandCapabilityError extends Error {
           ? 'The owning runtime does not support parallel objective execution. Update the host and try again.'
           : requiredCapability === HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
             ? 'The owning runtime does not support enrolling on a new worktree. Update the host and try again.'
-            : 'The owning runtime does not support Heimdall commands. Update the host and try again.'
+            : requiredCapability === HEIMDALL_PIPELINE_RUNTIME_CAPABILITY
+              ? 'The owning runtime does not support Heimdall pipelines. Update the host and try again.'
+              : 'The owning runtime does not support Heimdall commands. Update the host and try again.'
     )
     this.name = 'HeimdallCommandCapabilityError'
   }
@@ -133,6 +139,16 @@ export function createFleetEnvironmentTransport(
         id: environment.id,
         pairingRevision: environment.pairingRevision ?? environment.createdAt
       })),
+    displayName: (identity) => {
+      try {
+        const environment = resolveEnvironment(resolveUserDataPath(), identity.id)
+        return (environment.pairingRevision ?? environment.createdAt) === identity.pairingRevision
+          ? environment.name
+          : undefined
+      } catch {
+        return undefined
+      }
+    },
     availability,
     status: async (identity) => {
       assertAvailable(identity)

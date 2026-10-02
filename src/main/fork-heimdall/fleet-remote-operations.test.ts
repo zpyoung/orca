@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { HEIMDALL_PIPELINE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall-pipeline/capability'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
-import { enrollmentForParallelCompatibility } from './fleet-remote-operations'
+import type { WatcherCommandRequest } from '../../shared/fork-heimdall/fleet-types'
+import {
+  enrollmentForParallelCompatibility,
+  sendRemoteWatcherCommand
+} from './fleet-remote-operations'
+import {
+  HeimdallCommandCapabilityError,
+  type FleetEnvironmentTransport
+} from './fleet-environment-transport'
 
 function input(kindPayload: Record<string, unknown>): EnrollInput {
   return {
@@ -55,5 +64,64 @@ describe('enrollmentForParallelCompatibility', () => {
     expect(enrollmentForParallelCompatibility(enrollment, false).kindPayload).toEqual({
       maxConcurrency: 1
     })
+  })
+})
+describe('sendRemoteWatcherCommand pipeline capability gating', () => {
+  it('returns the runtime capability refusal from the mutation preflight', async () => {
+    const environments: FleetEnvironmentTransport = {
+      list: () => [],
+      availability: () => 'available',
+      status: async () => {
+        throw new Error('unused')
+      },
+      read: async () => {
+        throw new Error('unused')
+      },
+      mutate: async (_identity, _method, _params, requiredCapability) => {
+        if (requiredCapability !== HEIMDALL_PIPELINE_RUNTIME_CAPABILITY) {
+          throw new Error('The pipeline capability was not checked before sending the command.')
+        }
+        throw new HeimdallCommandCapabilityError(HEIMDALL_PIPELINE_RUNTIME_CAPABILITY)
+      },
+      subscribe: async () => {
+        throw new Error('unused')
+      }
+    }
+    const request: WatcherCommandRequest = {
+      target: { watcherId: 'watcher-1', connectionId: 'environment-1', pairingRevision: 7 },
+      expectedOwner: {
+        executionHostId: 'local',
+        schedulerOwner: 'local_host_service',
+        workspaceKey: 'local::/repo',
+        revision: 1
+      },
+      command: {
+        kind: 'answer-pipeline-choice',
+        scope: {
+          actionKind: 'pipeline-pass-gate',
+          contentIdentity: `pipeline:sha256:${'a'.repeat(64)}`,
+          evidenceKey: 'pipeline-choice'
+        },
+        choice: 'approve'
+      }
+    }
+    let unsupported = false
+
+    const result = await sendRemoteWatcherCommand(
+      environments,
+      { id: 'environment-1', pairingRevision: 7 },
+      request,
+      () => {
+        unsupported = true
+      }
+    )
+
+    expect(result).toEqual({
+      status: 'refused',
+      reason: 'unsupported-capability',
+      detail:
+        'The owning runtime does not support Heimdall pipelines. Update the host and try again.'
+    })
+    expect(unsupported).toBe(true)
   })
 })

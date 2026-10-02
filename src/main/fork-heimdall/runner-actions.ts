@@ -140,21 +140,49 @@ export class WatcherRunnerActions {
           const activeActions = getInFlightAttempts(dispatchLedger)
             .filter((candidate) => candidate.attemptId !== attempt.attemptId)
             .map((candidate) => candidate.action)
-          const result = await this.dependencies.dispatchLifecycle.dispatchAttempt(attempt, {
-            lease: executionLease,
-            enrollment: runner.enrollment,
-            action,
-            fingerprint,
-            dispatchKind: 'child',
-            ...request,
-            allowConcurrent:
-              concurrency?.canRunAlongside(action, activeActions, snapshot, dispatchLedger) ??
-              false,
-            allowBudgetExhausted:
-              concurrency?.canRunWhenBudgetExhausted(action, snapshot, dispatchLedger) ?? false
-          })
+          // Later revisions must extend the persisted action, whose JSON form may omit
+          // undefined passthrough fields from the object used during execution.
+          const recordedAttempt = getLatestAttempts(dispatchLedger).find(
+            (candidate) => candidate.attemptId === attempt.attemptId
+          )
+          if (recordedAttempt === undefined) {
+            throw new Error('Watcher write-ahead attempt was not persisted')
+          }
+          const result = await this.dependencies.dispatchLifecycle.dispatchAttempt(
+            recordedAttempt,
+            {
+              lease: executionLease,
+              enrollment: runner.enrollment,
+              action,
+              fingerprint,
+              dispatchKind: 'child',
+              ...request,
+              allowConcurrent:
+                concurrency?.canRunAlongside(action, activeActions, snapshot, dispatchLedger) ??
+                false,
+              allowBudgetExhausted:
+                concurrency?.canRunWhenBudgetExhausted(action, snapshot, dispatchLedger) ?? false
+            }
+          )
           dispatched = result.status === 'dispatched'
           return result
+        },
+        appendEvidence: async (evidenceKind, payload) => {
+          await executionLease.assertHeld()
+          this.append(runner, {
+            eventId: this.dependencies.createId(),
+            watcherId: runner.enrollment.watcherId,
+            atMs: this.dependencies.now(),
+            origin: 'owner',
+            class: 'fact',
+            kind: 'evidence',
+            evidenceKind,
+            payload: {
+              ...payload,
+              attemptId: attempt.attemptId,
+              attemptFingerprint: fingerprint
+            }
+          })
         }
       })
       await rawLease.assertHeld()

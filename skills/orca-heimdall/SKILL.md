@@ -1,12 +1,12 @@
 ---
 name: orca-heimdall
 description: >-
-  Use `orca heimdall ...` to observe and manage durable Heimdall watchers: list the fleet,
-  inspect status, escalations, workers, plans, and debug reports; create objective or
-  hosted-review watchers; approve gated actions; answer worker or owner questions; adjust
-  budgets and concurrency; and pause, resume, disarm, or permanently remove a watcher. Use
-  when the user says "orca heimdall", "Heimdall watcher", "watcher fleet", "PR sitter",
-  or asks to create, inspect, steer, or stop an objective or hosted-review watcher.
+  Use `orca heimdall ...` to observe and manage durable Heimdall watchers: list the fleet, inspect
+  status, escalations, workers, plans, and debug reports; create objective or hosted-review
+  watchers, and create and run saved pipelines; approve gated actions; answer worker or owner
+  questions; adjust budgets and concurrency; pause, resume, disarm, or permanently remove a watcher.
+  Use when the user says "orca heimdall", "Heimdall watcher", "watcher fleet", "pipeline",
+  "PR sitter", or asks to create, inspect, steer, or stop a watcher.
 ---
 
 # Orca Heimdall

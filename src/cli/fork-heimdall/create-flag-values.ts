@@ -14,11 +14,54 @@ import { RuntimeClientError } from '../runtime-client'
 import { parseHeimdallCreateSchema } from './create-input-validation'
 import { hoursToMilliseconds } from './watcher-command-values'
 
-const HOSTED_REVIEW_CAPABILITY_KEYS: Record<string, true> = {
-  updateBranch: true,
-  resolveConflicts: true,
-  fixChecks: true,
-  merge: true
+export const HEIMDALL_HOSTED_REVIEW_CAPABILITY_NAMES = [
+  'updateBranch',
+  'resolveConflicts',
+  'fixChecks',
+  'merge'
+] as const
+
+export function parseCapabilityFlags(
+  flags: Map<string, string | boolean>,
+  allowedKeys: readonly string[],
+  kindLabel: string
+): Record<string, z.infer<typeof CapabilityModeSchema>> {
+  const capabilities: Record<string, z.infer<typeof CapabilityModeSchema>> = {}
+  for (const [index, assignment] of repeatedCreateValues(flags, 'cap').entries()) {
+    const separator = assignment.indexOf('=')
+    if (separator <= 0 || separator === assignment.length - 1) {
+      throw new RuntimeClientError('invalid_argument', '--cap must be <key>=<off|gated|on>.')
+    }
+    const key = assignment.slice(0, separator)
+    const mode = assignment.slice(separator + 1)
+    const parsedMode = CapabilityModeSchema.safeParse(mode)
+    if (!parsedMode.success) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `--cap[${index + 1}]: invalid mode for ${key}; use off, gated, or on.`
+      )
+    }
+    if (!allowedKeys.includes(key)) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `--cap[${index + 1}]: unknown ${kindLabel} capability "${key}". Use: ${allowedKeys.join(', ')}.`
+      )
+    }
+    capabilities[key] = parsedMode.data
+  }
+  return capabilities
+}
+
+export function parseHeimdalCreateBudgetOverrides(flags: Map<string, string | boolean>): {
+  wallClockActiveMs?: number | null
+  turns?: number | null
+} {
+  const hours = parseHours(valueFlag(flags, 'hours'))
+  const turns = parseTurns(valueFlag(flags, 'turns'))
+  return {
+    ...(hours === undefined ? {} : { wallClockActiveMs: hours }),
+    ...(turns === undefined ? {} : { turns })
+  }
 }
 export const HeimdallHostedReviewCapabilitiesSchema = z
   .object({
@@ -190,51 +233,26 @@ export function buildHeimdallCreateFlagOverrides(
     overrides.kindPayload = payload
   }
 
+  const capabilityKeys =
+    kind === 'objective'
+      ? [...OBJECTIVE_CAPABILITY_KEYS, OWNER_INTERVENTION_CAPABILITY]
+      : [...HEIMDALL_HOSTED_REVIEW_CAPABILITY_NAMES, OWNER_INTERVENTION_CAPABILITY]
+  const parsedCapabilities = parseCapabilityFlags(flags, capabilityKeys, kind)
   const capabilities: Record<string, unknown> = {}
-  for (const [index, assignment] of repeatedCreateValues(flags, 'cap').entries()) {
-    const separator = assignment.indexOf('=')
-    if (separator <= 0 || separator === assignment.length - 1) {
-      throw new RuntimeClientError('invalid_argument', '--cap must be <key>=<off|gated|on>.')
-    }
-    const key = assignment.slice(0, separator)
-    const mode = assignment.slice(separator + 1)
-    if (!CapabilityModeSchema.safeParse(mode).success) {
-      throw new RuntimeClientError(
-        'invalid_argument',
-        `--cap[${index + 1}]: invalid mode for ${key}; use off, gated, or on.`
-      )
-    }
+  for (const [key, mode] of Object.entries(parsedCapabilities)) {
     if (key === OWNER_INTERVENTION_CAPABILITY) {
       overrides.ownerInterventionCapability = mode
-      continue
+    } else {
+      capabilities[key] = mode
     }
-    const valid =
-      kind === 'objective'
-        ? OBJECTIVE_CAPABILITY_KEYS.some((candidate) => candidate === key)
-        : Object.hasOwn(HOSTED_REVIEW_CAPABILITY_KEYS, key)
-    if (!valid) {
-      const keys =
-        kind === 'objective'
-          ? `${OBJECTIVE_CAPABILITY_KEYS.join(', ')}, ${OWNER_INTERVENTION_CAPABILITY}`
-          : `${Object.keys(HOSTED_REVIEW_CAPABILITY_KEYS).join(', ')}, ${OWNER_INTERVENTION_CAPABILITY}`
-      throw new RuntimeClientError(
-        'invalid_argument',
-        `--cap[${index + 1}]: unknown ${kind} capability "${key}". Use: ${keys}.`
-      )
-    }
-    capabilities[key] = mode
   }
   if (Object.keys(capabilities).length > 0) {
     overrides.capabilities = capabilities
   }
 
-  const hours = parseHours(valueFlag(flags, 'hours'))
-  const turns = parseTurns(valueFlag(flags, 'turns'))
-  if (hours !== undefined || turns !== undefined) {
-    overrides.budget = {
-      ...(hours === undefined ? {} : { wallClockActiveMs: hours }),
-      ...(turns === undefined ? {} : { turns })
-    }
+  const budget = parseHeimdalCreateBudgetOverrides(flags)
+  if (Object.keys(budget).length > 0) {
+    overrides.budget = budget
   }
   const owner = valueFlag(flags, 'owner')
   const ownerModel = valueFlag(flags, 'owner-model')

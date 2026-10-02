@@ -256,19 +256,6 @@ describe('objective enrollment contract', () => {
     expect(textareaValue(objective)).toBe('Ship the visible objective')
   })
 
-  it('renders the gate editor immediately after the parallel-execution fields', () => {
-    render(<EditableObjectiveFields />)
-
-    const headings = screen
-      .getAllByRole('heading', { level: 3 })
-      .map((heading) => heading.textContent)
-    const executionIndex = headings.indexOf('Execution contract')
-    const gatesIndex = headings.indexOf('Gates')
-
-    expect(executionIndex).toBeGreaterThanOrEqual(0)
-    expect(gatesIndex).toBe(executionIndex + 1)
-  })
-
   it('keeps the prior source plan when an imported file exceeds the pre-read size limit', () => {
     const priorPlan = '# Existing plan'
     const { container } = render(<EditableObjectiveFields existingPlanText={priorPlan} />)
@@ -584,7 +571,7 @@ describe('objective enrollment contract', () => {
     const onSubmit = vi.fn<(draft: ObjectiveEnrollmentDraft) => void>()
     render(<EditableObjectiveGateFields onSubmit={onSubmit} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add gate' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add check' }))
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'lint' } })
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'pnpm lint' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
@@ -604,7 +591,7 @@ describe('objective enrollment contract', () => {
     const onSubmit = vi.fn()
     render(<EditableObjectiveGateFields onSubmit={onSubmit} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add gate' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add check' }))
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lint' } })
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'pnpm lint' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
@@ -625,11 +612,10 @@ describe('objective enrollment contract', () => {
       />
     )
 
-    expect(screen.getByText(/Gates are unavailable on this host's Orca version/)).toBeVisible()
     expect(screen.getByLabelText('Name')).toBeDisabled()
     expect(screen.getByLabelText('Command')).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Add gate' })).toBeDisabled()
-    const removeButton = screen.getByRole('button', { name: 'Remove gate 1' })
+    expect(screen.getByRole('button', { name: 'Add check' })).toBeDisabled()
+    const removeButton = screen.getByRole('button', { name: 'Remove check 1' })
     expect(removeButton).toBeEnabled()
 
     fireEvent.click(removeButton)

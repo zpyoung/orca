@@ -3,13 +3,18 @@ import { ArrowLeft, Bot, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import type { WatcherDetail, WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
+import type {
+  WatcherDetailReader,
+  WatcherFleetEntryReader
+} from '../../../shared/fork-heimdall/remote-reader-schemas'
 import { projectFleetActions } from './fleet-action-history'
 import { isHeimdallAttentionRow, sortHeimdallFleetRows, sameWatcherTarget } from './fleet-selectors'
 import { getHeimdallControlApi } from './heimdall-control-api'
 import { HeimdallDetailPane } from './HeimdallDetailPane'
 import { HeimdallFleetActivity } from './HeimdallFleetActivity'
 import { HeimdallFleetList } from './HeimdallFleetList'
+import { buildObjectiveWorkspaceOptions } from '../fork-heimdall-objective/objective-workspace-options'
+import { PipelinesMenu } from '../fork-heimdall-pipeline/PipelinesMenu'
 
 const ObjectiveEnrollmentSheet = lazy(() =>
   import('../fork-heimdall-objective/ObjectiveEnrollmentSheet').then((module) => ({
@@ -17,11 +22,11 @@ const ObjectiveEnrollmentSheet = lazy(() =>
   }))
 )
 
-function detailKey(detail: WatcherDetail): string {
+function detailKey(detail: WatcherDetailReader): string {
   return `${detail.watcher.target.connectionId ?? 'local'}:${detail.watcher.target.pairingRevision ?? 'local'}:${detail.watcher.target.watcherId}`
 }
 
-function historyRowSignature(row: WatcherFleetEntry): string {
+function historyRowSignature(row: WatcherFleetEntryReader): string {
   return [
     `${row.target.connectionId ?? 'local'}:${row.target.pairingRevision ?? 'local'}:${row.target.watcherId}`,
     row.observedAtMs,
@@ -41,6 +46,47 @@ export default function HeimdallPage(): React.JSX.Element {
   const hydrateFleet = useAppStore((state) => state.hydrateHeimdallFleet)
   const closePage = useAppStore((state) => state.closeHeimdallPage)
   const rows = useMemo(() => sortHeimdallFleetRows(snapshot?.entries ?? []), [snapshot])
+  const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
+  const activeOrcaProfileId = useAppStore((state) => state.activeOrcaProfileId)
+  const repos = useAppStore((state) => state.repos)
+  const worktreesByRepo = useAppStore((state) => state.worktreesByRepo)
+  const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
+  const projectGroups = useAppStore((state) => state.projectGroups)
+  const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
+  const detectedAgentIds = useAppStore((state) => state.detectedAgentIds)
+  const remoteDetectedAgentIds = useAppStore((state) => state.remoteDetectedAgentIds)
+  const runtimeDetectedAgentIds = useAppStore((state) => state.runtimeDetectedAgentIds)
+  const runtimeStatusByEnvironmentId = useAppStore((state) => state.runtimeStatusByEnvironmentId)
+  const settings = useAppStore((state) => state.settings)
+  const pipelineWorkspaces = useMemo(
+    () =>
+      buildObjectiveWorkspaceOptions({
+        repos,
+        worktreesByRepo,
+        folderWorkspaces,
+        projectGroups,
+        runtimeEnvironments,
+        detectedAgentIds,
+        remoteDetectedAgentIds,
+        runtimeDetectedAgentIds,
+        runtimeStatusByEnvironmentId,
+        settings
+      }),
+    [
+      detectedAgentIds,
+      folderWorkspaces,
+      projectGroups,
+      remoteDetectedAgentIds,
+      repos,
+      runtimeDetectedAgentIds,
+      runtimeStatusByEnvironmentId,
+      runtimeEnvironments,
+      settings,
+      worktreesByRepo
+    ]
+  )
+  const pipelineWorkspace =
+    pipelineWorkspaces.find((workspace) => workspace.worktreeId === activeWorktreeId) ?? null
   const selectedRow = rows.find((row) => sameWatcherTarget(selectedTarget, row.target)) ?? null
   const activeCount = rows.filter(
     (row) =>
@@ -51,14 +97,14 @@ export default function HeimdallPage(): React.JSX.Element {
       row.entry.status.state !== 'disabled'
   ).length
   const attentionCount = rows.filter(isHeimdallAttentionRow).length
-  const [detailsByKey, setDetailsByKey] = useState<Record<string, WatcherDetail>>({})
+  const [detailsByKey, setDetailsByKey] = useState<Record<string, WatcherDetailReader>>({})
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyFailures, setHistoryFailures] = useState(0)
   const [historyAsOf, setHistoryAsOf] = useState<number | null>(null)
   const historyGeneration = useRef(0)
   const pageRef = useRef<HTMLElement>(null)
   const [wideDetailLayout, setWideDetailLayout] = useState(false)
-  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false)
+  const [newRunSheetOpen, setNewRunSheetOpen] = useState(false)
   const detailSignature = rows.map(historyRowSignature).sort().join('|')
 
   const completedHistoryRowSignatures = useRef<Record<string, string>>({})
@@ -115,7 +161,7 @@ export default function HeimdallPage(): React.JSX.Element {
         return
       }
       let failures = 0
-      const fulfilledDetails: WatcherDetail[] = []
+      const fulfilledDetails: WatcherDetailReader[] = []
       for (const [index, result] of results.entries()) {
         if (result.status === 'fulfilled') {
           fulfilledDetails.push(result.value)
@@ -126,7 +172,7 @@ export default function HeimdallPage(): React.JSX.Element {
         }
       }
       setDetailsByKey((current) => {
-        const next: Record<string, WatcherDetail> = {}
+        const next: Record<string, WatcherDetailReader> = {}
         for (const detail of Object.values(current)) {
           if (rows.some((row) => sameWatcherTarget(detail.watcher.target, row.target))) {
             next[detailKey(detail)] = detail
@@ -209,15 +255,20 @@ export default function HeimdallPage(): React.JSX.Element {
             )}
           </p>
         </div>
+        <PipelinesMenu
+          workspace={pipelineWorkspace}
+          worktreeId={activeWorktreeId}
+          profileId={activeOrcaProfileId}
+        />
         <Button
           type="button"
           variant="outline"
           size="sm"
           className="ml-auto"
-          onClick={() => setObjectiveSheetOpen(true)}
+          onClick={() => setNewRunSheetOpen(true)}
         >
           <Plus aria-hidden />
-          {translate('fork.heimdallObjective.enrollment.newAction', 'New objective')}
+          {translate('fork.heimdall.page.newRun', 'New run')}
         </Button>
         <Button
           type="button"
@@ -231,7 +282,7 @@ export default function HeimdallPage(): React.JSX.Element {
         </Button>
       </header>
       <Suspense fallback={null}>
-        <ObjectiveEnrollmentSheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen} />
+        <ObjectiveEnrollmentSheet open={newRunSheetOpen} onOpenChange={setNewRunSheetOpen} />
       </Suspense>
       {fleetError ? (
         <p
