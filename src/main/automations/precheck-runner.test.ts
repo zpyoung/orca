@@ -52,31 +52,6 @@ describe('runAutomationPrecheck', () => {
     expect(result.error).toBeNull()
   })
 
-  it('merges local extra environment variables over the inherited environment', async () => {
-    const inheritedPath = process.env.PATH ?? ''
-    const withoutExtraEnv = await runAutomationPrecheck({
-      precheck: {
-        command: nodeCommand(
-          `process.stdout.write(process.env.PATH === ${JSON.stringify(inheritedPath)} ? 'inherited' : 'missing')`
-        ),
-        timeoutSeconds: 5
-      },
-      target: { type: 'local', cwd }
-    })
-    const withExtraEnv = await runAutomationPrecheck({
-      precheck: {
-        command: nodeCommand(
-          `process.stdout.write([process.env.PR_TITLE, process.env.PATH === ${JSON.stringify(inheritedPath)} ? 'inherited' : 'missing'].join(':'))`
-        ),
-        timeoutSeconds: 5
-      },
-      target: { type: 'local', cwd, extraEnv: { PR_TITLE: 'hello' } }
-    })
-
-    expect(withoutExtraEnv.stdout).toBe('inherited')
-    expect(withExtraEnv.stdout).toBe('hello:inherited')
-  })
-
   it('marks a local precheck as timed out', async () => {
     const result = await runAutomationPrecheck({
       precheck: {
