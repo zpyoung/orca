@@ -11,8 +11,10 @@ export function isPipelineScalarValue(value: unknown): value is PipelineScalarVa
 }
 
 /** Read an own field by name from a schema object or YAML record. */
-export function pipelineObjectProperty(value: object, key: string): unknown {
-  return Object.getOwnPropertyDescriptor(value, key)?.value
+export function pipelineObjectProperty(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null
+    ? Object.getOwnPropertyDescriptor(value, key)?.value
+    : undefined
 }
 
 /** Compare schema values without depending on object-property insertion order. */
