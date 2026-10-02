@@ -54,11 +54,12 @@ export function buildPipelineSwarmExpansionAction(input: {
 
 function latestMergeProgressRows(
   world: PipelineWorld,
-  mergeId: string
+  mergeId: string,
+  epoch: number
 ): PipelineWorld['facts']['mergeProgress'] {
   const latestByChild = new Map<string, PipelineWorld['facts']['mergeProgress'][number]>()
   for (const row of world.facts.mergeProgress) {
-    if (row.mergeId !== mergeId) {
+    if (row.mergeId !== mergeId || row.epoch !== epoch) {
       continue
     }
     const previous = latestByChild.get(row.childInstanceId)
@@ -72,10 +73,11 @@ function latestMergeProgressRows(
 function appliedChildCommits(
   world: PipelineWorld,
   merge: PipelineMergeNode,
+  epoch: number,
   taskOrder: readonly string[]
 ): { taskId: string; commitSha: string }[] {
   const applied: { taskId: string; commitSha: string }[] = []
-  const progress = latestMergeProgressRows(world, merge.id)
+  const progress = latestMergeProgressRows(world, merge.id, epoch)
   for (const taskId of taskOrder) {
     const childInstanceId = nodeInstanceId(merge.from, taskId)
     const latest = progress.find((row) => row.childInstanceId === childInstanceId)
@@ -106,7 +108,7 @@ export function buildPipelineMergeChildAction(input: {
     input.source.applicableBaseCommit
   ])
   const orderedTaskIds = mergeOrder(input.tasks, new Set())
-  const appliedChildren = appliedChildCommits(input.world, input.node, orderedTaskIds)
+  const appliedChildren = appliedChildCommits(input.world, input.node, input.epoch, orderedTaskIds)
   return buildPipelineAction({
     kind: 'pipeline-merge-child',
     capability: 'integrate',
@@ -137,15 +139,12 @@ export function buildPipelineMergeChildAction(input: {
 export function mergeProgressFor(
   world: PipelineWorld,
   mergeId: string,
-  childInstanceId: string
+  childInstanceId: string,
+  epoch: number
 ): PipelineWorld['facts']['mergeProgress'][number] | undefined {
   let latest: PipelineWorld['facts']['mergeProgress'][number] | undefined
   for (const row of world.facts.mergeProgress) {
-    if (
-      row.mergeId === mergeId &&
-      row.childInstanceId === childInstanceId &&
-      (latest === undefined || row.epoch >= latest.epoch)
-    ) {
+    if (row.mergeId === mergeId && row.childInstanceId === childInstanceId && row.epoch === epoch) {
       latest = row
     }
   }
@@ -162,9 +161,10 @@ export type MergeConflictInfo = {
 export function mergeConflictInfo(
   world: PipelineWorld,
   merge: PipelineMergeNode,
+  epoch: number,
   skippedChildren: ReadonlySet<string> = new Set()
 ): MergeConflictInfo | null {
-  const progress = latestMergeProgressRows(world, merge.id)
+  const progress = latestMergeProgressRows(world, merge.id, epoch)
   let conflict: MergeConflictInfo['row'] | null = null
   for (const row of progress) {
     if (

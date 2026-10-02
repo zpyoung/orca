@@ -43,11 +43,16 @@ function childWorktreeFact(
 function latestMergeProgress(
   facts: PipelineStoreFacts,
   mergeId: string,
-  childInstanceId: string
+  childInstanceId: string,
+  epoch: number
 ): PipelineStoreFacts['mergeProgress'][number] | null {
   let selected: PipelineStoreFacts['mergeProgress'][number] | null = null
   for (const fact of facts.mergeProgress) {
-    if (fact.mergeId === mergeId && fact.childInstanceId === childInstanceId) {
+    if (
+      fact.mergeId === mergeId &&
+      fact.childInstanceId === childInstanceId &&
+      fact.epoch === epoch
+    ) {
       selected = fact
     }
   }
@@ -197,7 +202,7 @@ export async function readPipelineMergeSources(
       )
     )
     const progressForTask = (taskId: string) =>
-      latestMergeProgress(input.facts, merge.id, nodeInstanceId(swarm.id, taskId))
+      latestMergeProgress(input.facts, merge.id, nodeInstanceId(swarm.id, taskId), mergeState.epoch)
     const conflictProgress = expansion.tasks
       .map((task) => progressForTask(task.id))
       .find(
