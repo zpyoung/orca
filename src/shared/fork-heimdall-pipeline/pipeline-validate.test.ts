@@ -219,6 +219,79 @@ describe('validatePipeline', () => {
     ])
   })
 
+  it('rejects a decision on an output the runtime cannot branch on', () => {
+    for (const type of ['json', 'file', 'taskList']) {
+      const doc = document([
+        {
+          id: 'planner',
+          type: 'agent',
+          harness: 'claude',
+          prompt: 'Plan.',
+          outputs: { result: { type } }
+        },
+        { id: 'decision', type: 'decision', after: ['planner'], on: '$planner.outputs.result' }
+      ])
+      expect(pairs(validatePipeline(doc, { workspaceKind: 'git' }))).toEqual([
+        { nodeId: 'decision', code: 'invalid-output-ref' }
+      ])
+    }
+    const branchable = document([
+      {
+        id: 'planner',
+        type: 'agent',
+        harness: 'claude',
+        prompt: 'Plan.',
+        outputs: {
+          a: { type: 'enum', values: ['x', 'y'] },
+          b: { type: 'boolean' },
+          c: { type: 'verdict' },
+          d: { type: 'text' },
+          e: { type: 'number' }
+        }
+      },
+      ...['a', 'b', 'c', 'd', 'e'].map((name) => ({
+        id: `decide-${name}`,
+        type: 'decision',
+        after: ['planner'],
+        on: `$planner.outputs.${name}`
+      }))
+    ])
+    expect(validatePipeline(branchable, { workspaceKind: 'git' })).toEqual([])
+  })
+
+  it('rejects references to swarm outputs because child outputs are keyed per task', () => {
+    const doc = document([
+      {
+        id: 'planner',
+        type: 'agent',
+        harness: 'claude',
+        prompt: 'Plan.',
+        outputs: { tasks: { type: 'taskList' } }
+      },
+      {
+        id: 'fanout',
+        type: 'swarm',
+        after: ['planner'],
+        from: '$planner.outputs.tasks',
+        child: {
+          harness: 'claude',
+          prompt: '$task.spec',
+          outputs: { summary: { type: 'text' } }
+        }
+      },
+      {
+        id: 'after',
+        type: 'agent',
+        harness: 'claude',
+        after: ['fanout'],
+        prompt: 'Summarize $fanout.outputs.summary'
+      }
+    ])
+    expect(pairs(validatePipeline(doc, { workspaceKind: 'git' }))).toEqual([
+      { nodeId: 'after', code: 'invalid-output-ref' }
+    ])
+  })
+
   it('validates output references in swarm child prompts', () => {
     const unknown = document([
       {
