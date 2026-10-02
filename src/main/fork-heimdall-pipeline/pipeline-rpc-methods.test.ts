@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -8,6 +8,8 @@ import type { GitWorktreeInfo, Worktree } from '../../shared/worktree/types'
 import { DESKTOP_RENDERER_CLIENT_ID } from '../runtime/rpc/methods/fork-artifact-passwords/artifact-password-local-caller'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { closeTestStores, createStore, testState } from '../persistence-test-harness'
+import { bindHeimdallTransport } from '../runtime/rpc/methods/fork-heimdall/kernel-binding'
+import type { HeimdallFleetTransport } from '../fork-heimdall/fleet-transport'
 import { bindHeimdallPipeline } from './pipeline-binding'
 import type { PipelineProfileStore } from './pipeline-files'
 import { createInMemoryPipelineStore } from './pipeline-store-test-fixtures'
@@ -142,5 +144,43 @@ describe('pipeline RPC local-profile access', () => {
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
+  })
+})
+
+describe('pipeline run view ownership', () => {
+  const remoteTarget = { watcherId: 'w1', connectionId: 'env-1', pairingRevision: 3 }
+
+  function runtimeWithRemoteReader() {
+    const runtime = new OrcaRuntimeService(null)
+    const readRemote = vi.fn(async () => ({
+      ok: false as const,
+      error: { code: 'refused', message: 'stub' }
+    }))
+    bindHeimdallTransport(runtime, { readRemote } as unknown as HeimdallFleetTransport)
+    return { runtime, readRemote }
+  }
+
+  it('forwards a remotely owned run for the desktop renderer', async () => {
+    const { runtime, readRemote } = runtimeWithRemoteReader()
+
+    await expect(
+      PIPELINE_RPC_METHODS[4].handler(
+        { target: remoteTarget },
+        { runtime, clientKind: 'runtime', clientId: DESKTOP_RENDERER_CLIENT_ID }
+      )
+    ).rejects.toThrow('The owning runtime refused the pipeline run view: stub')
+    expect(readRemote).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a remotely owned run from a paired runtime forwarder', async () => {
+    const { runtime, readRemote } = runtimeWithRemoteReader()
+
+    await expect(
+      PIPELINE_RPC_METHODS[4].handler(
+        { target: remoteTarget },
+        { runtime, clientKind: 'runtime', clientId: 'a'.repeat(48) }
+      )
+    ).rejects.toThrow('A remote runtime can only serve locally owned Heimdall pipeline runs')
+    expect(readRemote).not.toHaveBeenCalled()
   })
 })

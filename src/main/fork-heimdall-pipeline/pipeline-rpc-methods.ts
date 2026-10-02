@@ -332,7 +332,11 @@ export const PIPELINE_RPC_METHODS = [
     name: HEIMDALL_CHANNELS.pipelineRunView,
     params: PipelineRunViewRequestSchema,
     handler: async ({ target }, context) => {
-      if (context.clientKind === 'runtime' && target.connectionId !== null) {
+      if (
+        context.clientKind === 'runtime' &&
+        !isLocalArtifactPasswordCaller(context) &&
+        target.connectionId !== null
+      ) {
         throw new Error('A remote runtime can only serve locally owned Heimdall pipeline runs')
       }
       if (target.connectionId !== null && target.pairingRevision !== null) {
