@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '@xyflow/react/dist/style.css'
 import './pipeline-canvas.css'
 import { ReactFlowProvider } from '@xyflow/react'
@@ -107,6 +107,20 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
     handleRunSheetOpenChange,
     dismissTracking
   } = usePipelineCanvasSaveSession({ file, draft, readOnly })
+  const rawSelectedRow = selectedRunId ? runRowsById[selectedRunId] : undefined
+  const selectedRowRef = useRef<{ key: string; row: WatcherFleetEntryReader } | null>(null)
+  // fleet snapshots hand back equal rows as fresh objects; keep identity so the run view is not refetched
+  const selectedRow = useMemo(() => {
+    if (!rawSelectedRow) {
+      selectedRowRef.current = null
+      return undefined
+    }
+    const key = JSON.stringify(rawSelectedRow)
+    if (selectedRowRef.current?.key !== key) {
+      selectedRowRef.current = { key, row: rawSelectedRow }
+    }
+    return selectedRowRef.current.row
+  }, [rawSelectedRow])
   const { loaded, loadError } = usePipelineCanvasSourceSession({ file, id, savedScope })
 
   useEffect(() => {
@@ -170,7 +184,7 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
       setRunViewLoading(false)
       return
     }
-    const row = runRowsById[selectedRunId]
+    const row = selectedRow
     if (!row) {
       setRunView(null)
       setRunRow(null)
@@ -213,7 +227,7 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
     return () => {
       disposed = true
     }
-  }, [id, mode, runRefreshRevision, runRowsById, savedScope, selectedRunId])
+  }, [id, mode, runRefreshRevision, savedScope, selectedRow, selectedRunId])
 
   const previewText = useMemo(() => {
     if (!draft) {
@@ -383,7 +397,7 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
       ) : null}
       {mode === 'run' ? (
         <div className="p-3">
-          {runViewLoading ? (
+          {runViewLoading && runRow?.target.watcherId !== selectedRunId ? (
             <div className="pipeline-canvas__empty" role="status">
               {translate('fork.heimdallPipeline.runGraph.loading', 'Loading pinned run…')}
             </div>
