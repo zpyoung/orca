@@ -77,17 +77,20 @@ export function applyLoopStates(input: {
       continue
     }
     const state = input.states.get(node.id)
+    if (state === undefined) {
+      continue
+    }
+    const accepted = input.history.acceptedLoops.get(node.id) === state.epoch
     const round = Math.max(
       input.history.loopRounds.get(node.id) ?? 1,
       ...node.body.map((nodeId) => (input.history.epochs.get(nodeId) ?? 0) + 1)
     )
     if (
-      state === undefined ||
-      (state.status !== 'ready' &&
-        state.status !== 'running' &&
-        state.status !== 'waiting' &&
-        state.status !== 'done' &&
-        !(state.status === 'pending' && (round > 1 || input.history.acceptedLoops.has(node.id))))
+      state.status !== 'ready' &&
+      state.status !== 'running' &&
+      state.status !== 'waiting' &&
+      state.status !== 'done' &&
+      !(state.status === 'pending' && (round > 1 || accepted))
     ) {
       continue
     }
@@ -99,7 +102,7 @@ export function applyLoopStates(input: {
       reference === null || verdictValue === undefined
         ? undefined
         : { [reference.name]: verdictValue }
-    if (input.history.acceptedLoops.has(node.id)) {
+    if (accepted) {
       input.states.set(node.id, {
         ...state,
         status: 'done',

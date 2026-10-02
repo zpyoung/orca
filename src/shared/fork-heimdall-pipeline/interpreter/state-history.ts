@@ -13,11 +13,19 @@ export type PipelineHistoryState = {
   skipped: Set<string>
   aborted: boolean
   gateOutputs: Map<string, Record<string, unknown>>
-  sendBackComments: Map<string, string>
-  acceptedLoops: Set<string>
+  /** Send-back comment per node, valid only for the epoch the send-back started. */
+  sendBackComments: Map<string, { epoch: number; comment: string }>
+  /** Loop epoch at which an operator accepted the loop. */
+  acceptedLoops: Map<string, number>
   loopRounds: Map<string, number>
   loopExtraRounds: Map<string, number>
   oneMoreChoicesSeen: Map<string, number>
+  /** Ledger position at which each node last moved to a new epoch. */
+  epochAdvancedAt: Map<string, number>
+  /** Ledger position of an instance's first attempt in an epoch, keyed by `epochKey`. */
+  epochDispatchedAt: Map<string, number>
+  /** Ledger position of the event being replayed; past the last entry once replay ends. */
+  position: number
 }
 
 type HistoryEvent =
@@ -105,6 +113,10 @@ function pathNodes(document: PipelineDocument, fromId: string, toId: string): st
     .map((node) => node.id)
 }
 
+function epochKey(instanceId: string, epoch: number): string {
+  return JSON.stringify([instanceId, epoch])
+}
+
 function advanceRepairPath(
   document: PipelineDocument,
   state: PipelineHistoryState,
@@ -114,18 +126,20 @@ function advanceRepairPath(
   preserveTriggerBudget: boolean,
   comment?: string
 ): void {
+  // loop rounds advance only the body, so an earlier repair shows in dispatch order, not epoch size
+  const triggerDispatchedAt =
+    state.epochDispatchedAt.get(epochKey(triggerId, triggerEpoch)) ?? Number.POSITIVE_INFINITY
   for (const nodeId of pathNodes(document, fromId, triggerId)) {
-    const currentEpoch = state.epochs.get(nodeId) ?? 0
-    if (currentEpoch > triggerEpoch) {
-      continue
-    }
-    state.epochs.set(nodeId, triggerEpoch + 1)
-    if (!(preserveTriggerBudget && nodeId === triggerId)) {
-      state.attempts.set(nodeId, 0)
-      state.failures.set(nodeId, 0)
+    if ((state.epochAdvancedAt.get(nodeId) ?? -1) <= triggerDispatchedAt) {
+      state.epochs.set(nodeId, Math.max(state.epochs.get(nodeId) ?? 0, triggerEpoch) + 1)
+      state.epochAdvancedAt.set(nodeId, state.position)
+      if (!(preserveTriggerBudget && nodeId === triggerId)) {
+        state.attempts.set(nodeId, 0)
+        state.failures.set(nodeId, 0)
+      }
     }
     if (comment !== undefined && nodeId === fromId) {
-      state.sendBackComments.set(nodeId, comment)
+      state.sendBackComments.set(nodeId, { epoch: state.epochs.get(nodeId) ?? 0, comment })
     }
   }
 }
@@ -148,16 +162,31 @@ function startFromLedger(document: PipelineDocument, ledger: WatcherLedger): Pip
     aborted: false,
     gateOutputs: new Map(),
     sendBackComments: new Map(),
-    acceptedLoops: new Set(),
+    acceptedLoops: new Map(),
     loopRounds,
     loopExtraRounds,
-    oneMoreChoicesSeen: new Map()
+    oneMoreChoicesSeen: new Map(),
+    epochAdvancedAt: new Map(),
+    epochDispatchedAt: new Map(),
+    position: -1
   }
   const attempts = pipelineAttemptFacts(ledger)
   const entryOrder = new Map(ledger.entries.map((entry, index) => [entry.eventId, index]))
+  const firstEntryByAttempt = new Map<string, number>()
+  ledger.entries.forEach((entry, index) => {
+    if (entry.kind === 'attempt' && !firstEntryByAttempt.has(entry.attemptId)) {
+      firstEntryByAttempt.set(entry.attemptId, index)
+    }
+  })
   const events: HistoryEvent[] = []
 
   for (const fact of attempts) {
+    const key = epochKey(fact.identity.instanceId, fact.identity.epoch)
+    const firstEntry = firstEntryByAttempt.get(fact.entry.attemptId) ?? 0
+    state.epochDispatchedAt.set(
+      key,
+      Math.min(state.epochDispatchedAt.get(key) ?? firstEntry, firstEntry)
+    )
     events.push({
       atMs: fact.entry.atMs,
       order: entryOrder.get(fact.entry.eventId) ?? 0,
@@ -192,9 +221,14 @@ function startFromLedger(document: PipelineDocument, ledger: WatcherLedger): Pip
   events.sort((left, right) => left.atMs - right.atMs || left.order - right.order)
 
   for (const event of events) {
+    state.position = event.order
     const currentEpoch = state.epochs.get(event.instanceId) ?? 0
     if (currentEpoch < event.epoch) {
       state.epochs.set(event.instanceId, event.epoch)
+      state.epochAdvancedAt.set(
+        event.instanceId,
+        state.epochDispatchedAt.get(epochKey(event.instanceId, event.epoch)) ?? event.order
+      )
     }
     if (event.kind === 'attempt') {
       if (event.failed) {
@@ -229,6 +263,7 @@ function startFromLedger(document: PipelineDocument, ledger: WatcherLedger): Pip
     }
     applyChoiceTransition(document, state, event)
   }
+  state.position = ledger.entries.length
   return state
 }
 
@@ -259,6 +294,7 @@ function applyChoiceTransition(
     case 'retry': {
       const nextEpoch = Math.max(state.epochs.get(event.instanceId) ?? event.epoch, event.epoch) + 1
       state.epochs.set(event.instanceId, nextEpoch)
+      state.epochAdvancedAt.set(event.instanceId, state.position)
       state.attempts.set(event.instanceId, 0)
       state.failures.set(event.instanceId, 0)
       return
@@ -277,7 +313,7 @@ function applyChoiceTransition(
       state.aborted = true
       return
     case 'accept':
-      state.acceptedLoops.add(nodeId)
+      state.acceptedLoops.set(nodeId, event.epoch)
       return
     case 'one-more-round': {
       if (node?.type !== 'loop') {
@@ -329,6 +365,16 @@ export function advancePipelineLoopRound(
     ...loop.body.map((nodeId) => (state.epochs.get(nodeId) ?? 0) + 1)
   )
   state.loopRounds.set(loopId, round)
+}
+
+/** Returns the send-back comment a node should see when it dispatches in `epoch`, if any. */
+export function pipelineSendBackComment(
+  history: PipelineHistoryState,
+  instanceId: string,
+  epoch: number
+): string | undefined {
+  const stored = history.sendBackComments.get(instanceId)
+  return stored?.epoch === epoch ? stored.comment : undefined
 }
 
 export function derivePipelineHistory(

@@ -156,7 +156,7 @@ function reviewerObjections(
       continue
     }
     const verdict = decodePipelineVerdict(sourceOutput[reference.name])
-    if (verdict === null) {
+    if (verdict === null || verdict.verdict === 'approve') {
       continue
     }
     const objections = [...(verdict.objections ?? [])]
