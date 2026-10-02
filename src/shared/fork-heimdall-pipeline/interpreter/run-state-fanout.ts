@@ -206,7 +206,7 @@ export function applyMergeStates(input: {
     }
     const progressByChild = new Map<string, PipelineStoreFacts['mergeProgress'][number]>()
     for (const row of input.facts.mergeProgress) {
-      if (row.mergeId === node.id) {
+      if (row.mergeId === node.id && row.epoch === state.epoch) {
         progressByChild.set(row.childInstanceId, row)
       }
     }
@@ -265,7 +265,7 @@ export function applyMergeStates(input: {
       })
     } else if (hasActiveConflict || hasResolverFailure) {
       input.states.set(node.id, { ...state, status: 'waiting', waitingFor: 'choice' })
-    } else {
+    } else if (state.status !== 'failed') {
       input.states.set(node.id, { ...state, status: 'ready' })
     }
   }

@@ -89,9 +89,14 @@ export function addMergeCandidates(input: {
       : latestSwarmExpansion(
           input.world,
           input.node.from,
-          input.history.epochs.get(input.node.from) ?? 0
+          input.runState.nodes.get(input.node.from)?.epoch ?? 0
         )
-  const conflict = mergeConflictInfo(input.world, input.node, input.history.skipped)
+  const conflict = mergeConflictInfo(
+    input.world,
+    input.node,
+    input.state.epoch,
+    input.history.skipped
+  )
   if (conflict !== null) {
     const resolution =
       swarm === undefined || expansion === undefined
@@ -155,7 +160,12 @@ export function addMergeCandidates(input: {
       continue
     }
     const childInstanceId = nodeInstanceId(input.node.from, taskId)
-    const progress = mergeProgressFor(input.world, input.node.id, childInstanceId)
+    const progress = mergeProgressFor(
+      input.world,
+      input.node.id,
+      childInstanceId,
+      input.state.epoch
+    )
     if (progress?.state === 'applied' || progress?.state === 'skipped') {
       continue
     }
