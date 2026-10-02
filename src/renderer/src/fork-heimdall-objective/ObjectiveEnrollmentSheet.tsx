@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Loader2, TriangleAlert } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -15,16 +15,24 @@ import { useAppStore } from '@/store'
 import { objectiveCapabilityModes } from '../../../shared/fork-heimdall-objective/contract-types'
 import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
+import { ObjectiveEnrollmentValidationErrors } from './ObjectiveEnrollmentValidationErrors'
 import {
   OBJECTIVE_ROLES,
   validateObjectiveEnrollmentDraft,
   type ObjectiveEnrollmentDraft,
-  type ObjectiveLandingBarAvailability,
-  type ObjectiveEnrollmentError
+  type ObjectiveLandingBarAvailability
 } from './objective-enrollment-model'
 import { buildObjectiveEnrollmentSubmission } from './objective-enrollment-request'
 import { describeObjectiveError, getObjectiveHeimdallApi } from './objective-heimdall-api'
 import { buildObjectiveWorkspaceOptions } from './objective-workspace-options'
+import type { PipelineObjectiveNode } from '../../../shared/fork-heimdall-pipeline/document-schema'
+import { routeEnrollmentKind } from '../../../shared/fork-heimdall-pipeline/enrollment-routing'
+import { PipelineRunForm } from '../fork-heimdall-pipeline/PipelineRunForm'
+import {
+  PipelinePicker,
+  type LoadedPipelineSelection
+} from '../fork-heimdall-pipeline/PipelinePicker'
+import { startPipelineRun } from '../fork-heimdall-pipeline/pipeline-run-start'
 
 const DEFAULT_ACTIVE_BUDGET_HOURS = 4
 const DEFAULT_TURN_BUDGET = '40'
@@ -57,116 +65,37 @@ function newDraft(): ObjectiveEnrollmentDraft {
     owner: defaultWatcherOwnerDraft()
   }
 }
-
-function validationErrorCopy(error: ObjectiveEnrollmentError): string {
-  switch (error.code) {
-    case 'workspace-required':
-      return translate('fork.heimdallObjective.validation.workspaceRequired', 'Choose a workspace.')
-    case 'new-worktree-name-required':
-      return translate(
-        'fork.heimdallObjective.validation.newWorktreeNameRequired',
-        'Enter a name for the new worktree.'
-      )
-    case 'objective-required':
-      return translate('fork.heimdallObjective.validation.objectiveRequired', 'Enter an objective.')
-    case 'objective-too-long':
-      return translate(
-        'fork.heimdallObjective.validation.objectiveTooLong',
-        'The objective must be 16,384 characters or fewer.'
-      )
-    case 'existing-plan-too-long':
-      return translate(
-        'fork.heimdallObjective.validation.existingPlanTooLong',
-        'The existing plan must be 65,536 characters or fewer.'
-      )
-    case 'landing-bar-requires-git':
-      return translate(
-        'fork.heimdallObjective.validation.landingBarRequiresGit',
-        'Folder workspaces support only the files-on-disk landing bar.'
-      )
-    case 'landing-bar-requires-worktree':
-      return translate(
-        'fork.heimdallObjective.enrollment.landingBarRequiresWorktree',
-        'Hosted-review and merged landing bars require a git worktree.'
-      )
-    case 'max-concurrency-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.maxConcurrency',
-        'Max concurrency must be a whole number from 1 to 1,024.'
-      )
-    case 'territory-too-many':
-      return translate(
-        'fork.heimdallObjective.validation.territoryTooMany',
-        'Write territory supports at most 64 globs.'
-      )
-    case 'territory-duplicate':
-      return translate(
-        'fork.heimdallObjective.validation.territoryDuplicate',
-        'Write-territory globs must be unique.'
-      )
-    case 'territory-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.territoryInvalid',
-        'Invalid write-territory glob: {{glob}}',
-        { glob: error.value ?? '' }
-      )
-    case 'capability-set-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.capabilitiesInvalid',
-        'All five objective capabilities must be configured.'
-      )
-    case 'plan-off-requires-approved-plan':
-      return translate(
-        'fork.heimdallObjective.validation.planOffRequiresApprovedPlan',
-        'Set Plan to Gated or On. This form cannot verify a reusable approved plan.'
-      )
-    case 'role-agent-unknown':
-      return translate(
-        'fork.heimdallObjective.validation.roleAgentUnknown',
-        'Agent {{agent}} is not available on the selected workspace host.',
-        { agent: error.value ?? '' }
-      )
-    case 'active-budget-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.activeBudgetInvalid',
-        'Choose a positive active-work budget.'
-      )
-    case 'turn-budget-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.turnBudgetInvalid',
-        'Worker turns must be a whole number of zero or more.'
-      )
-    case 'gate-name-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.gateNameInvalid',
-        'Gate name {{name}} must be lowercase letters, digits, or hyphens, starting with a letter or digit, up to 40 characters.',
-        { name: error.value ?? '' }
-      )
-    case 'gate-command-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.gateCommandInvalid',
-        'Enter a gate command of up to 8,192 characters.'
-      )
-    case 'gate-timeout-invalid':
-      return translate(
-        'fork.heimdallObjective.validation.gateTimeoutInvalid',
-        'Gate timeout must be a whole number of seconds from 10 to 14,400.'
-      )
-    case 'gate-name-duplicate':
-      return translate(
-        'fork.heimdallObjective.validation.gateNameDuplicate',
-        'Gate names must be unique.'
-      )
-    case 'gates-too-many':
-      return translate(
-        'fork.heimdallObjective.validation.gatesTooMany',
-        'Objectives support at most 8 declared gates.'
-      )
-    case 'gates-unsupported-host':
-      return translate(
-        'fork.heimdallObjective.validation.gatesUnsupportedHost',
-        "Gates are unavailable on this host's Orca version. Remove all gates to continue."
-      )
+function draftForObjectiveNode(
+  draft: ObjectiveEnrollmentDraft,
+  node: PipelineObjectiveNode
+): ObjectiveEnrollmentDraft {
+  return {
+    ...draft,
+    existingPlanText: '',
+    tier: node.tier,
+    landingBar: node.landingBar,
+    maxConcurrency: node.maxConcurrency ?? 3,
+    lanesEnabled: node.lanesEnabled ?? true,
+    writeTerritoryText: '**',
+    capabilities: objectiveCapabilityModes(node.landingBar),
+    roleAgents: {
+      planner: node.roleAgents?.planner ?? '',
+      implementer: node.roleAgents?.implementer ?? '',
+      reviewer: node.roleAgents?.reviewer ?? '',
+      integrator: node.roleAgents?.integrator ?? ''
+    },
+    sitterOverrides: {
+      updateBranch: 'inherit',
+      resolveConflicts: 'inherit',
+      fixChecks: 'inherit',
+      merge: 'inherit'
+    },
+    gates: (node.checks ?? []).map((check) => ({
+      rowKey: check.name,
+      name: check.name,
+      command: check.command,
+      timeoutSecondsText: String(check.timeoutSeconds)
+    }))
   }
 }
 
@@ -209,11 +138,15 @@ function enrollmentErrorCopy(error: unknown): string {
 export type ObjectiveEnrollmentSheetProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialPipelineRef?: string
+  initialWorktreeId?: string
 }
 
 export function ObjectiveEnrollmentSheet({
   open,
-  onOpenChange
+  onOpenChange,
+  initialPipelineRef,
+  initialWorktreeId
 }: ObjectiveEnrollmentSheetProps): React.JSX.Element {
   const repos = useAppStore((state) => state.repos)
   const worktreesByRepo = useAppStore((state) => state.worktreesByRepo)
@@ -264,6 +197,21 @@ export function ObjectiveEnrollmentSheet({
   const [showValidation, setShowValidation] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
+  const [selectedPipeline, setSelectedPipeline] = useState<LoadedPipelineSelection | null>(null)
+  const updatePipelineSelection = useCallback((selection: LoadedPipelineSelection | null) => {
+    setSelectedPipeline(selection)
+  }, [])
+  useEffect(() => {
+    const worktreeId = initialWorktreeId ?? activeWorktreeId
+    if (!open || !worktreeId || selectedWorkspaceKey) {
+      return
+    }
+    const initialWorkspace = workspaces.find((workspace) => workspace.worktreeId === worktreeId)
+    if (initialWorkspace) {
+      setSelectedWorkspaceKey(initialWorkspace.key)
+    }
+  }, [activeWorktreeId, initialWorktreeId, open, selectedWorkspaceKey, workspaces])
   const selectedWorkspace = workspaces.find((workspace) => workspace.key === selectedWorkspaceKey)
   const landingAvailability: ObjectiveLandingBarAvailability = {
     workspaceKind: selectedWorkspace?.workspaceKind ?? null,
@@ -273,6 +221,11 @@ export function ObjectiveEnrollmentSheet({
   }
   const validationErrors = validateObjectiveEnrollmentDraft(draft, landingAvailability)
   const planOffBlocked = draft.capabilities.plan === 'off'
+  const selectedRoute = selectedPipeline?.document
+    ? routeEnrollmentKind(selectedPipeline.document)
+    : null
+  const objectiveSelected = selectedRoute === 'objective'
+  const selectionValid = selectedPipeline?.valid === true
 
   useEffect(() => {
     if (!selectedWorkspace) {
@@ -337,6 +290,14 @@ export function ObjectiveEnrollmentSheet({
       })
     }
   }, [draft, selectedWorkspace, selectedWorkspaceKey])
+  useEffect(() => {
+    const document = selectedPipeline?.document
+    const node = document?.nodes[0]
+    if (!document || routeEnrollmentKind(document) !== 'objective' || node?.type !== 'objective') {
+      return
+    }
+    setDraft((current) => draftForObjectiveNode(current, node))
+  }, [selectedPipeline])
 
   const selectWorkspace = (key: string): void => {
     const workspace = workspaces.find((candidate) => candidate.key === key)
@@ -382,7 +343,7 @@ export function ObjectiveEnrollmentSheet({
       )
       return
     }
-    if (!selectedWorkspace || validationErrors.length > 0) {
+    if (!selectedWorkspace || validationErrors.length > 0 || !selectedPipeline || !selectionValid) {
       return
     }
     if (selectedWorkspace.ownerUnavailable) {
@@ -394,18 +355,35 @@ export function ObjectiveEnrollmentSheet({
       )
       return
     }
+    if (selectedRoute !== 'objective') {
+      setServerError(
+        translate(
+          'fork.heimdallPipeline.sheet.objectiveRequired',
+          'Choose an Objective pipeline to use these fields.'
+        )
+      )
+      return
+    }
 
     const submission = buildObjectiveEnrollmentSubmission(draft, selectedWorkspace)
-
     setSubmitting(true)
     try {
-      await api.enroll(submission.input, submission.owner)
+      await startPipelineRun({
+        ref: selectedPipeline.ref,
+        worktree: selectedWorkspace,
+        grants: {},
+        runInputs: {},
+        budget: submission.input.budget,
+        owner: submission.owner,
+        objectiveSubmission: submission
+      })
       if (selectedWorkspace.createsWorktree) {
         void fetchAllWorktrees()
       }
       await hydrateFleet()
       setDraft(newDraft())
       setSelectedWorkspaceKey('')
+      setSelectedPipeline(null)
       setShowValidation(false)
       onOpenChange(false)
     } catch (error) {
@@ -413,6 +391,15 @@ export function ObjectiveEnrollmentSheet({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const runStarted = (): void => {
+    void hydrateFleet()
+    setDraft(newDraft())
+    setSelectedWorkspaceKey('')
+    setSelectedPipeline(null)
+    setShowValidation(false)
+    onOpenChange(false)
   }
 
   return (
@@ -429,47 +416,55 @@ export function ObjectiveEnrollmentSheet({
       <SheetContent className="w-[min(620px,calc(100vw-1rem))] sm:max-w-[620px]">
         <div className="border-b border-border">
           <SheetHeader className="mr-12">
-            <SheetTitle>
-              {translate('fork.heimdallObjective.enrollment.title', 'New objective')}
-            </SheetTitle>
+            <SheetTitle>{translate('fork.heimdallPipeline.sheet.title', 'New run')}</SheetTitle>
             <SheetDescription>
               {translate(
-                'fork.heimdallObjective.enrollment.description',
-                'Define the contract Heimdall will plan, execute, review, and land.'
+                'fork.heimdallPipeline.sheet.description',
+                'Choose a pipeline, workspace, inputs, and capabilities for this run.'
               )}
             </SheetDescription>
           </SheetHeader>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 scrollbar-sleek">
-          <ObjectiveEnrollmentFields
-            draft={draft}
-            selectedWorkspaceKey={selectedWorkspaceKey}
-            workspaces={workspaces}
-            landingAvailability={landingAvailability}
-            agents={getAgentCatalog()}
-            disabled={submitting}
-            onWorkspaceChange={selectWorkspace}
-            onDraftChange={setDraft}
+          <PipelinePicker
+            key={`${open ? 'open' : 'closed'}:${initialPipelineRef ?? ''}`}
+            workspace={selectedWorkspace ?? null}
+            worktreeId={selectedWorkspace?.worktreeId ?? activeWorktreeId}
+            initialRef={initialPipelineRef}
+            onSelectionChange={updatePipelineSelection}
           />
-          {showValidation && validationErrors.length > 0 ? (
-            <div
-              className="mt-5 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-              role="alert"
-            >
-              <div className="flex items-center gap-2 font-medium">
-                <TriangleAlert className="size-3.5" aria-hidden />
-                {translate(
-                  'fork.heimdallObjective.enrollment.validationTitle',
-                  'Fix the contract before starting'
-                )}
-              </div>
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                {validationErrors.map((error) => (
-                  <li key={`${error.code}:${error.value ?? ''}`}>{validationErrorCopy(error)}</li>
-                ))}
-              </ul>
+          {objectiveSelected && selectedPipeline?.document ? (
+            <div className="mt-5">
+              <ObjectiveEnrollmentFields
+                draft={draft}
+                selectedWorkspaceKey={selectedWorkspaceKey}
+                workspaces={workspaces}
+                landingAvailability={landingAvailability}
+                agents={getAgentCatalog()}
+                disabled={submitting}
+                onWorkspaceChange={selectWorkspace}
+                onDraftChange={setDraft}
+              />
+            </div>
+          ) : selectedPipeline?.document ? (
+            <div className="mt-5">
+              <PipelineRunForm
+                key={selectedPipeline.ref}
+                pipelineRef={selectedPipeline.ref}
+                document={selectedPipeline.document}
+                validationErrors={selectedPipeline.validationErrors}
+                valid={selectedPipeline.valid}
+                workspaces={workspaces}
+                selectedWorkspaceKey={selectedWorkspaceKey}
+                onWorkspaceChange={selectWorkspace}
+                onStarted={runStarted}
+              />
             </div>
           ) : null}
+          <ObjectiveEnrollmentValidationErrors
+            visible={showValidation && objectiveSelected}
+            errors={validationErrors}
+          />
           {serverError ? (
             <p className="mt-5 text-xs text-destructive" role="alert">
               {serverError}
@@ -482,14 +477,16 @@ export function ObjectiveEnrollmentSheet({
               {translate('fork.heimdallObjective.enrollment.cancel', 'Cancel')}
             </Button>
           </SheetClose>
-          <Button
-            type="button"
-            disabled={submitting || planOffBlocked}
-            onClick={() => void submit()}
-          >
-            {submitting ? <Loader2 className="animate-spin" aria-hidden /> : null}
-            {translate('fork.heimdallObjective.enrollment.submit', 'Start objective')}
-          </Button>
+          {objectiveSelected ? (
+            <Button
+              type="button"
+              disabled={submitting || planOffBlocked || !selectedPipeline || !selectionValid}
+              onClick={() => void submit()}
+            >
+              {submitting ? <Loader2 className="animate-spin" aria-hidden /> : null}
+              {translate('fork.heimdallPipeline.runForm.start', 'Start run')}
+            </Button>
+          ) : null}
         </footer>
       </SheetContent>
     </Sheet>

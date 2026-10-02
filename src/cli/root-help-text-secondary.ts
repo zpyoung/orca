@@ -51,6 +51,7 @@ export const ROOT_HELP_TEXT_SECONDARY = [
   '  orca heimdall objective <watcherId> [--json]',
   '  orca heimdall create objective --objective <text> [--worktree <selector>] [--spec <json|@file>] [--json]',
   '  orca heimdall create hosted-review [--worktree <selector>] [--spec <json|@file>] [--json]',
+  '  orca heimdall create --pipeline <ref|path> --spec <task text> [--worktree <selector>] [--input name=value]... [--cap name=mode]... [--json]',
   '  orca heimdall pause|resume|disarm|rm <watcherId> [--json]',
   '  orca heimdall approve <watcherId> <escalationId> [--json]',
   '  orca heimdall answer-escalation <watcherId> <escalationId> --body <text> [--json]',

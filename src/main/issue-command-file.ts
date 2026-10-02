@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { loadHooks } from './hooks'
 import type { GitRuntimeOptions } from './git/git-runtime-options'
 import { checkIgnoredPaths } from './git/check-ignored-paths'
+import { gitignoreAlreadyCoversOrcaDir } from './fork-heimdall-pipeline/orca-gitignore-rules'
 
 type IssueCommandGitOptions = GitRuntimeOptions | (() => GitRuntimeOptions)
 
@@ -113,7 +114,7 @@ function ensureOrcaDirIgnored(repoPath: string): void {
   try {
     if (existsSync(gitignorePath)) {
       const content = readFileSync(gitignorePath, 'utf-8')
-      if (/^\.orca\/?$/m.test(content)) {
+      if (gitignoreAlreadyCoversOrcaDir(content)) {
         return
       }
       const separator = content.endsWith('\n') ? '' : '\n'

@@ -2,7 +2,10 @@
   "fork": {
     "heimdall": {
       "kind": {
-        "objective": "目的ウォッチャー"
+        "objectiveV1": "Objective v1",
+        "prSitterV1": "PR シッター v1",
+        "pipeline": "Pipeline",
+        "unknown": "不明なウォッチャー"
       },
       "status": {
         "watching": "監視中",
@@ -44,7 +47,8 @@
         "title": "Heimdallフリート",
         "summary": "{{active}}件がアクティブ · {{attention}}件に対応が必要",
         "refresh": "フリートを更新",
-        "staleError": "フリートの更新に失敗しました。最後に確認されたスナップショットを表示しています: {{error}}"
+        "staleError": "フリートの更新に失敗しました。最後に確認されたスナップショットを表示しています: {{error}}",
+        "newRun": "新しい実行"
       },
       "fleet": {
         "title": "ウォッチャーフリート",

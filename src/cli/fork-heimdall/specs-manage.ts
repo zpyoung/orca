@@ -60,11 +60,25 @@ export const HEIMDALL_MANAGE_SPECS: CommandSpec[] = [
   },
   {
     path: ['heimdall', 'approve'],
-    summary: 'Approve a specific unresolved watcher approval',
-    usage: 'orca heimdall approve <watcherId> <escalationId> [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'watcher-id', 'escalation-id'],
+    summary: 'Approve a specific unresolved watcher approval or answer a pipeline choice',
+    usage:
+      'orca heimdall approve <watcherId> <escalationId> [--choice <choice>] [--comment <text>] [--extend-minutes <n>] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'watcher-id',
+      'escalation-id',
+      'choice',
+      'comment',
+      'extend-minutes'
+    ],
     positionalArgs: ['watcher-id', 'escalation-id'],
-    examples: ['orca heimdall approve watcher_01J000000000000000000000 escalation_1']
+    notes: [
+      'For pipeline gates and choices, --choice defaults to approve; send-back requires --comment and extend requires --extend-minutes.'
+    ],
+    examples: [
+      'orca heimdall approve watcher_01J000000000000000000000 escalation_1',
+      "orca heimdall approve watcher_01J000000000000000000000 escalation_1 --choice send-back --comment 'split step 6'"
+    ]
   },
   {
     path: ['heimdall', 'answer'],

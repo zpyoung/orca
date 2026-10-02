@@ -1,5 +1,9 @@
 import type { WatcherOwnerFence } from '../../shared/fork-heimdall/fleet-types'
 import { WatcherKindIdSchema, type WatcherKindId } from '../../shared/fork-heimdall/watcher-types'
+import {
+  BUILTIN_ENROLLMENT_TABLES,
+  type EnrollmentTableSet
+} from '../fork-heimdall-pipeline/pipeline-enrollment-table'
 import type { HeimdallDatabase } from './database'
 import type { EnrollmentRecord } from './enrollment-store'
 
@@ -20,6 +24,7 @@ type EnrollmentDeletion = {
   watcherId: string
   expectedOwner: WatcherOwnerFence
   read(): EnrollmentRecord | null
+  tables?: EnrollmentTableSet
 }
 
 /** Applies the final owner fence and all kernel-store deletion in one writer transaction. */
@@ -61,19 +66,26 @@ export function deleteWatcherEnrollment(input: EnrollmentDeletion): EnrollmentDe
       }
     }
 
-    connection
-      .prepare(
-        `INSERT INTO heimdall_pending_kind_purge (watcher_id, kind)
-         VALUES (?, ?)`
-      )
-      .run(input.watcherId, current.kind)
+    const tables = input.tables ?? BUILTIN_ENROLLMENT_TABLES
+    if (tables.pendingPurgeHasKind) {
+      connection
+        .prepare(
+          `INSERT INTO ${tables.pendingPurge} (watcher_id, kind)
+           VALUES (?, ?)`
+        )
+        .run(input.watcherId, current.kind)
+    } else {
+      connection
+        .prepare(`INSERT INTO ${tables.pendingPurge} (watcher_id) VALUES (?)`)
+        .run(input.watcherId)
+    }
     connection
       .prepare('DELETE FROM heimdall_terminal_summary WHERE watcher_id = ?')
       .run(input.watcherId)
     connection.prepare('DELETE FROM heimdall_tick_trace WHERE watcher_id = ?').run(input.watcherId)
     connection.prepare('DELETE FROM heimdall_ledger WHERE watcher_id = ?').run(input.watcherId)
     const deleted = connection
-      .prepare('DELETE FROM heimdall_enrollment WHERE watcher_id = ? AND command_revision = ?')
+      .prepare(`DELETE FROM ${tables.enrollment} WHERE watcher_id = ? AND command_revision = ?`)
       .run(input.watcherId, input.expectedOwner.revision)
     if (Number(deleted.changes) !== 1) {
       throw new Error(`Heimdall watcher ${input.watcherId} changed during its delete transaction`)
@@ -88,13 +100,17 @@ export function deleteWatcherEnrollment(input: EnrollmentDeletion): EnrollmentDe
   }
 }
 
-export function readPendingKindPurges(database: HeimdallDatabase): PendingKindPurge[] {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
+export function readPendingKindPurges(
+  database: HeimdallDatabase,
+  tables: EnrollmentTableSet = BUILTIN_ENROLLMENT_TABLES
+): PendingKindPurge[] {
+  const kindColumn = tables.pendingPurgeHasKind ? 'kind' : "'pipeline' AS kind"
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; the selected literal columns are the only shape source.
   const rows = database
     .connection()
     .prepare(
-      `SELECT watcher_id AS watcherId, kind
-         FROM heimdall_pending_kind_purge
+      `SELECT watcher_id AS watcherId, ${kindColumn}
+         FROM ${tables.pendingPurge}
          ORDER BY watcher_id`
     )
     .all() as { watcherId: string; kind: string }[]
@@ -104,10 +120,14 @@ export function readPendingKindPurges(database: HeimdallDatabase): PendingKindPu
   }))
 }
 
-export function completePendingKindPurge(database: HeimdallDatabase, watcherId: string): void {
+export function completePendingKindPurge(
+  database: HeimdallDatabase,
+  watcherId: string,
+  tables: EnrollmentTableSet = BUILTIN_ENROLLMENT_TABLES
+): void {
   database.assertWritable()
   database
     .connection()
-    .prepare('DELETE FROM heimdall_pending_kind_purge WHERE watcher_id = ?')
+    .prepare(`DELETE FROM ${tables.pendingPurge} WHERE watcher_id = ?`)
     .run(watcherId)
 }

@@ -9,7 +9,11 @@ import {
   getUnresolvedHostedReviewAttempts
 } from './ledger-adapter'
 import { currentHeadChecks, requiresOwnerForCheckRecovery } from './decision-check-groups'
-import { getRepeatedFailureAfterOwnFixEvidence } from './stop-policy'
+import {
+  HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT,
+  repeatedOwnFixExhausted,
+  repeatedOwnFixGroups
+} from './stop-policy'
 import type {
   DerivedHostedReviewSitterDiscrepancy,
   HostedReviewAttemptEntry,
@@ -152,21 +156,28 @@ function unverifiableFailureDrafts(
 function repeatedFixDrafts(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger,
-  scope: HostedReviewMergeCheckScope
+  scope: HostedReviewMergeCheckScope,
+  repeatFixLimit: number
 ): readonly DiscrepancyDraft[] {
-  return getRepeatedFailureAfterOwnFixEvidence(review, ledger, scope).map((evidence) => ({
-    kind: 'fix-did-not-resolve',
-    evidenceKey: makeHostedReviewEvidenceKey([
-      evidence.sourceHeadSha,
-      evidence.producedHeadSha,
-      evidence.checkKey,
-      evidence.failureSignature,
-      evidence.publishActionId
-    ]),
-    headSha: review.headSha,
-    defaultStatus: 'escalated',
-    reason: `same-failure-after-own-fix:${evidence.checkKey}`
-  }))
+  const exhausted = repeatedOwnFixExhausted(
+    repeatedOwnFixGroups(review, ledger, scope),
+    repeatFixLimit
+  )
+  return exhausted
+    ? [
+        {
+          kind: 'fix-did-not-resolve',
+          evidenceKey: makeHostedReviewEvidenceKey([
+            exhausted.checkKey,
+            exhausted.failureSignature,
+            ...exhausted.publishActionIds.slice(0, repeatFixLimit)
+          ]),
+          headSha: review.headSha,
+          defaultStatus: 'escalated',
+          reason: `same-failure-after-own-fix:${exhausted.checkKey}`
+        }
+      ]
+    : []
 }
 
 function unresolvedActionDrafts(
@@ -200,10 +211,11 @@ function activeDrafts(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger,
   contention: HostedReviewSitterContention | undefined,
-  scope: HostedReviewMergeCheckScope
+  scope: HostedReviewMergeCheckScope,
+  repeatFixLimit: number
 ): readonly DiscrepancyDraft[] {
   const drafts: DiscrepancyDraft[] = [
-    ...repeatedFixDrafts(review, ledger, scope),
+    ...repeatedFixDrafts(review, ledger, scope, repeatFixLimit),
     ...unresolvedActionDrafts(review, ledger, contention),
     ...unverifiableFailureDrafts(review, ledger, scope),
     ...checkFailureDrafts(review, scope)
@@ -258,9 +270,10 @@ export function deriveHostedReviewSitterDiscrepancies(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger,
   scope: HostedReviewMergeCheckScope,
-  contention?: HostedReviewSitterContention
+  contention?: HostedReviewSitterContention,
+  repeatFixLimit = HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT
 ): readonly DerivedHostedReviewSitterDiscrepancy[] {
-  const active = activeDrafts(review, ledger, contention, scope)
+  const active = activeDrafts(review, ledger, contention, scope, repeatFixLimit)
   const activeIds = new Set(active.map(discrepancyId))
   const derived = active.map((draft) => toDerived(draft, ledger))
 

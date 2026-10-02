@@ -8,6 +8,7 @@ import {
   explainDesiredAction,
   type HostedReviewSitterDecisionOutcome
 } from '../../shared/fork-hosted-review-sitter/decision'
+import { HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT } from '../../shared/fork-hosted-review-sitter/stop-policy'
 import { deriveHostedReviewSitterDiscrepancies } from '../../shared/fork-hosted-review-sitter/reconciliation'
 import type {
   HostedReviewCheckSnapshot,
@@ -86,7 +87,9 @@ function buildPayloadBase(
     discrepancies: deriveHostedReviewSitterDiscrepancies(
       review,
       ledger,
-      definition.mergeCheckScope
+      definition.mergeCheckScope,
+      undefined,
+      definition.repeatFixLimit ?? HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT
     ).map((entry) => ({
       kind: entry.kind,
       status: entry.status,

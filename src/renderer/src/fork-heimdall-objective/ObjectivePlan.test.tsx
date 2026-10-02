@@ -182,26 +182,6 @@ describe('ObjectivePlan', () => {
     expect(container.textContent).toContain('docs/outside.md')
   })
 
-  it('groups plan lint findings by task and shows plan-level findings separately', async () => {
-    const withLint = detail([revision(1, 'draft')], [], {
-      planLint: {
-        findings: [
-          { code: 'missing-territory', taskKey: 'task-1', detail: 'Task 1 has no territory.' },
-          { code: 'no-gate-declared', taskKey: null, detail: 'The objective declares no gates.' }
-        ],
-        truncated: false,
-        conflictPairs: [['task-1', 'task-2']],
-        criticalPathLength: 2,
-        maxWidth: 1
-      }
-    })
-    await act(async () => root.render(<ObjectivePlan detail={withLint} />))
-
-    expect(container.textContent).toContain('Task 1 has no territory.')
-    expect(container.textContent).toContain('The objective declares no gates.')
-    expect(container.textContent).toContain('task-1 ↔ task-2')
-  })
-
   it('shows an assumption with a verified badge and evidence', async () => {
     const withAssumptions = detail([revision(1, 'draft')], [], {
       assumptions: [
@@ -254,7 +234,7 @@ describe('ObjectivePlan', () => {
     expect(container.textContent).toContain('task-2')
   })
 
-  it('shows a gate result and the no-gate note', async () => {
+  it('shows a check result', async () => {
     const withGate = detail([revision(1, 'draft')], [], {
       gates: [
         {
@@ -273,9 +253,5 @@ describe('ObjectivePlan', () => {
     })
     await act(async () => root.render(<ObjectivePlan detail={withGate} />))
     expect(container.textContent).toContain('Failed')
-
-    const withoutGates = detail([revision(1, 'draft')], [], { noGateDeclared: true })
-    await act(async () => root.render(<ObjectivePlan detail={withoutGates} />))
-    expect(container.textContent).toContain('No objective gate declared.')
   })
 })

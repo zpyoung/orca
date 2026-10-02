@@ -14,7 +14,6 @@ RUN apt-get update \
     ca-certificates \
     curl \
     dbus-x11 \
-    git \
     gnupg \
     jq \
     libasound2t64 \
@@ -30,6 +29,7 @@ RUN apt-get update \
     libxkbcommon0 \
     libxrandr2 \
     libxss1 \
+    lsof \
     openssh-client \
     procps \
     python3 \
@@ -46,6 +46,19 @@ RUN add-apt-repository -y ppa:fish-shell/release-4 \
   && apt-get update \
   && apt-get install -y --no-install-recommends fish \
   && rm -rf /var/lib/apt/lists/*
+
+# The sandbox's reftable fixtures need Git 2.45+; Noble's archive Git is too old.
+RUN add-apt-repository -y ppa:git-core/ppa \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends git \
+  && rm -rf /var/lib/apt/lists/*
+
+# Fail the image build unless the installed Git actually creates reftable repositories.
+RUN set -eux; \
+  fixture="$(mktemp -d)"; \
+  trap 'rm -rf "$fixture"' EXIT; \
+  git init --bare --ref-format=reftable "$fixture/repo"; \
+  test "$(git -C "$fixture/repo" config --local --get extensions.refStorage)" = reftable
 
 # The git-compatibility matrix and the ssh-docker e2e lanes shell out to docker themselves.
 RUN install -m 0755 -d /etc/apt/keyrings \

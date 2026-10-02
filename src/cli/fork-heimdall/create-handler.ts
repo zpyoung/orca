@@ -1,5 +1,4 @@
 import { HEIMDALL_CHANNELS, type EnrollSuccess } from '../../shared/fork-heimdall/api'
-import type { WatcherKindId } from '../../shared/fork-heimdall/watcher-types'
 import type { RuntimeWorktreeRecord, RuntimeStatus } from '../../shared/runtime-types'
 import {
   getRepoExecutionHostId,
@@ -14,13 +13,18 @@ import {
   assertHeimdallCreateCapabilities,
   buildHeimdallCreateCandidate,
   buildHeimdallEnrollInput,
+  type HeimdallCreateCandidate,
   type HeimdallCreateWorkspace
 } from './create-input'
 import { resolveHeimdallWorkspaceSelector } from './watcher-row'
+import { createPipelineCreateHandler } from '../fork-heimdall-pipeline/pipeline-create-handler'
 
 type RepoHostInfo = Pick<Repo, 'kind' | 'connectionId' | 'executionHostId'>
 
-function assertLocalCreateWorkspace(worktree: RuntimeWorktreeRecord, repo?: RepoHostInfo): void {
+export function assertLocalCreateWorkspace(
+  worktree: RuntimeWorktreeRecord,
+  repo?: RepoHostInfo
+): void {
   if (
     worktree.runtimeOwnerEnvironmentId ||
     getWorktreeExecutionHostId(worktree, repo) !== LOCAL_EXECUTION_HOST_ID ||
@@ -33,17 +37,22 @@ function assertLocalCreateWorkspace(worktree: RuntimeWorktreeRecord, repo?: Repo
   }
 }
 
-async function resolveCreateWorkspace(
+export async function resolveCreateWorkspace(
   context: HandlerContext,
   selector: string
-): Promise<HeimdallCreateWorkspace> {
+): Promise<HeimdallCreateWorkspace & { path: string }> {
   const response = await context.client.call<{ worktree: RuntimeWorktreeRecord }>('worktree.show', {
     worktree: selector
   })
   const worktree = response.result.worktree
   assertLocalCreateWorkspace(worktree)
   if (worktree.id.startsWith('folder:')) {
-    return { repoId: worktree.repoId, worktreeId: worktree.id, workspaceKind: 'folder' }
+    return {
+      repoId: worktree.repoId,
+      worktreeId: worktree.id,
+      workspaceKind: 'folder',
+      path: worktree.path
+    }
   }
   const repo = await context.client.call<{ repo: RepoHostInfo }>('repo.show', {
     repo: worktree.repoId
@@ -53,16 +62,20 @@ async function resolveCreateWorkspace(
   return {
     repoId: worktree.repoId,
     worktreeId: isFolder ? null : worktree.id,
-    workspaceKind: isFolder ? 'folder' : 'git'
+    workspaceKind: isFolder ? 'folder' : 'git',
+    path: worktree.path
   }
 }
 
-function formatEnrollmentResult(result: EnrollSuccess, kind: WatcherKindId): string {
+function formatEnrollmentResult(
+  result: EnrollSuccess,
+  kind: HeimdallCreateCandidate['kind']
+): string {
   const action = result.status === 're-armed' ? 're-armed' : 'enrolled'
   return `Heimdall ${kind} watcher ${result.entry.enrollment.watcherId} ${action}.`
 }
 
-function createHandler(kind: WatcherKindId): CommandHandler {
+function createHandler(kind: HeimdallCreateCandidate['kind']): CommandHandler {
   return async (context) => {
     const candidate = buildHeimdallCreateCandidate(context.flags, context.cwd, kind)
     const status = await context.client.call<RuntimeStatus>('status.get')
@@ -88,5 +101,6 @@ function createHandler(kind: WatcherKindId): CommandHandler {
 
 export const HEIMDALL_CREATE_HANDLERS: Record<string, CommandHandler> = {
   'heimdall create objective': createHandler('objective'),
-  'heimdall create hosted-review': createHandler('hosted-review')
+  'heimdall create hosted-review': createHandler('hosted-review'),
+  'heimdall create': createPipelineCreateHandler(resolveCreateWorkspace)
 }

@@ -22,8 +22,7 @@ import {
 import {
   CapabilityModeSchema,
   EnrollInputSchema,
-  type EnrollInput,
-  type WatcherKindId
+  type EnrollInput
 } from '../../shared/fork-heimdall/watcher-types'
 import { OWNER_INTERVENTION_CAPABILITY } from '../../shared/fork-heimdall/owner/owner-capability'
 import {
@@ -75,7 +74,7 @@ export type HeimdallCreateCandidate = CandidateBase &
 export function buildHeimdallCreateCandidate(
   flags: Map<string, string | boolean>,
   cwd: string,
-  kind: WatcherKindId
+  kind: HeimdallCreateCandidate['kind']
 ): HeimdallCreateCandidate {
   const explicitOverrides = buildHeimdallCreateFlagOverrides(flags, cwd, kind)
   const merged = mergeHeimdallCreateSpec(kind, flags, cwd, explicitOverrides)

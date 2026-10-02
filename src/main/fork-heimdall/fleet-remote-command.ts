@@ -2,9 +2,11 @@ import type {
   WatcherCommandRequest,
   WatcherCommandResult
 } from '../../shared/fork-heimdall/fleet-types'
-import type {
-  FleetEnvironmentIdentity,
-  FleetEnvironmentTransport
+import { HEIMDALL_PIPELINE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall-pipeline/capability'
+import {
+  HeimdallCommandCapabilityError,
+  type FleetEnvironmentIdentity,
+  type FleetEnvironmentTransport
 } from './fleet-environment-transport'
 import type { RemoteFleetMirrorState } from './fleet-remote-mirror-state'
 import { OWNER_UNREACHABLE, refused, sendRemoteWatcherCommand } from './fleet-remote-operations'
@@ -41,6 +43,22 @@ export function commandRemoteWatcher(
         mirror.commandSupport === 'unsupported'
           ? 'The owning runtime does not support Heimdall commands. Update the host and try again.'
           : 'Heimdall command support could not be verified. Refresh the owner state and try again.'
+      )
+    )
+  }
+  const targetEntry = mirror.entries.find(
+    (entry) => entry.target.watcherId === request.target.watcherId
+  )
+  if (targetEntry?.entry.enrollment.kind === 'unknown') {
+    return Promise.resolve(
+      refused('unsupported-capability', 'This watcher kind is not supported by this Orca version.')
+    )
+  }
+  if (request.command.kind === 'answer-pipeline-choice' && mirror.pipelineSupport !== 'supported') {
+    return Promise.resolve(
+      refused(
+        'unsupported-capability',
+        new HeimdallCommandCapabilityError(HEIMDALL_PIPELINE_RUNTIME_CAPABILITY).message
       )
     )
   }
@@ -90,6 +108,8 @@ export function commandRemoteWatcher(
       mirror.deleteSupport = 'unsupported'
     } else if (request.command.kind === 'answer-escalation') {
       mirror.answerEscalationSupport = 'unsupported'
+    } else if (request.command.kind === 'answer-pipeline-choice') {
+      mirror.pipelineSupport = 'unsupported'
     } else {
       mirror.commandSupport = 'unsupported'
     }

@@ -21,6 +21,7 @@ import { JIRA_STATUS_FILTER_RUNTIME_CAPABILITY } from './jira-quick-filters'
 import { JIRA_SAVED_FILTER_RUNTIME_CAPABILITY } from './jira-saved-filter-capability'
 import * as jiraDetailCapabilities from './jira-detail-capabilities'
 export * from './jira-detail-capabilities'
+import * as heimdallPipelineCapability from './fork-heimdall-pipeline/capability'
 import { WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES } from './workspace-attachment-capabilities'
 import { SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY } from './ssh-target-management'
 import {
@@ -192,6 +193,7 @@ export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
   HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   ...AUTOMATION_RUNTIME_CLIENT_CAPABILITIES,
+  ...heimdallPipelineCapability.HEIMDALL_PIPELINE_CLIENT_CAPABILITIES,
   agentLaunchCapabilities.AGENT_LAUNCH_RUNTIME_CAPABILITY
 ] as const
 
@@ -205,6 +207,7 @@ export const RUNTIME_CAPABILITIES = [
   QODER_OWNED_TERMINAL_CREATE_CAPABILITY,
   ...AGENT_SESSION_STOP_RUNTIME_CAPABILITIES,
   ...AGENT_SESSION_CREATE_RUNTIME_CAPABILITIES,
+  ...heimdallPipelineCapability.HEIMDALL_PIPELINE_RUNTIME_CAPABILITIES,
   ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY,
   'files.pathsExist',
   'ledger.v1',

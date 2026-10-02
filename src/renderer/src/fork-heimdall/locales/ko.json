@@ -2,7 +2,10 @@
   "fork": {
     "heimdall": {
       "kind": {
-        "objective": "목표 감시자"
+        "objectiveV1": "Objective v1",
+        "prSitterV1": "PR 시터 v1",
+        "pipeline": "Pipeline",
+        "unknown": "알 수 없는 감시자"
       },
       "status": {
         "watching": "감시 중",
@@ -44,7 +47,8 @@
         "title": "Heimdall 플릿",
         "summary": "활성 {{active}}개 · 확인 필요 {{attention}}개",
         "refresh": "플릿 새로 고침",
-        "staleError": "플릿 새로 고침에 실패하여 마지막으로 확인된 스냅샷을 표시합니다: {{error}}"
+        "staleError": "플릿 새로 고침에 실패하여 마지막으로 확인된 스냅샷을 표시합니다: {{error}}",
+        "newRun": "새 실행"
       },
       "fleet": {
         "title": "감시자 플릿",

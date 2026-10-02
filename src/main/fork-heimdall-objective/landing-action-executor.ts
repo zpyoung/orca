@@ -1,4 +1,3 @@
-import type { HostedReviewInfo } from '../../shared/hosted-review'
 import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
@@ -15,17 +14,14 @@ import { reachedRungs } from '../../shared/fork-heimdall-objective/landing-ladde
 import { computeWorkspaceContentIdentity, objectiveGitCommandForTarget } from './content-identity'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import { objectiveForgeContext, type ObjectiveForgeAccess } from './objective-forge-access'
+import type { ForgeProvider } from '../source-control/forge-provider'
 import {
-  objectiveRemoteRefSha,
-  objectiveRemoteRefState,
-  readObjectiveAttachedBranch,
-  readObjectiveHeadSha,
-  readObjectiveRemoteBranchHead,
-  resolveObjectivePushTarget
-} from './landing-git-state'
+  executeLandingPushCore,
+  executeLandingReviewCore,
+  landingErrorOutput
+} from './landing-push-review-core'
+import { readObjectiveAttachedBranch, readObjectiveHeadSha } from './landing-git-state'
 import {
-  hostedReviewIsLive,
-  hostedReviewMatchesAction,
   observeCommittedLocalBranch,
   type CommittedLocalBranchObservation
 } from './landing-recovery'
@@ -52,32 +48,8 @@ function indeterminate(reason: string, result?: unknown): ActionOutcome {
   return { effect: 'indeterminate', reason, ...(result === undefined ? {} : { result }) }
 }
 
-function errorOutput(error: unknown): { message: string; stdout: string; stderr: string } {
-  if (!error || typeof error !== 'object') {
-    return { message: String(error), stdout: '', stderr: '' }
-  }
-  return {
-    message: error instanceof Error ? error.message : String(error),
-    stdout: 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '',
-    stderr: 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : ''
-  }
-}
-function porcelainPushWasRejected(error: unknown, remoteRef: string): boolean {
-  const output = errorOutput(error)
-  return [output.message, output.stdout, output.stderr].some((text) =>
-    text.split(/\r?\n/u).some((line) => {
-      const [flag, refspec, summary] = line.split('\t')
-      return (
-        flag?.trim() === '!' &&
-        refspec?.endsWith(`:${remoteRef}`) === true &&
-        /^\[(?:remote )?rejected\](?: \(.+\))?$/u.test(summary ?? '')
-      )
-    })
-  )
-}
-
 function commitHookRejected(error: unknown): boolean {
-  const output = errorOutput(error)
+  const output = landingErrorOutput(error)
   return /(?:pre-commit|prepare-commit-msg|commit-msg|hook declined|hook failed)/iu.test(
     `${output.message}\n${output.stderr}`
   )
@@ -198,8 +170,8 @@ export async function executeCommitLocalBranch(
     observation = await observeCommittedLocalBranch(args.action, args.binding)
   } catch (error) {
     return indeterminate('commit-probe-failed', {
-      commit: commitError ? errorOutput(commitError) : 'completed',
-      probe: errorOutput(error)
+      commit: commitError ? landingErrorOutput(commitError) : 'completed',
+      probe: landingErrorOutput(error)
     })
   }
   await args.context.lease.assertHeld()
@@ -209,13 +181,13 @@ export async function executeCommitLocalBranch(
       return indeterminate('commit-state-indeterminate', { outsideTerritoryPaths })
     }
     return invalid(commitHookRejected(commitError) ? 'commit-hook-failed' : 'commit-not-landed', {
-      ...errorOutput(commitError),
+      ...landingErrorOutput(commitError),
       outsideTerritoryPaths
     })
   }
   if (observation.effect === 'indeterminate') {
     return indeterminate('commit-state-indeterminate', {
-      ...(commitError ? errorOutput(commitError) : {}),
+      ...(commitError ? landingErrorOutput(commitError) : {}),
       outsideTerritoryPaths
     })
   }
@@ -266,80 +238,40 @@ export async function executePushRef(
   if (headSha !== args.action.commitSha) {
     return invalid('landing-evidence-stale')
   }
-  let target: Awaited<ReturnType<typeof resolveObjectivePushTarget>>
-  try {
-    target = await resolveObjectivePushTarget(runGit, localBranch)
-  } catch (error) {
-    return indeterminate('push-probe-failed', errorOutput(error))
+
+  const pushed = await executeLandingPushCore({
+    runGit,
+    localBranch,
+    remote: args.action.remote,
+    branch: args.action.branch,
+    headSha: args.action.commitSha,
+    expectedBefore: args.action.expectedState.before,
+    assertLeaseHeld: () => args.context.lease.assertHeld()
+  })
+  if (pushed.effect === 'not-landed') {
+    return invalid(pushed.reason, pushed.result)
   }
-  if (!target || target.remote !== args.action.remote || target.branch !== args.action.branch) {
-    return invalid('push-target-changed')
+  if (pushed.effect === 'indeterminate') {
+    return indeterminate(pushed.reason, pushed.result)
   }
-  if (target.remoteSha !== args.action.expectedState.before) {
-    return invalid('expected-state-moved')
-  }
-  await runGit(['check-ref-format', '--branch', args.action.branch])
-  await runGit(['cat-file', '-e', `${args.action.commitSha}^{commit}`])
-  await args.context.lease.assertHeld()
-  const remoteRef = `refs/heads/${args.action.branch}`
-  const expectedBeforeSha = objectiveRemoteRefSha(args.action.expectedState.before)
-  let pushError: unknown
-  try {
-    await runGit([
-      'push',
-      '--porcelain',
-      `--force-with-lease=${remoteRef}:${expectedBeforeSha}`,
-      args.action.remote,
-      `${args.action.commitSha}:${remoteRef}`
-    ])
-  } catch (error) {
-    pushError = error
-  }
-  await args.context.lease.assertHeld()
-  let observed: string
-  try {
-    observed = await readObjectiveRemoteBranchHead(runGit, args.action.remote, args.action.branch)
-  } catch (error) {
-    return indeterminate('push-probe-failed', {
-      push: pushError ? errorOutput(pushError) : 'completed',
-      probe: errorOutput(error)
-    })
-  }
-  await args.context.lease.assertHeld()
-  const observedState = objectiveRemoteRefState(observed)
-  if (observed === args.action.commitSha) {
-    recordLanding(args, args.action.contentIdentity, {
-      revisionId: args.action.revisionId,
-      fromContentIdentity: args.action.contentIdentity,
-      remote: args.action.remote,
-      branch: args.action.branch,
-      commitSha: args.action.commitSha,
-      remoteSha: observed
-    })
-    return {
-      effect: 'landed',
-      expectedBefore: args.action.expectedState.before,
-      expectedAfter: args.action.commitSha,
-      result: {
-        kind: 'push-recorded',
-        naturalKey: objectiveActionNaturalKey(args.action),
-        remoteSha: observed
-      }
+  recordLanding(args, args.action.contentIdentity, {
+    revisionId: args.action.revisionId,
+    fromContentIdentity: args.action.contentIdentity,
+    remote: args.action.remote,
+    branch: args.action.branch,
+    commitSha: args.action.commitSha,
+    remoteSha: pushed.remoteSha
+  })
+  return {
+    effect: 'landed',
+    expectedBefore: pushed.expectedBefore,
+    expectedAfter: pushed.expectedAfter,
+    result: {
+      kind: 'push-recorded',
+      naturalKey: objectiveActionNaturalKey(args.action),
+      remoteSha: pushed.remoteSha
     }
   }
-  if (pushError && porcelainPushWasRejected(pushError, remoteRef)) {
-    return invalid(
-      observedState === args.action.expectedState.before ? 'push-not-landed' : 'remote-moved',
-      errorOutput(pushError)
-    )
-  }
-  if (observedState === args.action.expectedState.before) {
-    return invalid('push-not-landed', pushError ? errorOutput(pushError) : undefined)
-  }
-  return indeterminate('push-state-indeterminate', {
-    observed: observedState,
-    ...(pushError ? errorOutput(pushError) : {})
-  })
 }
 
 async function recordMatchingReview(
@@ -385,104 +317,40 @@ export async function executeOpenHostedReview(
     return invalid('landing-evidence-stale')
   }
   const context = objectiveForgeContext(args.binding.target)
-  let provider: Awaited<ReturnType<ObjectiveForgeAccess['getProvider']>>
+  let provider: ForgeProvider | null
   try {
     provider = await args.forge.getProvider(context)
   } catch (error) {
-    return indeterminate('forge-probe-failed', errorOutput(error))
+    return indeterminate('forge-probe-failed', landingErrorOutput(error))
   }
   if (!provider || provider.id !== args.action.provider) {
     return invalid('forge-changed')
   }
-  const createReview = provider.createReview?.bind(provider)
-  if (!provider.supportsReviewCreation || !createReview) {
-    return invalid('forge-cannot-create')
-  }
-  const reviewInput = {
-    ...context,
+  const outcome = await executeLandingReviewCore({
+    context,
+    provider,
+    forge: args.forge,
     branch: args.action.branch,
-    githubCurrentHeadOid: args.action.headSha
-  }
-  let existing: HostedReviewInfo | null
-  try {
-    existing = await provider.getReviewForBranch(reviewInput)
-  } catch (error) {
-    return indeterminate('hosted-review-probe-failed', errorOutput(error))
-  }
-  if (hostedReviewMatchesAction(existing, args.action)) {
-    return recordMatchingReview(args, existing)
-  }
-  if (existing && hostedReviewIsLive(existing)) {
-    return indeterminate('hosted-review-state-moved')
-  }
-  try {
-    if (!(await args.forge.isAuthenticated(provider.id, context))) {
-      return invalid('auth_required')
-    }
-  } catch (error) {
-    return indeterminate('forge-auth-probe-failed', errorOutput(error))
-  }
-  const plan = args.objectiveStore.getPlan(args.action.revisionId)
-  if (!plan) {
-    return invalid('landing-plan-missing')
-  }
-  await args.context.lease.assertHeld()
-  let result: Awaited<ReturnType<typeof createReview>> | undefined
-  let creationError: unknown
-  try {
-    result = await createReview(
-      context.repoPath,
-      {
-        provider: provider.id,
+    headSha: args.action.headSha,
+    resolveCreation: async () => {
+      const plan = args.objectiveStore.getPlan(args.action.revisionId)
+      if (!plan) {
+        return null
+      }
+      return {
         base: args.action.base,
-        head: args.action.branch,
         title: revisionTitle(args.binding),
         body: renderReviewBody(args.binding.contract, plan),
-        draft: false,
-        worktreePath: context.repoPath,
-        useTemplate: true
-      },
-      context.executionHostId,
-      context
-    )
-  } catch (error) {
-    creationError = error
+        draft: false
+      }
+    },
+    assertLeaseHeld: () => args.context.lease.assertHeld()
+  })
+  if (outcome.effect === 'not-landed') {
+    return invalid(outcome.reason, outcome.result)
   }
-  await args.context.lease.assertHeld()
-  args.forge.invalidate(context)
-  let authoritative: HostedReviewInfo | null
-  try {
-    authoritative = await provider.getReviewForBranch(reviewInput)
-  } catch (error) {
-    return indeterminate('hosted-review-probe-failed', {
-      create: creationError ? errorOutput(creationError) : result,
-      probe: errorOutput(error)
-    })
+  if (outcome.effect === 'indeterminate') {
+    return indeterminate(outcome.reason, outcome.result)
   }
-  if (hostedReviewMatchesAction(authoritative, args.action)) {
-    return recordMatchingReview(args, authoritative)
-  }
-  if (authoritative && hostedReviewIsLive(authoritative)) {
-    return indeterminate('hosted-review-state-moved')
-  }
-  if (creationError) {
-    return indeterminate('hosted-review-create-failed', errorOutput(creationError))
-  }
-  if (!result) {
-    return indeterminate('hosted-review-create-unverifiable')
-  }
-  if (
-    !result.ok &&
-    result.code !== 'already_exists' &&
-    (result.code === 'validation' ||
-      result.code === 'push_failed' ||
-      result.code === 'unsupported_provider' ||
-      result.code === 'auth_required')
-  ) {
-    return invalid(result.code, result)
-  }
-  if (!result.ok && result.code !== 'already_exists') {
-    return indeterminate(result.code, result)
-  }
-  return indeterminate('hosted-review-create-unverifiable', result)
+  return recordMatchingReview(args, outcome.review)
 }

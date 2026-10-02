@@ -1,32 +1,41 @@
 import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { projectWatcherListEntryForClient } from '../../../../src/main/runtime/rpc/methods/fork-heimdall/park-reason-wire'
+import {
+  projectHeimdallDetailParkReasonForClient,
+  projectHeimdallFleetSnapshotForClient,
+  projectWatcherListEntryForClient
+} from '../../../../src/main/runtime/rpc/methods/fork-heimdall/park-reason-wire'
 import { HEIMDALL_METHODS } from '../../../../src/main/runtime/rpc/methods/fork-heimdall/heimdall'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY
 } from '../../../../src/shared/fork-heimdall/capability'
-import { RUNTIME_CAPABILITIES } from '../../../../src/shared/protocol-version'
+import {
+  NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES,
+  RUNTIME_CAPABILITIES
+} from '../../../../src/shared/protocol-version'
 import {
   EnrollSuccessSchema,
   HeimdallSubscriptionEventSchema
 } from '../../../../src/shared/fork-heimdall/api'
 import {
+  HeimdallFleetSnapshotSchema,
   WatcherCommandResultSchema,
-  WatcherDetailSchema
+  WatcherDetailSchema,
+  type HeimdallFleetSnapshot,
+  type WatcherFleetEntry
 } from '../../../../src/shared/fork-heimdall/fleet-types'
 import {
   EnrollSuccessReaderSchema,
+  HeimdallFleetSnapshotReaderSchema,
   HeimdallSubscriptionEventReaderSchema,
   WatcherCommandResultReaderSchema,
-  WatcherDetailReaderSchema,
-  remoteReaderSchema
+  WatcherDetailReaderSchema
 } from '../../../../src/shared/fork-heimdall/remote-reader-schemas'
-import {
-  WatcherParkReasonSchema,
-  WatcherStatusSchema
-} from '../../../../src/shared/fork-heimdall/watcher-types'
+import type { EnrollInput, WatcherKindId } from '../../../../src/shared/fork-heimdall/watcher-types'
+import { enrollmentForPipelineCompatibility } from '../../../../src/main/fork-heimdall/fleet-remote-enrollment-capabilities'
+import { BUILTIN_OBJECTIVE_PIPELINE_TEXT } from '../../../../src/shared/fork-heimdall-pipeline/builtin-pipelines'
 import { ObjectiveDetailSchema } from '../../../../src/shared/fork-heimdall-objective/detail-types'
 import { ObjectiveDetailReaderSchema } from '../../../../src/main/runtime/rpc/methods/fork-heimdall-objective/objective-detail-reader-schema'
 import {
@@ -38,6 +47,10 @@ import {
 const SUITE_TIMEOUT_MS = 180_000
 let baselineMethodNames: string[]
 let baselineCapabilities: string[]
+let baselineClientCapabilities: string[]
+let baselineFleetSnapshotSchema: z.ZodType
+let baselineEnrollInputSchema: z.ZodType
+let baselineWatcherStatusSchema: z.ZodType
 
 const enrollmentWithExtraKeys = {
   watcherId: 'watcher-1',
@@ -296,17 +309,93 @@ function methodNames(methods: unknown): string[] {
     return 'name' in method && typeof method.name === 'string' ? [method.name] : []
   })
 }
+function releaseZodSchema(module: Record<string, unknown>, name: string): z.ZodType {
+  const schema = module[name]
+  if (!(schema instanceof z.ZodType)) {
+    throw new Error(`Cross-version baseline did not export ${name}`)
+  }
+  return schema
+}
+
+function watcherFleetEntry(kind: WatcherKindId): WatcherFleetEntry {
+  const watcherId = `watcher-${kind}`
+  return {
+    target: { watcherId, connectionId: null, pairingRevision: null },
+    entry: {
+      name: `${kind} watcher`,
+      enrollment: {
+        watcherId,
+        kind,
+        workspaceKey: 'local::/repo',
+        executionHostId: 'local',
+        repoId: 'repo-1',
+        worktreeId: 'worktree-1',
+        workspacePath: '/repo',
+        schedulerOwner: 'local_host_service',
+        enabled: true,
+        paused: false,
+        commandRevision: 1,
+        capabilities: {},
+        budget: { wallClockActiveMs: null, turns: null },
+        kindPayload: {},
+        coordinatorIdentity: { handle: 'coordinator-1', paneKey: 'pane-1' },
+        orchestrationRunId: null,
+        createdAtMs: 1,
+        terminalAtMs: null
+      },
+      status: {
+        watcherId,
+        enabled: true,
+        state: 'watching',
+        phase: 'observe',
+        reason: null,
+        parkReason: null,
+        budget: { activeMs: 0, turns: 0, exhausted: null },
+        startedAtMs: 1,
+        lastSuccessfulTickAtMs: null,
+        nextPulseAtMs: null
+      }
+    },
+    ownerFence: {
+      executionHostId: 'local',
+      schedulerOwner: 'local_host_service',
+      workspaceKey: 'local::/repo',
+      revision: 1
+    },
+    observedAtMs: 1,
+    contact: 'live',
+    readOnlyReason: null,
+    capabilityNotes: [],
+    paused: false,
+    workflowPhase: 'observe'
+  }
+}
+
+function pipelineWireSnapshot(): HeimdallFleetSnapshot {
+  return {
+    entries: [watcherFleetEntry('objective'), watcherFleetEntry('pipeline')],
+    generatedAtMs: 20
+  }
+}
 
 beforeAll(async () => {
   const baseline = await materializeReleaseCheckout(resolveBaselineReleaseRef())
-  const [registry, protocol] = await Promise.all([
+  const [registry, protocol, fleetTypes, watcherTypes] = await Promise.all([
     importReleaseCheckoutModule(baseline, '/src/main/runtime/rpc/methods/index.ts'),
-    importReleaseCheckoutModule(baseline, '/src/shared/protocol-version.ts')
+    importReleaseCheckoutModule(baseline, '/src/shared/protocol-version.ts'),
+    importReleaseCheckoutModule(baseline, '/src/shared/fork-heimdall/fleet-types.ts'),
+    importReleaseCheckoutModule(baseline, '/src/shared/fork-heimdall/watcher-types.ts')
   ])
   baselineMethodNames = methodNames(registry.ALL_RPC_METHODS)
   baselineCapabilities = Array.isArray(protocol.RUNTIME_CAPABILITIES)
     ? protocol.RUNTIME_CAPABILITIES
     : []
+  baselineClientCapabilities = Array.isArray(protocol.NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES)
+    ? protocol.NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES
+    : []
+  baselineFleetSnapshotSchema = releaseZodSchema(fleetTypes, 'HeimdallFleetSnapshotSchema')
+  baselineEnrollInputSchema = releaseZodSchema(watcherTypes, 'EnrollInputSchema')
+  baselineWatcherStatusSchema = releaseZodSchema(watcherTypes, 'WatcherStatusSchema')
 }, SUITE_TIMEOUT_MS)
 
 describe('Heimdall remote reader compatibility', () => {
@@ -344,6 +433,89 @@ describe('Heimdall remote reader compatibility', () => {
       { payload: { hostEvidenceField: { retained: true } } }
     ])
   })
+  it('reads future watcher kinds as unknown while preserving fleet rows and evidence', () => {
+    const knownDetail = WatcherDetailReaderSchema.parse(watcherDetailWithExtraKeys)
+    const futureDetail = {
+      ...knownDetail,
+      watcher: {
+        ...knownDetail.watcher,
+        entry: {
+          ...knownDetail.watcher.entry,
+          enrollment: { ...knownDetail.watcher.entry.enrollment, kind: 'future-engine-kind' }
+        }
+      }
+    }
+    const detail = WatcherDetailReaderSchema.safeParse(futureDetail)
+    const fleet = HeimdallFleetSnapshotReaderSchema.safeParse({
+      entries: [futureDetail.watcher],
+      generatedAtMs: 20
+    })
+
+    expect(WatcherDetailSchema.safeParse(futureDetail).success).toBe(false)
+    expect(detail.success).toBe(true)
+    expect(fleet.success).toBe(true)
+    if (detail.success) {
+      expect(detail.data.watcher.entry.enrollment.kind).toBe('unknown')
+      expect(detail.data.ledger.entries).toHaveLength(2)
+      expect(detail.data.ledger.entries).toMatchObject([
+        {
+          action: { hostActionField: { retained: true } },
+          result: { hostResultField: { retained: true } }
+        },
+        { payload: { hostEvidenceField: { retained: true } } }
+      ])
+      expect(() =>
+        projectHeimdallDetailParkReasonForClient(detail.data, {
+          clientKind: 'runtime',
+          clientCapabilities: baselineClientCapabilities
+        })
+      ).toThrow('watcher-not-found')
+    }
+    if (fleet.success) {
+      expect(fleet.data.entries[0]?.entry.enrollment.kind).toBe('unknown')
+      const baselineProjection = projectHeimdallFleetSnapshotForClient(fleet.data, {
+        clientKind: 'runtime',
+        clientCapabilities: baselineClientCapabilities
+      })
+      expect(baselineProjection.entries).toEqual([])
+      expect(baselineFleetSnapshotSchema.safeParse(baselineProjection).success).toBe(true)
+    }
+    const subscription = HeimdallSubscriptionEventReaderSchema.safeParse({
+      type: 'snapshot',
+      snapshot: { entries: [futureDetail.watcher], generatedAtMs: 20 }
+    })
+    expect(subscription.success).toBe(true)
+    if (subscription.success && subscription.data.type === 'snapshot') {
+      expect(subscription.data.snapshot.entries[0]?.entry.enrollment.kind).toBe('unknown')
+    }
+    expect(
+      WatcherDetailReaderSchema.safeParse({
+        ...futureDetail,
+        watcher: {
+          ...futureDetail.watcher,
+          entry: {
+            ...futureDetail.watcher.entry,
+            enrollment: {
+              ...futureDetail.watcher.entry.enrollment,
+              workspaceKey: 'ssh:buildbox::/repo'
+            }
+          }
+        }
+      }).success
+    ).toBe(false)
+    expect(
+      WatcherDetailReaderSchema.safeParse({
+        ...futureDetail,
+        watcher: {
+          ...futureDetail.watcher,
+          entry: {
+            ...futureDetail.watcher.entry,
+            enrollment: { ...futureDetail.watcher.entry.enrollment, kind: 42 }
+          }
+        }
+      }).success
+    ).toBe(false)
+  })
 })
 
 describe('Heimdall cross-version wire registration', () => {
@@ -365,76 +537,122 @@ describe('Heimdall cross-version wire registration', () => {
     expect(RUNTIME_CAPABILITIES).toContain(HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY)
   })
 })
+describe('Heimdall pipeline fleet wire compatibility with the release baseline', () => {
+  it('filters a pipeline row so the actual baseline fleet schema can parse the host reply', () => {
+    const snapshot = pipelineWireSnapshot()
+    expect(baselineFleetSnapshotSchema.safeParse(snapshot).success).toBe(false)
 
-// Why simulated: no release tag carries fork-heimdall, so there is no older build to read with.
-const BASELINE_PARK_REASON_KINDS = new Set([
-  'budget',
-  'stop-predicate',
-  'worker-question',
-  'coordinator-seat-lost'
-])
-
-function discriminatedUnionLiteralKind(option: z.ZodType): string {
-  const kindSchema = option instanceof z.ZodObject ? option.shape.kind : undefined
-  const value = kindSchema instanceof z.ZodLiteral ? kindSchema.value : undefined
-  if (typeof value !== 'string') {
-    throw new Error('Heimdall park reason option has no literal "kind" discriminant')
-  }
-  return value
-}
-
-function assertNonEmpty<T>(arr: readonly T[]): asserts arr is readonly [T, ...T[]] {
-  if (arr.length === 0) {
-    throw new Error('Expected a non-empty array')
-  }
-}
-
-const baselineParkReasonOptions = WatcherParkReasonSchema.def.options.filter((option) =>
-  BASELINE_PARK_REASON_KINDS.has(discriminatedUnionLiteralKind(option))
-)
-if (baselineParkReasonOptions.length !== BASELINE_PARK_REASON_KINDS.size) {
-  throw new Error(
-    'Heimdall baseline park reason fixture is missing a kind the current union still declares'
-  )
-}
-assertNonEmpty(baselineParkReasonOptions)
-const BaselineWatcherStatusSchema = z
-  .object({
-    ...WatcherStatusSchema.shape,
-    parkReason: z.discriminatedUnion('kind', baselineParkReasonOptions).nullable()
-  })
-  .strict()
-const BaselineWatcherStatusReaderSchema = remoteReaderSchema(BaselineWatcherStatusSchema)
-
-const parkedWorkerEscalationEntry = {
-  ...listEntryWithExtraKeys,
-  status: {
-    ...listEntryWithExtraKeys.status,
-    parkReason: { kind: 'worker-escalation', escalationId: 'escalation-1', messageId: 'message-1' }
-  }
-} as const
-
-describe('Heimdall watcher park reason capability gating', () => {
-  it('would have failed an old reader on an undegraded worker-escalation park', () => {
-    expect(
-      BaselineWatcherStatusReaderSchema.safeParse(parkedWorkerEscalationEntry.status).success
-    ).toBe(false)
-  })
-
-  it('lets an old reader parse the status the capability gate publishes when unnegotiated', () => {
-    const degraded = projectWatcherListEntryForClient(parkedWorkerEscalationEntry, {
+    const projected = projectHeimdallFleetSnapshotForClient(snapshot, {
       clientKind: 'runtime',
-      clientCapabilities: []
+      clientCapabilities: baselineClientCapabilities
     })
-    expect(degraded.status.parkReason).toBeNull()
-    expect(BaselineWatcherStatusReaderSchema.safeParse(degraded.status).success).toBe(true)
+
+    expect(projected.entries.map((entry) => entry.entry.enrollment.kind)).toEqual(['objective'])
+    expect(baselineFleetSnapshotSchema.safeParse(projected).success).toBe(true)
   })
 
-  it('publishes the typed value once the reader negotiates the capability', () => {
-    const negotiated = projectWatcherListEntryForClient(parkedWorkerEscalationEntry, {
+  it('shows pipeline rows to the current native client', () => {
+    const projected = projectHeimdallFleetSnapshotForClient(pipelineWireSnapshot(), {
       clientKind: 'runtime',
-      clientCapabilities: [HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY]
+      clientCapabilities: [...NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES]
     })
-    expect(negotiated.status.parkReason).toEqual(parkedWorkerEscalationEntry.status.parkReason)
+
+    expect(projected.entries.map((entry) => entry.entry.enrollment.kind)).toEqual([
+      'objective',
+      'pipeline'
+    ])
+    expect(HeimdallFleetSnapshotSchema.safeParse(projected).success).toBe(true)
+  })
+
+  it('strips a pin before the actual baseline strict enrollment schema sees it', () => {
+    const input: EnrollInput = {
+      kind: 'objective',
+      repoId: 'repo-1',
+      worktreeId: 'worktree-1',
+      capabilities: {},
+      budget: { wallClockActiveMs: null, turns: null },
+      kindPayload: {},
+      pipelinePin: {
+        ref: 'builtin:objective',
+        scope: 'builtin',
+        id: 'objective',
+        contentHash: `sha256:${'0'.repeat(64)}`,
+        documentVersion: 1
+      }
+    }
+    const compatible = enrollmentForPipelineCompatibility(input, {
+      pipelineSupport: 'unsupported',
+      pipelineNodeTypes: new Set<never>()
+    })
+
+    expect(baselineEnrollInputSchema.safeParse(input).success).toBe(false)
+    expect(baselineEnrollInputSchema.safeParse(compatible).success).toBe(true)
+    expect(compatible.kindPayload).toEqual(input.kindPayload)
+  })
+  it('refuses a source-bearing custom pin instead of stripping it for the baseline host', () => {
+    const input: EnrollInput = {
+      kind: 'objective',
+      repoId: 'repo-1',
+      worktreeId: 'worktree-1',
+      capabilities: {},
+      budget: { wallClockActiveMs: null, turns: null },
+      kindPayload: {},
+      pipelinePin: {
+        ref: 'repo:objective',
+        scope: 'repo',
+        id: 'objective',
+        contentHash: `sha256:${'0'.repeat(64)}`,
+        documentVersion: 1
+      },
+      pipelineSource: { sourceText: BUILTIN_OBJECTIVE_PIPELINE_TEXT }
+    }
+
+    expect(baselineEnrollInputSchema.safeParse(input).success).toBe(false)
+    expect(() =>
+      enrollmentForPipelineCompatibility(input, {
+        pipelineSupport: 'unsupported',
+        pipelineNodeTypes: new Set<never>()
+      })
+    ).toThrow(
+      'The owning runtime does not support Heimdall pipelines. Update the host and try again.'
+    )
+  })
+})
+
+describe('Heimdall baseline park reason compatibility', () => {
+  it('publishes typed park reasons to the actual baseline client', () => {
+    const entry = watcherFleetEntry('objective').entry
+    entry.status.parkReason = {
+      kind: 'worker-escalation',
+      escalationId: 'escalation-1',
+      messageId: 'message-1'
+    }
+
+    const projected = projectWatcherListEntryForClient(entry, {
+      clientKind: 'runtime',
+      clientCapabilities: baselineClientCapabilities
+    })
+
+    expect(projected.status.parkReason).toEqual(entry.status.parkReason)
+    expect(baselineWatcherStatusSchema.safeParse(projected.status).success).toBe(true)
+  })
+
+  it('degrades the typed reason for a baseline reader with the park reason capability removed', () => {
+    const entry = watcherFleetEntry('objective').entry
+    entry.status.parkReason = {
+      kind: 'worker-escalation',
+      escalationId: 'escalation-1',
+      messageId: 'message-1'
+    }
+
+    const projected = projectWatcherListEntryForClient(entry, {
+      clientKind: 'runtime',
+      clientCapabilities: baselineClientCapabilities.filter(
+        (capability) => capability !== HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY
+      )
+    })
+
+    expect(projected.status.parkReason).toBeNull()
+    expect(baselineWatcherStatusSchema.safeParse(projected.status).success).toBe(true)
   })
 })

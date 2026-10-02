@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { translate } from '@/i18n/i18n'
 import { ObjectiveEnrollmentPayloadSchema } from '../../../shared/fork-heimdall-objective/contract-types'
-import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
+import type { WatcherListEntryReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
 
 export function HeimdallConcurrencyControl({
   enrollment,
@@ -15,7 +15,7 @@ export function HeimdallConcurrencyControl({
   updating,
   onChange
 }: {
-  enrollment: WatcherEnrollment
+  enrollment: WatcherListEntryReader['enrollment']
   readOnly: boolean
   busy: boolean
   supported: boolean

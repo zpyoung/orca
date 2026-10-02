@@ -210,20 +210,21 @@ export function localFleetEntry(
   }
   const activity = activitySummary(projection.ledger, owned)
   const parallel =
-    projection.parallel &&
-    entry.enrollment.kind === 'objective' &&
-    typeof kindPayload === 'object' &&
-    kindPayload !== null &&
-    'maxConcurrency' in kindPayload &&
-    typeof kindPayload.maxConcurrency === 'number'
-      ? {
-          ...projection.parallel,
-          effectiveMaxConcurrency:
-            'workspaceKind' in kindPayload && kindPayload.workspaceKind === 'folder'
-              ? 1
-              : kindPayload.maxConcurrency
-        }
-      : projection.parallel
+    entry.enrollment.kind !== 'objective'
+      ? undefined
+      : projection.parallel &&
+          typeof kindPayload === 'object' &&
+          kindPayload !== null &&
+          'maxConcurrency' in kindPayload &&
+          typeof kindPayload.maxConcurrency === 'number'
+        ? {
+            ...projection.parallel,
+            effectiveMaxConcurrency:
+              'workspaceKind' in kindPayload && kindPayload.workspaceKind === 'folder'
+                ? 1
+                : kindPayload.maxConcurrency
+          }
+        : projection.parallel
   return {
     target: { watcherId: entry.enrollment.watcherId, connectionId: null, pairingRevision: null },
     entry,

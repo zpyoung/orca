@@ -1,5 +1,5 @@
 import type { AttemptEntry } from '../../../shared/fork-heimdall/ledger-types'
-import type { WatcherDetail } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherDetailReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
 
 export type HeimdallFleetAction = {
   watcherKey: string
@@ -7,7 +7,9 @@ export type HeimdallFleetAction = {
   attempt: AttemptEntry
 }
 
-export function projectFleetActions(details: readonly WatcherDetail[]): HeimdallFleetAction[] {
+export function projectFleetActions(
+  details: readonly WatcherDetailReader[]
+): HeimdallFleetAction[] {
   const latest = new Map<string, HeimdallFleetAction>()
   for (const detail of details) {
     for (const entry of detail.ledger.entries) {

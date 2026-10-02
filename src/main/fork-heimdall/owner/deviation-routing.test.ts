@@ -843,3 +843,46 @@ describe('deviationIsDispatchScoped', () => {
     ).toBe(true)
   })
 })
+
+describe('driveOwnerDeviation: owner-selected human escalation routing', () => {
+  async function ownerAsksHuman(humanEscalation?: 'park' | 'kind-handles') {
+    const ledgerStore = memoryLedgerStore()
+    const deps = baseDeps(ledgerStore)
+    recordDeviation(deps.ledgerRecord, 'watcher-1', deviation)
+    const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
+    runner.kind = kindWithOwner({
+      ...fakeOwner(null),
+      ...(humanEscalation === undefined ? {} : { humanEscalation })
+    })
+    await driveOwnerDeviation(deps, runner, snapshot)
+    const pending = requireOpenOwnerDeviation(ledgerStore)
+    appendAcceptedOwnerReady(ledgerStore, pending)
+    readOwnerReport.mockResolvedValueOnce({
+      ok: true,
+      path: '/report/path.json',
+      report: { kind: 'ask-human', question: 'A person must decide.' }
+    })
+    await driveOwnerDeviation(deps, runner, snapshot)
+    const escalated = getLatestEscalations(ledgerStore.read('watcher-1')).find(
+      (entry) => entry.escalationId === pending.escalationId
+    )
+    return { deps, escalated }
+  }
+
+  it('leaves parking to a kind that handles its own human escalation', async () => {
+    const { deps, escalated } = await ownerAsksHuman('kind-handles')
+
+    expect(escalated?.status).toBe('escalated')
+    expect(deps.park).not.toHaveBeenCalled()
+  })
+
+  it('keeps the existing park behavior for explicit park and absent policy', async () => {
+    const explicit = await ownerAsksHuman('park')
+    const defaulted = await ownerAsksHuman()
+
+    expect(explicit.escalated?.status).toBe('escalated')
+    expect(explicit.deps.park).toHaveBeenCalledTimes(1)
+    expect(defaulted.escalated?.status).toBe('escalated')
+    expect(defaulted.deps.park).toHaveBeenCalledTimes(1)
+  })
+})

@@ -1,6 +1,6 @@
 import type { EnrollInput, EnrollResult } from '../../shared/fork-heimdall/watcher-types'
 import { heimdallEnrollmentRefusalError } from '../../shared/fork-heimdall/enrollment-refusal-error'
-import type { EnrollSuccess, HeimdallRemoteOwner } from '../../shared/fork-heimdall/api'
+import type { HeimdallRemoteOwner } from '../../shared/fork-heimdall/api'
 import {
   HeimdallFleetSnapshotSchema,
   type HeimdallFleetSnapshot,
@@ -10,6 +10,11 @@ import {
   type WatcherFleetEntry,
   type WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
+import type {
+  EnrollSuccessReader,
+  HeimdallFleetSnapshotReader,
+  WatcherDetailReader
+} from '../../shared/fork-heimdall/remote-reader-schemas'
 import type { Store } from '../persistence'
 import type { HeimdallDebugReport } from './debug-report'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
@@ -43,7 +48,7 @@ export class HeimdallFleetTransport {
   private readonly remote: HeimdallRemoteFleetMirrors
   private readonly environments: FleetEnvironmentTransport
   private readonly now: () => number
-  private readonly listeners = new Set<(snapshot: HeimdallFleetSnapshot) => void>()
+  private readonly listeners = new Set<(snapshot: HeimdallFleetSnapshotReader) => void>()
   private localEntries: WatcherFleetEntry[] = []
   private localReadSequence = 0
   private lastGeneratedAtMs = 0
@@ -66,18 +71,18 @@ export class HeimdallFleetTransport {
     this.unsubscribeKernel = this.kernel.subscribe(() => this.schedulePublish(true))
   }
 
-  subscribe(listener: (snapshot: HeimdallFleetSnapshot) => void): () => void {
+  subscribe(listener: (snapshot: HeimdallFleetSnapshotReader) => void): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
 
-  async fleet(): Promise<HeimdallFleetSnapshot> {
+  async fleet(): Promise<HeimdallFleetSnapshotReader> {
     await this.refreshLocal()
     this.remote.sync()
     return this.snapshot()
   }
 
-  async enroll(input: EnrollInput, owner?: HeimdallRemoteOwner): Promise<EnrollSuccess> {
+  async enroll(input: EnrollInput, owner?: HeimdallRemoteOwner): Promise<EnrollSuccessReader> {
     if (owner) {
       return this.remote.enroll(input, owner)
     }
@@ -89,7 +94,7 @@ export class HeimdallFleetTransport {
     return result
   }
 
-  detail(target: WatcherTarget): Promise<WatcherDetail> {
+  detail(target: WatcherTarget): Promise<WatcherDetailReader> {
     assertWellFormedTarget(target)
     return target.connectionId === null ? this.kernel.detail(target) : this.remote.detail(target)
   }
@@ -172,7 +177,7 @@ export class HeimdallFleetTransport {
     this.publishRunning = false
   }
 
-  private snapshot(): HeimdallFleetSnapshot {
+  private snapshot(): HeimdallFleetSnapshotReader {
     const generatedAtMs = Math.max(Math.trunc(this.now()), this.lastGeneratedAtMs + 1)
     this.lastGeneratedAtMs = generatedAtMs
     return buildFleetSnapshot(this.localEntries, this.remote.entries(), generatedAtMs)

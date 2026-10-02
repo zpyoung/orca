@@ -142,11 +142,13 @@ export function compactTerminalRetention(
     const ledger = readLedger(database, watcherId)
     let summary = existing
     if (!summary) {
+      const enrollmentTable =
+        kind === 'pipeline' ? 'heimdall_pipeline_enrollment' : 'heimdall_enrollment'
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
       const enrollment = database
         .prepare(
           `SELECT kind, terminal_at_ms
-             FROM heimdall_enrollment
+             FROM ${enrollmentTable}
             WHERE watcher_id = ?`
         )
         .get(watcherId) as { kind: string; terminal_at_ms: number | null } | undefined

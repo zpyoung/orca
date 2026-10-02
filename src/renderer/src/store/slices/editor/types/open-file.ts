@@ -1,5 +1,6 @@
 import type { RecentlyClosedTabPosition } from '../../recently-closed-tabs'
 import type { EditorFileOperationProvenance } from '@/lib/editor-file-operation-owner'
+import type { OpenPipelineTabState } from '@/fork-heimdall-pipeline/open-pipeline-tab'
 import type {
   GitBranchChangeEntry,
   GitBranchCompareSummary,
@@ -95,7 +96,8 @@ export type OpenFile = {
   csvPreviewOnly?: boolean
   /** Why: explicit live tail, only meaningful for a read-only local log. */
   liveTail?: boolean
-  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details'
+  pipeline?: OpenPipelineTabState
+  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details' | 'pipeline'
 }
 
 export type ActivityBarPosition = 'top' | 'side'

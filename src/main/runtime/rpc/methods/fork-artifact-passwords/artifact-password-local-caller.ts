@@ -16,7 +16,7 @@
 export const DESKTOP_RENDERER_CLIENT_ID = 'desktop-renderer'
 
 export type ArtifactPasswordCaller = {
-  clientKind: 'mobile' | 'runtime' | undefined
+  clientKind?: 'mobile' | 'runtime' | undefined
   clientId?: string
 }
 
