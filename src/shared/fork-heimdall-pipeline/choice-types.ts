@@ -132,7 +132,7 @@ const isNonnegativeInteger = (value: unknown): value is number =>
 
 /** Encodes a node approval scope with a choice cause, native step, or composite evidence. */
 export function makePipelineNodeEvidenceKey(parts: PipelineNodeEvidenceKeyParts): string {
-  const key: (string | number)[] = ['node', parts.instanceId, parts.epoch, parts.attempt]
+  const segments: (string | number)[] = ['node', parts.instanceId, parts.epoch, parts.attempt]
 
   if (parts.step !== undefined) {
     if (parts.step.trim().length === 0) {
@@ -146,7 +146,7 @@ export function makePipelineNodeEvidenceKey(parts: PipelineNodeEvidenceKeyParts)
     ) {
       throw new Error('A pipeline node evidence-key step cannot be combined with other qualifiers')
     }
-    key.push(`step:${parts.step}`)
+    segments.push(`step:${parts.step}`)
   } else if (parts.cause !== undefined) {
     if (parts.innerContentIdentity !== undefined || parts.innerEvidenceKey !== undefined) {
       throw new Error(
@@ -156,9 +156,9 @@ export function makePipelineNodeEvidenceKey(parts: PipelineNodeEvidenceKeyParts)
     if (parts.deadlineMs !== undefined && parts.cause !== 'time-limit') {
       throw new Error('Only a time-limit choice may include a deadline')
     }
-    key.push(`choice:${parts.cause}`)
+    segments.push(`choice:${parts.cause}`)
     if (parts.deadlineMs !== undefined) {
-      key.push(parts.deadlineMs)
+      segments.push(parts.deadlineMs)
     }
   } else if (parts.deadlineMs !== undefined) {
     throw new Error('A pipeline node evidence key deadline requires a time-limit cause')
@@ -168,10 +168,10 @@ export function makePipelineNodeEvidenceKey(parts: PipelineNodeEvidenceKeyParts)
         'Composite pipeline node evidence requires both inner identity and evidence key'
       )
     }
-    key.push(parts.innerContentIdentity, parts.innerEvidenceKey)
+    segments.push(parts.innerContentIdentity, parts.innerEvidenceKey)
   }
 
-  return JSON.stringify(key)
+  return JSON.stringify(segments)
 }
 
 /** Decodes a node approval scope, returning null for malformed or non-node evidence keys. */
