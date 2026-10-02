@@ -5,6 +5,7 @@ import {
   parseArgs,
   validateCommandAndFlags
 } from '../args'
+import { HANDLER_GROUPS } from '../handler-group-manifest'
 import { dispatch, HANDLER_COMMAND_KEYS, type HandlerContext } from '../dispatch'
 import { COMMAND_SPECS } from '../specs'
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
@@ -213,5 +214,10 @@ describe('orca heimdall CLI registration', () => {
     expect(callMock).toHaveBeenCalledWith(HEIMDALL_CHANNELS.fleet, {})
     expect(callMock).toHaveBeenCalledWith(HEIMDALL_CHANNELS.debugReport, target)
     expect(logSpy).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 2 }, null, 2))
+  })
+
+  it('registers the Heimdall pipeline create command', () => {
+    const heimdall = HANDLER_GROUPS.find((group) => group.name === 'heimdall')
+    expect(heimdall?.keys).toContain('heimdall create')
   })
 })

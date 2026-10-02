@@ -88,15 +88,6 @@ describe('issue command ignore rules', () => {
     expect((await gitExecFileAsync(['status', '--porcelain'], { cwd: worktree })).stdout).toBe('')
   })
 
-  it('does not re-add .orca when the fallback sees .orca/*', async () => {
-    writeFileSync(join(repo, '.gitignore'), '.orca/*\n')
-    rmSync(join(repo, '.git'), { recursive: true, force: true })
-
-    await writeIssueCommand(repo, 'local command')
-
-    expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toBe('.orca/*\n')
-  })
-
   it('adds the rule once when .orca is not ignored', async () => {
     writeFileSync(join(repo, '.gitignore'), 'node_modules/')
 

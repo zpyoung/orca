@@ -36,11 +36,6 @@ function isHandlerRecord(value: unknown): value is Record<string, unknown> {
 }
 
 describe('handler group manifest', () => {
-  it('registers the Heimdall pipeline create command', () => {
-    const heimdall = HANDLER_GROUPS.find((group) => group.name === 'heimdall')
-    expect(heimdall?.keys).toContain('heimdall create')
-  })
-
   it('exposes every declared key as a callable handler', async () => {
     const notCallable: string[] = []
     for (const group of HANDLER_GROUPS) {
