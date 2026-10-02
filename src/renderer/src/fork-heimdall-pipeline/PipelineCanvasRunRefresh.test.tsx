@@ -179,15 +179,10 @@ describe('PipelineCanvas run view across fleet refreshes', () => {
     })
     const row = pipelineRunRow('watcher-12', 12)
     const view = pinnedRunView('watcher-12', 12)
-    installCanvasRunApi([row], new Map([[view.watcherId, view]]))
-    const heimdall = window.api.heimdall as unknown as {
-      fleet: () => Promise<unknown>
-      pipelineRunView: (target: unknown) => Promise<unknown>
-    }
-    const fleetSpy = vi.fn(heimdall.fleet)
-    const runViewSpy = vi.fn(heimdall.pipelineRunView)
-    heimdall.fleet = fleetSpy
-    heimdall.pipelineRunView = runViewSpy
+    const { fleet: fleetSpy, pipelineRunView: runViewSpy } = installCanvasRunApi(
+      [row],
+      new Map([[view.watcherId, view]])
+    )
     useAppStore.setState({ hydrateHeimdallFleet: vi.fn(async () => {}) })
 
     render(<PipelineCanvas file={file} />)
@@ -228,27 +223,22 @@ describe('PipelineCanvas run view across fleet refreshes', () => {
     const row11 = pipelineRunRow('watcher-11', 11)
     const view12 = pinnedRunView('watcher-12', 12)
     const view11 = pinnedRunView('watcher-11', 11)
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
     installCanvasRunApi(
       [row12, row11],
       new Map([
         [view12.watcherId, view12],
         [view11.watcherId, view11]
-      ])
-    )
-    const heimdall = window.api.heimdall as unknown as {
-      pipelineRunView: (target: { watcherId: string }) => Promise<unknown>
-    }
-    const original = heimdall.pipelineRunView
-    let release: () => void = () => undefined
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    heimdall.pipelineRunView = async (target) => {
-      if (target.watcherId === 'watcher-11') {
-        await gate
+      ]),
+      async (watcherId) => {
+        if (watcherId === 'watcher-11') {
+          await gate
+        }
       }
-      return original(target)
-    }
+    )
     useAppStore.setState({ hydrateHeimdallFleet: vi.fn(async () => {}) })
 
     render(<PipelineCanvas file={file} />)
