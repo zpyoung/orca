@@ -5278,12 +5278,6 @@
       "lines": ["const PRE_CHANGE_REF = 'v1.4.216-rc.0.zy01'"]
     },
     {
-      "path": "pnpm-lock.yaml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["        specifier: 12.5.1", "        version: 12.5.1"]
-    },
-    {
       "path": "config/scripts/localization-package-contract.test.mjs",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -8875,10 +8869,6 @@
     "tests/e2e/cross-version-wire/cross-version-worktree-ps-verdict.unit.test.ts": {
       "added": 1,
       "removed": 1
-    },
-    "pnpm-lock.yaml": {
-      "added": 94,
-      "removed": 37
     },
     "config/scripts/localization-package-contract.test.mjs": {
       "added": 1,
