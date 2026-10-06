@@ -1,6 +1,6 @@
-const ORCA_DIRECTORY_RULE = /^\.orca(\/|\/\*)?\r?$/m
-const BARE_ORCA_LINE = /^\.orca(\r\n|\n|\r|$)/gm
-const ORCA_DIRECTORY_LINE = /^\.orca\/(\r\n|\n|\r|$)/gm
+const ORCA_DIRECTORY_RULE = /^\/?\.orca(\/|\/\*)?\r?$/m
+const BARE_ORCA_LINE = /^\/?\.orca(\r\n|\n|\r|$)/gm
+const ORCA_DIRECTORY_LINE = /^\/?\.orca\/(\r\n|\n|\r|$)/gm
 
 /** Return whether `.gitignore` has an exact root rule covering `.orca`. */
 export function gitignoreAlreadyCoversOrcaDir(content: string): boolean {
