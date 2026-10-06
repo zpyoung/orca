@@ -49,6 +49,7 @@
               "native-chat-*",
               "orca-*",
               "pdfViewer",
+              "pipeline-*",
               "popover-scroll-content",
               "popover-wheel-scroll",
               "ravpr-*",

@@ -5457,6 +5457,12 @@
         "  pipeline?: OpenPipelineTabState",
         "  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details' | 'pipeline'"
       ]
+    },
+    {
+      "path": "config/oxlint-dead-classes.json",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": ["              \"pipeline-*\","]
     }
   ],
   "exceptions": [
@@ -8945,6 +8951,10 @@
     "src/main/ipc/hooks/register-worktree-hook-file-handlers.ts": {
       "added": 2,
       "removed": 1
+    },
+    "config/oxlint-dead-classes.json": {
+      "added": 1,
+      "removed": 0
     }
   }
 }
