@@ -105,6 +105,7 @@ export function validatePipelineNodeDetails(
 
     for (const referenceText of nodeTextReferences(node)) {
       for (const reference of findOutputRefs(referenceText)) {
+        inputIsDeclared(reference, document, node.id, index, addError)
         outputIsAncestor(reference, node.id, index, byId, ancestors, addError)
       }
     }
@@ -116,6 +117,7 @@ export function validatePipelineNodeDetails(
       specialOutputRefs.push(...findOutputRefs(node.type === 'loop' ? node.until : node.from))
     }
     for (const reference of specialOutputRefs) {
+      inputIsDeclared(reference, document, node.id, index, addError)
       const parts = outputRefParts(reference)
       if (parts === null) {
         continue
@@ -280,6 +282,7 @@ export function validatePipelineNodeDetails(
         const reference = node.inputs?.[name]
         if (reference !== undefined) {
           for (const outputRef of findOutputRefs(reference)) {
+            inputIsDeclared(outputRef, document, node.id, index, addError)
             outputIsAncestor(outputRef, node.id, index, byId, ancestors, addError)
           }
         }
@@ -376,6 +379,18 @@ function nodeTextReferences(node: PipelineNode): string[] {
     case 'objective':
     case 'pr-sitter':
       return []
+  }
+}
+
+function inputIsDeclared(
+  reference: PipelineOutputReference,
+  document: PipelineDocument,
+  nodeId: string,
+  nodeIndex: number,
+  addError: AddPipelineError
+): void {
+  if (reference.kind === 'input' && !Object.hasOwn(document.inputs, reference.name)) {
+    addError(nodeId, nodeIndex, 'invalid-output-ref', `Run input ${reference.name} is not declared`)
   }
 }
 
