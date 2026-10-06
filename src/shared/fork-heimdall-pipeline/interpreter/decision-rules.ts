@@ -137,3 +137,30 @@ export function resolvePipelineReadiness(
   }
   return states
 }
+
+/** Finds a settled Decision whose value matches none of the branches wired to it. */
+export function unmatchedPipelineDecision(
+  document: PipelineDocument,
+  states: ReadonlyMap<string, PipelineNodeRunState>
+): { nodeId: string; branch: string } | null {
+  const branchesByDecision = new Map<string, string[]>()
+  for (const node of document.nodes) {
+    for (const edge of node.after ?? []) {
+      if (typeof edge !== 'string') {
+        branchesByDecision.set(edge.node, [...(branchesByDecision.get(edge.node) ?? []), edge.when])
+      }
+    }
+  }
+  for (const node of document.nodes) {
+    const branches = branchesByDecision.get(node.id)
+    const state = states.get(node.id)
+    if (node.type !== 'decision' || branches === undefined || state?.status !== 'done') {
+      continue
+    }
+    const branch = pipelineDecisionBranchValue(state.outputs?.value)
+    if (branch !== null && !branches.includes(branch)) {
+      return { nodeId: node.id, branch }
+    }
+  }
+  return null
+}
