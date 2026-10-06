@@ -95,6 +95,46 @@ describe('validatePipeline', () => {
     ])
   })
 
+  it('rejects run-input references that the document does not declare', () => {
+    expect(
+      pairs(
+        validatePipeline(
+          document([
+            { id: 'fix', type: 'agent', harness: 'claude', prompt: 'Fix $run.inputs.taks' }
+          ]),
+          { workspaceKind: 'git' }
+        )
+      )
+    ).toEqual([{ nodeId: 'fix', code: 'invalid-output-ref' }])
+
+    expect(
+      pairs(
+        validatePipeline(
+          document(
+            [
+              {
+                id: 'fix',
+                type: 'agent',
+                harness: 'claude',
+                prompt: 'Fix $run.inputs.task in $run.inputs.area'
+              },
+              {
+                id: 'run',
+                type: 'script',
+                after: ['fix'],
+                command: 'echo "$AREA" "$MISSING"',
+                capability: 'script',
+                inputs: { AREA: '$run.inputs.area', MISSING: '$run.inputs.missing' }
+              }
+            ],
+            { inputs: { task: { type: 'text', required: true }, area: { type: 'text' } } }
+          ),
+          { workspaceKind: 'git' }
+        )
+      )
+    ).toEqual([{ nodeId: 'run', code: 'invalid-output-ref' }])
+  })
+
   it('checks output declarations, upstream references and decision conditions', () => {
     expect(
       pairs(

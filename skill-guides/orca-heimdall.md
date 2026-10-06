@@ -291,13 +291,17 @@ applies the child: Merge proposes a fresh `integrate` action through the normal 
 (gated by default, unless the run starter chose another grant). Shared or folder children have no
 private worktree, so their conflicts escalate; previously applied children remain applied.
 
-This minimal graph uses the implicit `task` input and declares one optional number input:
+This minimal graph declares the `task` input and one optional number input. `task` is implicit
+only when `inputs` is omitted, so a graph that declares other inputs must also declare it:
 
 ```yaml
 version: 1
 id: bugfix
 name: Bugfix
 inputs:
+  task:
+    type: text
+    required: true
   priority:
     type: number
     default: 2
