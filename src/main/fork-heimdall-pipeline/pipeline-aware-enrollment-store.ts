@@ -43,10 +43,16 @@ export class PipelineAwareEnrollmentStore implements EnrollmentStore {
   }
 
   get(watcherId: string): EnrollmentRecord | null {
-    return this.pipeline.get(watcherId) ?? this.builtin.get(watcherId)
+    return (
+      (this.hasPipelineTables() ? this.pipeline.get(watcherId) : null) ??
+      this.builtin.get(watcherId)
+    )
   }
 
   list(): EnrollmentRecord[] {
+    if (!this.hasPipelineTables()) {
+      return this.builtin.list()
+    }
     const builtinById = new Map(
       this.builtin.list().map((record) => [record.watcherId, record] as const)
     )
@@ -85,7 +91,7 @@ export class PipelineAwareEnrollmentStore implements EnrollmentStore {
   findLiveByWorkspace(workspaceKey: WorkspaceKey): EnrollmentRecord | null {
     return (
       this.builtin.findLiveByWorkspace(workspaceKey) ??
-      this.pipeline.findLiveByWorkspace(workspaceKey)
+      (this.hasPipelineTables() ? this.pipeline.findLiveByWorkspace(workspaceKey) : null)
     )
   }
 
@@ -129,6 +135,9 @@ export class PipelineAwareEnrollmentStore implements EnrollmentStore {
   }
 
   pendingKindPurges(): PendingKindPurge[] {
+    if (!this.hasPipelineTables()) {
+      return this.builtin.pendingKindPurges()
+    }
     return [...this.builtin.pendingKindPurges(), ...this.pipeline.pendingKindPurges()].sort(
       (left, right) =>
         left.watcherId < right.watcherId ? -1 : left.watcherId > right.watcherId ? 1 : 0
@@ -174,6 +183,9 @@ export class PipelineAwareEnrollmentStore implements EnrollmentStore {
     pipelineWatcherId: string
     builtinWatcherId: string
   }[] {
+    if (!this.hasPipelineTables()) {
+      return []
+    }
     const statement = this.database.connection().prepare(
       `SELECT pipeline.watcher_id AS pipelineWatcherId,
                 builtin.watcher_id AS builtinWatcherId
@@ -193,6 +205,18 @@ export class PipelineAwareEnrollmentStore implements EnrollmentStore {
   }
 
   private storeForWatcher(watcherId: string): HeimdallEnrollmentStore {
-    return this.pipeline.get(watcherId) ? this.pipeline : this.builtin
+    return this.hasPipelineTables() && this.pipeline.get(watcherId) ? this.pipeline : this.builtin
+  }
+
+  // a read-only database from a newer build may never have had the side tables created
+  private hasPipelineTables(): boolean {
+    if (!this.database.isReadOnly()) {
+      return true
+    }
+    const row = this.database
+      .connection()
+      .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`)
+      .get(PIPELINE_ENROLLMENT_TABLES.enrollment)
+    return row !== undefined
   }
 }
