@@ -417,3 +417,33 @@ describe('pipeline-aware enrollment persistence', () => {
     ])
   })
 })
+
+describe('read-only database from a newer build without pipeline tables', () => {
+  it('serves built-in enrollments instead of failing on the missing pipeline tables', () => {
+    const objective = enrollment({
+      watcherId: 'objective-row',
+      kind: 'objective',
+      workspaceKey: 'local::/objective-workspace'
+    })
+    enrollments.insert(objective)
+    // simulates a newer schema written by a build that never created the pipeline side tables
+    database.connection().exec(`
+      DROP TABLE heimdall_pipeline_enrollment;
+      DROP TABLE heimdall_pipeline_pending_purge;
+      PRAGMA user_version = 99;
+    `)
+    database.close()
+
+    database = new HeimdallDatabase(root)
+    enrollments = new PipelineAwareEnrollmentStore(database)
+
+    expect(database.isReadOnly()).toBe(true)
+    expect(enrollments.list()).toEqual([objective])
+    expect(enrollments.get(objective.watcherId)).toEqual(objective)
+    expect(enrollments.get('pipeline-1')).toBeNull()
+    expect(enrollments.findLiveByWorkspace(objective.workspaceKey)).toEqual(objective)
+    expect(enrollments.findLiveByWorkspace('local::/pipeline-workspace')).toBeNull()
+    expect(enrollments.pendingKindPurges()).toEqual([])
+    expect(enrollments.pipelineRowsClaimedByBuiltin()).toEqual([])
+  })
+})
