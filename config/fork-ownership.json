@@ -5781,6 +5781,12 @@
         "import { disposePipelineMode } from '@/fork-heimdall-pipeline/pipeline-tab-lifecycle'",
         "    if (!isStillClosed(closedFile) || disposePipelineMode(closedFile.id, closedFile.mode)) {"
       ]
+    },
+    {
+      "path": "config/oxlint-dead-classes.json",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": ["              \"pipeline-*\","]
     }
   ],
   "exceptions": [
@@ -9224,6 +9230,10 @@
     },
     "src/renderer/src/components/editor/editor-save-queue.ts": {
       "added": 4,
+      "removed": 0
+    },
+    "config/oxlint-dead-classes.json": {
+      "added": 1,
       "removed": 0
     }
   }
