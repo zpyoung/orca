@@ -11,6 +11,10 @@ describe('pipeline gitignore rules', () => {
     ['.orca/\n', true],
     ['.orca/*\n', true],
     ['node_modules\r\n.orca\r\n', true],
+    ['/.orca\n', true],
+    ['/.orca/\n', true],
+    ['/.orca/*\n', true],
+    ['src//.orca\n', false],
     ['.orcarc\n', false],
     ['# .orca\n', false],
     ['src/.orca\n', false]
@@ -30,6 +34,14 @@ describe('pipeline gitignore rules', () => {
     })
   })
 
+  it('treats a root-anchored /.orca like a bare .orca line', () => {
+    expect(rewriteBareOrcaLine('/.orca\n')).toEqual({
+      content: '.orca/*\n!.orca/pipelines/\n',
+      changed: true
+    })
+    expect(rewriteBareOrcaLine('/.orca/\n')).toEqual({ content: '/.orca/\n', changed: false })
+  })
+
   it('preserves CRLF for inserted ignore rules', () => {
     expect(rewriteBareOrcaLine('a\r\n.orca\r\nb\r\n')).toEqual({
       content: 'a\r\n.orca/*\r\n!.orca/pipelines/\r\nb\r\n',
@@ -41,6 +53,12 @@ describe('pipeline gitignore rules', () => {
     expect(reincludePipelines('.orca/\n')).toBe('.orca/*\n!.orca/pipelines/\n')
     expect(reincludePipelines('x')).toBe('x\n!.orca/pipelines/\n')
     expect(reincludePipelines('')).toBe('!.orca/pipelines/\n')
+  })
+
+  it('rewrites a root-anchored directory rule on explicit re-include', () => {
+    expect(reincludePipelines('/.orca/\n')).toBe('.orca/*\n!.orca/pipelines/\n')
+    expect(reincludePipelines('/.orca/\r\n')).toBe('.orca/*\r\n!.orca/pipelines/\r\n')
+    expect(reincludePipelines('/.orca/*\n')).toBe('/.orca/*\n!.orca/pipelines/\n')
   })
 
   it('preserves unrelated rules and the file line ending on re-include', () => {

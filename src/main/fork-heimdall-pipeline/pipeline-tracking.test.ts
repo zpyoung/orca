@@ -179,6 +179,18 @@ describe('native Git and host routing', () => {
     expect(untracked.stdout.split(/\r?\n/)).toContain(pipelinePath)
   })
 
+  it('re-includes a root-anchored /.orca/ rule using native Git', async () => {
+    mkdirSync(join(worktreePath, '.orca', 'pipelines'), { recursive: true })
+    writeFileSync(join(worktreePath, pipelinePath), 'pipeline: true\n')
+    writeFileSync(join(worktreePath, '.gitignore'), '/.orca/\n')
+    const nativeTarget = { ...target, repoPath: worktreePath, worktreePath }
+
+    await expect(reincludePipelineFiles(nativeTarget)).resolves.toEqual({ status: 'tracked' })
+    expect(readFileSync(join(worktreePath, '.gitignore'), 'utf8')).toBe(
+      '.orca/*\n!.orca/pipelines/\n'
+    )
+  })
+
   it('does not fall back to native Git when the SSH Git host is unavailable', async () => {
     writeFileSync(join(worktreePath, '.gitignore'), '.orca\n')
     const remoteTarget = {
