@@ -1,4 +1,5 @@
 import type { NativeChatMessage } from '../../../../shared/native-chat-types'
+import { resolveNativeChatTranscriptAgent } from '../../../../shared/native-chat-agent-support'
 import {
   readNativeChatTranscriptTail,
   subscribeNativeChatTranscript,
@@ -8,6 +9,10 @@ import {
 import { nativeChatCompanionFrameFields } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../core'
 import { sanitizeNativeChatRpcBlock } from './native-chat-rpc-block-sanitize'
+import {
+  boundNativeChatRpcPageByBytes,
+  nativeChatRpcAppendBatches
+} from './native-chat-rpc-page-bounds'
 import {
   MOBILE_NATIVE_CHAT_MAX_WINDOW,
   NativeChatSession,
@@ -52,16 +57,21 @@ function windowTranscript(
   return messages.length > window ? messages.slice(-window) : messages.slice()
 }
 
-/** Apply the windowed slice and keep inline image bytes off every RPC transport.
- *  Mobile clients additionally receive bounded text and tool bodies; runtime
- *  clients keep those bodies intact. */
-function windowForClient(
+function pageForClient(
   messages: readonly NativeChatMessage[],
+  hasMore: boolean,
+  beforeOffset: number,
   clientKind: RpcContext['clientKind'],
-  limit = MOBILE_NATIVE_CHAT_DEFAULT_WINDOW
-): NativeChatMessage[] {
-  const windowed = windowTranscript(messages, limit)
-  return windowed.map((message) => sanitizeMessage(message, clientKind))
+  limit = MOBILE_NATIVE_CHAT_DEFAULT_WINDOW,
+  agent?: string
+): { messages: NativeChatMessage[]; hasMore: boolean; beforeOffset: number } {
+  const isOpenCode = resolveNativeChatTranscriptAgent(agent) === 'opencode'
+  const sanitized = (isOpenCode ? messages : windowTranscript(messages, limit)).map((message) =>
+    sanitizeMessage(message, clientKind)
+  )
+  return isOpenCode
+    ? boundNativeChatRpcPageByBytes(sanitized, hasMore, beforeOffset)
+    : { messages: sanitized, hasMore, beforeOffset }
 }
 
 export const NATIVE_CHAT_METHODS = [
@@ -145,9 +155,7 @@ export const NATIVE_CHAT_METHODS = [
           // instead of stranding the view at 'loading' when the read keeps throwing.
           emit({
             type: 'snapshot',
-            messages: windowForClient(messages, clientKind, limit),
-            hasMore,
-            beforeOffset,
+            ...pageForClient(messages, hasMore, beforeOffset, clientKind, limit, params.agent),
             ...(error ? { error } : {}),
             ...nativeChatCompanionFrameFields(companion)
           })

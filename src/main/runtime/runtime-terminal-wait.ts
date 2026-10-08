@@ -11,19 +11,38 @@ import {
   buildTerminalWaitResult,
   getTerminalState
 } from './terminal-wait-results'
+import { readsTrustedScreen } from './agent-state-rules/agent-state-rules-engine'
+import { showsScreenProbeBanner } from './agent-state-rules/agent-state-text-anchors'
 import { buildTerminalWaitText } from './terminal-wait-tail-state'
+import { evaluateTuiIdle, type TuiIdleVerdict } from './tui-idle-evidence'
 import {
-  evaluateTuiIdle,
   leafTuiIdleEvidence,
   ptyTuiIdleEvidence,
-  type TuiIdleEvidenceSource,
-  type TuiIdleVerdict
-} from './tui-idle-evidence'
+  type TuiIdleEvidenceSource
+} from './tui-idle-evidence-source'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { TerminalWaiter } from './runtime-terminal-contracts'
 import type { RuntimeLeafRecord, RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
 import type { RuntimeTerminalIdlePolls } from './runtime-terminal-idle-polls'
 import type { RuntimeTerminalWaiterRegistry } from './runtime-terminal-waiter-registry'
+
+/**
+ * A pane with no retained bytes and no status has only its provider's screen to read, and one
+ * whose tail shows a rule file's `profile.screenProbeBanner` is probed as before screen rules. So
+ * is a clockless pane whose rules read the trusted screen, whatever its status: a re-attached
+ * pane's own model can be untrusted. A clocked one settles through the poll, once quiet.
+ */
+function shouldProbeVisibleScreen(
+  paneAgent: TuiAgent | null,
+  record: Pick<RuntimePtyWorktreeRecord, 'lastAgentStatus' | 'lastOutputAt'>,
+  waitText: string
+): boolean {
+  return (
+    (record.lastAgentStatus === null && waitText.length === 0) ||
+    showsScreenProbeBanner(waitText) ||
+    (readsTrustedScreen(paneAgent) && record.lastOutputAt === null)
+  )
+}
 
 type RuntimeTerminalWaitDependencies = TuiIdleEvidenceSource & {
   defaultTimeoutMs: number
@@ -59,6 +78,8 @@ export class RuntimeTerminalWait {
       condition?: RuntimeTerminalWaitCondition
       timeoutMs?: number
       signal?: AbortSignal
+      /** Main-internal, never on the wire: see `TerminalWaiter.launchReadiness`. */
+      launchReadiness?: boolean
     }
   ): Promise<RuntimeTerminalWaitResult> {
     const condition = options?.condition ?? 'exit'
@@ -95,7 +116,8 @@ export class RuntimeTerminalWait {
           reject,
           timeout: null,
           cancelIdlePoll: null,
-          abortCleanup: null
+          abortCleanup: null,
+          ...(options?.launchReadiness ? { launchReadiness: true } : {})
         }
         if (!this.waiters.bindAbort(waiter, options?.signal)) {
           reject(new Error('request_aborted'))
@@ -186,7 +208,8 @@ export class RuntimeTerminalWait {
         reject,
         timeout: null,
         cancelIdlePoll: null,
-        abortCleanup: null
+        abortCleanup: null,
+        ...(options?.launchReadiness ? { launchReadiness: true } : {})
       }
 
       if (!this.waiters.bindAbort(waiter, options?.signal)) {

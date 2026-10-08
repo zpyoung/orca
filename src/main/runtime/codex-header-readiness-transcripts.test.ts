@@ -200,13 +200,15 @@ describe('Codex 0.157 header readiness from captured bytes', () => {
 
   describe('through the runtime', () => {
     async function codexPane(name: string, size?: { cols: number; rows: number }) {
-      return createTranscriptPane({
+      const created = await createTranscriptPane({
         paneTitle: 'Terminal',
         foregroundProcess: 'codex',
         launchAgent: 'codex',
         data: readRuntimeFixture(name),
         size
       })
+      await created.runtime.readTerminal(created.handle, { screen: true })
+      return created
     }
 
     it.each(ALL_FIXTURES)(
@@ -251,6 +253,7 @@ describe('Codex 0.157 header readiness from captured bytes', () => {
         data: '',
         size: { cols: 120, rows: 40 }
       })
+      await runtime.readTerminal(handle, { screen: true })
       const readVisibleScreen = vi.spyOn(runtime, 'readTerminal').mockResolvedValue({
         handle,
         status: 'running',
@@ -267,9 +270,7 @@ describe('Codex 0.157 header readiness from captured bytes', () => {
         nextCursor: null,
         source: 'screen'
       })
-      await expect(
-        runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 2_500 })
-      ).rejects.toThrow(/timeout/)
+      await expect(waitForTranscriptIdle({ runtime, handle }, 2_500)).rejects.toThrow(/timeout/)
       // Presence precondition: the visible-screen probe actually ran.
       expect(readVisibleScreen).toHaveBeenCalled()
     }, 15_000)

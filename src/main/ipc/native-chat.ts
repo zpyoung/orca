@@ -1,3 +1,4 @@
+import { DESKTOP_READ_WINDOW } from '../native-chat/transcript-watch-contract'
 import { ipcMain, type IpcMainEvent, type WebContents } from 'electron'
 import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
 import {
@@ -37,7 +38,6 @@ export type NativeChatReadSessionArgs = {
 
 // Why: render and parse only the recent window so long transcripts do not stall
 // either the main process or the message list. Pagination raises this limit.
-const DESKTOP_READ_WINDOW = 300
 
 async function readSession(args: NativeChatReadSessionArgs): Promise<ReadTranscriptResult> {
   const { agent, sessionId } = args

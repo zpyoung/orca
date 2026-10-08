@@ -50,7 +50,7 @@ export type GitHandlerOperationHost = {
 export abstract class GitHandlerOperationContext {
   constructor(private readonly host: GitHandlerOperationHost) {}
 
-  protected get gitDiffReadDedupe(): InFlightPromiseDedupe<unknown> {
+  protected get gitDiffReadDedupe(): GitStatusReadLeaseOwner<unknown> {
     return this.host.gitDiffReadDedupe
   }
 

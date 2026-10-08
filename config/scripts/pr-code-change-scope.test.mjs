@@ -117,6 +117,12 @@ describe('per-job path classification', () => {
     expectClassification(['.github/actions/prepare-git-compatibility/action.yml'], {
       git_compatibility: true
     })
+    // The contract pins the local-main fast-forward's exact arguments.
+    expectClassification(['src/shared/worktree/local-base-branch-fast-forward.ts'], {
+      git_compatibility: true,
+      package: true,
+      package_windows: true
+    })
   })
 
   it('runs the Codex index-heal contract only when the heal or its transport changes', () => {
@@ -138,6 +144,13 @@ describe('per-job path classification', () => {
     expectClassification(['src/main/codex/codex-index-heal-binary-contract.test.ts'], {
       codex_index_heal_contract: true
     })
+    for (const file of ['src/main/agent-trust-presets.ts', 'src/main/codex/config-toml-trust.ts']) {
+      expectClassification([file], {
+        codex_index_heal_contract: true,
+        package: true,
+        package_windows: true
+      })
+    }
     // Keep the real-binary gate live when a transport or launch dependency changes.
     for (const file of [
       'src/main/codex/codex-app-server-capability-signal.ts',
@@ -172,7 +185,7 @@ describe('per-job path classification', () => {
   })
 
   it('runs native package jobs only for the platform that ships the changed native', () => {
-    expectClassification(['native/windows-cli-launcher/OrcaCliLauncher.cs'], {
+    expectClassification(['native/windows-cli-launcher/src/main.rs'], {
       package_windows: true
     })
     expectClassification(['native/computer-use-linux/runtime.py'], {
@@ -184,6 +197,7 @@ describe('per-job path classification', () => {
   it('runs Linux packaging when an artifact contract changes', () => {
     for (const file of [
       'config/scripts/package-linux-formats.mjs',
+      'config/scripts/package-linux-formats-appimage.mjs',
       'config/scripts/script-child-process.mjs',
       'config/scripts/space-sharing-copy.mjs',
       '.github/actions/prepare-linux-package-fixture/action.yml',
@@ -255,6 +269,23 @@ describe('per-job path classification', () => {
       package: true,
       package_windows: true
     })
+  })
+
+  it('runs shell contracts for the structured-session login-shell test, its harness and its subject', () => {
+    expectClassification(
+      ['src/main/runtime/structured-session-cli-login-shell.live-shell.test.ts'],
+      { shell_contracts: true }
+    )
+    for (const file of [
+      'src/main/runtime/structured-session-login-shell-test-harness.ts',
+      'src/main/runtime/structured-session-child-identity-env.ts'
+    ]) {
+      expectClassification([file], {
+        shell_contracts: true,
+        package: true,
+        package_windows: true
+      })
+    }
   })
 
   it('runs orcad browser when Chrome launch, session, or tab modules change', () => {
@@ -338,7 +369,11 @@ describe('per-job path classification', () => {
       'src/main/runtime/runtime-worktree-agent-rows.ts',
       'src/main/runtime/runtime-worktree-pty-agent-sources.ts',
       'src/shared/runtime-worktree-contracts.ts',
-      'src/renderer/src/runtime/remote-runtime-terminal-multiplexer.ts'
+      'src/renderer/src/runtime/remote-runtime-terminal-multiplexer.ts',
+      'src/shared/structured-agent-session-projection.ts',
+      'src/shared/agent-turn-outcome.ts',
+      'src/main/runtime/orchestration/db.ts',
+      'src/main/runtime/orchestration/orchestration-schema-version-skew.ts'
     ]) {
       expectClassification([file], {
         'cross-version-wire': true,
@@ -369,6 +404,7 @@ describe('per-job path classification', () => {
       'package.json',
       'pnpm-lock.yaml',
       '.github/actions/install-node-dependencies/action.yml',
+      '.github/actions/prepare-native-runtime/action.yml',
       'config/scripts/ensure-native-runtime.mjs',
       'config/scripts/rebuild-native-deps.mjs',
       'config/patches/node-pty@1.1.0.patch'
@@ -512,14 +548,16 @@ describe('PR Checks skip wiring', () => {
     expect(prWorkflow.jobs.code_paths.outputs.mobile_dependencies).toBe(
       '${{ steps.filter.outputs.mobile_dependencies }}'
     )
-    const steps = prWorkflow.jobs.static_analysis.steps
+    const steps = prWorkflow.jobs.preflight.steps
     const install = steps.findIndex(
       (step) => step.uses === './.github/actions/install-mobile-dependencies'
     )
     const gate = steps.findIndex((step) => step.name === 'Enforce changed-code quality')
     expect(install).toBeGreaterThan(-1)
     expect(install).toBeLessThan(gate)
-    expect(steps[install].if).toBe("needs.code_paths.outputs.mobile_dependencies == 'true'")
+    expect(steps[install].if).toBe(
+      "needs.code_paths.outputs.static_analysis == 'true' && needs.code_paths.outputs.mobile_dependencies == 'true'"
+    )
     // The install itself moved into the action the packaging jobs share; assert it there so
     // this job cannot keep the step while the action stops installing anything.
     const action = parse(

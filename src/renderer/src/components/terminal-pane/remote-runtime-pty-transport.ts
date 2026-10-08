@@ -424,10 +424,12 @@ export function createRemoteRuntimePtyTransport(
   ): void => {
     outputProcessor.processData(data, storedCallbacks, undefined, meta)
   }
+  // Why flagged: only pushed snapshots are buffered for this pty during a shutdown.
   const shutdownReplayHandler = (data: string): void => {
     outputProcessor.processData(data, storedCallbacks, {
       replayingBufferedData: true,
-      suppressAttentionEvents: true
+      suppressAttentionEvents: true,
+      carriesNormalBuffer: true
     })
   }
   const shutdownLifecycle = {
@@ -2023,7 +2025,8 @@ export function createRemoteRuntimePtyTransport(
               // host dimensions. Absent/zero degrades to the pane's own grid.
               ...(meta?.cols !== undefined && meta.rows !== undefined
                 ? { snapshotCols: meta.cols, snapshotRows: meta.rows }
-                : {})
+                : {}),
+              carriesNormalBuffer: true
             })
           }
         },

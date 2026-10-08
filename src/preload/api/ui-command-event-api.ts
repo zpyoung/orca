@@ -2,6 +2,7 @@ import type { MarkdownDocument } from '../../shared/filesystem-entry-types'
 import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
 import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'
 import type { TuiAgent } from '../../shared/tui-agent'
+import type { RuntimeNavigationTarget } from '../../shared/runtime-navigation'
 import type { TerminalSurfaceCloseTarget } from '../../shared/terminal-surface-close-target'
 import type {
   WorktreeDefaultTabsLaunch,
@@ -56,7 +57,7 @@ export type UiCommandEventApi = {
   consumePendingOpenSettings: () => Promise<boolean>
   onOpenSkillShare: (callback: (shareId: string) => void) => () => void
   consumePendingSkillShare: () => Promise<string | null>
-  /** OS "Open With" markdown paths pushed while a renderer is already listening. */
+  /** OS "Open With" Markdown/CSV/TSV documents; the local IPC name is retained. */
   onOpenMarkdownFiles: (callback: (documents: MarkdownDocument[]) => void) => () => void
   /** Drains the "Open With" paths queued before this renderer's listener attached. */
   consumePendingMarkdownFileOpens: () => Promise<MarkdownDocument[]>
@@ -226,6 +227,7 @@ export type UiCommandEventApi = {
       filePath: string
       relativePath: string
       runtimeEnvironmentId?: string
+      navigation?: RuntimeNavigationTarget
     }) => void
   ) => () => void
   onOpenDiffFromMobile: (
@@ -235,6 +237,7 @@ export type UiCommandEventApi = {
       relativePath: string
       staged: boolean
       runtimeEnvironmentId?: string
+      navigation?: RuntimeNavigationTarget
     }) => void
   ) => () => void
   onMobileMarkdownRequest: (callback: (request: RuntimeMobileMarkdownRequest) => void) => () => void

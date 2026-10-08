@@ -3,6 +3,7 @@ import { agentLaunchOverridesToSessionOptionValues } from '../../../../../../sha
 import type { AppState } from '@/store'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { getConnectionId } from '@/lib/connection-context'
 import { planAgentCliArgsSuffix } from '@/lib/tui-agent-startup'
 import {
@@ -160,6 +161,7 @@ export async function launchSourceControlRecoveryAgentWithDefault({
     ? agentLaunchOverridesToSessionOptionValues(savedRecipe.launchOptions)
     : undefined
   const result = launchAgentInNewTab({
+    requestId: newAgentLaunchRequestId(),
     agent,
     worktreeId: activeWorktreeId,
     groupId: activeGroupId ?? activeWorktreeId,

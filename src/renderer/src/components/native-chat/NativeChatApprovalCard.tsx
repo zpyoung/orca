@@ -5,6 +5,10 @@ import { translate } from '@/i18n/i18n'
 import CommentMarkdown, {
   type CommentMarkdownLinkClickHandler
 } from '@/components/sidebar/CommentMarkdown'
+import {
+  isNewerApprovalSubject,
+  isPlanApprovalSubject
+} from '../../../../shared/agent-session-approval-subject'
 import { NativeChatCodeBlock } from './NativeChatCodeBlock'
 import type { ChatApproval } from './native-chat-interactive-prompt'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
@@ -37,6 +41,8 @@ export function NativeChatApprovalCard({
   const widthClassName = useNativeChatWidthClassName()
 
   const cardRef = useRef<HTMLDivElement>(null)
+  // A newer Orca's subject: its detail is shown, and only the card's cancel answers.
+  const newerSubject = isNewerApprovalSubject(approval.subject)
   const hasContext = Boolean(
     approval.description ||
     approval.decisionReason ||
@@ -124,7 +130,7 @@ export function NativeChatApprovalCard({
                   </span>
                 </p>
               ) : null}
-              {approval.subject?.kind === 'plan' ? (
+              {isPlanApprovalSubject(approval.subject) ? (
                 <div data-native-chat-approval-plan="true">
                   <CommentMarkdown
                     content={approval.subject.text}
@@ -152,6 +158,14 @@ export function NativeChatApprovalCard({
                   {approval.detail}
                 </div>
               ) : null}
+              {newerSubject ? (
+                <p data-native-chat-approval-needs-newer-orca="true" className="break-words">
+                  {translate(
+                    'components.native-chat.approval.needsNewerOrca',
+                    'This request needs a newer version of Orca.'
+                  )}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <div data-native-chat-approval-actions="true" className="flex shrink-0 flex-wrap gap-2">
@@ -159,9 +173,10 @@ export function NativeChatApprovalCard({
               <button
                 key={`${opt.label}-${i}`}
                 type="button"
+                disabled={newerSubject}
                 onClick={() => onChoose(opt.send)}
                 className={cn(
-                  'rounded-md px-4 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'rounded-md px-4 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
                   i === 0
                     ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                     : 'border border-border bg-background text-foreground hover:bg-accent'

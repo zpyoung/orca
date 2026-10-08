@@ -30,12 +30,9 @@ export function getCompactAgentSecondary(
   now: number,
   lastAssistantMessageOverride?: string
 ): string {
-  const verdictMark = agentVerdictDisplayMark(agent.entry)
-  if (verdictMark === 'interrupted') {
-    return 'Interrupted by user'
-  }
-  if (verdictMark === 'failed') {
-    return 'Failed'
+  const verdictLine = agentVerdictStatusLine(agent.entry)
+  if (verdictLine) {
+    return verdictLine
   }
   // Why: the only honest thing to say about a pane Orca still holds but no longer hears
   // from is how long the silence has run; the user supplies the meaning.

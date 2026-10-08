@@ -14,6 +14,11 @@ import {
   getAgentStatusHooksSearchKeywords,
   getAgentStatusHooksTitle
 } from './agent-status-hooks-copy'
+import {
+  getAgentWorkspaceTrustDescription,
+  getAgentWorkspaceTrustSearchKeywords,
+  getAgentWorkspaceTrustTitle
+} from './agent-workspace-trust-copy'
 import { getAgentCacheTimerSearchEntries } from './agent-cache-timer-search'
 import {
   getCodexTerminalServerIsolationDescription,
@@ -71,6 +76,7 @@ type AgentsPaneSearchOptions = {
 }
 
 const AGENT_AWAKE_SEARCH_ENTRY_ID = 'agent-awake'
+const AGENT_WORKSPACE_TRUST_SEARCH_ENTRY_ID = 'agent-workspace-trust'
 const AGENT_RUNTIME_SEARCH_ENTRY_ID = 'agent-runtime'
 const CODEX_TERMINAL_SERVER_ISOLATION_SEARCH_ENTRY_ID = 'codex-terminal-server-isolation'
 

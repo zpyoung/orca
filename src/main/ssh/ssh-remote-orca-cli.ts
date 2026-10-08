@@ -230,10 +230,7 @@ async function dispatchRemoteCli(
           // authority as the full host CLI passthrough.
           senderPaneKey: env.ORCA_PANE_KEY || undefined
         },
-        {
-          ...compatibilityEnvelope,
-          orchestrationCapability: optionalRemoteCliString(parsed.flags, 'dispatch-capability')
-        }
+        compatibilityEnvelope
       )
     }
     case 'orchestration check':
@@ -273,10 +270,7 @@ async function dispatchRemoteCli(
           run: optionalRemoteCliString(parsed.flags, 'run'),
           compatibilityCliCommand: 'orca'
         },
-        {
-          ...compatibilityEnvelope,
-          orchestrationCapability: optionalRemoteCliString(parsed.flags, 'dispatch-capability')
-        }
+        compatibilityEnvelope
       )
     case 'orchestration reply':
       return await call(
@@ -320,7 +314,6 @@ async function call(
     authToken: 'remote-cli',
     method,
     params,
-    orchestrationCapability: envelope?.orchestrationCapability,
     orchestrationContractVersion: method.startsWith('orchestration.')
       ? ORCHESTRATION_CONTRACT_VERSION
       : undefined,

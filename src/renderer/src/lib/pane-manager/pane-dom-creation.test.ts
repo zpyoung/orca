@@ -46,7 +46,16 @@ vi.mock('@xterm/xterm', () => ({
     return {
       options: {},
       loadAddon: vi.fn(),
-      open: vi.fn()
+      open: vi.fn(),
+      parser: {
+        registerCsiHandler: vi.fn(
+          (id: { final: string }, handler: (params: (number | number[])[]) => boolean) => {
+            csiHandlers.set(id.final, handler)
+            return { dispose: vi.fn() }
+          }
+        ),
+        registerEscHandler: vi.fn(() => ({ dispose: vi.fn() }))
+      }
     }
   })
 }))

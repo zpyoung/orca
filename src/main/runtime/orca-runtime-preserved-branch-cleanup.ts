@@ -95,6 +95,10 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
 
   protected readonly retireAgentHookCompatibilityAuthorityFn: ((paneKey: string) => void) | null
 
+  protected readonly checkHookAgentPresenceFn:
+    | ((paneKey: string) => Promise<'live' | 'unverifiable' | 'exited' | null>)
+    | null
+
   protected readonly reconcileAgentStatusForEndedProcessFn:
     | ((paneKeys: Iterable<string>) => void)
     | null
@@ -112,17 +116,11 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
     | null
 
   protected readonly prepareCodexStructuredLaunchFn:
-    | ((input: {
-        workspacePath: string
-        launchEnv: NodeJS.ProcessEnv
-      }) => string | null | Promise<string | null>)
+    | ((input: { launchEnv: NodeJS.ProcessEnv }) => string | null | Promise<string | null>)
     | null
 
   protected readonly resolveCodexStructuredLaunchHomeFn:
-    | ((input: {
-        workspacePath: string
-        launchEnv: NodeJS.ProcessEnv
-      }) => string | null | Promise<string | null>)
+    | ((input: { launchEnv: NodeJS.ProcessEnv }) => string | null | Promise<string | null>)
     | null
 
   protected readonly agentSessionClaimSigner: AgentSessionClaimSigner

@@ -113,6 +113,7 @@ export function useVisibleSidebarWorktrees(args: {
       workspaceActivity,
       workspaceReview,
       worktreeLineageById,
+      preserveLineageParentOrder: sortBy === 'manual',
       forcedVisibleWorktreeIds: args.agentSendTargetWorktreeId
         ? [args.agentSendTargetWorktreeId]
         : undefined
@@ -142,6 +143,7 @@ export function useVisibleSidebarWorktrees(args: {
     workspaceActivity,
     workspaceReview,
     sortedIds,
+    sortBy,
     worktreeLineageById,
     worktreesByRepo,
     pairedDeviceIdsByEnvironment,

@@ -635,7 +635,7 @@ describe('OrcaRuntimeRpcServer', () => {
     expect(mocks.abortRuntimeGitMerge).toHaveBeenCalledWith('id:wt-1')
     expect(mocks.abortRuntimeGitRebase).toHaveBeenCalledWith('id:wt-1')
     expect(mocks.bulkUnstageRuntimeGitPaths).toHaveBeenCalledWith('id:wt-1', ['c.ts'])
-    expect(mocks.openMobileDiff).toHaveBeenCalledWith('id:wt-1', 'docs/readme.md', true)
+    expect(mocks.openMobileDiff).toHaveBeenCalledWith('id:wt-1', 'docs/readme.md', true, undefined)
     // A mobile WebSocket client is transport-capped; a local caller gets undefined here.
     // The trailing signal is undefined because this dispatch has no socket to abort on.
     expect(mocks.getRuntimeGitDiff).toHaveBeenCalledWith(

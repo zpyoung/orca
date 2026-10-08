@@ -119,7 +119,6 @@ export class RpcDispatcher {
           clientKind: options?.clientKind,
           clientCapabilities: options?.clientCapabilities,
           updateClientCapabilities: options?.updateClientCapabilities,
-          orchestrationCapability: request.orchestrationCapability,
           authenticatedCallerFingerprint: options?.authenticatedCallerFingerprint,
           authenticatedCredential: options?.authenticatedCredential,
           orchestrationCaller: resolved.caller

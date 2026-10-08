@@ -18,6 +18,7 @@ import {
   AgentPermissionsSetting,
   AgentGeneratedTabTitlesSetting,
   AgentStatusHooksSetting,
+  AgentWorkspaceTrustSetting,
   AgentsPane,
   getAgentsPaneSearchEntries,
   buildAgentAvailabilitySettingsUpdate,
@@ -333,6 +334,24 @@ describe('AgentsPane', () => {
     )
   })
 
+  it('describes macOS lid behavior without promising lid-closed wake', () => {
+    expect(getAgentAwakeDescription('Macintosh')).toBe(
+      'Choose On, Agent, or Off. Agent mode prevents idle sleep while agents work, so long runs finish with the lid open. Closing the lid still puts this Mac to sleep.'
+    )
+  })
+
+  it('picks the lid note for each platform', () => {
+    expect(getAgentAwakeLidNote('Macintosh')).toBe(
+      'Prevents idle sleep with the lid open; closing the lid still puts this Mac to sleep.'
+    )
+    expect(getAgentAwakeLidNote('Windows')).toBe(
+      "Lid-close behavior follows this device's power settings."
+    )
+    expect(getAgentAwakeLidNote('X11; Linux x86_64')).toBe(
+      'Orca also asks this device to stay awake when the lid is closed, subject to its power policy.'
+    )
+  })
+
   it('updates the keep-awake mode with its legacy fallback', () => {
     const updateSettings = vi.fn()
     const element = AgentAwakeSetting({
@@ -375,6 +394,28 @@ describe('AgentsPane', () => {
     expect(updateSettings).toHaveBeenCalledWith({
       agentStatusHooksEnabled: false
     })
+  })
+
+  it('defaults agent folder trust on and toggles it off', () => {
+    const updateSettings = vi.fn()
+    const element = AgentWorkspaceTrustSetting({
+      settings: getDefaultSettings('/tmp'),
+      updateSettings
+    })
+
+    const trustSwitch = findSwitchRow(element, getAgentWorkspaceTrustTitle())
+    expect(trustSwitch.props.checked).toBe(true)
+    expect(getAgentWorkspaceTrustDescription()).toContain('hooks')
+    expect(getAgentWorkspaceTrustDescription()).toContain('already trusted stay trusted')
+    expect(getAgentWorkspaceTrustDescription()).toContain('without you watching')
+
+    const onChange: unknown = trustSwitch.props.onChange
+    expect(typeof onChange).toBe('function')
+    if (typeof onChange === 'function') {
+      onChange()
+    }
+
+    expect(updateSettings).toHaveBeenCalledWith({ agentWorkspaceTrustEnabled: false })
   })
 
   it('toggles generated tab titles with the next value', () => {

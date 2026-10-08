@@ -45,7 +45,10 @@ export function NativeChatImageAttachmentPreview({
   const localSrc = useLocalImageSrc(
     !isPending && (isNearViewport || isOpen) ? attachment.path : undefined,
     attachment.path,
-    attachment.connectionId
+    attachment.connectionId,
+    undefined,
+    // Why chat-image: a draft handed off from the host queue may carry paths a paired client chose.
+    chatImageAccess()
   )
   // The clipboard thumbnail is already in this process, so it renders with no
   // round-trip; the on-disk file only wins for the full-size dialog.

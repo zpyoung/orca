@@ -44,7 +44,9 @@ export type NativeChatInteractiveSend = {
   sendRaw: (raw: string) => void
   /** Stop delayed writes without interrupting the agent. */
   cancelPending: () => void
-  /** Send ESC to interrupt — cancels a question / denies an approval. */
+  /** Reject the active question without requesting session interruption. */
+  cancelAsk: () => void
+  /** Interrupt the active turn. */
   cancel: () => void
 }
 
@@ -52,7 +54,7 @@ export type NativeChatInteractiveSend = {
  * Reuse the desktop composer's exact send path for the interactive cards:
  * resolve this tab's live ptyId + runtime owner settings, then write bytes via
  * `sendRuntimePtyInput` (which branches local pty:write vs remote runtime RPC,
- * so SSH panes work unchanged). Claude and Codex answers use their respective
+ * so SSH panes work unchanged). Selector answers use their respective
  * selector keystrokes via `sendNativeChatAskAnswer`; other agents still go through
  * `sendNativeChatMessage`. Control strings (option digits, ESC) are written raw.
  */
@@ -195,11 +197,24 @@ export function useNativeChatInteractiveSend(
     [terminalTabId, paneKey, targetPtyId, agent, cancelInFlight]
   )
 
-  // Stop/cancel: drop any pending answer writes, then send ESC to interrupt.
-  const cancel = useCallback(() => {
+  const cancelAsk = useCallback(() => {
     cancelInFlight()
     sendRaw(ESC)
   }, [cancelInFlight, sendRaw])
 
-  return { sendAnswer, sendRaw, cancelPending: cancelInFlight, cancel }
+  const cancel = useCallback(() => {
+    cancelInFlight()
+    if (resolveNativeChatTranscriptAgent(agent) === 'opencode' && targetPtyId) {
+      // OpenCode confirms interruption with a second Escape; pace writes like mobile Stop.
+      inFlightRef.current = sendNativeChatAskAnswer(
+        getSettingsForAgentTabRuntimeOwner(terminalTabId),
+        targetPtyId,
+        [{ raw: ESC }, { raw: ESC }]
+      )
+      return
+    }
+    sendRaw(ESC)
+  }, [agent, cancelInFlight, sendRaw, targetPtyId, terminalTabId])
+
+  return { sendAnswer, sendRaw, cancelPending: cancelInFlight, cancelAsk, cancel }
 }

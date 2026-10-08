@@ -17,6 +17,7 @@ import { resolveAiVaultSessionHandoffLaunchTargetOrNotify } from '@/components/a
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
 import { activateAiVaultStructuredSession } from '@/lib/activate-ai-vault-structured-session'
 import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
+import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import {
   activateAiVaultResumeWorkspace,
   resumeAiVaultSessionInNewChat
@@ -162,7 +163,12 @@ export function useAiVaultSessionLaunchActions({
         )
         return
       }
-      void resumeAiVaultSessionInNewChat(session, session.agent, worktreeId)
+      void resumeAiVaultSessionInNewChat(
+        session,
+        session.agent,
+        worktreeId,
+        newAgentLaunchRequestId()
+      )
     },
     [activeWorktree?.id, activeWorktreeId]
   )

@@ -1,13 +1,8 @@
 import { isQoderComposerReady } from './qoder-terminal-readiness'
 import { memoizeTitleClassification } from '../../shared/terminal-title-classification-memo'
-import {
-  detectAgentStatusFromTitle,
-  isOpenCodeNativeTitle,
-  type AgentStatus
-} from '../../shared/agent-detection'
+import { detectAgentStatusFromTitle, type AgentStatus } from '../../shared/agent-detection'
 import type { RuntimeTerminalWaitBlockedReason } from '../../shared/runtime-types'
 import type { TuiAgent } from '../../shared/tui-agent'
-import { findAntigravityReadyPromptIndex } from './antigravity-terminal-readiness'
 import {
   findCodexHeaderIndex,
   findCodexScreenReadyPromptIndex,
@@ -21,48 +16,40 @@ import {
   startOfLastNonBlankLines
 } from './terminal-wait-tail-window'
 
+// Why agent-agnostic: Orca's own `<Agent> ready` titles, and any agent title stating rest in words.
 const EXPLICIT_IDLE_TITLE_RE = /(^|\s)(ready|idle|done)(\s|$|[.!?])/i
-const CLAUDE_IDLE_PREFIX = '\u2733'
-const GEMINI_IDLE_PREFIX = '\u25c7'
-const PI_IDLE_PREFIX = '\u03c0 - '
 
 function computeExplicitIdleStatusFromTitle(title: string): AgentStatus | null {
   const status = detectAgentStatusFromTitle(title)
-  if (status !== 'idle') {
-    return null
-  }
   // Why: launch titles like "Codex YOLO" contain an agent name but aren't readiness signals; terminal.wait needs explicit idle evidence.
-  if (
-    EXPLICIT_IDLE_TITLE_RE.test(title) ||
-    // Why: unblock hookless remote waits; guarded writes corroborate this marker.
-    isOpenCodeNativeTitle(title) ||
-    title.startsWith(CLAUDE_IDLE_PREFIX) ||
-    title.startsWith('* ') ||
-    title.includes(GEMINI_IDLE_PREFIX) ||
-    title.startsWith(PI_IDLE_PREFIX)
-  ) {
-    return 'idle'
-  }
-  return null
+  return status === 'idle' && (EXPLICIT_IDLE_TITLE_RE.test(title) || showsIdleTitleAnchor(title))
+    ? 'idle'
+    : null
 }
 
 /**
- * Pure in `title`, so it is memoized on the title string like the status classifier it
- * wraps: the wait path re-asks for the same unchanged title on every poll tick and every
- * repaint frame, and the marker scan below is a regex sweep each time (~72ns vs ~7ns).
+ * Pure in `title` for one rule set, so it is memoized on the title string like the status
+ * classifier it wraps: the wait path re-asks for the same unchanged title on every poll tick and
+ * every repaint frame, and the marker scan below is a regex sweep each time (~72ns vs ~7ns). Why a
+ * fresh memo per rule set: a rules reload can change which titles read as idle.
  */
-export const detectExplicitIdleStatusFromTitle: (title: string) => AgentStatus | null =
+const explicitIdleTitleMemo = compiledFromActiveAgentStateRules(() =>
   memoizeTitleClassification(computeExplicitIdleStatusFromTitle)
+)
+
+export function detectExplicitIdleStatusFromTitle(title: string): AgentStatus | null {
+  return explicitIdleTitleMemo()(title)
+}
 
 export function isKnownReadyPromptPreview(preview: string): boolean {
   const normalized = preview.toLowerCase()
-  return isReadyPromptUnblocked(normalized, findKnownReadyPromptIndex(normalized))
+  return isUnblockedAfter(normalized, findPromptAnchorIndexes(normalized).ready)
 }
 
 /**
  * The ready-prompt text rules for a pane about to take input. Unlike isKnownReadyPromptPreview
- * (agent presence), Codex's provisional startup header does not count: 0.157 discards input typed
- * behind it while its daemon starts.
+ * (agent presence), nothing counts while a hold anchor shows (Codex's provisional startup header):
+ * 0.157 discards input typed behind it while its daemon starts.
  */
 export function isKnownReadyPromptSettled(preview: string): boolean {
   const normalized = preview.toLowerCase()
@@ -76,8 +63,8 @@ function isReadyPromptSettled(normalized: string, readyIndex: number | null): bo
 }
 
 /**
- * Tier 1 body evidence for every tui-idle site. `readScreenLines` yields the live emulator's
- * visible grid, or null when the runtime has no trustworthy one.
+ * Tier 1 body evidence for every tui-idle site. `readScreenLines` yields the screen the agent's
+ * rules read, or null when the runtime has no trustworthy one.
  *
  * Why not for a clocked Codex pane: its header stays up through every turn, so it proves only
  * that Codex started; isQuietReadyScreenBody holds it to quiescence instead.
@@ -89,7 +76,7 @@ export function isKnownReadyPromptBody(
   readScreenLines: () => readonly string[] | null,
   hasOutputClock: boolean
 ): boolean {
-  if (agent === 'qoder') {
+  if (agent === 'qoder' || agent === 'qoder-cn') {
     return isQoderComposerReady(readScreenLines())
   }
   if (agent === 'codex' && hasOutputClock) {
@@ -107,9 +94,9 @@ export function isKnownReadyPromptBody(
 }
 
 /**
- * Tier 1b body evidence: a ready screen from an agent with no title rest signal. Unlike tier 1
- * it only proves the TUI is up, so the ranking holds it to quiescence.
- * Why codex panes only: a `cat`ed transcript or pager in an unknown pane can show the composer.
+ * Tier 1b body evidence: a ready screen or text the agent also paints mid-turn, so the ranking
+ * holds it to quiescence. Why identified panes only for Muse: a `cat`ed transcript or pager in an
+ * unknown pane can show the composer.
  */
 export function isQuietReadyScreenBody(
   waitText: string,
@@ -155,7 +142,7 @@ function isReadyPromptUnblocked(normalized: string, readyIndex: number | null): 
 
 export function isMuseReadyPromptPreview(preview: string): boolean {
   const normalized = preview.toLowerCase()
-  return isReadyPromptUnblocked(normalized, findMuseReadyPromptIndex(normalized))
+  return isUnblockedAfter(normalized, findMuseReadyPromptIndex(normalized))
 }
 
 export function detectTerminalWaitBlockedReason(
@@ -180,6 +167,7 @@ export function findActionableTerminalWaitBlockedSignal(
 }
 
 // Why: a live prompt (idle OR busy) proves the startup modal was dismissed, so a mid-run Cursor lane stops reporting stale trust hits.
+// Why Muse beside the rule-file anchors: Muse has not moved to agent-state-rules/ yet.
 function findDismissedStartupModalIndex(normalized: string): number | null {
   const indexes = [
     findCodexReadyPromptIndex(normalized),
@@ -299,161 +287,5 @@ function findMuseReadyPromptIndex(normalized: string): number | null {
   const segment = normalized.slice(headerIndex)
   return segment.includes('voice') && segment.includes('input') && segment.includes('❯')
     ? headerIndex
-    : null
-}
-
-function findCodexReadyPromptIndex(normalized: string): number | null {
-  const headerIndex = normalized.lastIndexOf('openai codex')
-  if (headerIndex === -1) {
-    return null
-  }
-  const readySegment = normalized.slice(headerIndex)
-  // Why: Codex prints permissions only in YOLO mode; the stable ready header is OpenAI Codex + model + directory.
-  return readySegment.includes('model:') && readySegment.includes('directory:') ? headerIndex : null
-}
-
-export const TERMINAL_WAIT_BLOCKED_SENTINEL_RE =
-  /update available|choose working directory to|codex just got an upgrade|available\s*·|esc\s*skip|enter\s*confirm\s*·|enter\/esc\s*(?:continue|confirm)|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always|run this command\?/i
-
-// Why text at all: cursor-agent has no approval hook, so the key-bound menu is the only authority.
-const CURSOR_APPROVAL_CHOICE_MARKERS = [
-  'run (once)',
-  'to allowlist?',
-  'run everything',
-  'skip & tell the agent'
-]
-// Why bounded: an answered menu remains in scrollback; only a dialog owning the screen bottom is live.
-const CURSOR_APPROVAL_TAIL_LINES = 8
-
-function findCursorApprovalPromptIndex(normalized: string): number | null {
-  const windowStart = startOfLastLines(normalized, CURSOR_APPROVAL_TAIL_LINES)
-  const tail = normalized.slice(windowStart)
-  if (!tail.includes('run this command?')) {
-    return null
-  }
-  const lines = tail.split('\n')
-  while (lines.length > 0 && lines.at(-1)?.trim() === '') {
-    lines.pop()
-  }
-  let matchedLines = 0
-  let lastChoiceLine = -1
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!isCursorApprovalChoiceLine(lines[index])) {
-      continue
-    }
-    matchedLines += 1
-    lastChoiceLine = index
-  }
-  return matchedLines >= 2 && lastChoiceLine === lines.length - 1
-    ? windowStart + tail.lastIndexOf('run this command?')
-    : null
-}
-
-// Why the trailing key: narration can repeat the menu wording, but it does not end in a selectable key.
-const CURSOR_APPROVAL_CHOICE_KEY_RE =
-  /\((?:shift\+tab|ctrl\+[a-z]|esc(?: or [a-z])*|tab|enter|return|space|[a-z]|[\u21b5\u21e7\u21b9\u238b\u23ce]{1,3})\)\s*$/
-
-function isCursorApprovalChoiceLine(line: string): boolean {
-  return (
-    CURSOR_APPROVAL_CHOICE_KEY_RE.test(line) &&
-    CURSOR_APPROVAL_CHOICE_MARKERS.some((marker) => line.includes(marker))
-  )
-}
-
-// Why bounded: answered dialogs and quoted prompt wording (agents grep this file and its specs) stay in the
-// retained tail; only a dialog owning the screen bottom is live. Real Codex dialogs (trust, hooks review,
-// update, exec approval) are 4-8 lines; the slack covers a wrapped command or a longer hook list.
-const LIVE_PROMPT_TAIL_LINES = 12
-
-function findTerminalWaitBlockedSignal(
-  fullTail: string
-): { reason: RuntimeTerminalWaitBlockedReason; index: number } | null {
-  const windowStart = startOfLastNonBlankLines(fullTail, LIVE_PROMPT_TAIL_LINES)
-  const normalized = windowStart === 0 ? fullTail : fullTail.slice(windowStart)
-  // Why: one combined negative scan avoids a dozen searches when no prompt can match.
-  if (!TERMINAL_WAIT_BLOCKED_SENTINEL_RE.test(normalized)) {
-    return null
-  }
-  const signal = findBlockedSignalInLiveWindow(normalized)
-  // Why: callers compare this index against ready-header indexes found over the full tail.
-  return signal === null ? null : { reason: signal.reason, index: signal.index + windowStart }
-}
-
-function findBlockedSignalInLiveWindow(
-  normalized: string
-): { reason: RuntimeTerminalWaitBlockedReason; index: number } | null {
-  const candidates = findStartupDialogBlockedSignals(normalized)
-  const trustIndex = Math.max(
-    normalized.lastIndexOf('do you trust'),
-    normalized.lastIndexOf('trust this'),
-    normalized.lastIndexOf('trusted workspace')
-  )
-  const trustSegment = trustIndex === -1 ? '' : normalized.slice(trustIndex)
-  if (
-    trustIndex !== -1 &&
-    (trustSegment.includes('workspace') ||
-      trustSegment.includes('folder') ||
-      trustSegment.includes('directory') ||
-      trustSegment.includes('repo'))
-  ) {
-    // Why neutral: this matcher never inspects the agent -- every TUI agent ships a workspace-trust dialog.
-    candidates.push({ reason: 'agent-trust-workspace', index: trustIndex })
-  }
-  const interactivePromptIndex = Math.max(
-    normalized.lastIndexOf('press enter to confirm'),
-    normalized.lastIndexOf('press enter to continue'),
-    normalized.lastIndexOf('press enter to view'),
-    normalized.lastIndexOf('press enter to insert'),
-    normalized.lastIndexOf('press t to trust')
-  )
-  const interactivePromptContext =
-    interactivePromptIndex === -1
-      ? ''
-      : normalized.slice(Math.max(0, interactivePromptIndex - 600), interactivePromptIndex + 200)
-  // Why 'codex' only widens detection and never names the reason: the sole Codex evidence here is
-  // that word somewhere in 600 chars of scrollback, which an agent narrating about Codex satisfies
-  // on any pane -- enough to suspect a dialog, not enough to label a non-Codex user's pane.
-  const hasInteractiveDialogContext =
-    interactivePromptContext.includes('codex') ||
-    interactivePromptContext.includes('permission') ||
-    interactivePromptContext.includes('sandbox') ||
-    interactivePromptContext.includes('trust') ||
-    interactivePromptContext.includes('hook')
-  if (interactivePromptIndex !== -1 && hasInteractiveDialogContext) {
-    const contextStart = Math.max(0, interactivePromptIndex - 600)
-    const hasSpecificPromptInContext = candidates.some(
-      (candidate) => candidate.index >= contextStart && candidate.index <= interactivePromptIndex
-    )
-    if (!hasSpecificPromptInContext) {
-      candidates.push({ reason: 'agent-interactive-prompt', index: interactivePromptIndex })
-    }
-  }
-  const cursorApprovalIndex = findCursorApprovalPromptIndex(normalized)
-  if (cursorApprovalIndex !== null) {
-    candidates.push({ reason: 'agent-approval-prompt', index: cursorApprovalIndex })
-  }
-  const permissionPromptIndex = Math.max(
-    normalized.lastIndexOf('permission required'),
-    normalized.lastIndexOf('requires permission')
-  )
-  if (permissionPromptIndex !== -1) {
-    const permissionSegment = normalized.slice(permissionPromptIndex, permissionPromptIndex + 1_500)
-    const decisionCount = ['allow once', 'allow always', 'reject', 'deny'].filter((choice) =>
-      permissionSegment.includes(choice)
-    ).length
-    if (decisionCount >= 2) {
-      // Why neutral: an approval dialog with named choices identifies no agent; older hosts publish
-      // 'codex-interactive-prompt' here and clients alias the two. Rule 1 additive member --
-      // remote-wire-compatibility.md names RuntimeTerminalWaitBlockedReason as Rule 1 because no
-      // consumer switches exhaustively on it.
-      // Why alias rather than drop the old spelling: preserve the existing remote receipt value for
-      // mixed-version clients -- an older host still publishes codex-* on this path.
-      candidates.push({ reason: 'agent-interactive-prompt', index: permissionPromptIndex })
-    }
-  }
-  return candidates.length > 0
-    ? candidates.reduce((latest, candidate) =>
-        candidate.index > latest.index ? candidate : latest
-      )
     : null
 }
