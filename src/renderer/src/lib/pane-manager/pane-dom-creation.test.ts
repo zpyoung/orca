@@ -175,7 +175,7 @@ describe('createPaneDOM dock slot', () => {
   const leafId = '11111111-1111-4111-8111-111111111111' as TerminalLeafId
 
   function makePane() {
-    return createPaneDOM(
+    const pane = createPaneDOM(
       1,
       leafId,
       { linkOpenHint: () => 'open hint' },
@@ -184,40 +184,43 @@ describe('createPaneDOM dock slot', () => {
       vi.fn(),
       vi.fn()
     )
+    const { dockContainer } = pane
+    if (!dockContainer) {
+      throw new Error('Expected createPaneDOM to create a dock slot')
+    }
+    return { pane, dockContainer }
   }
 
   it('appends the dock slot to container as a sibling after xtermContainer', () => {
-    const pane = makePane()
+    const { pane, dockContainer } = makePane()
 
-    expect(pane.dockContainer.parentElement).toBe(pane.container)
+    expect(dockContainer.parentElement).toBe(pane.container)
     const children = Array.from(pane.container.children)
-    expect(children.indexOf(pane.dockContainer)).toBeGreaterThan(
-      children.indexOf(pane.xtermContainer)
-    )
+    expect(children.indexOf(dockContainer)).toBeGreaterThan(children.indexOf(pane.xtermContainer))
   })
 
   it('gives the dock slot a stable class name', () => {
-    const pane = makePane()
+    const { dockContainer } = makePane()
 
-    expect(pane.dockContainer.classList.contains('pane-dock-slot')).toBe(true)
+    expect(dockContainer.classList.contains('pane-dock-slot')).toBe(true)
   })
 
   it('declares data-pane-prevent-terminal-focus on the dock slot', () => {
-    const pane = makePane()
+    const { dockContainer } = makePane()
 
-    expect(pane.dockContainer.hasAttribute('data-pane-prevent-terminal-focus')).toBe(true)
+    expect(dockContainer.hasAttribute('data-pane-prevent-terminal-focus')).toBe(true)
   })
 
   it('is honored by shouldFocusTerminalFromPanePointerDown for pointer targets inside the slot', () => {
-    const pane = makePane()
+    const { dockContainer } = makePane()
     const childInsideDock = document.createElement('span')
-    pane.dockContainer.appendChild(childInsideDock)
+    dockContainer.appendChild(childInsideDock)
 
     expect(shouldFocusTerminalFromPanePointerDown(childInsideDock)).toBe(false)
   })
 
   it('exposes the dock slot on the pane record', () => {
-    const pane = makePane()
+    const { pane } = makePane()
 
     expect(pane.dockContainer).toBeInstanceOf(HTMLElement)
   })

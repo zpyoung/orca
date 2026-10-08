@@ -7,6 +7,7 @@ import {
 } from '@/components/editor/useLocalImageSrc'
 import { useAppStore } from '@/store'
 import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
+import { chatImageAccess } from '@/lib/local-file-access'
 import { findTerminalTabWorktreeId } from '../native-chat-file-link'
 import { attachmentPreviewSourcePath } from './agent-composer-attachment-preview'
 
@@ -74,14 +75,13 @@ function useAttachmentThumbnailSource(path: string, terminalTabId: string): stri
         attachmentPreviewConnectionId(terminalTabId),
         path
       )
-      // Attaching is the user gesture that authorizes the read; images picked,
-      // dropped, or pasted from outside a worktree are otherwise denied.
-      try {
-        await window.api.fs.authorizeExternalPath({ targetPath: previewPath })
-      } catch {
-        // already-authorized paths and unavailable IPC both just fall through to the read
-      }
-      const url = await loadLocalImageAbsolutePath(previewPath)
+      // Why chat-image: attachments from outside a worktree are otherwise denied.
+      const url = await loadLocalImageAbsolutePath(
+        previewPath,
+        undefined,
+        undefined,
+        chatImageAccess()
+      )
       if (!cancelled) {
         setSource(url ?? undefined)
       }

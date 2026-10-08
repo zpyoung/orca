@@ -152,7 +152,7 @@ export type ScrollState = {
 export type ManagedPaneInternal = {
   xtermContainer: HTMLElement
   /** Empty strip beneath xtermContainer reserved for portaling a composer; see terminal.css. */
-  dockContainer: HTMLElement
+  dockContainer?: HTMLElement
   linkTooltip: HTMLElement
   terminalTuiScrollSensitivity?: () => number | undefined
   terminalGpuAcceleration: GlobalSettings['terminalGpuAcceleration']

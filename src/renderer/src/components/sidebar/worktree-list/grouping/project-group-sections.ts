@@ -28,11 +28,12 @@ export function appendProjectGroupSections(
     folderWorkspaces: readonly RenderableFolderWorkspace[]
     projectOrderBy: ProjectOrderBy
     repoOrder: Map<string, number> | undefined
-    looseWorktreesByProjectGroupId: LooseWorktreesByProjectGroupId
+    looseWorktreesByProjectGroupId?: LooseWorktreesByProjectGroupId
   }
 ): void {
   const { orderedGroups, projectGroups, folderWorkspaces, projectOrderBy, repoOrder } = args
-  const { looseWorktreesByProjectGroupId } = args
+  const looseWorktreesByProjectGroupId: LooseWorktreesByProjectGroupId =
+    args.looseWorktreesByProjectGroupId ?? new Map()
   const { result, collapsedGroups } = ctx
 
   const groupByProjectGroupId = new Map<string | null, OrderedGroupEntry[]>()
