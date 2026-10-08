@@ -158,6 +158,7 @@ describe('launchAgentInNewTab paired web runtime', () => {
     const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
 
     launchAgentInNewTab({
+      requestId: 'request-overrides',
       agent: 'claude',
       worktreeId: 'wt-1',
       sessionOptions: { model: 'sonnet' },

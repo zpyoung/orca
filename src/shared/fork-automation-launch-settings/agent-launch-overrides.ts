@@ -4,6 +4,7 @@ import {
   getAgentSessionOptionCatalog,
   sessionOptionValueIsValid
 } from '../agent-session-option-catalog'
+import type { CatalogOptionApply } from '../agent-session-option-catalog-types'
 import { resolveAgentSessionOptionLaunch } from '../agent-session-option-launch'
 import type { SessionOptionValue } from '../native-chat-session-options'
 import { tokenizeStartupCommand, type AgentStartupShell } from '../tui-agent-startup-shell'
@@ -85,6 +86,11 @@ export function resolveAgentLaunchOverrides(
   }
 }
 
+function isOverriddenByAgentArgs(apply: CatalogOptionApply, tokens: readonly string[]): boolean {
+  const kept = apply.removeAgentArgs?.(tokens)
+  return kept !== undefined && kept.length < tokens.length
+}
+
 /** List structured picker ids shadowed by the override's raw arguments. */
 export function describeOverriddenOptionIds(
   agent: AgentType,
@@ -97,7 +103,7 @@ export function describeOverriddenOptionIds(
     return []
   }
   const overriddenIds: string[] = []
-  if (catalog.modelApply.agentArgsOverride?.(tokens)) {
+  if (isOverriddenByAgentArgs(catalog.modelApply, tokens)) {
     overriddenIds.push('model')
   }
   const selectedModel = overrides?.model?.trim()
@@ -107,7 +113,7 @@ export function describeOverriddenOptionIds(
   const model = findCatalogModel(catalog, selectedModel)
   const options = model?.options ?? catalog.unknownModelOptions ?? []
   for (const option of options) {
-    if (option.apply.agentArgsOverride?.(tokens)) {
+    if (isOverriddenByAgentArgs(option.apply, tokens)) {
       overriddenIds.push(option.id)
     }
   }

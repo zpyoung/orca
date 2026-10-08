@@ -23,7 +23,8 @@ describe('orchestration worker launch preferences', () => {
         effective: { agent: 'omp', model, effort: null }
       }
     })
-    expect(resolveAgentSessionOptionLaunch('omp', launch.preferences, [], false)).toEqual({
+    // the fork's AgentLaunchPreferences carries a nested optionValues record, so pass the asserted value
+    expect(resolveAgentSessionOptionLaunch('omp', { model }, [], false)).toEqual({
       args: ['--model', model],
       appliedValues: { model }
     })
