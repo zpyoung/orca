@@ -169,14 +169,14 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
         includeSessionOptionCatalogDefaults:
           request.launchPreferences?.optionValues === undefined ? undefined : false
       }
-      const startup =
-        request.promptDelivery === 'draft'
-          ? buildAgentDraftLaunchPlan({ ...startupArgs, draft: request.prompt ?? '' })
-          : buildAgentStartupPlan({
-              ...startupArgs,
-              prompt: request.prompt ?? '',
-              allowEmptyPromptLaunch: true
-            })
+      const startup = await buildExecutionHostAgentStartupPlan({
+        inputs: startupArgs,
+        cwd: startupCwd ?? workspace.path,
+        prompt: request.prompt ?? '',
+        promptDelivery: request.promptDelivery,
+        hostIdentity: this.runtimeId,
+        signal: caller.signal
+      })
       if (!startup) {
         throw new Error('agent_session_identity_required')
       }

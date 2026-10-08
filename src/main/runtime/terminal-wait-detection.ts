@@ -4,17 +4,20 @@ import { detectAgentStatusFromTitle, type AgentStatus } from '../../shared/agent
 import type { RuntimeTerminalWaitBlockedReason } from '../../shared/runtime-types'
 import type { TuiAgent } from '../../shared/tui-agent'
 import {
-  findCodexHeaderIndex,
-  findCodexScreenReadyPromptIndex,
-  isCodexComposerReadyScreen,
-  isCodexProvisionalStartupText
-} from './codex-terminal-readiness'
-import { findStartupDialogBlockedSignals } from './startup-dialog-blocked-signals'
+  evaluateAgentStateRules,
+  hasQuietReadyRules,
+  holdsReadyTextToQuiet,
+  type AgentStateVerdict
+} from './agent-state-rules/agent-state-rules-engine'
+import { findPromptAnchorIndexes } from './agent-state-rules/agent-state-text-anchors'
+import { isTerminalWaitWhitespace } from './terminal-wait-tail-window'
+import { showsIdleTitleAnchor } from './agent-state-rules/agent-state-title-anchors'
+import { compiledFromActiveAgentStateRules } from './agent-state-rules/active-agent-state-rules'
 import {
-  isTerminalWaitWhitespace,
-  startOfLastLines,
-  startOfLastNonBlankLines
-} from './terminal-wait-tail-window'
+  findTerminalWaitBlockedSignal,
+  isSettledAfter,
+  isUnblockedAfter
+} from './agent-state-rules/blocked-text-layer'
 
 // Why agent-agnostic: Orca's own `<Agent> ready` titles, and any agent title stating rest in words.
 const EXPLICIT_IDLE_TITLE_RE = /(^|\s)(ready|idle|done)(\s|$|[.!?])/i
@@ -43,7 +46,7 @@ export function detectExplicitIdleStatusFromTitle(title: string): AgentStatus | 
 
 export function isKnownReadyPromptPreview(preview: string): boolean {
   const normalized = preview.toLowerCase()
-  return isUnblockedAfter(normalized, findPromptAnchorIndexes(normalized).ready)
+  return isUnblockedAfter(normalized, findKnownReadyPromptIndex(normalized))
 }
 
 /**
@@ -53,22 +56,17 @@ export function isKnownReadyPromptPreview(preview: string): boolean {
  */
 export function isKnownReadyPromptSettled(preview: string): boolean {
   const normalized = preview.toLowerCase()
-  return isReadyPromptSettled(normalized, findKnownReadyPromptIndex(normalized))
-}
-
-function isReadyPromptSettled(normalized: string, readyIndex: number | null): boolean {
-  return (
-    isReadyPromptUnblocked(normalized, readyIndex) && !isCodexProvisionalStartupText(normalized)
-  )
+  return isSettledAfter(normalized, findKnownReadyPromptIndex(normalized))
 }
 
 /**
  * Tier 1 body evidence for every tui-idle site. `readScreenLines` yields the screen the agent's
  * rules read, or null when the runtime has no trustworthy one.
  *
- * Why not for a clocked Codex pane: its header stays up through every turn, so it proves only
- * that Codex started; isQuietReadyScreenBody holds it to quiescence instead.
- * Why a clockless pane keeps it: quiescence needs an output clock, which a restored pane lacks.
+ * Why the agent's own answer is final: a screen refusal must shut the shared text lane too.
+ * A strong rule held to quiet counts here only on a clockless pane, which cannot measure quiet;
+ * on a clocked one isQuietReadyScreenBody holds it to quiescence instead, and an agent whose
+ * own ready text is held to quiet takes no shared text either.
  */
 export function isKnownReadyPromptBody(
   waitText: string,
@@ -79,18 +77,19 @@ export function isKnownReadyPromptBody(
   if (agent === 'qoder' || agent === 'qoder-cn') {
     return isQoderComposerReady(readScreenLines())
   }
-  if (agent === 'codex' && hasOutputClock) {
+  // Why before the rules: such an agent settles only on the quiet lane while it has a clock.
+  if (hasOutputClock && holdsReadyTextToQuiet(agent)) {
     return false
   }
-  if (isKnownReadyPromptSettled(waitText)) {
-    return true
+  const ruled = evaluateAgentStateRules(agent, {
+    readScreenLines,
+    readText: () => waitText.toLowerCase(),
+    hasOutputClock
+  })
+  if (ruled !== null) {
+    return isStrongIdle(ruled) && (!ruled.requiresQuiet || !hasOutputClock)
   }
-  // Why the agent gate: another agent's screen can merely mention "OpenAI Codex".
-  if (agent !== null && agent !== 'codex') {
-    return false
-  }
-  const screen = readScreen(readScreenLines)
-  return screen !== null && isCodexScreenHeaderReady(screen)
+  return isKnownReadyPromptSettled(waitText)
 }
 
 /**
@@ -103,41 +102,20 @@ export function isQuietReadyScreenBody(
   agent: TuiAgent | null,
   readScreenLines: () => readonly string[] | null
 ): boolean {
-  if (agent === 'codex') {
-    const screen = readScreen(readScreenLines)
-    if (
-      screen !== null &&
-      (isCodexComposerReadyScreen(screen) || isCodexScreenHeaderReady(screen))
-    ) {
-      return true
-    }
-    // Why the provisional veto here too: a daemon start can stay quiet past the quiescence window.
-    const normalized = waitText.toLowerCase()
-    return isReadyPromptSettled(normalized, findCodexReadyPromptIndex(normalized))
+  if (hasQuietReadyRules(agent)) {
+    const ruled = evaluateAgentStateRules(agent, {
+      readScreenLines,
+      readText: () => waitText.toLowerCase()
+    })
+    return ruled !== null && isStrongIdle(ruled) && ruled.requiresQuiet
   }
   return (agent === null || agent === 'muse') && isMuseReadyPromptPreview(waitText)
 }
 
-/**
- * Why the screen: Codex repaints its 0.150-0.157 header by cell diff (`ESC[5;3Hdir
- * ESC[5;7Hctory:`), which only a grid reassembles — the line-folded wait text reads `dirctory:`.
- * Why it can only add readiness: a grid out of step with the PTY (size mismatch, resize
- * mid-paint) garbles the header, so the text rule keeps every verdict it gives on its own.
- */
-function isCodexScreenHeaderReady(screen: string): boolean {
-  return isReadyPromptUnblocked(screen, findCodexScreenReadyPromptIndex(screen))
-}
-
-function readScreen(readScreenLines: () => readonly string[] | null): string | null {
-  return readScreenLines()?.join('\n').toLowerCase() ?? null
-}
-
-function isReadyPromptUnblocked(normalized: string, readyIndex: number | null): boolean {
-  if (readyIndex === null) {
-    return false
-  }
-  const blockedSignal = findTerminalWaitBlockedSignal(normalized)
-  return blockedSignal === null || blockedSignal.index <= readyIndex
+function isStrongIdle(
+  verdict: AgentStateVerdict
+): verdict is Extract<AgentStateVerdict, { state: 'idle' }> {
+  return verdict.state === 'idle' && verdict.strength === 'strong'
 }
 
 export function isMuseReadyPromptPreview(preview: string): boolean {
@@ -169,24 +147,15 @@ export function findActionableTerminalWaitBlockedSignal(
 // Why: a live prompt (idle OR busy) proves the startup modal was dismissed, so a mid-run Cursor lane stops reporting stale trust hits.
 // Why Muse beside the rule-file anchors: Muse has not moved to agent-state-rules/ yet.
 function findDismissedStartupModalIndex(normalized: string): number | null {
-  const indexes = [
-    findCodexReadyPromptIndex(normalized),
-    findCodexHeaderIndex(normalized),
-    findAntigravityReadyPromptIndex(normalized),
-    findCursorActivePromptIndex(normalized),
-    findMuseReadyPromptIndex(normalized)
-  ].filter((index): index is number => index !== null)
-  return indexes.length > 0 ? Math.max(...indexes) : null
+  const live = findPromptAnchorIndexes(normalized).live
+  const muse = findMuseReadyPromptIndex(normalized)
+  return live === null || muse === null ? (live ?? muse) : Math.max(live, muse)
 }
 
 function findKnownReadyPromptIndex(normalized: string): number | null {
-  const indexes = [
-    findCodexReadyPromptIndex(normalized),
-    findAntigravityReadyPromptIndex(normalized),
-    findCursorReadyPromptIndex(normalized),
-    findClaudeReadyPromptIndex(normalized)
-  ].filter((index): index is number => index !== null)
-  return indexes.length > 0 ? Math.max(...indexes) : null
+  const anchored = findPromptAnchorIndexes(normalized).ready
+  const claude = findClaudeReadyPromptIndex(normalized)
+  return anchored === null || claude === null ? (anchored ?? claude) : Math.max(anchored, claude)
 }
 
 const CLAUDE_PROMPT_GLYPH = '\u276f'
@@ -255,26 +224,6 @@ export function tuiIdleNeedsVisibleScreenProbe(
   agent: string | null | undefined
 ): boolean {
   return lastAgentStatus === null && (waitText.length === 0 || agent === 'claude')
-}
-
-// Why: match the banner's last occurrence to skip the trust dialog's own "Cursor Agent" text; "→" is cursor-agent's persistent input prompt.
-function findCursorActivePromptIndex(normalized: string): number | null {
-  const headerIndex = normalized.lastIndexOf('cursor agent')
-  if (headerIndex === -1) {
-    return null
-  }
-  return normalized.includes('→', headerIndex) ? headerIndex : null
-}
-
-// Why: cursor-agent emits no idle OSC title; infer idle from the tail (braille spinner = busy, its absence = idle).
-const CURSOR_BUSY_SPINNER_RE = /[⠁-⣿]/
-
-function findCursorReadyPromptIndex(normalized: string): number | null {
-  const activeIndex = findCursorActivePromptIndex(normalized)
-  if (activeIndex === null) {
-    return null
-  }
-  return CURSOR_BUSY_SPINNER_RE.test(normalized.slice(activeIndex)) ? null : activeIndex
 }
 
 // Why: Muse titles its OSC with the bare cwd and never updates it, so only the body can

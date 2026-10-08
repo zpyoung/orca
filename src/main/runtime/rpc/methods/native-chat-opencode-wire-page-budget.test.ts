@@ -322,7 +322,7 @@ it('preserves empty append lifecycle frames', async () => {
     context(),
     (frame) => frames.push(frame)
   )
-  state.watcher?.onAppend([], { state: 'completed', turnId: 'turn', timestamp: 10 })
+  state.watcher?.onAppend([], { lifecycle: { state: 'completed', turnId: 'turn', timestamp: 10 } })
   expect(frames).toEqual([
     {
       type: 'appended',

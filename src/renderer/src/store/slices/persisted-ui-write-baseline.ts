@@ -24,6 +24,8 @@ export type PersistedUIWriteBaseline = {
   workspaceActivityCustomDays: NonNullable<PersistedUIState['workspaceActivityCustomDays']>
   hideCompletedReviewWorkspaces: boolean
   hidePassingCheckWorkspaces: boolean
+  workspaceHostScope: PersistedUIState['workspaceHostScope']
+  visibleWorkspaceHostIds: PersistedUIState['visibleWorkspaceHostIds']
   hideDefaultBranchWorkspace: boolean
   hideAutomationGeneratedWorkspaces: boolean
   hideCliCreatedWorkspaces: boolean

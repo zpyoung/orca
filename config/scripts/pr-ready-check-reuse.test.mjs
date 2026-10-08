@@ -154,7 +154,11 @@ describe('ready-for-review required check reuse', () => {
     )
     expect(workflow.jobs.verify.if).toBe('${{ !cancelled() }}')
     expect(workflow.jobs.verify.needs).toEqual(
-      ['code_paths', ...PR_CHECK_JOBS].toSpliced(2, 0, 'fork_ownership_guard')
+      [
+        'code_paths',
+        'preflight',
+        ...PR_CHECK_JOBS.filter((job) => job !== 'static_analysis' && job !== 'typecheck')
+      ].toSpliced(2, 0, 'fork_ownership_guard')
     )
   })
 

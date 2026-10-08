@@ -17,7 +17,7 @@ import { AI_VAULT_AGENTS } from '../../../src/shared/ai-vault-types'
 import { redactForTransport } from '../../../src/shared/ai-vault-search-transport'
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
-const PRE_QODER_HOSTS = ['v1.4.211', 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c']
+const PRE_QODER_HOSTS = ['v1.4.216-rc.0.zy01', 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c']
 const QODER_HOST = 'f97ca2a49d9c711dab54a656a7f8a47ae6c6749c'
 const LEGACY_AGENTS = AI_VAULT_AGENTS.filter(
   (agent) => !['codebuddy', 'zcode', 'qoder', 'jcode'].includes(agent)
@@ -51,7 +51,7 @@ function releaseParser(schema: unknown) {
 test.each(['qoder', 'jcode'] as const)(
   'a pre-agent release can read current %s search pages without losing other agents',
   async (agent) => {
-    const baseline = await releaseSearchSchemas('v1.4.211')
+    const baseline = await releaseSearchSchemas('v1.4.216-rc.0.zy01')
     const responseParser = releaseParser(baseline.AiVaultSearchResponseSchema)
     const newHit = { ...searchHit(), agent }
     expect(responseParser.safeParse({ ...searchResults(), hits: [newHit] })).toHaveProperty(

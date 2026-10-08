@@ -1141,9 +1141,14 @@ jobs:
       - create-release
       - orcad-template
       - release-preflight
+      - release-javascript
+      - relay-windows-process-tree
     # Fork: mac-only. Windows/Linux builds are disabled (no SignPath on this fork).
     # macOS is built + signed by build-mac -> release-mac-build.yml.
     if: false
+    env:
+      # beforePack and afterPack fail the package when the template is absent.
+      ORCA_REQUIRE_ORCAD_TEMPLATE: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -1381,38 +1386,12 @@ jobs:
       - name: Build app
         shell: bash
         run: |
-          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=x64
-          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=arm64
-
-      # Why an explicit step rather than trusting the runner image: the packaged
-      # CLI launcher is a native Rust binary, and a Windows host without cargo
-      # fails deep inside electron-builder's native hook instead of here. Real
-      # Windows dev machines do not have it by default either.
-      - name: Ensure the Rust toolchain for the Windows CLI launcher
-        if: matrix.platform == 'win'
-        shell: pwsh
-        run: |
-          if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-            rustup toolchain install stable --profile minimal
-            rustup default stable
-          }
-          cargo --version
-
-      # Why ORCA_POSTHOG_WRITE_KEY here: this is the only build that
-      # produces a published binary, so this is the only place the secret
-      # needs to be in scope. The key is a PostHog *project* API key, not
-      # a server secret — it ships in every official binary's app.asar
-      # and is therefore extractable from any release. We still keep it
-      # in GitHub Actions secrets so the literal stays out of the repo
-      # (and out of fork CI runs / log scrapers / casual greps).
-      # Why ORCA_BUILD_IDENTITY here (not in env at the job level): the
-      # value comes from the per-tag classification above and electron-vite
-      # reads it from `process.env` during `pnpm build:release` only.
-      # Why ORCA_DIAGNOSTICS_TOKEN_URL here: official builds pin crash
-      # diagnostic uploads to Orca's endpoint at compile time, matching the
-      # telemetry gate's "official binary only" behavior.
-      - name: Build app
-        run: pnpm build:release
+          if [ "$SHARED_JAVASCRIPT" = true ]; then
+            node config/scripts/release-javascript-artifact.mjs restore
+            pnpm run build:release:host
+          else
+            pnpm run build:release
+          fi
         env:
           # Why: Vite's web build crossed Node's default old-space ceiling on
           # the macOS release runner, leaving v1.4.2-rc.8 as an incomplete draft.
@@ -2305,13 +2284,11 @@ jobs:
       - build-mac
       - terminal-rendering-golden
     # Why explicit: a skipped orcad-template (tags that predate it) would skip every job after it.
+    # Fork: only the jobs in this fork's needs list; build and the skill-sharing gates do not run here.
     if: >-
       !cancelled() &&
       needs.cut.result == 'success' &&
-      needs.build.result == 'success' &&
       needs.build-mac.result == 'success' &&
-      needs.skill-sharing-linux-floor-release-gate.result == 'success' &&
-      needs.skill-sharing-release-gate.result == 'success' &&
       needs.terminal-rendering-golden.result == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -2463,7 +2440,7 @@ jobs:
     # Fork: gated off for the same reason as homebrew-bump-published-rc-draft.
     # This one only ever skipped because publish-release did; a release that
     # actually succeeds would be its first run, and its first failure.
-    if: ${{ github.repository == 'stablyai/orca' && needs.cut.outputs.tag != '' && startsWith(needs.cut.outputs.tag, 'v') }}
+    if: ${{ github.repository == 'stablyai/orca' && !cancelled() && needs.publish-release.result == 'success' && needs.cut.outputs.tag != '' && startsWith(needs.cut.outputs.tag, 'v') }}
     uses: ./.github/workflows/homebrew-bump.yml
     with:
       tag: ${{ needs.cut.outputs.tag }}

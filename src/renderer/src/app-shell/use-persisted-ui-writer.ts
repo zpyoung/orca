@@ -159,6 +159,8 @@ export function usePersistedUIWriter(): void {
       workspaceActivityCustomDays: s.workspaceActivityCustomDays,
       hideCompletedReviewWorkspaces: s.hideCompletedReviewWorkspaces,
       hidePassingCheckWorkspaces: s.hidePassingCheckWorkspaces,
+      workspaceHostScope: s.workspaceHostScope,
+      visibleWorkspaceHostIds: s.visibleWorkspaceHostIds,
       hideDefaultBranchWorkspace: s.hideDefaultBranchWorkspace,
       hideAutomationGeneratedWorkspaces: s.hideAutomationGeneratedWorkspaces,
       hideCliCreatedWorkspaces: s.hideCliCreatedWorkspaces,

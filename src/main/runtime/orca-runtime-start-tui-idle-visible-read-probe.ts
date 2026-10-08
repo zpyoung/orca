@@ -11,6 +11,7 @@ import {
 import { withTimeout } from './runtime-async-boundaries'
 import {
   detectTerminalWaitBlockedReason,
+  isKnownReadyPromptBody,
   isKnownReadyPromptSettled,
   tuiIdleNeedsVisibleScreenProbe
 } from './terminal-wait-detection'
@@ -28,7 +29,6 @@ import {
 } from './terminal-wait-results'
 import { createSetupCompletionScanner } from './orchestration/setup-completion-signal'
 import { buildTerminalWaitText } from './terminal-wait-tail-state'
-import { isAntigravityReadyPromptSnapshot } from './antigravity-terminal-readiness'
 import type { TuiAgent } from '../../shared/tui-agent'
 
 // Why re-probe: a TUI that paints with cursor moves (Claude Code) never reaches the newline tail the

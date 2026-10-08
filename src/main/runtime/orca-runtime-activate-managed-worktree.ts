@@ -157,6 +157,7 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
       agentArgs?: string | null
       launchSource?: string
       launchOverrides?: AgentLaunchOverrides
+      onPromptCarry?: (carried: boolean) => void
     }
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
@@ -174,6 +175,7 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
       ...(launchInputs?.agentArgs !== undefined ? { agentArgs: launchInputs.agentArgs } : {}),
       ...(launchInputs?.launchSource ? { launchSource: launchInputs.launchSource } : {}),
       ...(launchOverrides ? { launchOverrides } : {}),
+      ...(launchInputs?.onPromptCarry ? { onPromptCarry: launchInputs.onPromptCarry } : {}),
       settings: this.store.getSettings(),
       getLaunchPlatform: () => this.getAgentLaunchPlatformForRepo(repo),
       toSessionOptions: (preferences) => this.toAgentSessionOptions(preferences)
@@ -194,33 +196,6 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
       platform: this.getAgentLaunchPlatformForRepo(repo),
       isRemote: repoIsRemote(repo)
     })
-  }
-
-  protected async markLocalWorkspaceTrustedForAgent(
-    agent: TuiAgent,
-    workspacePath: string
-  ): Promise<void> {
-    await markLocalWorktreeTrusted(agent, workspacePath)
-  }
-
-  protected async markWorkspaceTrustedForAgent(
-    agent: TuiAgent,
-    connectionId: string | null | undefined,
-    workspacePath: string
-  ): Promise<void> {
-    if (connectionId) {
-      await this.markRemoteWorkspaceTrustedForAgent(agent, connectionId, workspacePath)
-      return
-    }
-    await this.markLocalWorkspaceTrustedForAgent(agent, workspacePath)
-  }
-
-  protected async markRemoteWorkspaceTrustedForAgent(
-    agent: TuiAgent,
-    connectionId: string,
-    workspacePath: string
-  ): Promise<void> {
-    await markRemoteWorktreeTrusted(agent, connectionId, workspacePath)
   }
 
   protected recordCreatedWorktreeLineage(

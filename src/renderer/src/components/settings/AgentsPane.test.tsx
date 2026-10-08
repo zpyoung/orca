@@ -8,7 +8,15 @@ import { AGENT_CATALOG } from '@/lib/agent-catalog'
 import { useAppStore } from '../../store'
 import { getAgentGeneratedTabTitlesTitle } from './agent-generated-tab-title-copy'
 import { getAgentStatusHooksTitle } from './agent-status-hooks-copy'
-import { getAgentAwakeDescription, getAgentAwakeTitle } from './agent-awake-copy'
+import {
+  getAgentWorkspaceTrustDescription,
+  getAgentWorkspaceTrustTitle
+} from './agent-workspace-trust-copy'
+import {
+  getAgentAwakeDescription,
+  getAgentAwakeLidNote,
+  getAgentAwakeTitle
+} from './agent-awake-copy'
 import { getCodexTerminalServerIsolationTitle } from './codex-terminal-server-isolation-copy'
 import { AgentAwakeSetting } from './AgentAwakeSetting'
 import { AgentRuntimeSetting } from './AgentRuntimeSetting'
@@ -262,6 +270,21 @@ describe('AgentsPane', () => {
       ).toBe(false)
     } finally {
       delete (globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__
+    }
+  })
+
+  it('keeps the host-only folder trust row out of paired web clients and their search', () => {
+    Reflect.set(globalThis, '__ORCA_WEB_CLIENT__', true)
+    try {
+      expect(renderPane(getDefaultSettings('/tmp'))).not.toContain(getAgentWorkspaceTrustTitle())
+      expect(
+        matchesSettingsSearch(
+          'trust',
+          getAgentsPaneSearchEntries({ includeAgentWorkspaceTrust: false })
+        )
+      ).toBe(false)
+    } finally {
+      Reflect.deleteProperty(globalThis, '__ORCA_WEB_CLIENT__')
     }
   })
 

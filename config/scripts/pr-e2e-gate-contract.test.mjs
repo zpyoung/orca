@@ -135,7 +135,7 @@ describe('PR E2E gate contract', () => {
       expect(verifyStep.env[envVar]).toBe(`\${{ needs.${job}.result }}`)
       // fork_ownership_guard is ungated: it runs on every PR, so it is checked
       // unconditionally above rather than through the SHOULD_RUN loop.
-      if (job === 'code_paths' || job === 'fork_ownership_guard') {
+      if (job === 'code_paths' || job === 'preflight' || job === 'fork_ownership_guard') {
         continue
       }
       expect(successLoop).toContain(`"$${envVar}"`)

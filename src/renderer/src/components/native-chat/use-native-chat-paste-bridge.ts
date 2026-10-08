@@ -41,7 +41,12 @@ export function useNativeChatPasteBridge({
         .readClipboardText({ maxBytes: TEXT_CONTROL_PASTE_MAX_BYTES })
         .catch(() => '')
       if (text.length > 0) {
-        await pasteTextIntoTextControl(answerInput, text, { source: 'programmatic' })
+        if (questionAnswerInputRef?.current === answerInput) {
+          await pasteTextIntoTextControl(answerInput, text, {
+            source: 'programmatic',
+            canContinue: () => questionAnswerInputRef?.current === answerInput
+          })
+        }
         return
       }
       composerRef.current?.pasteFromClipboard()
@@ -60,7 +65,7 @@ export function useNativeChatPasteBridge({
       }
       if (isEditableTarget(event.target)) {
         // Other text fields (search, answer) keep their native paste.
-        if (event.target instanceof Node && composerRef.current?.contains(event.target)) {
+        if (event.target instanceof Node && composerRef.current?.contains?.(event.target)) {
           composerRef.current.handlePasteEvent(event)
         }
         return
@@ -114,7 +119,7 @@ export function useNativeChatPasteBridge({
       }
       if (
         isEditableTarget(activeElement) &&
-        !composerRef.current?.contains(activeElement) &&
+        !composerRef.current?.contains?.(activeElement) &&
         activeElement !== questionAnswerInputRef?.current
       ) {
         return

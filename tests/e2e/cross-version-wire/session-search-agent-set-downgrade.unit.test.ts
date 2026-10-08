@@ -160,7 +160,7 @@ test.each([{ supportedAgents: [] }, { supportedAgents: ['future-agent'] }])(
   }
 )
 
-test.each(['v1.4.211', LEGACY_REF])(
+test.each(['v1.4.216-rc.0.zy01', LEGACY_REF])(
   'a missing status method still searches through the actual %s request parser',
   async (ref) => {
     const baseline = await importReleaseCheckoutModule(

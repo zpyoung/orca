@@ -50,7 +50,7 @@ export type NotificationDispatchRequest = {
   agentToolInput?: string
   agentLastAssistantMessage?: string
   /** The verdict on the turn this notification reports, which picks its wording. */
-  agentTurnOutcome?: AgentJournalTurnOutcome
+  agentTurnOutcome?: AgentTurnOutcome
   /** Read only for source 'pending-ask', whose text is built in the renderer so it goes
    *  through translate(). Every other source must leave these unset: it builds its own
    *  title/body in buildNotificationOptions, which does not read these fields at all. */

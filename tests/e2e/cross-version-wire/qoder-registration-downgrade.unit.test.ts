@@ -3,7 +3,7 @@ import { EnsureAgentSessionParams } from '../../../src/shared/rpc-contract/agent
 import { normalizeAgentStatusPayload } from '../../../src/shared/agent-status-types'
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
-test.each(['v1.4.205', 'v1.4.211'])(
+test.each(['9ab0a18e821880d1c6f26573264c2026f6c6b641', 'v1.4.211'])(
   'release %s preserves new provider status tags but refuses unsupported resume',
   async (ref) => {
     const checkout = await materializeReleaseCheckout(ref)

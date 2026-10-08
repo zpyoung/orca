@@ -1,3 +1,4 @@
+import { readOpenCodeNativeChatTranscriptTail } from './transcript-opencode'
 import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
 import {
   retainNativeChatTranscriptCompanion,

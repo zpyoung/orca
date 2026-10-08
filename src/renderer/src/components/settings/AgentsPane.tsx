@@ -261,7 +261,13 @@ export function AgentsPane({
       />
       <AgentStatusHooksSetting settings={settings} updateSettings={updateSettings} />
       {!isPairedWebClientWindow() ? (
-        <CodexTerminalServerIsolationSetting settings={settings} updateSettings={updateSettings} />
+        <>
+          <AgentWorkspaceTrustSetting settings={settings} updateSettings={updateSettings} />
+          <CodexTerminalServerIsolationSetting
+            settings={settings}
+            updateSettings={updateSettings}
+          />
+        </>
       ) : null}
       <AgentGeneratedTabTitlesSetting settings={settings} updateSettings={updateSettings} />
       {!isPairedWebClientWindow() ? (

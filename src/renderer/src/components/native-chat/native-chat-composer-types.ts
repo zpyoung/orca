@@ -42,9 +42,18 @@ export type NativeChatStructuredComposerTransport = {
   runtimeEnvironmentId: string | null
 }
 
+export type NativeChatOptimisticSendOutcome = {
+  /** The host refused the write: mark the echo "Message not sent". */
+  reject: (pendingId: string) => void
+  /** The write acknowledgment was lost: hold the echo, then flag it unconfirmed. */
+  holdUnconfirmed: (pendingId: string) => void
+}
+
 export type NativeChatComposerProps = AgentComposerCoreProps & {
   /** Prompts recovered by a host from the pane transcript or live status. */
   historyPrompts?: readonly string[]
+  /** Settle an optimistic echo whose write was refused or never acknowledged. */
+  optimisticSendOutcome?: NativeChatOptimisticSendOutcome
   /** Record a dispatched slash command that does not create a chat turn. */
   onSlashCommand?: (command: string) => void
   /** Picker-only agent commands continue in the hosted TUI after dispatch. */
@@ -71,4 +80,8 @@ export type NativeChatLaunchSeed = {
   ownsTabWideLaunchDraft: boolean
 }
 
-export type NativeChatComposerHandle = AgentComposerHandle
+export type NativeChatComposerHandle = AgentComposerHandle & {
+  /** Whether a node is inside the composer's own input, not merely the chat pane.
+   *  Absent on a dock composer, whose field handles its own paste. */
+  contains?: (node: Node | null) => boolean
+}

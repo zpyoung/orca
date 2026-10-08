@@ -25,8 +25,12 @@ function findCodexHeader(screen: string): { index: number; text: string } | null
   return { index, text }
 }
 
-/** The 0.150-0.157 header, which only a grid reassembles (see isCodexScreenHeaderReady). */
-export function findCodexScreenReadyPromptIndex(screen: string): number | null {
+/**
+ * The named screen predicate `codex-header-ready`: the 0.150-0.157 header, loaded, with no blocker
+ * painted below it. Why the screen: Codex repaints that header by cell diff (`ESC[5;3Hdir
+ * ESC[5;7Hctory:`), which only a grid reassembles; the line-folded wait text reads `dirctory:`.
+ */
+export function isCodexHeaderReadyScreen(screen: string): boolean {
   const header = findCodexHeader(screen)
   return (
     header !== null &&

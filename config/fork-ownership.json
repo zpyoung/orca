@@ -910,7 +910,7 @@
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": ["      if (job === 'code_paths' || job === 'fork_ownership_guard') {"]
+      "lines": ["      if (job === 'code_paths' || job === 'preflight' || job === 'fork_ownership_guard') {"]
     },
     {
       "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
@@ -930,8 +930,54 @@
       "kind": "passthrough",
       "lines": [
         "      ref: 'v1.4.191-rc.0.zy01',",
-        "    const checkout = await materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot })"
+        "    const checkout = await materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot })",
+        "      [secondRef, 'v1.4.191-rc.0.zy01']"
       ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/agent-session-newer-chat-refusal.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const BEFORE_NEWER_REASON_REF = 'v1.4.219-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/agent-session-stop-event-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const BASELINE_REF = 'v1.4.219-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-host-observed-turn-end.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const OLD_REF = 'v1.4.216-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/qoder-history-search-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "const PRE_QODER_HOSTS = ['v1.4.216-rc.0.zy01', 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c']",
+        "    const baseline = await releaseSearchSchemas('v1.4.216-rc.0.zy01')"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/session-search-agent-set-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["test.each(['v1.4.216-rc.0.zy01', LEGACY_REF])("]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/qoder-registration-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["test.each(['9ab0a18e821880d1c6f26573264c2026f6c6b641', 'v1.4.211'])("]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/native-chat-opencode-wire-page-budget.test.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": ["  state.watcher?.onAppend([], { lifecycle: { state: 'completed', turnId: 'turn', timestamp: 10 } })"]
     },
     {
       "path": "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts",
@@ -1134,7 +1180,7 @@
       "kind": "passthrough",
       "lines": [
         "const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)",
-        "      ['code_paths', ...PR_CHECK_JOBS].toSpliced(2, 0, 'fork_ownership_guard')"
+        "      ].toSpliced(2, 0, 'fork_ownership_guard')"
       ]
     },
     {
@@ -4329,12 +4375,6 @@
       "lines": ["    cancellations,", "    cancellations"]
     },
     {
-      "path": "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["const BASELINE_REF = 'v1.4.208-rc.0.zy01'"]
-    },
-    {
       "path": "src/renderer/src/components/cmd-j/palette-live-status.tsx",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -5125,12 +5165,6 @@
       ]
     },
     {
-      "path": "src/main/runtime/orca-runtime-create-managed-worktree.ts",
-      "feature": "automation-launch-settings",
-      "kind": "passthrough",
-      "lines": ["                ? { launchOverrides: args.startupLaunchOverrides }"]
-    },
-    {
       "path": "src/main/runtime/orca-runtime-get-agent-session-execution-namespace.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
@@ -5158,7 +5192,10 @@
       "path": "src/main/runtime/runtime-worktree-agent-startup.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": ["} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'"]
+      "lines": [
+        "} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'",
+        "    ...(args.startupLaunchOverrides ? { launchOverrides: args.startupLaunchOverrides } : {}),"
+      ]
     },
     {
       "path": "src/main/startup/main-process-automations.ts",
@@ -5252,12 +5289,6 @@
       "lines": ["        launchOptions: SourceControlLaunchOptions.nullable().optional()"]
     },
     {
-      "path": "tests/e2e/cross-version-wire/agent-session-death-evidence-downgrade.unit.test.ts",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["const BASELINE_REF = 'v1.4.208-rc.0.zy01'"]
-    },
-    {
       "path": "tests/e2e/cross-version-wire/agent-session-resume-marker-downgrade.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -5268,12 +5299,6 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["const PRE_CHANGE_REF = 'v1.4.216-rc.0.zy01'"]
-    },
-    {
-      "path": "pnpm-lock.yaml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["        specifier: 12.5.1", "        version: 12.5.1"]
     },
     {
       "path": "config/scripts/localization-package-contract.test.mjs",
@@ -5556,11 +5581,6 @@
     {
       "path": "config/scripts/create-draft-release.test.mjs",
       "reason": "Tests for the fork's release-tooling delta above.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/electron-builder-config.test.mjs",
-      "reason": "Tests the fork's arm64-only electron-builder config, not upstream's matrix.",
       "status": "permanent"
     },
     {
@@ -6073,12 +6093,6 @@
       "ledger": "bug-12"
     },
     {
-      "path": "src/relay/git-handler-submodule-ops.ts",
-      "reason": "Preserves relay discovery cancellation so a retry still routes submodule diffs correctly.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
       "path": "src/main/git/status-submodule-path-cache.test.ts",
       "reason": "Regression coverage ensuring an aborted diff discovery cannot poison the next submodule lookup.",
       "status": "pending-upstream",
@@ -6213,36 +6227,6 @@
     {
       "path": "src/main/runtime/rpc/methods/git-diff-methods.ts",
       "reason": "Forwards the RPC request abort signal into Git diff execution.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/git/command-runner/git-exec-file.ts",
-      "reason": "Preserves cancellation for buffered Git subprocesses used by diff reads.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-operation-context.ts",
-      "reason": "Allows relay diff buffer reads to carry the request abort signal.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler.ts",
-      "reason": "Propagates cancellation into buffered Git execution on the SSH host.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-ops.ts",
-      "reason": "Cancels diff blob reads rather than allowing aborted requests to launch further Git subprocesses.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-read-operations.ts",
-      "reason": "Threads relay diff request cancellation into host-side diff computation.",
       "status": "pending-upstream",
       "ledger": "bug-12"
     },
@@ -6407,19 +6391,6 @@
       "reason": "Removes an invalid global assertion that CLI flags are exclusive; Heimdall create commands legitimately use repeatable flags.",
       "status": "pending-upstream",
       "ledger": "bug-253"
-    },
-    {
-      "path": "config/scripts/mobile-recording-pin-checkout.test.mjs",
-      "reason": "v1.4.218's mobile.yml (synced from main for the cut) has no recording-pin job, so its own contract test fails; upstream deleted the test in e594cb06af.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#mobile-workflow-tests-ahead-of-their-release",
-      "deleted": true
-    },
-    {
-      "path": "config/scripts/mobile-release-check-scope.test.mjs",
-      "reason": "v1.4.218's mobile.yml gates 'Summarize RPC recording changes', which the tag's test does not expect; aligned with upstream's e594cb06af.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#mobile-workflow-tests-ahead-of-their-release"
     }
   ],
   "residuals": {
@@ -6721,7 +6692,7 @@
     },
     "src/main/native-chat/transcript-watch.ts": {
       "added": 30,
-      "removed": 268
+      "removed": 267
     },
     "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": {
       "added": 2,
@@ -6904,8 +6875,8 @@
       "removed": 1
     },
     "config/scripts/pr-ready-check-reuse.test.mjs": {
-      "added": 6,
-      "removed": 8
+      "added": 10,
+      "removed": 12
     },
     "config/scripts/pr-ready-check-gate.test.mjs": {
       "added": 3,
@@ -7080,8 +7051,8 @@
       "removed": 32
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
-      "added": 15,
-      "removed": 36
+      "added": 18,
+      "removed": 37
     },
     "src/renderer/src/components/native-chat/native-chat-pending.ts": {
       "added": 1,
@@ -7392,8 +7363,8 @@
       "removed": 7
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.test.ts": {
-      "added": 27,
-      "removed": 4
+      "added": 29,
+      "removed": 3
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.ts": {
       "added": 25,
@@ -7872,8 +7843,36 @@
       "removed": 2
     },
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
-      "added": 11,
-      "removed": 14
+      "added": 12,
+      "removed": 15
+    },
+    "tests/e2e/cross-version-wire/agent-session-newer-chat-refusal.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/agent-session-stop-event-downgrade.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/cross-version-host-observed-turn-end.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/qoder-history-search-downgrade.unit.test.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "tests/e2e/cross-version-wire/session-search-agent-set-downgrade.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/qoder-registration-downgrade.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/native-chat-opencode-wire-page-budget.test.ts": {
+      "added": 1,
+      "removed": 1
     },
     "src/renderer/src/components/terminal-pane/pty-connection/direct-ssh-retry-status.ts": {
       "added": 8,
@@ -8169,10 +8168,6 @@
     },
     "src/main/ipc/filesystem-download-lifetime.test.ts": {
       "added": 7,
-      "removed": 1
-    },
-    "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts": {
-      "added": 1,
       "removed": 1
     },
     "tests/e2e/cross-version-wire/cross-version-session-tabs-retirement-proof.unit.test.ts": {
@@ -8540,8 +8535,8 @@
       "removed": 2
     },
     "src/shared/commit-message-agent-specs-primary.ts": {
-      "added": 10,
-      "removed": 9
+      "added": 11,
+      "removed": 10
     },
     "src/shared/commit-message-model-parsers.ts": {
       "added": 10,
@@ -8591,10 +8586,6 @@
       "added": 20,
       "removed": 10
     },
-    "src/main/runtime/orca-runtime-create-managed-worktree.ts": {
-      "added": 4,
-      "removed": 1
-    },
     "src/main/runtime/orca-runtime-get-agent-session-execution-namespace.ts": {
       "added": 4,
       "removed": 2
@@ -8612,8 +8603,8 @@
       "removed": 0
     },
     "src/main/runtime/runtime-worktree-agent-startup.ts": {
-      "added": 15,
-      "removed": 3
+      "added": 24,
+      "removed": 8
     },
     "src/main/startup/main-process-automations.ts": {
       "added": 4,
@@ -8671,10 +8662,6 @@
       "added": 15,
       "removed": 2
     },
-    "tests/e2e/cross-version-wire/agent-session-death-evidence-downgrade.unit.test.ts": {
-      "added": 1,
-      "removed": 1
-    },
     "tests/e2e/cross-version-wire/agent-session-resume-marker-downgrade.unit.test.ts": {
       "added": 1,
       "removed": 1
@@ -8682,10 +8669,6 @@
     "tests/e2e/cross-version-wire/cross-version-worktree-ps-verdict.unit.test.ts": {
       "added": 1,
       "removed": 1
-    },
-    "pnpm-lock.yaml": {
-      "added": 94,
-      "removed": 37
     },
     "config/scripts/localization-package-contract.test.mjs": {
       "added": 1,

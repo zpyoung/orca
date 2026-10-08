@@ -14,7 +14,7 @@ import { useAgentRowConversationName } from '@/components/dashboard/use-agent-ro
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { formatShortTimeAgo } from '@/lib/short-time-ago'
-import { agentVerdictDisplayMark } from '../../../../shared/agent-main-agent-verdict'
+import { agentVerdictStatusLine } from '@/lib/agent-verdict-status-line'
 import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'
 
 function getCompactAgentPrimary(

@@ -127,8 +127,7 @@ export function useNativeChatInteractiveSend(
       cancelInFlight()
       const settings = getSettingsForAgentTabRuntimeOwner(terminalTabId)
       const target = { terminalTabId, ptyId: targetPtyId, settings }
-      // Claude and Codex ignore pasted labels but have different selector state
-      // machines; Grok commits pasted text. OpenClaude follows Claude's path.
+      // Selector TUIs ignore pasted labels; Codex uses a different key sequence.
       const stepsAnswer = shouldStepNativeChatAskAnswer(agent)
       const buildsCodexAnswer = resolveNativeChatTranscriptAgent(agent) === 'codex'
       // Why: pin the answered question's baseline BEFORE delivery. A late settle
@@ -205,10 +204,16 @@ export function useNativeChatInteractiveSend(
   const cancel = useCallback(() => {
     cancelInFlight()
     if (resolveNativeChatTranscriptAgent(agent) === 'opencode' && targetPtyId) {
+      if (isTerminalInputQuarantined(terminalTabId)) {
+        return
+      }
       // OpenCode confirms interruption with a second Escape; pace writes like mobile Stop.
       inFlightRef.current = sendNativeChatAskAnswer(
-        getSettingsForAgentTabRuntimeOwner(terminalTabId),
-        targetPtyId,
+        {
+          terminalTabId,
+          ptyId: targetPtyId,
+          settings: getSettingsForAgentTabRuntimeOwner(terminalTabId)
+        },
         [{ raw: ESC }, { raw: ESC }]
       )
       return

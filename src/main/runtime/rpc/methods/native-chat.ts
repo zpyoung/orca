@@ -92,9 +92,14 @@ export const NATIVE_CHAT_METHODS = [
       )
       return 'messages' in result
         ? {
-            messages: windowForClient(result.messages, clientKind, limit),
-            hasMore: result.hasMore,
-            beforeOffset: result.beforeOffset,
+            ...pageForClient(
+              result.messages,
+              result.hasMore,
+              result.beforeOffset,
+              clientKind,
+              limit,
+              params.agent
+            ),
             ...nativeChatCompanionFrameFields(result.companion)
           }
         : result
@@ -175,9 +180,7 @@ export const NATIVE_CHAT_METHODS = [
           }
           emit({
             type: 'replacement',
-            messages: windowForClient(messages, clientKind, limit),
-            hasMore,
-            beforeOffset,
+            ...pageForClient(messages, hasMore, beforeOffset, clientKind, limit, params.agent),
             ...nativeChatCompanionFrameFields(companion)
           })
         },
@@ -185,11 +188,18 @@ export const NATIVE_CHAT_METHODS = [
           if (closed) {
             return
           }
-          emit({
-            type: 'appended',
-            messages: sanitizeAppendForClient(messages, clientKind),
-            ...nativeChatCompanionFrameFields(companion)
-          })
+          const sanitized = sanitizeAppendForClient(messages, clientKind)
+          const batches =
+            sanitized.length > 0 && resolveNativeChatTranscriptAgent(params.agent) === 'opencode'
+              ? nativeChatRpcAppendBatches(sanitized)
+              : [sanitized]
+          for (const batch of batches) {
+            emit({
+              type: 'appended',
+              messages: batch,
+              ...(batch === batches.at(-1) ? nativeChatCompanionFrameFields(companion) : {})
+            })
+          }
         }
       }
       let subscription: NativeChatTranscriptSubscription

@@ -1,13 +1,16 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
+// FORK-COPY-SHA: 4bb6f2072b07c1f0664b809551f77754700570e4
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
 import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'
+import { isMacPlatform } from '../native-chat-shortcut'
 
 export type UseAgentComposerKeyDownArgs = {
   autocomplete: ComposerAutocomplete
   activeSuggestion: number
   draft: string
+  /** Image chips count as composer content, like typed text. */
+  hasAttachments?: boolean
   history: HistoryState
   isComposing: () => boolean
   completePickerItem: (item: NativeChatPickerItem) => void
@@ -15,6 +18,9 @@ export type UseAgentComposerKeyDownArgs = {
   dismissPicker: (triggerKey: string) => void
   interrupt: () => void
   send: () => void
+  /** Cmd/Ctrl+Enter from an empty composer: send the newest queued draft now; false falls
+   *  through to send. */
+  steerQueued?: (() => boolean) | undefined
   setActiveSuggestion: Dispatch<SetStateAction<number>>
   setDraft: Dispatch<SetStateAction<string>>
   setCaret: Dispatch<SetStateAction<number>>
@@ -25,6 +31,7 @@ export function useAgentComposerKeyDown({
   autocomplete,
   activeSuggestion,
   draft,
+  hasAttachments = false,
   history,
   isComposing,
   completePickerItem,
@@ -32,6 +39,7 @@ export function useAgentComposerKeyDown({
   dismissPicker,
   interrupt,
   send,
+  steerQueued,
   setActiveSuggestion,
   setDraft,
   setCaret,
@@ -89,6 +97,14 @@ export function useAgentComposerKeyDown({
         return
       }
       if (event.key === 'Enter' && !event.shiftKey) {
+        // Platform primary modifier only (AGENTS.md): ⌘ on Mac, Ctrl elsewhere.
+        const steerChord = isMacPlatform() ? event.metaKey : event.ctrlKey
+        // Only from an empty composer: the chord never sends a card past what the user just wrote.
+        const composerEmpty = draft.trim() === '' && !hasAttachments
+        if (steerChord && composerEmpty && steerQueued?.()) {
+          event.preventDefault()
+          return
+        }
         event.preventDefault()
         send()
         return
@@ -120,10 +136,12 @@ export function useAgentComposerKeyDown({
       dismissPicker,
       dispatchPickerCommand,
       draft,
+      hasAttachments,
       history,
       interrupt,
       isComposing,
       send,
+      steerQueued,
       setActiveSuggestion,
       setCaret,
       setDraft,

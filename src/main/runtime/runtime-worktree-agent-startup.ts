@@ -155,7 +155,7 @@ export function buildWorktreeStartupForAgent(
     ? launchOverrides.agentArgs
     : undefined
   const agentArgs = overrideAgentArgs ?? environment.agentArgs
-  const startupPlan = buildAgentStartupPlan({
+  const planInputs = {
     ...resolveAgentStartupPlanInputs({
       agent,
       settings,
@@ -166,9 +166,7 @@ export function buildWorktreeStartupForAgent(
         ? agentLaunchOverridesToSessionOptionValues(launchOverrides)
         : environment.toSessionOptions(environment.launchPreferences)
     }),
-    includeSessionOptionCatalogDefaults: launchOverrides ? false : undefined,
-    prompt: environment.prompt ?? '',
-    allowEmptyPromptLaunch: true
+    includeSessionOptionCatalogDefaults: launchOverrides ? false : undefined
   })
   const prompt = environment.prompt ?? ''
   let startupPlan: ReturnType<typeof buildAgentStartupPlan>
@@ -226,6 +224,7 @@ export function resolveWorktreeCreateAgentStartup(
     inputs: {
       agentArgs?: string | null
       launchSource?: string
+      launchOverrides?: AgentLaunchOverrides
       onPromptCarry?: (carried: boolean) => void
     }
   ) => { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup }
@@ -236,6 +235,7 @@ export function resolveWorktreeCreateAgentStartup(
   return build(args.startupAgent, args.startupPrompt, args.startupLaunchPreferences, {
     ...(args.startupAgentArgs !== undefined ? { agentArgs: args.startupAgentArgs } : {}),
     ...(args.startupLaunchSource ? { launchSource: args.startupLaunchSource } : {}),
+    ...(args.startupLaunchOverrides ? { launchOverrides: args.startupLaunchOverrides } : {}),
     ...(args.onStartupPromptCarry ? { onPromptCarry: args.onStartupPromptCarry } : {})
   })
 }

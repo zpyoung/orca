@@ -14,7 +14,7 @@ import { useNativeChatLaunchDraftAdoption } from './use-native-chat-launch-draft
 import { AgentComposerField } from './fork-agent-composer/AgentComposerField'
 import { nativeChatComposerTargetIsRemote } from './native-chat-composer-target'
 import { useNativeChatComposerAttachments } from './use-native-chat-composer-attachments'
-import { useNativeChatComposerHandle } from './use-native-chat-composer-handle'
+import { useNativeChatComposerPaste } from './use-native-chat-composer-paste'
 import { useNativeChatExternalAttachments } from './use-native-chat-external-attachments'
 import { useNativeChatSessionOptions } from './use-native-chat-session-options'
 import { useNativeChatFileAttachmentActions } from './use-native-chat-file-attachment-actions'
@@ -66,7 +66,6 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       onSendOutcome,
       onStop,
       onOptimisticSend,
-      optimisticSendOutcome,
       onOptimisticSendCanceled,
       onSlashCommand,
       onSwitchToTerminal,
@@ -169,14 +168,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setNotice: core.setNotice
     })
 
-    const handlePasteEvent = useNativeChatComposerHandle(ref, {
-      textareaRef,
-      caret,
-      draft,
-      setDraft,
-      setCaret,
-      setHistory,
-      setActiveSuggestion,
+    const { handlePaste, pasteFromClipboard } = useNativeChatComposerPaste({
       targetKey: JSON.stringify([
         paneKey,
         targetPtyId,
@@ -360,9 +352,10 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
         focus: core.focus,
         insertTypedText: core.insertTypedText,
         handlePasteEvent: handlePaste,
-        pasteFromClipboard
+        pasteFromClipboard,
+        contains: (node: Node | null) => core.textareaRef.current?.contains?.(node) === true
       }),
-      [core.focus, core.insertTypedText, handlePaste, pasteFromClipboard]
+      [core.focus, core.insertTypedText, core.textareaRef, handlePaste, pasteFromClipboard]
     )
 
     return (

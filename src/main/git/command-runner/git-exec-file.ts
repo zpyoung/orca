@@ -238,7 +238,7 @@ export async function gitExecFileAsyncBuffer(
       termination = new Promise<void>((resolve) => {
         reportTerminated = resolve
       })
-      const result = await execFileCapture(resolved.binary, resolved.args, {
+      const { stdout } = await execFileCapture(resolved.binary, resolved.args, {
         cwd: resolved.cwd,
         encoding: 'buffer',
         signal: options.signal,
@@ -246,16 +246,15 @@ export async function gitExecFileAsyncBuffer(
         timeout: timeoutMs,
         env: untranslatedGitOutputEnv(options.env),
         admissionTier: options.admissionTier,
-        signal: options.signal,
         onChildTerminated: reportTerminated,
         ...(timeoutMs === undefined
           ? {}
           : { createTimeoutError: () => new GitCommandTimeoutError(timeoutMs) })
       })
-      if (!Buffer.isBuffer(result.stdout)) {
-        throw new TypeError('Expected buffered git output')
+      if (!Buffer.isBuffer(stdout)) {
+        throw new Error('Git buffer capture returned text instead of bytes')
       }
-      return { stdout: readCapturedGitBuffer(result.stdout, resolved) }
+      return { stdout: readCapturedGitBuffer(stdout, resolved) }
     } finally {
       if (termination) {
         void termination.then(grant.release)

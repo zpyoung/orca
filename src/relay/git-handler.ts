@@ -4,7 +4,6 @@ import { expandTilde } from './context'
 import { MAX_IN_FLIGHT_PROMISE_DEDUPE_ENTRIES } from '../shared/in-flight-promise-dedupe'
 import { GitStatusReadLeaseOwner } from '../shared/git-status-read-lease-owner'
 import { GitCapabilityCache } from '../shared/git-capability-cache'
-import { GitStatusReadLeaseOwner } from '../shared/git-status-read-lease-owner'
 import {
   clearSubmodulePathsCache,
   createSubmodulePathsCache,
@@ -33,8 +32,10 @@ import {
 
 export class GitHandler {
   private dispatcher: RelayDispatcher
-  private readonly gitDiffReadDedupe = new InFlightPromiseDedupe<unknown>()
-  private readonly gitFileDiffReadLeaseOwner = new GitStatusReadLeaseOwner<unknown>()
+  private readonly gitDiffReadDedupe = new GitStatusReadLeaseOwner<unknown>(
+    MAX_IN_FLIGHT_PROMISE_DEDUPE_ENTRIES,
+    30_000
+  )
   private readonly gitCapabilities = new GitCapabilityCache()
   // Why: cache .gitmodules per instance to avoid SSH reads and test leakage.
   private submodulePathsCache: SubmodulePathsCache = createSubmodulePathsCache()
@@ -53,7 +54,6 @@ export class GitHandler {
     this.dispatcher = dispatcher
     const handlers = createGitHandlerOperationSet({
       gitDiffReadDedupe: this.gitDiffReadDedupe,
-      gitFileDiffReadLeaseOwner: this.gitFileDiffReadLeaseOwner,
       gitCapabilities: this.gitCapabilities,
       submodulePathsCache: this.submodulePathsCache,
       watcherRegistry: this.watcherRegistry,
@@ -107,8 +107,7 @@ export class GitHandler {
   }
 
   private clearGitMutationReadCaches(): void {
-    this.gitDiffReadDedupe.clear()
-    this.gitFileDiffReadLeaseOwner.invalidate()
+    this.gitDiffReadDedupe.invalidate()
     invalidateGitBranchLineTotalInFlight()
     clearGitStatusLineStatsCache()
     clearSubmodulePathsCache(this.submodulePathsCache)
@@ -158,22 +157,53 @@ export class GitHandler {
       : run()
   }
 
+  private async networkSshEnv(
+    args: readonly string[],
+    cwd: string,
+    signal?: AbortSignal
+  ): Promise<NodeJS.ProcessEnv> {
+    const env = buildRelayUnattendedGitEnv()
+    if (env.GIT_SSH_COMMAND || env.GIT_SSH) {
+      return env
+    }
+    const subcommandIndex = findGitSubcommandIndex(args)
+    let config = parseGitSshConfig('')
+    try {
+      const { stdout } = await this.git(
+        [...args.slice(0, Math.max(0, subcommandIndex)), ...GIT_SSH_CONFIG_ARGS],
+        cwd,
+        { signal, timeout: 2500, nonInteractive: true }
+      )
+      config = parseGitSshConfig(stdout)
+    } catch (error) {
+      if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 1) {
+        throw error
+      }
+    }
+    return buildGitSshPolicyEnv(env, config.command, config.variant).env
+  }
+
   private async gitBuffer(
     args: string[],
     cwd: string,
-    opts?: { signal?: AbortSignal }
+    opts?: GitHandlerCommandOptions
   ): Promise<Buffer> {
-    const result = await execFileAsync('git', args, {
-      cwd,
-      env: buildRelayGitEnv(),
-      encoding: 'buffer',
-      maxBuffer: MAX_GIT_BUFFER,
-      signal: opts?.signal
-    })
-    if (!Buffer.isBuffer(result.stdout)) {
-      throw new TypeError('Expected buffered git output')
+    const result = await runGitToTermination(
+      args,
+      {
+        cwd: expandTilde(cwd),
+        env: buildRelayGitEnv(),
+        captureStdoutAsBytes: true,
+        signal: opts?.signal,
+        timeout: opts?.timeout,
+        maxBuffer: opts?.maxBuffer
+      },
+      undefined
+    )
+    if (!result.stdoutBytes) {
+      throw new Error('Git byte capture returned no bytes.')
     }
-    return result.stdout
+    return result.stdoutBytes
   }
 
   private async spawnClone(

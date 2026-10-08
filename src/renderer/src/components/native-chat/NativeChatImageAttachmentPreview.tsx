@@ -6,6 +6,7 @@ import { basename } from '@/lib/path'
 import { useLocalImageSrc } from '@/components/editor/useLocalImageSrc'
 import { isNativeChatPastedImagePath } from './native-chat-image-paste'
 import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
+import { chatImageAccess } from '@/lib/local-file-access'
 
 type Props = {
   attachment: NativeChatComposerImageAttachment

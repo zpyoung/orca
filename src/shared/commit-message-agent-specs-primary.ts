@@ -113,7 +113,7 @@ export function buildPrimaryCommitMessageAgentSpecs({
         {
           id: 'gpt-5.6-terra',
           label: 'GPT-5.6 Terra',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
+          thinkingLevels: CODEX_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         },
         {

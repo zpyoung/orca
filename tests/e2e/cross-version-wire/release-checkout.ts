@@ -7,7 +7,10 @@ import {
   extractReleaseCheckoutTree,
   scavengeReleaseCheckoutStaging
 } from './release-checkout-tree.ts'
-import { selectLatestStableReleaseTag } from '../../../config/scripts/stable-release-tags.mjs'
+import {
+  compareReleaseTags,
+  selectLatestStableReleaseTag
+} from '../../../config/scripts/stable-release-tags.mjs'
 
 export { selectLatestStableReleaseTag }
 

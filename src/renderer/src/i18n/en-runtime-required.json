@@ -2989,6 +2989,13 @@
       "title": "Agent dashboard"
     }
   },
+  "fileExplorer": {
+    "root": {
+      "omittedFiles": "Files omitted by sparse checkout are not searched.",
+      "viewOnly": "Sparse checkout · View changes do not change checked-out files.",
+      "viewing": "Viewing: {{path}}"
+    }
+  },
   "ledger": {
     "chooser": {
       "summary_one": "{{tier}} · {{count}} entry",

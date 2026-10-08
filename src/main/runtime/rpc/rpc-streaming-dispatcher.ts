@@ -142,7 +142,6 @@ export class RpcStreamingDispatcher {
             clientCapabilities: options?.clientCapabilities,
             updateClientCapabilities: options?.updateClientCapabilities,
             authenticatedCredential: options?.authenticatedCredential,
-            orchestrationCapability: request.orchestrationCapability,
             authenticatedCallerFingerprint:
               mutation?.identity.callerFingerprint ??
               legacyCoordinator?.mutationCallerFingerprint ??

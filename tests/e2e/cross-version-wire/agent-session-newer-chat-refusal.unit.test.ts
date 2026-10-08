@@ -32,7 +32,7 @@ import {
  */
 const SUITE_TIMEOUT_MS = 180_000
 // The last release that does not know the newer-Orca reason: its words fall back to the code's.
-const BEFORE_NEWER_REASON_REF = 'v1.4.218'
+const BEFORE_NEWER_REASON_REF = 'v1.4.219-rc.0.zy01'
 // A main build that shares this one's host database and schema version, so a downgrade to it opens
 // the journal writable. No release tag has that database yet; move to the first one that does.
 const WRITABLE_BASELINE_REF = '3727100cc9dbcea6201f8a3e506676a3c4b53b18'

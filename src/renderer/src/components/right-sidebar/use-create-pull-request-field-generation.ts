@@ -11,6 +11,7 @@ import type { ResolveSourceControlAiResult } from '../../../../shared/source-con
 import type { SourceControlAiPrCreationDefaults } from '../../../../shared/source-control-ai-types'
 import type { PullRequestFieldRevisions } from '@/store/slices/pull-request-generation'
 import { materializeSourceControlTextGenerationParams } from '../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
+import type { PullRequestGenerationOptions } from '@/store/slices/pull-request-generation-auto-submit'
 import { stripBaseRef } from './create-pull-request-base-ref-normalization'
 import type {
   GenerationSeed,
@@ -125,7 +126,8 @@ export function useCreatePullRequestFieldGeneration({
         return await generation.onGenerate(
           { base, title, body, draft },
           { ...fieldRevisionsRef.current },
-          effectiveOverrides
+          effectiveOverrides,
+          options
         )
       }
       const requestId = generationRequestIdRef.current + 1

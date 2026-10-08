@@ -22,6 +22,7 @@ import {
 import {
   commandWithNodePath,
   listRelayBaseDirsCommand,
+  MAX_RELAY_GC_LISTING_ENTRIES,
   makeRemoteDirectoryCommand,
   moveRemoteTreeCommand,
   probeDirectoryExistsCommand,
@@ -259,30 +260,44 @@ describe('ssh remote command builders', () => {
   })
 
   it.runIf(process.platform !== 'win32')(
-    'filters a stage listing larger than the exec cap before emitting real POSIX GC entries',
+    'bounds real POSIX GC output with more than the exec-cap stage population',
     async () => {
       const fixture = createRelayGcListingFixture()
       try {
-        const stagePrefix = `/relay-0.1.0+abc.upload-${'x'.repeat(256)}`
-        mkdirSync(join(root, 'relay-0.1.0+aaa'))
-        mkdirSync(join(root, 'relay-0.1.0+bbb'))
+        const paths = await readUncappedRelayGcPaths(fixture.findCommand)
+        expect(paths.join('\n').length).toBeGreaterThan(SSH_EXEC_OUTPUT_CAP_CHARS)
+        const cappedRaw = await runCappedRelayGcShellCommand(
+          `${fixture.findCommand} | LC_ALL=C sort`
+        )
+        expect(cappedRaw.length).toBe(SSH_EXEC_OUTPUT_CAP_CHARS)
+        for (const name of fixture.validNames) {
+          expect(cappedRaw).not.toContain(join(fixture.root, name))
+        }
 
-        const command = `
-find() {
-  index=0
-  while [ "$index" -lt 4096 ]; do
-    printf '%s%s\\n' '${stagePrefix}' "$index"
-    index=$((index + 1))
-  done
-  command find "$@"
-}
-${listRelayBaseDirsCommand(posix, root)}`
-        const output = await runShellCommand(command)
+        const output = await runCappedRelayGcShellCommand(
+          listRelayBaseDirsCommand(posix, fixture.root)
+        )
         const entries = output.trim().split('\n')
 
         // find enumerates in filesystem order, which is insertion-ordered on ext4 but not APFS
         expect([...entries].sort()).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
         expect(Buffer.byteLength(output)).toBeLessThan(1_024)
+        expect(entries.length).toBeLessThanOrEqual(MAX_RELAY_GC_LISTING_ENTRIES)
+
+        fixture.fillValidEntryBoundary()
+        const validNames = new Set(fixture.validNames)
+        const unboundedEntries = (await readUncappedRelayGcPaths(fixture.findCommand))
+          .map((path) => basename(path))
+          .filter((name) => validNames.has(name))
+        expect(unboundedEntries).toHaveLength(65)
+        const boundedOutput = await runCappedRelayGcShellCommand(
+          listRelayBaseDirsCommand(posix, fixture.root)
+        )
+        const boundedEntries = boundedOutput.trim().split('\n')
+        expect(boundedEntries).toEqual(unboundedEntries.slice(0, 64))
+        expect(boundedEntries).toHaveLength(64)
+        expect(new Set(boundedEntries).size).toBe(64)
+        expect(Buffer.byteLength(boundedOutput)).toBeLessThan(1_024)
       } finally {
         fixture.dispose()
       }

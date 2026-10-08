@@ -33,6 +33,11 @@ import { getPosixOmpShellWrapper } from './pty/omp-shell-wrapper'
 import { WSL_MANAGED_CLI_PATH_RESTORE } from './wsl-managed-cli-path-restore'
 import { getPosixCodexShellLaunchPreflight } from '../shared/codex-shell-function'
 import {
+  ZSH_DEFERRED_LINE_INIT_BLOCK,
+  ZSH_DEFERRED_LINE_INIT_CLEANUP_BLOCK,
+  ZSH_DEFERRED_LINE_INIT_RETIRE_BLOCK
+} from './zsh-deferred-startup-line-init'
+import {
   getZshShellReadyMarkerRegistrationBlock,
   SHELL_STARTUP_IDENTITY_MARKER_BLOCK,
   ZSH_FEATURE_CHANNEL_BLOCK,

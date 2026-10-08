@@ -195,6 +195,14 @@ module.exports = {
     '!out/**/*.map',
     // Why: Vite's manifest is only used to project the paired web client.
     '!out/renderer/.vite{,/**/*}',
+    // Why: out/electron-dev caches `pnpm dev`'s per-branch Electron.app copies (~270MB each).
+    // CI never creates it, but packaging on a machine that has run dev would pack them all.
+    '!out/electron-dev{,/**/*}',
+    // Why: relayExtraResource already ships out/relay to resources/relay, which is
+    // the only path a packaged build resolves. Packing it again added 14MB and put
+    // relay.js inside app.asar, so a script-heuristic verdict on relay.js took the
+    // whole asar with it as a compound object and gutted the install (#20966, #20972).
+    '!out/relay{,/**/*}',
     '!electron.vite.config.{js,ts,mjs,cjs}',
     '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,CHANGELOG.md,README.md}',
     '!{.env,.env.*,.npmrc,pnpm-lock.yaml}',
@@ -255,7 +263,6 @@ module.exports = {
     'out/main/gitlab/project-ref-parser.js',
     'out/main/grok/**',
     'out/main/hermes/**',
-    'out/main/win32-utils.js',
     'out/main/orca-profiles/profile-index-store.js',
     'out/main/persistence/profile-state/**',
     'out/main/startup/http1-compatibility-marker.js',
@@ -266,7 +273,6 @@ module.exports = {
     'out/main/plugin-host-entry.js',
     'out/main/computer-sidecar.js',
     'out/main/parcel-watcher-process-entry.js',
-    'out/main/main-thread-hang-watchdog-entry.js',
     'out/main/chunks/**',
     'resources/**',
     'node_modules/ws/**',
@@ -390,8 +396,14 @@ module.exports = {
     }
     if (context.electronPlatformName === 'darwin') {
       await signMacComputerUseHelper(join(resourcesDir, 'Orca Computer Use.app'), context.packager)
-      await signMacNotificationStatusHelper(
+      await signMacStandaloneHelper(
         join(resourcesDir, '..', 'MacOS', 'orca-notification-status'),
+        'orca-notification-status',
+        context.packager
+      )
+      await signMacStandaloneHelper(
+        join(resourcesDir, '..', 'MacOS', 'orca-keyboard-layout'),
+        'orca-keyboard-layout',
         context.packager
       )
     }
@@ -520,6 +532,10 @@ module.exports = {
       {
         from: 'native/notification-status-macos/.build/release/orca-notification-status',
         to: 'MacOS/orca-notification-status'
+      },
+      {
+        from: 'native/keyboard-layout-macos/.build/release/orca-keyboard-layout',
+        to: 'MacOS/orca-keyboard-layout'
       }
     ],
     // Fork: arm64 only. Each arch is a separate ~40min notarization submission,
@@ -701,10 +717,10 @@ async function signMacComputerUseHelper(helperAppPath, packager) {
   })
 }
 
-async function signMacNotificationStatusHelper(helperPath, packager) {
+async function signMacStandaloneHelper(helperPath, helperName, packager) {
   if (!existsSync(helperPath)) {
     if (isMacRelease) {
-      throw new Error(`Missing orca-notification-status helper at ${helperPath}`)
+      throw new Error(`Missing ${helperName} helper at ${helperPath}`)
     }
     return
   }
@@ -717,12 +733,9 @@ async function signMacNotificationStatusHelper(helperPath, packager) {
     findInstalledMacSigningIdentity(codeSigningInfo?.keychainFile) ??
     (isMacRelease ? null : '-')
   if (!identity) {
-    throw new Error('Missing signing identity for orca-notification-status helper')
+    throw new Error(`Missing signing identity for ${helperName} helper`)
   }
-  // Why: macOS keys notification records to the code-signing identifier; the
-  // binary embeds the app's CFBundleIdentifier in __TEXT,__info_plist so this
-  // (and any later) `codesign --force` derives the correct identifier. Sign
-  // before the outer Orca.app is sealed, like the computer-use helper.
+  // Why: nested executables must be signed before the outer app bundle is sealed.
   const args = ['--force', '--sign', identity]
   if (isMacRelease) {
     args.push('--options', 'runtime', '--timestamp')

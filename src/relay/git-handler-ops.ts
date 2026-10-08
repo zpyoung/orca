@@ -93,10 +93,8 @@ export async function computeDiff(
   worktreePath: string,
   filePath: string,
   staged: boolean,
-  compareAgainstHead = false,
-  signal?: AbortSignal
+  compareAgainstHead = false
 ) {
-  signal?.throwIfAborted()
   let originalContent = ''
   let modifiedContent = ''
   let originalIsBinary = false
@@ -105,13 +103,12 @@ export async function computeDiff(
 
   try {
     if (staged) {
-      const left = await readBlobAtOid(git, worktreePath, 'HEAD', filePath)
-      signal?.throwIfAborted()
+      const [left, right] = await Promise.all([
+        readBlobAtOid(git, worktreePath, 'HEAD', filePath),
+        readBlobAtIndex(git, worktreePath, filePath)
+      ])
       originalContent = left.content
       originalIsBinary = left.isBinary
-
-      const right = await readBlobAtIndex(git, worktreePath, filePath)
-      signal?.throwIfAborted()
       modifiedContent = right.content
       modifiedIsBinary = right.isBinary
       modifiedDeleted = right.missing
@@ -119,21 +116,20 @@ export async function computeDiff(
       const left = compareAgainstHead
         ? await readBlobAtOid(git, worktreePath, 'HEAD', filePath)
         : await readUnstagedLeft(git, worktreePath, filePath)
-      signal?.throwIfAborted()
       originalContent = left.content
       originalIsBinary = left.isBinary
 
       const right = await readWorkingDiffFile(path.join(worktreePath, filePath))
-      signal?.throwIfAborted()
       modifiedContent = right.content
       modifiedIsBinary = right.isBinary
       modifiedDeleted = right.missing
     }
-  } catch {
-    signal?.throwIfAborted()
+  } catch (error) {
+    if (isGitReadInterruptedError(error)) {
+      throw error
+    }
     // Fallback to empty
   }
-  signal?.throwIfAborted()
 
   const result = buildDiffResult(
     originalContent,

@@ -1,15 +1,15 @@
 [
   {
-    "filePath": "src/renderer/src/components/settings/appearance-search.ts",
-    "kind": "object-property:keywords",
-    "text": "Idioma",
+    "filePath": "src/renderer/src/components/sidebar/WorktreeCard.tsx",
+    "kind": "jsx-attribute:label",
+    "text": "sidebar",
     "dynamic": false,
     "count": 1
   },
   {
-    "filePath": "src/renderer/src/components/sidebar/WorktreeCard.tsx",
-    "kind": "jsx-attribute:label",
-    "text": "sidebar",
+    "filePath": "src/renderer/src/components/settings/appearance-search.ts",
+    "kind": "object-property:keywords",
+    "text": "Idioma",
     "dynamic": false,
     "count": 1
   },

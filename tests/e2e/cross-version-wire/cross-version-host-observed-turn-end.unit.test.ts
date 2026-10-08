@@ -12,7 +12,7 @@ import type { AgentJournalRenderItem } from '../../../src/shared/agent-session-j
  * The older build is pinned to the newest release whose status parser knew `mainAgent.outcome`,
  * so each reader here is one that validates the arm rather than one that never looks at it.
  */
-const OLD_REF = 'v1.4.214'
+const OLD_REF = 'v1.4.216-rc.0.zy01'
 const SUITE_TIMEOUT_MS = 180_000
 // `superseded` is also journaled: a newer request replaced the turn, recorded at the replacement.
 const NEW_ARMS = ['interruption', 'unconfirmed', 'superseded'] as const

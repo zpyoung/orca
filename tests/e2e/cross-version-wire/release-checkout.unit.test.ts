@@ -307,7 +307,7 @@ describe('release checkout materialization', () => {
     const secondRef = `${scope}_release`
     for (const [ref, revision] of [
       [firstRef, 'HEAD'],
-      [secondRef, 'v1.4.190']
+      [secondRef, 'v1.4.191-rc.0.zy01']
     ]) {
       const commit = git(['rev-parse', `${revision}^{commit}`])
       git(['update-ref', ref, commit, '0'.repeat(40)])

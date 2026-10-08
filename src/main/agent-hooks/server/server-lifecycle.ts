@@ -13,8 +13,9 @@ import { HOOK_REQUEST_SLOWLORIS_MS } from '../../../shared/agent-hook-listener/l
 import { isHookRequestTruncatedError } from '../../../shared/agent-hook-transport-interference'
 import { clearAllListenerCaches } from '../../../shared/agent-hook-listener/listener-state'
 import { trackEmptyPaneKeyHook } from './server-transport-rules'
-import { AgentHookServerRuntimeEnv } from './server-runtime-env'
 import { sessionInfoService } from '../../fork-session-info/session-info-service'
+import { AgentHookServerStatusHookLifecycle } from './server-status-hook-lifecycle'
+import { OPENCODE_STARTUP_PROMPT_CLAIM_PATH } from '../../../shared/opencode-startup-prompt'
 
 export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHookLifecycle {
   /** Start the loopback listener after hydration and spool replay have settled. */

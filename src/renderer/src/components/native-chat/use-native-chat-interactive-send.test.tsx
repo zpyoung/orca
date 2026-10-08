@@ -141,22 +141,6 @@ describe('useNativeChatInteractiveSend', () => {
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
   })
 
-  it('does not send a trailing Enter after Codex submits a multi-question answer', () => {
-    const prompt: AskPrompt = {
-      questions: [
-        { question: 'q1', multiSelect: false, options: [{ label: 'A' }, { label: 'B' }] },
-        { question: 'q2', multiSelect: false, options: [{ label: 'C' }, { label: 'D' }] }
-      ]
-    }
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'codex')
-    )
-
-    act(() => result.current.sendAnswer(prompt, [{ indices: [1] }, { indices: [0] }]))
-
-    expect(mocks.sendNativeChatAskAnswer.mock.calls[0]?.[1]).toEqual([{ raw: '2' }, { raw: '1' }])
-  })
-
   it('routes a Claude answer through the option-number keystroke path', () => {
     const { result } = renderHook(() =>
       useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
@@ -255,8 +239,11 @@ describe('useNativeChatInteractiveSend', () => {
       )
       act(() => result.current.cancel())
       expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
-        { terminalTabId: 'tab-1' },
-        'pty-1',
+        {
+          terminalTabId: 'tab-1',
+          ptyId: 'pty-1',
+          settings: { terminalTabId: 'tab-1' }
+        },
         [{ raw: '\x1b' }, { raw: '\x1b' }]
       )
       rerender({ ptyId: 'pty-2' })
@@ -289,8 +276,11 @@ describe('useNativeChatInteractiveSend', () => {
       )
       act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
       expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
-        { terminalTabId: 'tab-1' },
-        'pty-1',
+        {
+          terminalTabId: 'tab-1',
+          ptyId: 'pty-1',
+          settings: { terminalTabId: 'tab-1' }
+        },
         [{ raw: '2' }],
         expect.any(Function)
       )

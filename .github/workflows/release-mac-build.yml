@@ -40,6 +40,10 @@ jobs:
     # submission, not two — dual-arch ran ~80min and fit no workable timeout.
     # Sized so a full retry fits (70 + 0.5 + 70).
     timeout-minutes: 150
+    # actions: read fetches the relay addons from the release-cut run.
+    permissions:
+      actions: read
+      contents: write
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:

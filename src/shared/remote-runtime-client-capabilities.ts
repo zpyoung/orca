@@ -12,6 +12,7 @@ import {
   type RuntimeCapability
 } from './protocol-version'
 import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from './fork-heimdall/capability'
+import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from './agent-session-background-task-child-views-capability'
 import { SKILL_INSTALL_RESULT_V2_CAPABILITY } from './skill-install-capability'
 
 // Keep every remote request transport on the same mixed-version capability contract.

@@ -23,7 +23,7 @@ import { importReleaseCheckoutModule, materializeReleaseCheckout } from './relea
 
 // A release that knows neither the Stop event nor the Resume marker: an unknown row kind would
 // make it delete the journal from that row on, so both ride a tombstone it already reads.
-const BASELINE_REF = 'v1.4.218'
+const BASELINE_REF = 'v1.4.219-rc.0.zy01'
 const JOURNAL = 'src/main/native-chat/agent-session-journal'
 // A main build that shares this one's host database and schema version, so a downgrade to it opens
 // the journal writable. No release tag has that database yet; move to the first one that does.

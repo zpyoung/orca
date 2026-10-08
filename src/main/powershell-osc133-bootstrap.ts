@@ -1,4 +1,5 @@
 import { getPowerShellOmpShellWrapper } from './pty/omp-shell-wrapper'
+import { MANAGED_DATA_ACCOUNT_POWERSHELL_RESTORE } from '../shared/managed-data-account-shell'
 import { getPowerShellCodexShellLaunchPreflight } from '../shared/codex-shell-function'
 export { encodePowerShellCommand } from '../shared/powershell-command-encoding'
 

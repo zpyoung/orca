@@ -19,7 +19,6 @@ import { shouldClearNativeChatWorkingSuppression } from './native-chat-working-s
 import { resolveNativeChatTerminalTurn } from './native-chat-terminal-turn'
 import { useNativeChatTerminalTurnTiming } from './use-native-chat-terminal-turn-timing'
 import {
-  appendPendingSendCache,
   pendingSendsAsMessages,
   shouldPruneLaunchPrompt
 } from './native-chat-pending'
@@ -363,7 +362,7 @@ export function NativeChatResolvedView({
             awaitingInput={awaitingInput}
             onLinkClick={onLinkClick}
             allowFileUriLinks={fileLinkContext !== null}
-            deliveryNotices={launchPromptDeliveryNotices}
+            deliveryNotices={deliveryNotices}
             readError={viewState.error}
           />
         )}

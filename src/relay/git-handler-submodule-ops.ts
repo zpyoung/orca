@@ -134,7 +134,7 @@ export async function listSubmodulePaths(git: GitExec, worktreePath: string): Pr
       })
       .filter((value) => value.length > 0)
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (isGitReadInterruptedError(error)) {
       throw error
     }
     return []

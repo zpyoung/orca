@@ -135,6 +135,11 @@ export function initializeMainProcessAccountServices(): void {
   )
   // Why: live Claude sessions stream usage windows through their statusLine command; feeding them here avoids OAuth usage-endpoint polling (and its 429s).
   agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(state.rateLimits, event))
+  store.migrateLegacyOpenCodeGoApiKey({
+    has: hasOpenCodeGoApiKey,
+    read: readOpenCodeGoApiKey,
+    save: saveOpenCodeGoApiKey
+  })
   state.rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()
     return {

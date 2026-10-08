@@ -207,8 +207,6 @@ export function RepositoryPane({
   const hostSetupEntries = allEntries.filter((entry) => entry.title === 'Available Hosts')
   const projectRuntimeEntries = allEntries.filter((entry) => entry.title === 'Project Runtime')
   const ledgerStalenessEntries = allEntries.filter((entry) => entry.title === 'Ledger Staleness')
-  const removeProjectLabel =
-    confirmingRemove === repo.id ? 'Confirm Remove Project' : 'Remove Project'
 
   const hooksSection =
     !isFolder && (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, hooksEntries)) ? (

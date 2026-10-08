@@ -190,11 +190,13 @@ describe('GitHandler', () => {
       firstController.abort(firstError)
       await expect(first).rejects.toBe(firstError)
       expect(sharedSignal?.aborted).toBe(false)
+      // a staged diff reads both blobs concurrently, so count launches rather than pinning one
+      const launchedBeforeCancel = gitBufferSpy.mock.calls.length
 
       secondController.abort(secondError)
       await expect(second).rejects.toBe(secondError)
       expect(sharedSignal?.aborted).toBe(true)
-      expect(gitBufferSpy).toHaveBeenCalledTimes(1)
+      expect(gitBufferSpy).toHaveBeenCalledTimes(launchedBeforeCancel)
     })
 
     it('clears pending git.diff reads when status runs', async () => {

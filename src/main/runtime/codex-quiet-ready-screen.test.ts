@@ -296,6 +296,9 @@ describe('a busy 0.150-0.157 pane whose header stays in the tail', () => {
           readQuietReadyBodyEvidence: () =>
             isQuietReadyScreenBody(waitText, 'codex', () => screenLines),
           agent: 'codex',
+          readAgentRuleVerdict: () => null,
+          readScreenInputVeto: () => null,
+          titleObservedAtEpochMs: null,
           firstPartyStatus: null,
           quiescenceMs: QUIESCENCE_MS
         })
@@ -352,6 +355,9 @@ describe('a busy 0.150-0.157 pane whose header stays in the tail', () => {
           isKnownReadyPromptBody(waitText, 'codex', () => header, record.lastOutputAt !== null),
         readQuietReadyBodyEvidence: () => isQuietReadyScreenBody(waitText, 'codex', () => header),
         agent: 'codex',
+        readAgentRuleVerdict: () => null,
+        readScreenInputVeto: () => null,
+        titleObservedAtEpochMs: null,
         firstPartyStatus: null,
         quiescenceMs: QUIESCENCE_MS
       })

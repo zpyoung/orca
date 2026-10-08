@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { getPosixOmpShellWrapper } from '../main/pty/omp-shell-wrapper'
+import { ORCA_CLI_POSIX_PATH_RESTORE } from '../shared/orca-cli-shell-path'
 import { getPosixCodexShellLaunchPreflight } from '../shared/codex-shell-function'
 import {
   BASH_FEATURE_CHANNEL_BLOCK,

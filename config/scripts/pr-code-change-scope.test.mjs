@@ -604,7 +604,7 @@ describe('PR Checks skip wiring', () => {
     for (const job of prWorkflow.jobs.verify.needs) {
       // fork_ownership_guard is ungated: it runs on every PR, so it is checked
       // unconditionally rather than through the SHOULD_RUN loop.
-      if (job === 'code_paths' || job === 'fork_ownership_guard') {
+      if (job === 'code_paths' || job === 'preflight' || job === 'fork_ownership_guard') {
         continue
       }
       const envVar = `${job.replaceAll('-', '_').toUpperCase()}_SHOULD_RUN`

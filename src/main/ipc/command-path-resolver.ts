@@ -178,7 +178,7 @@ export async function isCommandOnLocalPath(
   command: string,
   options: ResolveCommandOptions = {}
 ): Promise<boolean> {
-  return (await resolveCommandOnLocalPath(command, options)) !== null
+  return (await findLocalCommandPaths(command, options, true)).length > 0
 }
 
 /** The absolute path `isCommandOnLocalPath` found, or null. */
@@ -186,8 +186,24 @@ export async function resolveCommandOnLocalPath(
   command: string,
   options: ResolveCommandOptions = {}
 ): Promise<string | null> {
+  return (await findLocalCommandPaths(command, options, true))[0] ?? null
+}
+
+/** Ordered, deduplicated candidates, including executable shims that may fail to run. */
+export async function listLocalCommandPaths(
+  command: string,
+  options: ResolveCommandOptions = {}
+): Promise<string[]> {
+  return findLocalCommandPaths(command, options, false)
+}
+
+async function findLocalCommandPaths(
+  command: string,
+  options: ResolveCommandOptions,
+  stopAtFirst: boolean
+): Promise<string[]> {
   if (!command) {
-    return null
+    return []
   }
   const platform = options.platform ?? process.platform
   const env = options.env ?? process.env
@@ -220,9 +236,12 @@ export async function resolveCommandOnLocalPath(
       }
       seen.add(candidateKey)
       if (await isExecutableFile(candidate, isWin)) {
-        return candidate
+        found.push(candidate)
+        if (stopAtFirst || found.length >= (options.maxResults ?? Infinity)) {
+          return found
+        }
       }
     }
   }
-  return null
+  return found
 }

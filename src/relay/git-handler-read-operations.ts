@@ -29,8 +29,7 @@ function resolveSubmoduleStatusArea(
 
 export class GitHandlerReadOperations extends GitHandlerOperationContext {
   async getStatus(params: Record<string, unknown>, context: RequestContext) {
-    this.gitDiffReadDedupe.clear()
-    this.gitFileDiffReadLeaseOwner.invalidate()
+    this.gitDiffReadDedupe.invalidate()
     return getStatusOp(this.git.bind(this), streamRelayGitStdout, params, {
       signal: context.signal
     })
@@ -118,34 +117,29 @@ export class GitHandlerReadOperations extends GitHandlerOperationContext {
     }
     const staged = params.staged as boolean
     const compareAgainstHead = params.compareAgainstHead as boolean | undefined
-    const result = await this.gitFileDiffReadLeaseOwner.lease(
+    // Why: register dedupe before awaiting so identical reads coalesce.
+    const result = await this.gitDiffReadDedupe.lease(
       stableInFlightKey(['diff', worktreePath, filePath, staged, compareAgainstHead]),
       context?.signal,
-      async (sharedSignal) => {
-        const requestGit: GitExec = (args, cwd, options) =>
-          this.git(args, cwd, { ...options, signal: sharedSignal })
-        const requestGitBuffer = (args: string[], cwd: string): Promise<Buffer> =>
-          this.gitBuffer(args, cwd, { signal: sharedSignal })
+      async (signal) => {
+        // Why: route gitlink roots to pointer diffs and inner files to their submodule worktree.
         const submodulePaths = await listSubmodulePathsCached(
-          requestGit,
+          this.gitForSignal(signal),
           worktreePath,
           this.submodulePathsCache
         )
-        sharedSignal.throwIfAborted()
         if (submodulePaths.length > 0) {
           const matchedSubmodule = findContainingSubmodule(submodulePaths, filePath)
           if (matchedSubmodule) {
             const normalizedFilePath = filePath.replace(/\\/g, '/').replace(/\/+$/, '')
             if (normalizedFilePath === matchedSubmodule) {
-              const pointerDiff = await computeSubmodulePointerDiff(
-                requestGit,
+              return computeSubmodulePointerDiff(
+                this.gitForSignal(signal),
                 worktreePath,
                 matchedSubmodule,
                 staged,
                 compareAgainstHead
               )
-              sharedSignal.throwIfAborted()
-              return pointerDiff
             }
             const submoduleWorktreePath = resolveSubmoduleWorktreePath(
               worktreePath,
@@ -153,40 +147,36 @@ export class GitHandlerReadOperations extends GitHandlerOperationContext {
             )
             const innerPath = normalizedFilePath.slice(matchedSubmodule.length + 1)
             const { fromOid, toOid } = await resolveSubmoduleCommitRange(
-              requestGit,
+              this.gitForSignal(signal),
               worktreePath,
               matchedSubmodule,
               staged
             )
-            sharedSignal.throwIfAborted()
+            // Why: a moved gitlink (clean worktree) keeps inner changes in committed history, so diff the two commits; otherwise read the working-tree blob.
             if (fromOid && toOid && fromOid !== toOid) {
-              const rangeDiff = await buildSubmoduleInnerCommitRangeDiff(
-                requestGitBuffer,
+              return buildSubmoduleInnerCommitRangeDiff(
+                this.gitBufferForSignal(signal),
                 submoduleWorktreePath,
                 innerPath,
                 fromOid,
                 toOid
               )
-              sharedSignal.throwIfAborted()
-              return rangeDiff
             }
             return computeDiff(
-              requestGitBuffer,
+              this.gitBufferForSignal(signal),
               submoduleWorktreePath,
               innerPath,
               staged,
-              compareAgainstHead,
-              sharedSignal
+              compareAgainstHead
             )
           }
         }
         return computeDiff(
-          requestGitBuffer,
+          this.gitBufferForSignal(signal),
           worktreePath,
           filePath,
           staged,
-          compareAgainstHead,
-          sharedSignal
+          compareAgainstHead
         )
       }
     )

@@ -9,8 +9,6 @@ import {
 } from '../tab-group-state'
 import { buildActiveSurfacePatch } from './tabs-surface'
 import { removeTabPaneKeysFromPendingMutations } from '../fork-terminal-dock/tab-terminal-dock-state'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
-import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { beginStructuredAgentSessionTabClose } from '@/runtime/structured-agent-session-tab-retirement'
 import {
   hasStructuredAgentSessionLaunchCancellationTombstone,

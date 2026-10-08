@@ -2,8 +2,6 @@ import type {
   RuntimeTerminalWait as RuntimeTerminalWaitResult,
   RuntimeTerminalWaitCondition
 } from '../../shared/runtime-types'
-import { hasAntigravityTerminalHeader } from './antigravity-terminal-readiness'
-import { tuiIdleNeedsVisibleScreenProbe } from './terminal-wait-detection'
 import {
   buildPtyTerminalWaitBlockedResult,
   buildPtyTerminalWaitResult,
@@ -14,6 +12,7 @@ import {
 import { readsTrustedScreen } from './agent-state-rules/agent-state-rules-engine'
 import { showsScreenProbeBanner } from './agent-state-rules/agent-state-text-anchors'
 import { buildTerminalWaitText } from './terminal-wait-tail-state'
+import { tuiIdleNeedsVisibleScreenProbe } from './terminal-wait-detection'
 import { evaluateTuiIdle, type TuiIdleVerdict } from './tui-idle-evidence'
 import {
   leafTuiIdleEvidence,
@@ -154,16 +153,7 @@ export class RuntimeTerminalWait {
             this.polls.startPty(waiter, live.pty, verdict)
             const paneAgent = this.deps.getPaneAgent(live.pty.ptyId)
             if (
-              // AGY can retain a stale working/blocked status after a trust dialog was
-              // dismissed. Its visible composer is authoritative, so probe whenever the
-              // pane is identified as AGY (or its banner is present), regardless of that
-              // stale status.
-              ((paneAgent === 'antigravity' ||
-                hasAntigravityTerminalHeader(livePtyWaitText) ||
-                live.pty.lastAgentStatus === null) &&
-                (livePtyWaitText.length === 0 ||
-                  paneAgent === 'antigravity' ||
-                  hasAntigravityTerminalHeader(livePtyWaitText))) ||
+              shouldProbeVisibleScreen(paneAgent, live.pty, livePtyWaitText) ||
               tuiIdleNeedsVisibleScreenProbe(live.pty.lastAgentStatus, livePtyWaitText, paneAgent)
             ) {
               this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs, paneAgent)
@@ -258,12 +248,7 @@ export class RuntimeTerminalWait {
             this.polls.startLeaf(waiter, live.leaf, verdict)
             const paneAgent = this.deps.getPaneAgent(live.leaf.ptyId)
             if (
-              ((paneAgent === 'antigravity' ||
-                hasAntigravityTerminalHeader(liveLeafWaitText) ||
-                live.leaf.lastAgentStatus === null) &&
-                (liveLeafWaitText.length === 0 ||
-                  paneAgent === 'antigravity' ||
-                  hasAntigravityTerminalHeader(liveLeafWaitText))) ||
+              shouldProbeVisibleScreen(paneAgent, live.leaf, liveLeafWaitText) ||
               tuiIdleNeedsVisibleScreenProbe(live.leaf.lastAgentStatus, liveLeafWaitText, paneAgent)
             ) {
               this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs, paneAgent)
