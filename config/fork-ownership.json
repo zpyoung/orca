@@ -1976,7 +1976,7 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "  dockContainer: HTMLElement",
+        "  dockContainer?: HTMLElement",
         "  /** Empty strip beneath xtermContainer reserved for portaling a composer; see terminal.css. */"
       ]
     },
@@ -5189,6 +5189,12 @@
       "lines": ["  startupLaunchOverrides?: AgentLaunchOverrides"]
     },
     {
+      "path": "src/main/runtime/rpc/methods/orchestration/worker/worker-launch-preferences.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    expect(resolveAgentSessionOptionLaunch('omp', { model }, [], false)).toEqual({"]
+    },
+    {
       "path": "src/main/runtime/runtime-worktree-agent-startup.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
@@ -7271,7 +7277,7 @@
       "removed": 2
     },
     "src/renderer/src/components/sidebar/worktree-list/grouping/project-group-sections.ts": {
-      "added": 15,
+      "added": 16,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-group-keys.ts": {
@@ -7455,7 +7461,7 @@
       "removed": 0
     },
     "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts": {
-      "added": 53,
+      "added": 56,
       "removed": 0
     },
     "src/renderer/src/lib/pane-manager/pane-dom-creation.ts": {
@@ -7719,8 +7725,8 @@
       "removed": 1
     },
     "src/shared/native-chat-agent-profiles.ts": {
-      "added": 9,
-      "removed": 1
+      "added": 16,
+      "removed": 2
     },
     "src/shared/native-chat-session-option-state.test.ts": {
       "added": 65,
@@ -8479,7 +8485,7 @@
       "removed": 27
     },
     "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
-      "added": 27,
+      "added": 28,
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-in-new-tab.ts": {
@@ -8602,9 +8608,13 @@
       "added": 2,
       "removed": 0
     },
+    "src/main/runtime/rpc/methods/orchestration/worker/worker-launch-preferences.test.ts": {
+      "added": 2,
+      "removed": 1
+    },
     "src/main/runtime/runtime-worktree-agent-startup.ts": {
-      "added": 24,
-      "removed": 8
+      "added": 25,
+      "removed": 9
     },
     "src/main/startup/main-process-automations.ts": {
       "added": 4,
