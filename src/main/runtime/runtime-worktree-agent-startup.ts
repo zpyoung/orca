@@ -167,7 +167,7 @@ export function buildWorktreeStartupForAgent(
         : environment.toSessionOptions(environment.launchPreferences)
     }),
     includeSessionOptionCatalogDefaults: launchOverrides ? false : undefined
-  })
+  }
   const prompt = environment.prompt ?? ''
   let startupPlan: ReturnType<typeof buildAgentStartupPlan>
   if (environment.onPromptCarry) {
