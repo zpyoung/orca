@@ -1,48 +1,48 @@
 import type { JSX } from 'react'
-import type { NodeProps, NodeTypes } from '@xyflow/react'
-import { PipelineNodeCard, type PipelineCanvasNode } from './PipelineNodeCard'
+import type { NodeTypes } from '@xyflow/react'
+import { PipelineNodeCard, type PipelineNodeViewProps } from './PipelineNodeCard'
 
-export function AgentNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function AgentNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="agent" />
 }
 
-export function CheckNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function CheckNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="check" />
 }
 
-export function ScriptNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function ScriptNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="script" />
 }
 
-export function DecisionNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function DecisionNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="decision" />
 }
 
-export function LoopNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function LoopNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="loop" />
 }
 
-export function SwarmNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function SwarmNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="swarm" />
 }
 
-export function MergeNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function MergeNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="merge" />
 }
 
-export function GateNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function GateNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="gate" />
 }
 
-export function LandNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function LandNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="land" />
 }
 
-export function ObjectiveNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function ObjectiveNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="objective" />
 }
 
-export function PrSitterNodeView(props: NodeProps<PipelineCanvasNode>): JSX.Element {
+export function PrSitterNodeView(props: PipelineNodeViewProps): JSX.Element {
   return <PipelineNodeCard {...props} nodeType="pr-sitter" />
 }
 

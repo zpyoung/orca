@@ -81,7 +81,10 @@ vi.mock('@xyflow/react', () => {
       createElement(Fragment, null, children),
     useReactFlow: () => ({
       screenToFlowPosition: ({ x, y }: { x: number; y: number }) => ({ x, y })
-    })
+    }),
+    // near zoom, so cards keep their full detail
+    useStore: (selector: (state: { transform: [number, number, number] }) => unknown) =>
+      selector({ transform: [0, 0, 1] })
   }
 })
 
