@@ -238,7 +238,7 @@ describe('PipelineNodeContextMenu on the edit graph', () => {
     inputs: { task: { type: 'text', required: true } },
     nodes: [
       { id: 'fix', type: 'agent', harness: 'codex', prompt: 'Fix the issue' },
-      { id: 'check', type: 'check', command: 'true', after: ['fix'] }
+      { id: 'check', type: 'check', command: 'true', timeoutSeconds: 1800, after: ['fix'] }
     ]
   }
 
