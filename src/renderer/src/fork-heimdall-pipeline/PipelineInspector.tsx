@@ -1,4 +1,4 @@
-import type { JSX } from 'react'
+import type { JSX, ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -15,6 +15,17 @@ import {
 } from './pipeline-node-inspector-fields'
 import { PipelineNodeInspectorCompositeFields } from './pipeline-node-inspector-composite-fields'
 import { getPipelineNodeTypeLabel } from './pipeline-node-views/PipelineNodeCard'
+
+function InspectorPanel({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+  return (
+    <aside
+      className="scrollbar-sleek flex min-h-0 flex-col gap-3 overflow-auto border-l border-border bg-card p-3 text-card-foreground max-lg:col-span-full max-lg:max-h-56 max-lg:border-t max-lg:border-l-0"
+      aria-label={label}
+    >
+      {children}
+    </aside>
+  )
+}
 
 export function PipelineInspector({
   document,
@@ -34,8 +45,8 @@ export function PipelineInspector({
   const panelLabel = translate('fork.heimdallPipeline.inspector.title', 'Inspector')
   if (readOnly) {
     return (
-      <aside className="pipeline-inspector scrollbar-sleek" aria-label={panelLabel}>
-        <h2 className="pipeline-inspector__heading">{panelLabel}</h2>
+      <InspectorPanel label={panelLabel}>
+        <h2 className="text-[13px] font-semibold">{panelLabel}</h2>
         <p className="text-sm text-muted-foreground">
           {selectedNode
             ? translate(
@@ -47,17 +58,17 @@ export function PipelineInspector({
                 'Duplicate this built-in to edit its graph.'
               )}
         </p>
-      </aside>
+      </InspectorPanel>
     )
   }
 
   if (!selectedNode) {
     return (
-      <aside className="pipeline-inspector scrollbar-sleek" aria-label={panelLabel}>
-        <h2 className="pipeline-inspector__heading">
+      <InspectorPanel label={panelLabel}>
+        <h2 className="text-[13px] font-semibold">
           {translate('fork.heimdallPipeline.inspector.pipeline', 'Pipeline')}
         </h2>
-        <div className="pipeline-inspector__fields scrollbar-sleek">
+        <div className="scrollbar-sleek grid gap-3 overflow-auto">
           <TextField
             label={translate('fork.heimdallPipeline.inspector.id', 'Pipeline id')}
             value={document.id}
@@ -94,7 +105,7 @@ export function PipelineInspector({
             onChange={(value) => updateDocumentJson(document, 'defaults', value, onDocumentChange)}
           />
         </div>
-      </aside>
+      </InspectorPanel>
     )
   }
 
@@ -102,10 +113,10 @@ export function PipelineInspector({
     updateNodeJson(document, selectedNode, key, value, onDocumentChange)
   const heading = selectedNode.label?.trim() || selectedNode.id
   return (
-    <aside className="pipeline-inspector scrollbar-sleek" aria-label={panelLabel}>
-      <div className="pipeline-inspector__heading-row">
+    <InspectorPanel label={panelLabel}>
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="pipeline-inspector__heading">{heading}</h2>
+          <h2 className="text-[13px] font-semibold">{heading}</h2>
           <p className="text-xs text-muted-foreground">{selectedNode.type}</p>
         </div>
         <Button
@@ -117,7 +128,7 @@ export function PipelineInspector({
           <Trash2 aria-hidden="true" />
         </Button>
       </div>
-      <div className="pipeline-inspector__fields scrollbar-sleek">
+      <div className="scrollbar-sleek grid gap-3 overflow-auto">
         <TextField
           label={translate('fork.heimdallPipeline.inspector.nodeId', 'Node id')}
           value={selectedNode.id}
@@ -161,6 +172,6 @@ export function PipelineInspector({
           />
         )}
       </div>
-    </aside>
+    </InspectorPanel>
   )
 }
