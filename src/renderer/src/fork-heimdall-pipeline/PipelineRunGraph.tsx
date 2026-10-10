@@ -9,7 +9,6 @@ import { formatHeimdallDuration } from '@/fork-heimdall/fleet-format'
 import { translate } from '@/i18n/i18n'
 import {
   PipelineNodeSchema,
-  PIPELINE_NODE_TYPES,
   type PipelineDocument,
   type PipelineNode
 } from '../../../shared/fork-heimdall-pipeline/document-schema'
@@ -21,26 +20,25 @@ import {
 import type { WatcherCommandResult } from '../../../shared/fork-heimdall/fleet-types'
 import type { ApprovalScope, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherFleetEntryReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
-import { parsePipelineNodeEvidenceKey } from '../../../shared/fork-heimdall-pipeline/choice-types'
 import type {
   PipelineRunNodeView,
   PipelineRunView
 } from '../../../shared/fork-heimdall-pipeline/run-view-types'
 import { CapabilityApprovalDialog } from './CapabilityApprovalDialog'
+import {
+  copyNodeIdMenuItem,
+  PipelineNodeContextMenu,
+  type PipelineNodeContextMenuItem
+} from './PipelineNodeContextMenu'
 import { RunGraphNode, type PipelineRunGraphNode } from './PipelineRunGraphNode'
 import { layeredLayout } from './layered-layout'
+import { PipelineGateDialog, type PipelineChoiceCommand } from './PipelineGateDialog'
 import {
-  PipelineGateDialog,
-  pipelineChoicesForNode,
-  type PipelineChoiceCommand
-} from './PipelineGateDialog'
+  pipelineRunNodeControl,
+  pipelineRunNodeOpensWorker,
+  type PipelineRunNodeControl
+} from './pipeline-run-node-actions'
 import './pipeline-canvas.css'
-
-type ActiveControl = {
-  node: PipelineRunNodeView
-  scope: ApprovalScope
-  kind: 'choice' | 'capability'
-}
 
 function displayNode(
   sourceNode: PipelineRunView['document']['nodes'][number] | null,
@@ -140,7 +138,7 @@ function PipelineRunGraphFlow({
   onApprove,
   onAnswered
 }: PipelineRunGraphProps): React.JSX.Element {
-  const [activeControl, setActiveControl] = useState<ActiveControl | null>(null)
+  const [activeControl, setActiveControl] = useState<PipelineRunNodeControl | null>(null)
   const parsedNodes = useMemo(
     () =>
       view.document.nodes.flatMap((node) => {
@@ -173,7 +171,8 @@ function PipelineRunGraphFlow({
           },
           draggable: false,
           connectable: false,
-          selectable: false
+          selectable: false,
+          focusable: false
         }
       }),
     [positions, view]
@@ -223,75 +222,68 @@ function PipelineRunGraphFlow({
   const runTurns = view.nodes.reduce((total, node) => total + node.turns, 0)
   const nodeTypes = useMemo(() => ({ 'pipeline-run-node': RunGraphNode }), [])
 
-  const chooseNode = (runNode: PipelineRunNodeView): void => {
-    const kind =
-      runNode.waitingFor === 'gate' || runNode.waitingFor === 'choice'
-        ? 'choice'
-        : runNode.waitingFor === 'capability-approval'
-          ? 'capability'
-          : null
-    if (
-      isUnknownWatcher ||
-      !row ||
-      !PIPELINE_NODE_TYPES.some((type) => type === runNode.type) ||
-      kind === null
-    ) {
+  const controlFor = (runNode: PipelineRunNodeView): PipelineRunNodeControl | null =>
+    pipelineRunNodeControl({
+      runNode,
+      view,
+      row,
+      ledger,
+      latestEscalations,
+      isUnknownWatcher
+    })
+
+  const openWorkerTerminal = (runNode: PipelineRunNodeView): void => {
+    if (!runNode.workerNavigation) {
       return
     }
-    const escalation = latestEscalations.find(
-      (entry) =>
-        entry.escalationId === runNode.escalationId &&
-        (entry.status === 'open' || entry.status === 'escalated') &&
-        entry.escalationKind === 'awaiting-approval' &&
-        entry.approvalScope !== undefined
+    const navigation = resolveHeimdallWorkerNavigation(
+      runNode.workerNavigation,
+      row?.target.connectionId ?? null
     )
-    const scope = escalation?.approvalScope
-    const identity = scope ? parsePipelineNodeEvidenceKey(scope.evidenceKey) : null
-    if (
-      !scope ||
-      !ledger ||
-      getLatestApproval(ledger, scope) !== null ||
-      scope.contentIdentity !== `pipeline:${view.pin.contentHash}` ||
-      identity?.instanceId !== runNode.instanceId ||
-      identity.epoch !== runNode.epoch ||
-      identity.attempt !== runNode.attempt
-    ) {
-      return
+    if (navigation) {
+      openHeimdallWorker(navigation)
     }
-    if (
-      (kind === 'choice' &&
-        ((runNode.waitingFor === 'gate' && scope.actionKind !== 'pipeline-pass-gate') ||
-          (runNode.waitingFor === 'choice' && scope.actionKind !== 'pipeline-apply-choice') ||
-          pipelineChoicesForNode(view, runNode, scope).length === 0)) ||
-      (kind === 'capability' &&
-        (scope.actionKind === 'pipeline-pass-gate' || scope.actionKind === 'pipeline-apply-choice'))
-    ) {
-      return
-    }
-    setActiveControl({ node: runNode, scope, kind })
   }
 
   const onNodeClick = (_event: unknown, node: PipelineRunGraphNode): void => {
-    const runNode = node.data.runNode
-    const sourceNode = node.data.sourceNode
-    const isAgentNode =
-      sourceNode?.type === 'agent' ||
-      (runNode.parentInstanceId !== undefined && sourceNode?.type === 'swarm')
-    if (
-      !isUnknownWatcher &&
-      isAgentNode &&
-      runNode.status === 'running' &&
-      runNode.workerNavigation
-    ) {
-      const navigation = resolveHeimdallWorkerNavigation(
-        runNode.workerNavigation,
-        row?.target.connectionId ?? null
-      )
-      if (navigation) {
-        openHeimdallWorker(navigation)
-      }
+    const { runNode, sourceNode } = node.data
+    if (pipelineRunNodeOpensWorker({ runNode, sourceNode, isUnknownWatcher })) {
+      openWorkerTerminal(runNode)
     }
-    chooseNode(runNode)
+    const control = controlFor(runNode)
+    if (control) {
+      setActiveControl(control)
+    }
+  }
+
+  const getNodeMenuItems = (node: PipelineRunGraphNode): PipelineNodeContextMenuItem[] => {
+    const { runNode, sourceNode } =
+      nodes.find((candidate) => candidate.id === node.id)?.data ?? node.data
+    const control = controlFor(runNode)
+    return [
+      ...(pipelineRunNodeOpensWorker({ runNode, sourceNode, isUnknownWatcher })
+        ? [
+            {
+              key: 'open-worker',
+              label: translate(
+                'fork.heimdallPipeline.contextMenu.openWorker',
+                'Open worker terminal'
+              ),
+              onSelect: () => openWorkerTerminal(runNode)
+            }
+          ]
+        : []),
+      ...(control
+        ? [
+            {
+              key: 'answer',
+              label: translate('fork.heimdallPipeline.contextMenu.answer', 'Answer'),
+              onSelect: () => setActiveControl(control)
+            }
+          ]
+        : []),
+      copyNodeIdMenuItem(runNode.nodeId)
+    ]
   }
 
   const answer = async (command: PipelineChoiceCommand): Promise<WatcherCommandResult | null> =>
@@ -322,25 +314,36 @@ function PipelineRunGraphFlow({
           </span>
         </div>
       </header>
-      <div className="pipeline-flow h-[28rem]" data-testid="pipeline-run-graph">
-        <ReactFlow<PipelineRunGraphNode, Edge>
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          fitView={nodes.length > 0}
-          fitViewOptions={{ padding: 0.25 }}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          panOnDrag
-          zoomOnScroll
-          deleteKeyCode={null}
-          onNodeClick={onNodeClick}
-          aria-label={translate('fork.heimdallPipeline.runGraph.graphLabel', 'Pipeline run graph')}
-        >
-          <Background gap={24} size={1} />
-        </ReactFlow>
-      </div>
+      <PipelineNodeContextMenu<PipelineRunGraphNode>
+        className="pipeline-flow h-[28rem]"
+        data-testid="pipeline-run-graph"
+        getItems={getNodeMenuItems}
+      >
+        {(onNodeContextMenu) => (
+          <ReactFlow<PipelineRunGraphNode, Edge>
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            fitView={nodes.length > 0}
+            fitViewOptions={{ padding: 0.25 }}
+            minZoom={0.2}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            panOnDrag
+            zoomOnScroll
+            deleteKeyCode={null}
+            onNodeClick={onNodeClick}
+            onNodeContextMenu={onNodeContextMenu}
+            aria-label={translate(
+              'fork.heimdallPipeline.runGraph.graphLabel',
+              'Pipeline run graph'
+            )}
+          >
+            <Background gap={24} size={1} />
+          </ReactFlow>
+        )}
+      </PipelineNodeContextMenu>
       {activeControl?.kind === 'choice' && activeNode && selectedApprovalScope && row ? (
         <PipelineGateDialog
           key={selectedApprovalScope.evidenceKey}
