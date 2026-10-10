@@ -367,7 +367,8 @@
         "deleteNode": "Delete node",
         "copyNodeId": "Copy node ID",
         "openWorker": "Open worker terminal",
-        "answer": "Answer"
+        "answer": "Answer",
+        "copyNodeIdFailed": "Couldn't copy the node ID"
       }
     }
   }
