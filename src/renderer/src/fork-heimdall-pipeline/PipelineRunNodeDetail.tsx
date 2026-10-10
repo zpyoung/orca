@@ -3,7 +3,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { formatHeimdallJson } from '@/fork-heimdall/fleet-format'
 import { translate } from '@/i18n/i18n'
 import type { PipelineRunNodeView } from '../../../shared/fork-heimdall-pipeline/run-view-types'
-import { COST_FORMAT, statusLabel } from './pipeline-run-node-format'
+import { COST_FORMAT } from './pipeline-run-node-format'
 
 type PipelineRunNodeDetailProps = {
   runNode: PipelineRunNodeView
@@ -76,7 +76,6 @@ export function PipelineRunNodeDetail({
         <div
           className="min-w-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           role="button"
-          aria-label={`${fullLabel}, ${statusLabel(runNode.status)}`}
           tabIndex={0}
           onKeyDown={activateOnEnterOrSpace}
           data-testid={`pipeline-run-node-${runNode.instanceId}`}

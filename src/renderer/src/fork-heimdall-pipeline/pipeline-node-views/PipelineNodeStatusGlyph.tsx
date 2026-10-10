@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { Check, CircleHelp } from 'lucide-react'
+import { Check, CircleHelp, CircleSlash } from 'lucide-react'
 import { AgentWorkingSpinner } from '@/components/AgentWorkingSpinner'
 import type { PipelineNodeVisualState } from '../pipeline-run-visual-state'
 
@@ -22,9 +22,7 @@ function GlyphShape({ state }: { state: PipelineNodeVisualState }): JSX.Element 
     case 'done':
       return <Check aria-hidden="true" className="size-full text-status-success" />
     case 'skipped':
-      return (
-        <span className="block size-full rounded-full border-2 border-dashed border-muted-foreground opacity-50" />
-      )
+      return <CircleSlash aria-hidden="true" className="size-full text-muted-foreground" />
     case 'unknown':
       return <CircleHelp aria-hidden="true" className="size-full text-muted-foreground" />
   }

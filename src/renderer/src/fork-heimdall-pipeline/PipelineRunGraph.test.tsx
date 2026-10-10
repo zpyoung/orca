@@ -318,13 +318,48 @@ describe('PipelineRunGraph', () => {
 
       const trigger = screen.getByTestId('pipeline-run-node-build')
       expect(trigger).toHaveAttribute('role', 'button')
-      expect(trigger).toHaveAttribute('aria-label', 'build, Running')
+      expect(trigger).not.toHaveAttribute('aria-label')
+      expect(trigger).not.toHaveAttribute('aria-labelledby')
       expect(trigger).toHaveAttribute('tabindex', '0')
       trigger.focus()
       fireEvent.keyDown(trigger, { key: 'Enter' })
 
       expect(openWorker).toHaveBeenCalledTimes(1)
       expect(openWorker).toHaveBeenCalledWith(workerNavigation)
+    })
+
+    it('exposes the full card content as the focus stop name instead of a short label', () => {
+      const view = makeView({
+        document: documentWith([
+          { id: 'build', type: 'agent', harness: 'codex', prompt: 'Build the feature' }
+        ]),
+        nodes: [
+          graphNode({
+            id: 'build',
+            type: 'agent',
+            status: 'running',
+            phase: 'review',
+            revision: 3,
+            progress: { done: 2, total: 4 },
+            workerNavigation
+          })
+        ]
+      })
+      render(<PipelineRunGraph view={view} surface="heimdall-detail" />)
+
+      const trigger = screen.getByTestId('pipeline-run-node-build')
+
+      expect(trigger).toHaveAttribute('role', 'button')
+      expect(trigger).not.toHaveAttribute('aria-label')
+      expect(trigger).not.toHaveAttribute('aria-labelledby')
+      expect(trigger).toHaveTextContent('build')
+      expect(trigger).toHaveTextContent('Running')
+      expect(trigger).toHaveTextContent('Elapsed 2m')
+      expect(trigger).toHaveTextContent('Attempt 1')
+      expect(trigger).toHaveTextContent('2 turns')
+      expect(trigger).toHaveTextContent('Phase: Review')
+      expect(trigger).toHaveTextContent('Revision 3')
+      expect(trigger).toHaveTextContent('2 of 4 tasks done')
     })
 
     it('opens a waiting gate when Space is pressed and keeps the page from scrolling', async () => {
@@ -383,7 +418,8 @@ describe('PipelineRunGraph', () => {
         />
       )
       const trigger = screen.getByTestId('pipeline-run-node-approve')
-      expect(trigger).toHaveAttribute('aria-label', 'Review the result, Waiting')
+      expect(trigger).not.toHaveAttribute('aria-label')
+      expect(trigger).not.toHaveAttribute('aria-labelledby')
       const notPrevented = fireEvent.keyDown(trigger, { key: ' ' })
 
       expect(notPrevented).toBe(false)
