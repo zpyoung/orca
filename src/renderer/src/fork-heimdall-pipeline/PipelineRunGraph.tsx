@@ -25,6 +25,7 @@ import type {
   PipelineRunView
 } from '../../../shared/fork-heimdall-pipeline/run-view-types'
 import { CapabilityApprovalDialog } from './CapabilityApprovalDialog'
+import { buildRunFlowEdges, pipelineEdgeTypes } from './PipelineFlowEdge'
 import {
   copyNodeIdMenuItem,
   PipelineNodeContextMenu,
@@ -100,33 +101,6 @@ function flowPositions(
   return positions
 }
 
-function flowEdges(view: PipelineRunView, nodes: readonly PipelineRunGraphNode[]): Edge[] {
-  const rootInstanceByNodeId = new Map<string, string>()
-  for (const node of view.nodes) {
-    if (!node.parentInstanceId) {
-      rootInstanceByNodeId.set(node.nodeId, node.instanceId)
-    }
-  }
-  const visibleIds = new Set(nodes.map((node) => node.id))
-  return view.edges.flatMap((edge, index) => {
-    const source = rootInstanceByNodeId.get(edge.from)
-    const target = rootInstanceByNodeId.get(edge.to)
-    if (!source || !target || !visibleIds.has(source) || !visibleIds.has(target)) {
-      return []
-    }
-    return [
-      {
-        id: `${edge.from}:${edge.to}:${index}`,
-        source,
-        target,
-        sourceHandle: 'pipeline-output',
-        targetHandle: 'pipeline-input',
-        type: 'smoothstep',
-        ...(edge.when === undefined ? {} : { label: edge.when })
-      }
-    ]
-  })
-}
 function PipelineRunGraphFlow({
   view,
   surface,
@@ -177,7 +151,10 @@ function PipelineRunGraphFlow({
       }),
     [positions, view]
   )
-  const edges = useMemo(() => flowEdges(view, nodes), [nodes, view])
+  const edges = useMemo(
+    () => buildRunFlowEdges(view, new Set(nodes.map((node) => node.id))),
+    [nodes, view]
+  )
   const latestEscalations = useMemo(
     () => (ledger === null || ledger === undefined ? [] : getLatestEscalations(ledger)),
     [ledger]
@@ -327,6 +304,7 @@ function PipelineRunGraphFlow({
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={pipelineEdgeTypes}
             fitView={nodes.length > 0}
             fitViewOptions={{ padding: 0.25 }}
             minZoom={0.2}
