@@ -1,8 +1,9 @@
-import type { JSX } from 'react'
+import type { JSX, ReactNode } from 'react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { Badge } from '@/components/ui/badge'
-import { Handle, Position } from '@xyflow/react'
 import { translate } from '@/i18n/i18n'
+import type { PipelineNodeVisualState } from '../pipeline-run-visual-state'
+import { PipelineNodeCardFrame } from './PipelineNodeCardFrame'
 
 export type UnknownPipelineNodeData = {
   id: string
@@ -11,24 +12,33 @@ export type UnknownPipelineNodeData = {
   state?: string
 }
 
+type UnknownNodeViewProps = NodeProps<Node<UnknownPipelineNodeData>> & {
+  visualState?: PipelineNodeVisualState
+  children?: ReactNode
+}
+
 export function UnknownNodeView({
   data,
-  selected
-}: NodeProps<Node<UnknownPipelineNodeData>>): JSX.Element {
-  const title = data.label?.trim() || data.id
+  selected,
+  visualState,
+  children
+}: UnknownNodeViewProps): JSX.Element {
   return (
-    <div className="pipeline-node-card" data-selected={selected} data-node-type="unknown">
-      <Handle type="target" position={Position.Top} id="pipeline-input" />
-      <div className="pipeline-node-card__type">
-        {translate('fork.heimdallPipeline.node.unknownType', 'Unknown node type: {{value0}}', {
+    <PipelineNodeCardFrame
+      typeLabel={translate(
+        'fork.heimdallPipeline.node.unknownType',
+        'Unknown node type: {{value0}}',
+        {
           value0: data.type
-        })}
-      </div>
-      <div className="pipeline-node-card__label" title={title}>
-        {title}
-      </div>
+        }
+      )}
+      nodeType="unknown"
+      label={data.label?.trim() || data.id}
+      selected={selected}
+      visualState={visualState}
+    >
+      {children}
       {data.state ? <Badge variant="outline">{data.state}</Badge> : null}
-      <Handle type="source" position={Position.Bottom} id="pipeline-output" />
-    </div>
+    </PipelineNodeCardFrame>
   )
 }

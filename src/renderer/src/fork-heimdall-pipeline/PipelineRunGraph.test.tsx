@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildWatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-test-fixtures'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
@@ -130,6 +130,43 @@ function graphNode(input: {
 
 function documentWith(nodes: readonly unknown[]): unknown {
   return { version: 1, id: 'demo', name: 'Demo', inputs: {}, nodes }
+}
+
+function objectiveView(): PipelineRunView {
+  const parsed = parsePipelineText(BUILTIN_OBJECTIVE_PIPELINE_TEXT)
+  if (!parsed.document) {
+    throw new Error('The built-in Objective source is invalid')
+  }
+  return makeView({
+    document: parsed.document,
+    kind: 'objective',
+    label: 'Objective v1',
+    nodes: [
+      graphNode({
+        id: 'objective',
+        type: 'objective',
+        label: 'Objective v1',
+        status: 'running',
+        phase: 'review',
+        revision: 3,
+        progress: { done: 2, total: 4 },
+        checks: [
+          {
+            name: 'Unit tests',
+            result: {
+              contentIdentity: 'objective-content',
+              pass: true,
+              exitCode: 0,
+              timedOut: false,
+              completedAtMs: 1_000
+            }
+          }
+        ],
+        usage: { totalTokens: 12, estimatedCostUsd: 0.5, estimate: true },
+        warnings: ['Overlapping task ownership']
+      })
+    ]
+  })
 }
 
 describe('PipelineRunGraph', () => {
@@ -435,54 +472,86 @@ describe('PipelineRunGraph', () => {
     await waitFor(() => expect(onApprove).toHaveBeenCalledWith(scope))
   })
 
-  it('shows objective composite phase, revision, task progress, and Checks results', () => {
-    const parsed = parsePipelineText(BUILTIN_OBJECTIVE_PIPELINE_TEXT)
-    if (!parsed.document) {
-      throw new Error('The built-in Objective source is invalid')
-    }
-    const view = makeView({
-      document: parsed.document,
-      kind: 'objective',
-      label: 'Objective v1',
-      nodes: [
-        graphNode({
-          id: 'objective',
-          type: 'objective',
-          label: 'Objective v1',
-          status: 'running',
-          phase: 'review',
-          revision: 3,
-          progress: { done: 2, total: 4 },
-          checks: [
-            {
-              name: 'Unit tests',
-              result: {
-                contentIdentity: 'objective-content',
-                pass: true,
-                exitCode: 0,
-                timedOut: false,
-                completedAtMs: 1_000
-              }
-            }
-          ],
-          usage: { totalTokens: 12, estimatedCostUsd: 0.5, estimate: true },
-          warnings: ['Overlapping task ownership']
-        })
-      ]
-    })
+  it('shows objective composite phase, revision, and task progress on the card face', () => {
+    const view = objectiveView()
 
     render(<PipelineRunGraph view={view} surface="heimdall-detail" row={rowForKind('objective')} />)
 
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent('Phase: Review')
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent('Revision 3')
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent('2 of 4 tasks done')
-    expect(screen.getByText('Unit tests')).toBeInTheDocument()
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent('"pass": true')
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent('Estimate')
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent('12 tokens')
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent('0.50 estimated')
-    expect(screen.getByTestId('pipeline-run-node-objective')).toHaveTextContent(
-      'Overlapping task ownership'
+    const card = screen.getByTestId('pipeline-run-node-objective')
+    expect(card).toHaveTextContent('Phase: Review')
+    expect(card).toHaveTextContent('Revision 3')
+    expect(card).toHaveTextContent('2 of 4 tasks done')
+    // react flow leaves unmeasured nodes visibility:hidden in happy-dom, so the role query needs hidden
+    expect(within(card).getByRole('progressbar', { hidden: true })).toHaveAttribute(
+      'aria-valuenow',
+      '50'
     )
+    expect(card).not.toHaveTextContent('Unit tests')
+    expect(card).not.toHaveTextContent('Overlapping task ownership')
+  })
+
+  it('moves Checks results, warnings and the usage estimate into a hover card that opens on focus', async () => {
+    const view = objectiveView()
+
+    render(<PipelineRunGraph view={view} surface="heimdall-detail" row={rowForKind('objective')} />)
+
+    expect(screen.queryByText('Unit tests')).toBeNull()
+    const trigger = screen.getByTestId('pipeline-run-node-objective')
+    expect(trigger).toHaveAttribute('tabindex', '0')
+    fireEvent.focus(trigger)
+
+    expect(await screen.findByText('Unit tests')).toBeInTheDocument()
+    const detail = (await screen.findByText('Unit tests')).closest(
+      '[data-slot="hover-card-content"]'
+    )
+    expect(detail).not.toBeNull()
+    expect(detail).toHaveTextContent('"pass": true')
+    expect(detail).toHaveTextContent('Estimate')
+    expect(detail).toHaveTextContent('12 tokens')
+    expect(detail).toHaveTextContent('0.50 estimated')
+    expect(detail).toHaveTextContent('Overlapping task ownership')
+    expect(detail).toHaveTextContent('Objective v1')
+    expect(detail).toHaveTextContent('Node ID')
+    expect(detail).toHaveTextContent('Instance ID')
+  })
+
+  it('renders one card frame per run node carrying its visual state and no second status box', () => {
+    const view = makeView({
+      document: documentWith([
+        { id: 'build', type: 'agent', harness: 'codex', prompt: 'Build the feature' },
+        { id: 'approve', type: 'gate', label: 'Review the result', sendBackTo: 'build' },
+        { id: 'broken', type: 'teleport' }
+      ]),
+      nodes: [
+        graphNode({ id: 'build', type: 'agent', status: 'running' }),
+        graphNode({
+          id: 'approve',
+          type: 'gate',
+          label: 'Review the result',
+          status: 'waiting',
+          waitingFor: 'gate'
+        }),
+        graphNode({ id: 'broken', type: 'teleport', status: 'failed' })
+      ]
+    })
+
+    render(<PipelineRunGraph view={view} surface="heimdall-detail" />)
+
+    const expected = { build: 'running', approve: 'needs-you', broken: 'failed' }
+    for (const [id, state] of Object.entries(expected)) {
+      const card = screen.getByTestId(`pipeline-run-node-${id}`)
+      expect(card).toHaveAttribute('data-node-instance', id)
+      const frames = card.querySelectorAll('[data-node-type]')
+      expect(frames).toHaveLength(1)
+      expect(frames[0]).toHaveAttribute('data-visual-state', state)
+      expect(card.querySelectorAll(`[data-testid="pipeline-run-node-status-${id}"]`)).toHaveLength(
+        1
+      )
+    }
+    expect(screen.getByTestId('pipeline-run-node-status-approve')).toHaveAttribute(
+      'data-tone',
+      'warning'
+    )
+    expect(screen.getByTestId('pipeline-run-node-status-broken')).toHaveTextContent('Failed')
   })
 })
