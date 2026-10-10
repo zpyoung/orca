@@ -40,10 +40,29 @@ function input(): EnrollInput {
   }
 }
 
+function existingEnrollment(): WatcherEnrollment {
+  return {
+    ...authorized(),
+    watcherId: 'existing-1',
+    enabled: false,
+    paused: false,
+    commandRevision: 0,
+    coordinatorIdentity: { handle: 'coordinator', paneKey: 'pane-1' },
+    orchestrationRunId: null,
+    createdAtMs: 1,
+    terminalAtMs: null
+  }
+}
+
 function harness(
   options: {
     insert?: (enrollment: WatcherEnrollment) => WatcherEnrollment
+    rollbackInserted?: EnrollmentStore['rollbackInserted']
+    rearm?: () => WatcherEnrollment
+    existing?: WatcherEnrollment
     validateEnrollment?: () => void
+    validatePipelineSource?: KernelEnrollmentLifecycleDependencies['validatePipelineSource']
+    afterInsert?: KernelEnrollmentLifecycleDependencies['afterInsert']
     restore?: () => WatcherRunner
   } = {}
 ) {
@@ -66,16 +85,21 @@ function harness(
     resolveOutcome: vi.fn()
   }
   registry.register(kind)
+  const rollbackInserted = vi.fn(
+    options.rollbackInserted ?? (() => ({ status: 'rolled-back' as const }))
+  )
   const insert = vi.fn(options.insert ?? ((enrollment: WatcherEnrollment) => enrollment))
   const dependencies: KernelEnrollmentLifecycleDependencies = {
     registry,
     storageAuthority: 'desktop',
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a first enrollment only reads findLiveByWorkspace and writes insert.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: these lifecycle cases exercise only the store methods supplied here.
     enrollments: {
-      findLiveByWorkspace: () => null,
-      insert
+      findLiveByWorkspace: () => options.existing ?? null,
+      insert,
+      rollbackInserted,
+      rearm: options.rearm ?? (() => ({ ...options.existing!, enabled: true }))
     } as unknown as EnrollmentStore,
-    readLedger: vi.fn(),
+    readLedger: vi.fn((watcherId: string) => ({ watcherId, entries: [] })),
     appendBudgetGeneration: vi.fn(),
     owns: () => true,
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the enrolled result never reads the restored runner.
@@ -87,9 +111,13 @@ function harness(
     schedule: vi.fn(),
     publish: vi.fn(),
     now: () => 1,
-    createId: () => 'id-1'
+    createId: () => 'id-1',
+    ...(options.validatePipelineSource === undefined
+      ? {}
+      : { validatePipelineSource: options.validatePipelineSource }),
+    ...(options.afterInsert === undefined ? {} : { afterInsert: options.afterInsert })
   }
-  return { dependencies, insert, undo }
+  return { dependencies, insert, rollbackInserted, undo }
 }
 
 describe('enrollWatcher authorization undo', () => {
@@ -102,6 +130,45 @@ describe('enrollWatcher authorization undo', () => {
     expect(insert).toHaveBeenCalledOnce()
     expect(undo).not.toHaveBeenCalled()
   })
+  it('runs pin recording only after a successful new insert', async () => {
+    const afterInsert = vi.fn()
+    const { dependencies, insert } = harness({ afterInsert })
+    const enrollmentInput = input()
+
+    await expect(enrollWatcher(enrollmentInput, dependencies)).resolves.toMatchObject({
+      status: 'enrolled'
+    })
+    expect(insert).toHaveBeenCalledOnce()
+    expect(afterInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ watcherId: 'id-1' }),
+      enrollmentInput
+    )
+  })
+
+  it('validates copied source before writing and preserves pins on re-arm', async () => {
+    const afterInsert = vi.fn()
+    const sourceRefusal = {
+      status: 'refused',
+      reason: 'invalid-payload',
+      detail: 'source mismatch'
+    } as const
+    const validatePipelineSource = vi.fn<
+      NonNullable<KernelEnrollmentLifecycleDependencies['validatePipelineSource']>
+    >(() => sourceRefusal)
+    const refusing = harness({ validatePipelineSource })
+
+    await expect(enrollWatcher(input(), refusing.dependencies)).resolves.toEqual(sourceRefusal)
+    expect(refusing.insert).not.toHaveBeenCalled()
+
+    validatePipelineSource.mockImplementation(() => null)
+    const existing = existingEnrollment()
+    const rearming = harness({ existing, validatePipelineSource, afterInsert })
+    await expect(enrollWatcher(input(), rearming.dependencies)).resolves.toMatchObject({
+      status: 're-armed'
+    })
+    expect(rearming.insert).not.toHaveBeenCalled()
+    expect(afterInsert).not.toHaveBeenCalled()
+  })
 
   it('undoes authorization side effects when the insert fails', async () => {
     const failure = new Error('attempt to write a readonly database')
@@ -113,6 +180,44 @@ describe('enrollWatcher authorization undo', () => {
 
     await expect(enrollWatcher(input(), dependencies)).rejects.toBe(failure)
     expect(undo).toHaveBeenCalledOnce()
+  })
+
+  it('rolls back an inserted enrollment when post-insert pin persistence fails', async () => {
+    const failure = new Error('pipeline run-pin write failed')
+    const { dependencies, rollbackInserted, undo } = harness({
+      afterInsert: () => {
+        throw failure
+      }
+    })
+
+    await expect(enrollWatcher(input(), dependencies)).rejects.toBe(failure)
+    expect(rollbackInserted).toHaveBeenCalledWith(expect.objectContaining({ watcherId: 'id-1' }))
+    expect(undo).toHaveBeenCalledOnce()
+    expect(dependencies.restore).not.toHaveBeenCalled()
+    expect(dependencies.publish).not.toHaveBeenCalled()
+  })
+
+  it('preserves authorization side effects when the inserted row changed before rollback', async () => {
+    const failure = new Error('pipeline run-pin write failed')
+    const { dependencies, rollbackInserted, undo } = harness({
+      afterInsert: () => {
+        throw failure
+      },
+      rollbackInserted: () => ({
+        status: 'refused',
+        reason: 'row-changed',
+        detail: 'Heimdall watcher id-1 changed after insertion'
+      })
+    })
+
+    await expect(enrollWatcher(input(), dependencies)).rejects.toMatchObject({
+      name: 'AggregateError',
+      message: expect.stringContaining('could not be safely rolled back')
+    })
+    expect(rollbackInserted).toHaveBeenCalledOnce()
+    expect(undo).not.toHaveBeenCalled()
+    expect(dependencies.restore).not.toHaveBeenCalled()
+    expect(dependencies.publish).not.toHaveBeenCalled()
   })
 
   it('undoes authorization side effects when kind validation refuses', async () => {

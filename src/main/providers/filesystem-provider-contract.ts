@@ -98,6 +98,7 @@ export type IFilesystemProvider = {
   renameNoClobber(oldPath: string, newPath: string): Promise<void>
   copy(source: string, destination: string): Promise<void>
   realpath(filePath: string): Promise<string>
+  readlink?(filePath: string): Promise<string>
   search(opts: SearchOptions): Promise<SearchResult>
   listFiles(
     rootPath: string,

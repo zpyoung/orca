@@ -105,7 +105,10 @@ export async function executeHostedReviewSitterAction(
     const fingerprint = hostedReviewAttemptFingerprint(action)
     let request: HostedReviewWorkerDispatch
     try {
-      request = buildHostedReviewWorkerDispatch(store, definition, action, fingerprint)
+      request = buildHostedReviewWorkerDispatch(store, definition, action, fingerprint, {
+        review: context.snapshot.world.review,
+        ledger: context.ledger
+      })
       await context.lease.assertHeld()
     } catch (error) {
       throw tagHostedReviewPreDispatchError(error)

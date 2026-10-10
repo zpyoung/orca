@@ -8,7 +8,8 @@ import {
   LIST_TABLE_ROW_SELECTED_CLASS
 } from '@/lib/list-table-layout'
 import { ObjectiveEnrollmentPayloadSchema } from '../../../shared/fork-heimdall-objective/contract-types'
-import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherFleetEntryReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
 import { formatHeimdallAge, formatHeimdallDuration } from './fleet-format'
 import {
   resolveFleetActivity,
@@ -16,12 +17,13 @@ import {
   resolveFleetWorkspace
 } from './fleet-row-presentation'
 import { sameWatcherTarget } from './fleet-selectors'
+import { watcherKindLabel } from './watcher-status-copy'
 import { HeimdallStatusPill } from './HeimdallStatusPill'
 
 const GRID =
   'grid min-w-[1180px] grid-cols-[minmax(175px,1.25fr)_minmax(165px,1.2fr)_minmax(155px,1fr)_minmax(90px,0.65fr)_minmax(125px,0.9fr)_110px_52px_58px_82px]'
 
-function ActiveBurn({ row }: { row: WatcherFleetEntry }): React.JSX.Element {
+function ActiveBurn({ row }: { row: WatcherFleetEntryReader }): React.JSX.Element {
   const used = row.entry.status.budget.activeMs
   const limit = row.entry.enrollment.budget.wallClockActiveMs
   const percent = limit === null || limit === 0 ? null : Math.min(100, (used / limit) * 100)
@@ -79,7 +81,7 @@ function ActivityIndicator({
   row,
   asOfMs
 }: {
-  row: WatcherFleetEntry
+  row: WatcherFleetEntryReader
   asOfMs: number
 }): React.JSX.Element {
   const activity = resolveFleetActivity(row)
@@ -206,7 +208,7 @@ function WorkspaceCell({
   row,
   current
 }: {
-  row: WatcherFleetEntry
+  row: WatcherFleetEntryReader
   current: boolean
 }): React.JSX.Element {
   const workspace = resolveFleetWorkspace(row)
@@ -232,7 +234,7 @@ function WorkspaceCell({
 }
 
 export type HeimdallFleetListProps = {
-  rows: readonly WatcherFleetEntry[]
+  rows: readonly WatcherFleetEntryReader[]
   asOfMs: number
   selected: WatcherTarget | null
   onSelect: (target: WatcherTarget) => void
@@ -292,9 +294,7 @@ export function HeimdallFleetList({
                   {row.entry.name}
                 </span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {row.entry.enrollment.kind === 'objective'
-                    ? translate('fork.heimdall.kind.objective', 'Objective')
-                    : translate('fork.heimdall.kind.hostedReview', 'Hosted review')}
+                  {watcherKindLabel(row.entry.enrollment.kind)}
                 </span>
               </span>
               <ActivityIndicator row={row} asOfMs={asOfMs} />

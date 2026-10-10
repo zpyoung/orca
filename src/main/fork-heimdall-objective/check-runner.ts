@@ -14,13 +14,14 @@ export type CriterionCheckResult = {
   stdoutTail: string
   stderrTail: string
   error: string | null
+  stdoutTruncated?: boolean
   startedAtMs: number
   completedAtMs: number
   durationMs: number
 }
 
 type CriterionCheckExecutionTarget =
-  | { type: 'local'; cwd: string }
+  | { type: 'local'; cwd: string; extraEnv?: NodeJS.ProcessEnv }
   | { type: 'ssh'; cwd: string; connectionId: string }
 
 function unsupportedSshDialectResult(command: string, error: string): CriterionCheckResult {
@@ -44,9 +45,11 @@ export async function runCriterionCheck(args: {
   command: string
   target: ObjectiveWorkspaceTarget
   timeoutSeconds?: number
+  extraEnv?: NodeJS.ProcessEnv
+  preserveCommand?: boolean
 }): Promise<CriterionCheckResult> {
-  const command = args.command.trim()
-  if (!command) {
+  const command = args.preserveCommand ? args.command : args.command.trim()
+  if (!command.trim()) {
     throw new Error('Criterion check command cannot be empty')
   }
   const timeoutSeconds = args.timeoutSeconds ?? OBJECTIVE_CHECK_TIMEOUT_SECONDS
@@ -60,7 +63,11 @@ export async function runCriterionCheck(args: {
     if (sshTargetId !== undefined || args.target.executionHostId !== 'local') {
       throw new Error('Remote criterion check target has no filesystem provider')
     }
-    executionTarget = { type: 'local', cwd: args.target.workspacePath }
+    executionTarget = {
+      type: 'local',
+      cwd: args.target.workspacePath,
+      ...(args.extraEnv !== undefined ? { extraEnv: args.extraEnv } : {})
+    }
   } else {
     if (sshTargetId === undefined) {
       throw new Error('Criterion check filesystem provider is not SSH-routable')
@@ -96,6 +103,7 @@ export async function runCriterionCheck(args: {
     timedOut: result.timedOut,
     stdoutTail: result.stdout.slice(-OBJECTIVE_CHECK_OUTPUT_TAIL_CHARS),
     stderrTail: result.stderr.slice(-OBJECTIVE_CHECK_OUTPUT_TAIL_CHARS),
+    ...(result.stdoutTruncated ? { stdoutTruncated: true } : {}),
     error: result.error,
     startedAtMs: result.startedAt,
     completedAtMs: result.completedAt,

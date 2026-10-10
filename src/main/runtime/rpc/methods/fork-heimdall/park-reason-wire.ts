@@ -3,10 +3,11 @@ import {
   HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY
 } from '../../../../../shared/fork-heimdall/capability'
 import type {
-  HeimdallFleetSnapshot,
-  WatcherDetail,
-  WatcherFleetEntry
-} from '../../../../../shared/fork-heimdall/fleet-types'
+  HeimdallFleetSnapshotReader,
+  WatcherDetailReader,
+  WatcherFleetEntryReader,
+  WatcherListEntryReader
+} from '../../../../../shared/fork-heimdall/remote-reader-schemas'
 import { ObjectiveEnrollmentPayloadSchema } from '../../../../../shared/fork-heimdall-objective/contract-types'
 import type { ObjectiveDetail } from '../../../../../shared/fork-heimdall-objective/detail-types'
 import type {
@@ -14,6 +15,10 @@ import type {
   WatcherParkReason,
   WatcherStatus
 } from '../../../../../shared/fork-heimdall/watcher-types'
+import {
+  projectPipelineDetailForClient,
+  projectPipelineFleetSnapshotForClient
+} from './pipeline-kind-wire'
 import type { RpcContext } from '../../core'
 
 type HeimdallWireProjectionContext = Pick<RpcContext, 'clientKind' | 'clientCapabilities'>
@@ -54,17 +59,17 @@ function degradeStatus(status: WatcherStatus): WatcherStatus {
   return { ...status, parkReason: null }
 }
 
-function degradeListEntry(entry: WatcherListEntry): WatcherListEntry {
+function degradeListEntry(entry: WatcherListEntryReader): WatcherListEntryReader {
   const status = degradeStatus(entry.status)
   return status === entry.status ? entry : { ...entry, status }
 }
 
-function degradeFleetEntry(entry: WatcherFleetEntry): WatcherFleetEntry {
+function degradeFleetEntry(entry: WatcherFleetEntryReader): WatcherFleetEntryReader {
   const listEntry = degradeListEntry(entry.entry)
   return listEntry === entry.entry ? entry : { ...entry, entry: listEntry }
 }
 
-function degradeParallelListEntry(entry: WatcherListEntry): WatcherListEntry {
+function degradeParallelListEntry(entry: WatcherListEntryReader): WatcherListEntryReader {
   const { enrollment } = entry
   if (enrollment.kind !== 'objective') {
     return entry
@@ -80,7 +85,7 @@ function degradeParallelListEntry(entry: WatcherListEntry): WatcherListEntry {
   return { ...entry, enrollment: { ...enrollment, kindPayload } }
 }
 
-function degradeParallelFleetEntry(entry: WatcherFleetEntry): WatcherFleetEntry {
+function degradeParallelFleetEntry(entry: WatcherFleetEntryReader): WatcherFleetEntryReader {
   const listEntry = degradeParallelListEntry(entry.entry)
   if (entry.parallel === undefined) {
     return listEntry === entry.entry ? entry : { ...entry, entry: listEntry }
@@ -93,36 +98,46 @@ function degradeParallelFleetEntry(entry: WatcherFleetEntry): WatcherFleetEntry 
 export function projectWatcherListEntryForClient(
   entry: WatcherListEntry,
   context: HeimdallWireProjectionContext
-): WatcherListEntry {
+): WatcherListEntry
+export function projectWatcherListEntryForClient(
+  entry: WatcherListEntryReader,
+  context: HeimdallWireProjectionContext
+): WatcherListEntryReader
+export function projectWatcherListEntryForClient(
+  entry: WatcherListEntryReader,
+  context: HeimdallWireProjectionContext
+): WatcherListEntryReader {
   const projected = negotiatedTypedParkReason(context) ? entry : degradeListEntry(entry)
   return negotiatedParallelExecution(context) ? projected : degradeParallelListEntry(projected)
 }
 
 export function projectHeimdallFleetSnapshotForClient(
-  snapshot: HeimdallFleetSnapshot,
+  snapshot: HeimdallFleetSnapshotReader,
   context: HeimdallWireProjectionContext
-): HeimdallFleetSnapshot {
+): HeimdallFleetSnapshotReader {
+  const pipelineProjected = projectPipelineFleetSnapshotForClient(snapshot, context)
   const typedParkReason = negotiatedTypedParkReason(context)
   const parallelExecution = negotiatedParallelExecution(context)
   if (typedParkReason && parallelExecution) {
-    return snapshot
+    return pipelineProjected
   }
-  const entries = snapshot.entries.map((entry) => {
+  const entries = pipelineProjected.entries.map((entry) => {
     const projected = typedParkReason ? entry : degradeFleetEntry(entry)
     return parallelExecution ? projected : degradeParallelFleetEntry(projected)
   })
-  return entries.some((entry, index) => entry !== snapshot.entries[index])
-    ? { ...snapshot, entries }
-    : snapshot
+  return entries.some((entry, index) => entry !== pipelineProjected.entries[index])
+    ? { ...pipelineProjected, entries }
+    : pipelineProjected
 }
 
 export function projectHeimdallDetailParkReasonForClient(
-  detail: WatcherDetail,
+  detail: WatcherDetailReader,
   context: HeimdallWireProjectionContext
-): WatcherDetail {
+): WatcherDetailReader {
+  const pipelineProjected = projectPipelineDetailForClient(detail, context)
   const projected = negotiatedTypedParkReason(context)
-    ? detail.watcher
-    : degradeFleetEntry(detail.watcher)
+    ? pipelineProjected.watcher
+    : degradeFleetEntry(pipelineProjected.watcher)
   const watcher = negotiatedParallelExecution(context)
     ? projected
     : degradeParallelFleetEntry(projected)

@@ -8,6 +8,10 @@ import {
   type WatcherEnrollment,
   type WorkspaceKey
 } from '../../shared/fork-heimdall/watcher-types'
+import {
+  BUILTIN_ENROLLMENT_TABLES,
+  type EnrollmentTableSet
+} from '../fork-heimdall-pipeline/pipeline-enrollment-table'
 import type { HeimdallDatabase } from './database'
 import {
   completePendingKindPurge,
@@ -16,6 +20,10 @@ import {
   type EnrollmentDeleteCommit,
   type PendingKindPurge
 } from './enrollment-deletion'
+import {
+  rollbackInsertedEnrollment,
+  type EnrollmentInsertRollbackResult
+} from './enrollment-insert-rollback'
 import type { EnrollmentRow } from './enrollment-row'
 import { withImmediateTransaction } from './transaction-scope'
 
@@ -67,6 +75,7 @@ export type EnrollmentStore = {
   get(watcherId: string): EnrollmentRecord | null
   list(): EnrollmentRecord[]
   findLiveByWorkspace(workspaceKey: WorkspaceKey): EnrollmentRecord | null
+  rollbackInserted(enrollment: WatcherEnrollment): EnrollmentInsertRollbackResult
   insert(enrollment: WatcherEnrollment): WatcherEnrollment
   commitControl(
     watcherId: string,
@@ -94,7 +103,10 @@ export type EnrollmentStore = {
 
 /** Authoritative, schema-validated enrollment persistence. */
 export class HeimdallEnrollmentStore implements EnrollmentStore {
-  constructor(private readonly database: HeimdallDatabase) {}
+  constructor(
+    private readonly database: HeimdallDatabase,
+    private readonly tables: EnrollmentTableSet = BUILTIN_ENROLLMENT_TABLES
+  ) {}
 
   get(watcherId: string): EnrollmentRecord | null {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: node:sqlite types every row as unknown; this SELECT's literal column list is the row's only shape source.
@@ -106,7 +118,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
                 capabilities_json, budget_json, kind_payload_json, coordinator_handle,
                 coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms,
                 owner_json
-           FROM heimdall_enrollment
+           FROM ${this.tables.enrollment}
           WHERE watcher_id = ?`
       )
       .get(watcherId) as EnrollmentRow | undefined
@@ -123,7 +135,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
                 capabilities_json, budget_json, kind_payload_json, coordinator_handle,
                 coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms,
                 owner_json
-           FROM heimdall_enrollment
+           FROM ${this.tables.enrollment}
           ORDER BY created_at_ms, watcher_id`
       )
       .all() as EnrollmentRow[]
@@ -140,7 +152,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
                 capabilities_json, budget_json, kind_payload_json, coordinator_handle,
                 coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms,
                 owner_json
-           FROM heimdall_enrollment
+           FROM ${this.tables.enrollment}
           WHERE workspace_key = ? AND terminal_at_ms IS NULL`
       )
       .get(workspaceKey) as EnrollmentRow | undefined
@@ -153,7 +165,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     this.database
       .connection()
       .prepare(
-        `INSERT INTO heimdall_enrollment (
+        `INSERT INTO ${this.tables.enrollment} (
            watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
            workspace_path, scheduler_owner, enabled, paused, command_revision, capabilities_json,
            budget_json, kind_payload_json, coordinator_handle, coordinator_pane_key,
@@ -188,7 +200,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
   setEnabled(watcherId: string, enabled: boolean): EnrollmentRecord {
     this.updateExisting(
       watcherId,
-      `UPDATE heimdall_enrollment
+      `UPDATE ${this.tables.enrollment}
           SET enabled = ?
         WHERE watcher_id = ? AND terminal_at_ms IS NULL`,
       enabled ? 1 : 0,
@@ -215,7 +227,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     return withImmediateTransaction(connection, () => {
       const result = connection
         .prepare(
-          `UPDATE heimdall_enrollment
+          `UPDATE ${this.tables.enrollment}
               SET enabled = 1,
                   paused = 0,
                   command_revision = command_revision + 1,
@@ -296,7 +308,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
 
       const result = connection
         .prepare(
-          `UPDATE heimdall_enrollment
+          `UPDATE ${this.tables.enrollment}
               SET enabled = ?,
                   paused = ?,
                   budget_json = ?,
@@ -331,16 +343,24 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       database: this.database,
       watcherId,
       expectedOwner,
-      read: () => this.get(watcherId)
+      read: () => this.get(watcherId),
+      tables: this.tables
+    })
+  }
+  rollbackInserted(enrollment: WatcherEnrollment): EnrollmentInsertRollbackResult {
+    return rollbackInsertedEnrollment({
+      database: this.database,
+      enrollment,
+      tables: this.tables
     })
   }
 
   pendingKindPurges(): PendingKindPurge[] {
-    return readPendingKindPurges(this.database)
+    return readPendingKindPurges(this.database, this.tables)
   }
 
   completeKindPurge(watcherId: string): void {
-    completePendingKindPurge(this.database, watcherId)
+    completePendingKindPurge(this.database, watcherId, this.tables)
   }
 
   setOrchestrationRunId(watcherId: string, runId: string | null): WatcherEnrollment {
@@ -351,7 +371,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     this.requireValid(watcherId)
     this.updateExisting(
       watcherId,
-      'UPDATE heimdall_enrollment SET orchestration_run_id = ? WHERE watcher_id = ? AND terminal_at_ms IS NULL',
+      `UPDATE ${this.tables.enrollment} SET orchestration_run_id = ? WHERE watcher_id = ? AND terminal_at_ms IS NULL`,
       normalizedRunId,
       watcherId
     )
@@ -377,7 +397,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       appendWithinTransaction?.()
       const result = connection
         .prepare(
-          `UPDATE heimdall_enrollment
+          `UPDATE ${this.tables.enrollment}
               SET enabled = 0, paused = 0, terminal_at_ms = ?
             WHERE watcher_id = ? AND terminal_at_ms IS NULL`
         )

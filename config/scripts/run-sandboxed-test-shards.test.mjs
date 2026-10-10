@@ -65,6 +65,41 @@ describe('sandbox lane selection', () => {
     const shell = laneCommand({ lane: 'shell', extraArgs: [] }, 1)
     expect(shell[0]).toBe('pnpm')
   })
+
+  it('requires an explicit local baseline ref for the wire lane before Docker preflight', () => {
+    const runner = resolve(projectDir, 'config/scripts/run-sandboxed-test-shards.mjs')
+    const result = spawnSync(
+      process.execPath,
+      [
+        runner,
+        '--lane=wire',
+        '--',
+        'tests/e2e/cross-version-wire/fork-heimdall/cross-version-heimdall-wire.unit.test.ts'
+      ],
+      { cwd: projectDir, encoding: 'utf8' }
+    )
+
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('--lane=wire requires --baseline-ref=')
+  })
+
+  it('runs supplied wire specs directly in one unexcluded unit Vitest command', () => {
+    const wireSpec =
+      'tests/e2e/cross-version-wire/fork-heimdall/cross-version-heimdall-wire.unit.test.ts'
+    const command = laneCommand({ lane: 'wire', extraArgs: [wireSpec] }, 1)
+
+    expect(command.slice(0, 6)).toEqual([
+      'pnpm',
+      'exec',
+      'vitest',
+      'run',
+      '--config',
+      'config/vitest.config.ts'
+    ])
+    expect(command).toContain(wireSpec)
+    expect(command.filter((argument) => argument.startsWith('--exclude='))).toEqual([])
+    expect(command.some((argument) => argument.startsWith('--shard='))).toBe(false)
+  })
 })
 
 describe('related and files selection modes', () => {

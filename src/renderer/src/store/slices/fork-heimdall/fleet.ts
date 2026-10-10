@@ -1,22 +1,20 @@
 import type { StateCreator } from 'zustand'
 import { translate } from '@/i18n/i18n'
-import type {
-  HeimdallFleetSnapshot,
-  WatcherTarget
-} from '../../../../../shared/fork-heimdall/fleet-types'
+import type { WatcherTarget } from '../../../../../shared/fork-heimdall/fleet-types'
+import type { HeimdallFleetSnapshotReader } from '../../../../../shared/fork-heimdall/remote-reader-schemas'
 import type { UiViewHistory } from '../ui/ui-slice-contract-core'
 import { rewindHistoryIndexPastView } from '../worktree-nav-history'
 import type { AppState } from '../../types'
 
 export type HeimdallFleetSlice = {
-  heimdallFleet: HeimdallFleetSnapshot | null
+  heimdallFleet: HeimdallFleetSnapshotReader | null
   heimdallFleetLoading: boolean
   heimdallFleetError: string | null
   heimdallFleetGeneration: number
   heimdallSelectedTarget: WatcherTarget | null
   previousViewBeforeHeimdall: Exclude<UiViewHistory, 'heimdall'>
   hydrateHeimdallFleet: () => Promise<void>
-  applyHeimdallFleetSnapshot: (snapshot: HeimdallFleetSnapshot) => void
+  applyHeimdallFleetSnapshot: (snapshot: HeimdallFleetSnapshotReader) => void
   selectHeimdallWatcher: (target: WatcherTarget | null) => void
   openHeimdallPage: () => void
   closeHeimdallPage: () => void

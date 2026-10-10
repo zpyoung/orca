@@ -14,6 +14,9 @@ import type {
   HostedReviewSnapshot,
   HostedReviewWorld
 } from './types'
+
+export const HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT = 3
+
 function producedHeadForCompletedEntry(
   entry: HostedReviewAttemptEntry,
   ledger: WatcherLedger
@@ -104,7 +107,13 @@ export function getRepeatedFailureAfterOwnFixEvidence(
     if (!repeated) {
       continue
     }
-    matches.set(attribution.publishActionId, attribution)
+    matches.set(attribution.publishActionId, {
+      sourceHeadSha: attribution.sourceHeadSha,
+      producedHeadSha: attribution.producedHeadSha,
+      checkKey: attribution.checkKey,
+      failureSignature: attribution.failureSignature,
+      publishActionId: attribution.publishActionId
+    })
   }
   for (const entry of getLatestHostedReviewAttempts(ledger)) {
     if (entry.action.kind !== 'publish-fix') {
@@ -131,6 +140,51 @@ export function getRepeatedFailureAfterOwnFixEvidence(
     })
   }
   return [...matches.values()]
+}
+
+export type RepeatedOwnFixGroup = {
+  checkKey: string
+  failureSignature: string
+  publishActionIds: string[]
+}
+
+function groupRepeatedOwnFixEvidence(
+  evidence: readonly RepeatedOwnFixEvidence[]
+): RepeatedOwnFixGroup[] {
+  const groups = new Map<string, RepeatedOwnFixGroup>()
+  for (const entry of evidence) {
+    const key = JSON.stringify([entry.checkKey, entry.failureSignature])
+    const group = groups.get(key)
+    if (group) {
+      group.publishActionIds.push(entry.publishActionId)
+    } else {
+      groups.set(key, {
+        checkKey: entry.checkKey,
+        failureSignature: entry.failureSignature,
+        publishActionIds: [entry.publishActionId]
+      })
+    }
+  }
+  return [...groups.values()].sort(
+    (left, right) =>
+      left.checkKey.localeCompare(right.checkKey) ||
+      left.failureSignature.localeCompare(right.failureSignature)
+  )
+}
+
+export function repeatedOwnFixGroups(
+  review: HostedReviewSnapshot,
+  ledger: WatcherLedger,
+  scope: HostedReviewMergeCheckScope
+): RepeatedOwnFixGroup[] {
+  return groupRepeatedOwnFixEvidence(getRepeatedFailureAfterOwnFixEvidence(review, ledger, scope))
+}
+
+export function repeatedOwnFixExhausted(
+  groups: readonly RepeatedOwnFixGroup[],
+  limit: number
+): RepeatedOwnFixGroup | null {
+  return groups.find((group) => group.publishActionIds.length >= limit) ?? null
 }
 
 export function hasRepeatedFailureAfterOwnFix(
@@ -201,37 +255,59 @@ export const HOSTED_REVIEW_STOP_PREDICATES: readonly StopPredicate<HostedReviewW
   {
     id: 'repeated-failure-after-own-fix',
     evaluate(snapshot, ledger) {
+      const repeatFixLimit =
+        snapshot.world.definition.repeatFixLimit ?? HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT
+      const exhausted = repeatedOwnFixExhausted(
+        repeatedOwnFixGroups(
+          snapshot.world.review,
+          ledger,
+          snapshot.world.definition.mergeCheckScope
+        ),
+        repeatFixLimit
+      )
+      return exhausted
+        ? {
+            stop: true,
+            reason: 'repeated-failure-after-own-fix',
+            detail: exhausted.checkKey
+          }
+        : { stop: false }
+    },
+    deviationForFiring(_verdict, snapshot, ledger): CheckFailedDeviation {
+      const repeatFixLimit =
+        snapshot.world.definition.repeatFixLimit ?? HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT
       const evidence = getRepeatedFailureAfterOwnFixEvidence(
         snapshot.world.review,
         ledger,
         snapshot.world.definition.mergeCheckScope
       )
-      return evidence.length === 0
-        ? { stop: false }
-        : {
-            stop: true,
-            reason: 'repeated-failure-after-own-fix',
-            detail: evidence
-              .map((entry) => entry.checkKey)
-              .sort()
-              .join(',')
-          }
-    },
-    deviationForFiring(_verdict, snapshot, ledger): CheckFailedDeviation {
-      // re-derived rather than parsed back out of `verdict.detail`; guaranteed non-empty since
-      // `evaluate` only fires with at least one entry, using the same snapshot and ledger
-      const [primary] = getRepeatedFailureAfterOwnFixEvidence(
-        snapshot.world.review,
-        ledger,
-        snapshot.world.definition.mergeCheckScope
+      const exhausted = repeatedOwnFixExhausted(
+        groupRepeatedOwnFixEvidence(evidence),
+        repeatFixLimit
       )
+      if (!exhausted) {
+        throw new Error('Repeated own-fix predicate fired without an exhausted failure group.')
+      }
+      const [publishActionId] = exhausted.publishActionIds
+      if (!publishActionId) {
+        throw new Error('Exhausted own-fix group has no publish action.')
+      }
+      const primary = evidence.find(
+        (entry) =>
+          entry.checkKey === exhausted.checkKey &&
+          entry.failureSignature === exhausted.failureSignature &&
+          entry.publishActionId === publishActionId
+      )
+      if (!primary) {
+        throw new Error('Exhausted own-fix group lost its durable publish evidence.')
+      }
       return {
         kind: 'check-failed',
-        criterionId: primary!.checkKey,
+        criterionId: primary.checkKey,
         command: null,
         exitCode: null,
         timedOut: null,
-        detail: `same failure recurred after the sitter's own fix (produced ${primary!.producedHeadSha})`
+        detail: `same failure recurred after the sitter's own fix (produced ${primary.producedHeadSha})`
       }
     }
   },

@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import { OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH } from '../../fork-heimdall-objective/contract-types'
+import {
+  PipelineChoiceCauseSchema,
+  PipelineChoiceSchema
+} from '../../fork-heimdall-pipeline/choice-types'
 import { WORKER_LAST_MESSAGE_MAX_BYTES } from './worker-last-message'
 
 const IdSchema = z.string().trim().min(1).max(1_024)
@@ -171,6 +175,20 @@ export const StallDeviationSchema = z
   .strict()
 export type StallDeviation = z.infer<typeof StallDeviationSchema>
 
+export const PipelineNodeDeviationSchema = z
+  .object({
+    kind: z.literal('pipeline-node'),
+    nodeInstanceId: IdSchema,
+    epoch: z.number().int().nonnegative(),
+    attempt: z.number().int().nonnegative(),
+    deadlineMs: z.number().int().nonnegative().optional(),
+    cause: PipelineChoiceCauseSchema,
+    options: z.array(PipelineChoiceSchema),
+    detail: z.string().max(4_000)
+  })
+  .strict()
+export type PipelineNodeDeviation = z.infer<typeof PipelineNodeDeviationSchema>
+
 export const DeviationSchema = z.discriminatedUnion('kind', [
   ReportRejectedDeviationSchema,
   NodeFailedDeviationSchema,
@@ -184,7 +202,8 @@ export const DeviationSchema = z.discriminatedUnion('kind', [
   LandingFailedDeviationSchema,
   PlanFailedDeviationSchema,
   GateHeldDeviationSchema,
-  StallDeviationSchema
+  StallDeviationSchema,
+  PipelineNodeDeviationSchema
 ])
 /** A non-happy-path kernel event the owning agent is woken to reason about. */
 export type Deviation = z.infer<typeof DeviationSchema>
@@ -221,6 +240,14 @@ export function deviationNaturalKey(deviation: Deviation): string {
       return `gate-held:${encodeURIComponent(deviation.actionKind)}`
     case 'stall':
       return `stall:${encodeURIComponent(deviation.dispatchId)}`
+    case 'pipeline-node': {
+      const key = `pipeline-node:${encodeURIComponent(deviation.nodeInstanceId)}:${encodeURIComponent(
+        String(deviation.epoch)
+      )}:${encodeURIComponent(String(deviation.attempt))}:${encodeURIComponent(deviation.cause)}`
+      return deviation.cause === 'time-limit' && deviation.deadlineMs !== undefined
+        ? `${key}:${encodeURIComponent(String(deviation.deadlineMs))}`
+        : key
+    }
   }
 }
 

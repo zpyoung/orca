@@ -2,6 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { OrchestrationError } from '../../runtime/orchestration/orchestration-error'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  OrcaRuntimeService,
+  scanLocalRepoWorktreesForResolutionMock
+} from '../../runtime/orca-runtime-test-mocks.spec'
+import {
+  makeWorktreeInfo,
+  TEST_REPO_ID,
+  TEST_WORKTREE_ID,
+  TEST_WORKTREE_PATH,
+  store
+} from '../../runtime/orca-runtime-test-fixtures.spec'
 import { hashCanonical } from '../../runtime/rpc/orchestration-mutation-receipt'
 import {
   CoordinatorSeatLostError,
@@ -10,6 +23,7 @@ import {
   orchestrationRequestIdForAttemptFingerprint,
   type HeimdallOrchestrationPersistence
 } from './orchestration-adapter'
+import { coordinatorRuntimeFacade } from './coordinator-runtime-facade'
 
 const upstream = vi.hoisted(() => ({
   startLocalWorker: vi.fn(),
@@ -350,6 +364,86 @@ describe('Heimdall orchestration adapter', () => {
     expect(workerArgs.coordinator).toMatchObject({
       terminalHandle: IDENTITY.handle,
       paneKey: IDENTITY.paneKey
+    })
+  })
+
+  it('keeps Heimdall PTYs nonvisual without bypassing live Claude readiness', async () => {
+    vi.mocked(scanLocalRepoWorktreesForResolutionMock).mockResolvedValue({
+      ok: true,
+      worktrees: [makeWorktreeInfo(TEST_WORKTREE_PATH)]
+    })
+    const runtime = new OrcaRuntimeService(store)
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-heimdall' })
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null,
+      // the cold-start fixture was captured at 120x40 and cursor-addresses rows past an 80x24 default
+      getSize: () => ({ cols: 120, rows: 40 })
+    })
+    const revealTerminalSession = vi.fn(async () => ({ tabId: 'renderer-tab' }))
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: trust writes touch the test user's agent config; only the PTY/readiness path is under test.
+    const runtimeInternals = runtime as unknown as {
+      markWorkspaceTrustedForAgent(
+        agent: string,
+        connectionId: string | null | undefined,
+        workspacePath: string
+      ): Promise<void>
+    }
+    vi.spyOn(runtimeInternals, 'markWorkspaceTrustedForAgent').mockResolvedValue(undefined)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test supplies only the reveal callback consumed by createTerminal.
+    runtime.setNotifier({ revealTerminalSession } as never)
+
+    const watched = enrollment({
+      workspaceKey: `local::${TEST_WORKTREE_PATH}`,
+      repoId: TEST_REPO_ID,
+      worktreeId: TEST_WORKTREE_ID,
+      workspacePath: TEST_WORKTREE_PATH
+    })
+    const workerRuntime = coordinatorRuntimeFacade(runtime, watched, TEST_WORKTREE_ID)
+    const created = await workerRuntime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      startupAgent: 'claude',
+      title: 'Heimdall worker',
+      surfaceOwner: false
+    })
+
+    expect(created).toMatchObject({
+      worktreeId: TEST_WORKTREE_ID,
+      surface: 'background'
+    })
+    expect(spawn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: expect.stringContaining('claude'),
+        cwd: TEST_WORKTREE_PATH,
+        worktreeId: TEST_WORKTREE_ID
+      })
+    )
+    expect(revealTerminalSession).not.toHaveBeenCalled()
+
+    // Captured fresh-install terminal tail: Claude still presents its "Security guide" choice.
+    runtime.onPtyData('pty-heimdall', '\r\n Security guide\r\n\r\n ❯ No, exit\r\n', Date.now())
+    await expect(
+      workerRuntime.waitForTerminal(created.handle, { condition: 'tui-idle', timeoutMs: 50 })
+    ).rejects.toThrow('timeout')
+
+    const readiness = workerRuntime.waitForTerminal(created.handle, {
+      condition: 'tui-idle',
+      timeoutMs: 5_000
+    })
+    runtime.onPtyData(
+      'pty-heimdall',
+      readFileSync(
+        join(__dirname, '../../runtime/__fixtures__/claude-code-ready-cold-start.txt'),
+        'utf8'
+      ),
+      Date.now()
+    )
+    await expect(readiness).resolves.toMatchObject({
+      handle: created.handle,
+      condition: 'tui-idle',
+      satisfied: true,
+      status: 'running'
     })
   })
 

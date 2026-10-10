@@ -1,4 +1,4 @@
-import { HEIMDALL_CHANNELS, type EnrollSuccess } from '../../shared/fork-heimdall/api'
+import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
 import {
   HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
   HeimdallEnrollmentRefusalError,
@@ -8,6 +8,7 @@ import {
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
+import { HEIMDALL_PIPELINE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall-pipeline/capability'
 import type {
   WatcherCommandRequest,
   WatcherCommandResult,
@@ -15,7 +16,8 @@ import type {
 } from '../../shared/fork-heimdall/fleet-types'
 import {
   EnrollSuccessReaderSchema,
-  WatcherCommandResultReaderSchema
+  WatcherCommandResultReaderSchema,
+  type EnrollSuccessReader
 } from '../../shared/fork-heimdall/remote-reader-schemas'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
@@ -54,7 +56,7 @@ export async function enrollRemoteWatcher(
   environments: FleetEnvironmentTransport,
   identity: FleetEnvironmentIdentity,
   input: EnrollInput
-): Promise<EnrollSuccess> {
+): Promise<EnrollSuccessReader> {
   let response: RuntimeRpcResponse<unknown>
   try {
     response = await environments.mutate(identity, HEIMDALL_CHANNELS.enroll, {
@@ -127,7 +129,14 @@ export async function sendRemoteWatcherCommand(
               localRequest,
               HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
             )
-          : await environments.mutate(identity, HEIMDALL_CHANNELS.command, localRequest)
+          : request.command.kind === 'answer-pipeline-choice'
+            ? await environments.mutate(
+                identity,
+                HEIMDALL_CHANNELS.command,
+                localRequest,
+                HEIMDALL_PIPELINE_RUNTIME_CAPABILITY
+              )
+            : await environments.mutate(identity, HEIMDALL_CHANNELS.command, localRequest)
     if (response.ok !== true) {
       return response.error.code === 'method_not_found'
         ? refused('unsupported-capability', 'The owning runtime does not expose Heimdall commands.')

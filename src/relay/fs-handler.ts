@@ -44,6 +44,7 @@ import {
   readAuthorizedDocPreviewFile,
   type DocPreviewFileAccessRequest
 } from '../shared/doc-preview-file-access'
+import { readRelayLinkTarget } from './fork-heimdall-pipeline/link-target-request'
 
 export class FsHandler {
   private dispatcher: RelayDispatcher
@@ -80,6 +81,7 @@ export class FsHandler {
 
   private registerHandlers(): void {
     this.dispatcher.onRequest('fs.readDir', (p) => readRelayDir(p))
+    this.dispatcher.onRequest('fs.readlink', readRelayLinkTarget)
     this.dispatcher.onRequest('fs.readFile', (p) => this.readFile(p))
     this.dispatcher.onRequest('fs.readFileStream', (p, c) => this.readFileStream(p, c))
     this.dispatcher.onRequest('fs.readFileRange', (p) => this.readFileRange(p))

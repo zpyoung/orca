@@ -1,14 +1,22 @@
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
-import type { ObjectiveNewWorktreeRequest } from '../../shared/fork-heimdall-objective/contract-types'
 import type { Repo } from '../../shared/repo-types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+
+export type EnrollmentNewWorktreeRequest = Readonly<{
+  name: string
+  baseBranch?: string
+}>
+
+export type EnrollmentWorktreeContext = Readonly<{
+  label: string
+  diagnosticPrefix: string
+}>
 
 async function listNamedWorktreeIds(
   runtime: OrcaRuntimeService,
   repo: Repo,
   name: string
 ): Promise<string[]> {
-  // a cached or truncated listing could hide a pre-existing same-named worktree and mark it stranded
   runtime.invalidateWorktreeCatalog(repo.id)
   const listed = await runtime.listManagedWorktrees(`id:${repo.id}`, Number.MAX_SAFE_INTEGER)
   return listed.worktrees
@@ -20,28 +28,32 @@ async function removeStrandedWorktrees(
   runtime: OrcaRuntimeService,
   repo: Repo,
   name: string,
-  preexisting: ReadonlySet<string>
+  preexisting: ReadonlySet<string>,
+  diagnosticPrefix: string
 ): Promise<void> {
   try {
     const stranded = (await listNamedWorktreeIds(runtime, repo, name)).filter(
       (id) => !preexisting.has(id)
     )
     for (const id of stranded) {
-      await objectiveEnrollmentWorktreeRollback(runtime, id, getRepoExecutionHostId(repo))()
+      await enrollmentWorktreeRollback(
+        runtime,
+        id,
+        getRepoExecutionHostId(repo),
+        diagnosticPrefix
+      )()
     }
   } catch (error) {
-    console.warn('Objective enrollment worktree rollback failed', error)
+    console.warn(`${diagnosticPrefix} enrollment worktree rollback failed`, error)
   }
 }
 
-/**
- * Creates an independent, inactive workspace for an objective enrollment on its repo's host.
- * A create that fails after its checkout exists removes that checkout before rethrowing.
- */
-export async function createObjectiveEnrollmentWorktree(
+/** Creates an inactive, parentless managed worktree and removes any newly stranded checkout on failure. */
+export async function createEnrollmentWorktree(
   runtime: OrcaRuntimeService,
   repo: Repo,
-  request: ObjectiveNewWorktreeRequest
+  request: EnrollmentNewWorktreeRequest,
+  context: EnrollmentWorktreeContext
 ) {
   const preexisting = new Set(await listNamedWorktreeIds(runtime, repo, request.name))
   try {
@@ -52,29 +64,33 @@ export async function createObjectiveEnrollmentWorktree(
       displayName: request.name,
       activate: false,
       lineage: { noParent: true },
-      comment: `Objective enrollment: ${request.name}`
+      comment: `${context.label} enrollment: ${request.name}`
     })
   } catch (error) {
-    await removeStrandedWorktrees(runtime, repo, request.name, preexisting)
+    await removeStrandedWorktrees(
+      runtime,
+      repo,
+      request.name,
+      preexisting,
+      context.diagnosticPrefix
+    )
     throw error
   }
 }
 
-/**
- * Returns the removal of a workspace created by a refused objective enrollment on its execution
- * host. The removal runs at most once and never throws, so every failure path may invoke it.
- */
-export function objectiveEnrollmentWorktreeRollback(
+/** Returns a host-scoped once-only removal for a worktree created by a refused enrollment. */
+export function enrollmentWorktreeRollback(
   runtime: OrcaRuntimeService,
   worktreeId: string,
-  hostId: ExecutionHostId
+  hostId: ExecutionHostId,
+  diagnosticPrefix: string
 ): () => Promise<void> {
   let removal: Promise<void> | null = null
   return () => {
     removal ??= runtime.removeManagedWorktree(`id:${worktreeId}`, { force: true, hostId }).then(
       () => undefined,
       (error: unknown) => {
-        console.warn('Objective enrollment worktree rollback failed', error)
+        console.warn(`${diagnosticPrefix} enrollment worktree rollback failed`, error)
       }
     )
     return removal

@@ -15,6 +15,7 @@ import {
 import { createEditorSaveQueue, type AppStoreApi } from './editor-save-queue'
 import { createEditorRestartSaveHandlers } from './editor-restart-save-handlers'
 import { createEditorExternalChangeTabReset } from './editor-external-change-tab-reset'
+import { savePipelineDraftForClose } from '@/fork-heimdall-pipeline/pipeline-tab-save'
 import {
   ORCA_EDITOR_PREPARE_HOT_EXIT_EVENT,
   ORCA_EDITOR_SAVE_DIRTY_FILES_EVENT
@@ -41,6 +42,9 @@ export function attachEditorAutosaveController(store: AppStoreApi): () => void {
     const { fileId } = (event as CustomEvent<{ fileId: string }>).detail
     const file = store.getState().openFiles.find((openFile) => openFile.id === fileId)
     if (!file) {
+      return
+    }
+    if (file.mode === 'pipeline' && !(await savePipelineDraftForClose(fileId))) {
       return
     }
 

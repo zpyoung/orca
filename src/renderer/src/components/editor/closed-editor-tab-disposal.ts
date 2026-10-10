@@ -5,6 +5,7 @@ import {
   pdfViewPositionCache,
   scrollTopCache
 } from '@/lib/scroll-cache'
+import { disposePipelineMode } from '@/fork-heimdall-pipeline/pipeline-tab-lifecycle'
 import {
   disposeUnattachedMonacoModelsByPathPrefixes,
   getDiffViewerMonacoModelPathPrefixes,
@@ -88,7 +89,7 @@ export function disposeClosedEditorTabCaches(
   const closedPdfFilePaths: string[] = []
 
   for (const closedFile of closedFiles) {
-    if (!isStillClosed(closedFile)) {
+    if (!isStillClosed(closedFile) || disposePipelineMode(closedFile.id, closedFile.mode)) {
       continue
     }
     switch (closedFile.mode) {

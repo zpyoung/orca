@@ -15,6 +15,7 @@ import type {
   WatcherFleetEntry
 } from '../../shared/fork-heimdall/fleet-types'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
+import type { HeimdallFleetSnapshotReader } from '../../shared/fork-heimdall/remote-reader-schemas'
 import { HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE } from '../../shared/fork-heimdall/enrollment-refusal-error'
 import {
   HeimdallEnrollOwnerCapabilityError,
@@ -235,7 +236,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment,
       now: () => 100
     })
-    const pushed: HeimdallFleetSnapshot[] = []
+    const pushed: HeimdallFleetSnapshotReader[] = []
     transport.subscribe((next) => pushed.push(next))
 
     const fleet = await transport.fleet()
@@ -268,7 +269,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment,
       now: () => 100
     })
-    const pushed: HeimdallFleetSnapshot[] = []
+    const pushed: HeimdallFleetSnapshotReader[] = []
     transport.subscribe((next) => pushed.push(next))
     await transport.fleet()
     await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
@@ -293,7 +294,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment,
       now: () => 100
     })
-    const pushed: HeimdallFleetSnapshot[] = []
+    const pushed: HeimdallFleetSnapshotReader[] = []
     transport.subscribe((next) => pushed.push(next))
     await transport.fleet()
     await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
@@ -388,7 +389,7 @@ describe('HeimdallFleetTransport', () => {
       userDataPath: () => '/unused',
       environments: remote.environment
     })
-    const pushed: HeimdallFleetSnapshot[] = []
+    const pushed: HeimdallFleetSnapshotReader[] = []
     transport.subscribe((next) => pushed.push(next))
     await transport.fleet()
     await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
@@ -611,7 +612,7 @@ describe('HeimdallFleetTransport', () => {
       userDataPath: () => '/unused',
       environments: remote.environment
     })
-    const pushed: HeimdallFleetSnapshot[] = []
+    const pushed: HeimdallFleetSnapshotReader[] = []
     transport.subscribe((next) => pushed.push(next))
 
     await transport.fleet()
@@ -631,7 +632,7 @@ describe('HeimdallFleetTransport', () => {
       userDataPath: () => '/unused',
       environments: remote.environment
     })
-    const pushed: HeimdallFleetSnapshot[] = []
+    const pushed: HeimdallFleetSnapshotReader[] = []
     transport.subscribe((next) => pushed.push(next))
     await transport.fleet()
     await vi.waitFor(() => expect(pushed.at(-1)?.entries[0]?.contact).toBe('live'))

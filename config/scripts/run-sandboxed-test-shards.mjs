@@ -41,6 +41,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
+import { appendSandboxBaseline } from './fork-heimdall-pipeline/sandbox-baseline.mjs'
 
 const PROJECT_DIR = path.resolve(import.meta.dirname, '../..')
 
@@ -84,7 +85,7 @@ const SHELL_CONTRACT_SPECS = [
 /** CI's unit shards set this so the vitest config applies UNIT_EXCLUDE (shell contracts, relay regions, cross-version). */
 const UNIT_SHARD_ENV = 'ORCA_BALANCE_UNIT_SHARDS=1'
 
-const LANES = new Set(['unit', 'shell', 'e2e'])
+const LANES = new Set(['unit', 'shell', 'e2e', 'wire'])
 
 /** related/files selection above this file count splits across buckets instead of one container. */
 export const RELATED_SINGLE_CONTAINER_MAX = 300
@@ -111,6 +112,15 @@ function main() {
   const sourceTarPath = options.sourceRef
     ? createSourceRefTar(options.sourceRef)
     : createSourceTar()
+  if (options.baselineRef) {
+    try {
+      const baseline = appendSandboxBaseline(sourceTarPath, options.baselineRef, PROJECT_DIR)
+      console.log(`Baseline ref "${options.baselineRef}" resolved to ${baseline.commit}`)
+    } catch (error) {
+      rmSync(path.dirname(sourceTarPath), { recursive: true, force: true })
+      fail(`could not prepare sandbox baseline: ${error.message}`)
+    }
+  }
   mkdirSync(options.logsDir, { recursive: true })
 
   const workItems = options.select ? selectionWorkItems(options) : shardWorkItems(options)
@@ -150,12 +160,25 @@ function readOptions() {
       'keep-failed': { type: 'boolean', default: false },
       select: { type: 'string' },
       'files-from': { type: 'string' },
-      'source-ref': { type: 'string' }
+      'source-ref': { type: 'string' },
+      'baseline-ref': { type: 'string' }
     }
   })
 
   if (!LANES.has(values.lane)) {
     fail(`--lane must be one of ${[...LANES].join(', ')}`)
+  }
+  if (values.lane === 'wire' && !values['baseline-ref']) {
+    fail('--lane=wire requires --baseline-ref=<explicit-local-ref>')
+  }
+  if (values.lane !== 'wire' && values['baseline-ref'] !== undefined) {
+    fail('--baseline-ref applies only to --lane=wire')
+  }
+  if (values.lane === 'wire' && values['source-ref'] !== undefined) {
+    fail('--lane=wire cannot be combined with --source-ref')
+  }
+  if (values.lane === 'wire' && positionals.length === 0) {
+    fail('--lane=wire requires Vitest file paths after "--"')
   }
 
   let selectionMode
@@ -174,7 +197,10 @@ function readOptions() {
     }
   }
 
-  const shardTotal = values.lane === 'shell' ? 1 : readPositiveInteger(values.shards, '--shards')
+  const shardTotal =
+    values.lane === 'shell' || values.lane === 'wire'
+      ? 1
+      : readPositiveInteger(values.shards, '--shards')
   const jobs = values.jobs ? readPositiveInteger(values.jobs, '--jobs') : shardTotal
 
   return {
@@ -194,6 +220,7 @@ function readOptions() {
     select: selectionMode.select,
     selection,
     sourceRef: values['source-ref'] || null,
+    baselineRef: values['baseline-ref'] || null,
     extraArgs: positionals
   }
 }
@@ -531,6 +558,7 @@ function runShard({ item, options, imageTag, sourceTarPath, dockerEnv }) {
   const dockerArgs = [
     'run',
     '--interactive',
+    '--init',
     ...(options.keepFailed ? ['--name', containerName] : ['--rm']),
     ...laneEnvArgs(options.lane),
     ...options.extraEnv.flatMap((pair) => ['--env', pair]),
@@ -569,9 +597,11 @@ export function laneEnvArgs(lane) {
   if (lane === 'e2e') {
     return ['--env', 'ORCA_E2E_FORWARD_APP_LOGS=1', '--env', 'ORCA_E2E_WEB_CLIENT=1']
   }
+  if (lane === 'wire') {
+    return ['--env', 'ORCA_SANDBOX_REQUIRE_BASELINE=1']
+  }
   return []
 }
-
 export function laneCommand(options, shard) {
   if (options.lane === 'shell') {
     return [
@@ -583,6 +613,17 @@ export function laneCommand(options, shard) {
       'config/vitest.config.ts',
       '--maxWorkers=1',
       ...SHELL_CONTRACT_SPECS,
+      ...options.extraArgs
+    ]
+  }
+  if (options.lane === 'wire') {
+    return [
+      'pnpm',
+      'exec',
+      'vitest',
+      'run',
+      '--config',
+      'config/vitest.config.ts',
       ...options.extraArgs
     ]
   }

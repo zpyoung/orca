@@ -62,5 +62,33 @@ export const HEIMDALL_CREATE_SPECS: CommandSpec[] = [
       'orca heimdall create hosted-review --worktree active',
       'orca heimdall create hosted-review --worktree branch:feature/report --cap fixChecks=gated --branch-update rebase'
     ]
+  },
+  {
+    path: ['heimdall', 'create'],
+    summary: 'Start a headless pipeline run',
+    usage:
+      'orca heimdall create --pipeline <ref|path> --spec <task text> [--worktree <selector>] [--input name=value]... [--cap name=mode]... [--hours <n>] [--turns <n>] [--owner <agent>] [--owner-model <m>] [--owner-effort <e>] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'pipeline',
+      'spec',
+      'worktree',
+      'input',
+      'cap',
+      'hours',
+      'turns',
+      'owner',
+      'owner-model',
+      'owner-effort'
+    ],
+    repeatableFlags: ['input', 'cap'],
+    notes: [
+      '--spec is plain task text for the task input; use --input name=value for other declared inputs.',
+      'Pipeline references are bare repository ids, user:<id>, builtin:<id>, or a saved pipeline YAML path.'
+    ],
+    examples: [
+      "orca heimdall create --pipeline .orca/pipelines/bugfix.yaml --spec 'fix the flaky login test'",
+      'orca heimdall create --pipeline user:bugfix --spec "Fix the bug" --cap push=on'
+    ]
   }
 ]

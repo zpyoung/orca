@@ -12,6 +12,7 @@ import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import type { IFilesystemProvider } from '../providers/types'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
+import { gitignoreAlreadyCoversOrcaDir } from '../fork-heimdall-pipeline/orca-gitignore-rules'
 
 type RuntimeRepositoryIssueCommandDeps = {
   resolveRepo: (selector: string) => Promise<Repo>
@@ -140,7 +141,7 @@ async function ensureRemoteOrcaDirIgnored(
     }
     return
   }
-  if (result.isBinary || /^\.orca\/?$/m.test(result.content)) {
+  if (result.isBinary || gitignoreAlreadyCoversOrcaDir(result.content)) {
     return
   }
   const separator = result.content.endsWith('\n') ? '' : '\n'

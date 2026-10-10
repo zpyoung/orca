@@ -41,6 +41,7 @@ import {
   writeSshTerminalArtifact
 } from './ssh-filesystem-terminal-artifact'
 import { readSshDocPreviewFile } from './ssh-filesystem-doc-preview'
+import { attachPipelineLinkReader } from '../fork-heimdall-pipeline/ssh-link-reader'
 const WORKSPACE_SPACE_SCAN_TIMEOUT_MS = 130_000
 export class SshFilesystemProvider implements IFilesystemProvider {
   private connectionId: string
@@ -61,6 +62,7 @@ export class SshFilesystemProvider implements IFilesystemProvider {
   ) {
     this.connectionId = connectionId
     this.mux = mux
+    attachPipelineLinkReader(this, mux, createSftp)
 
     if (createSftp) {
       // Why: system SSH has raw single-file transfer but no ssh2 SFTP channel;

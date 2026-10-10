@@ -1,1 +1,37 @@
-{}
+{
+  "fork": {
+    "heimdallObjective": {
+      "enrollment": {
+        "gatesHelpLabel": "Ayuda sobre checks",
+        "gatesHelpSummary": "Comandos de check con nombre que el kernel ejecuta en la rama integrada después de fusionar cada nodo del plan, antes de la revisión y el aterrizaje.",
+        "gatesHelp": {
+          "whenLabel": "Cuándo",
+          "when": "Después de fusionar el último nodo del plan, antes de la revisión y el aterrizaje.",
+          "whatLabel": "Qué incluir",
+          "what": "La suite completa de pruebas y otros checks de todo el árbol, no checks por nodo."
+        },
+        "removeGate": "Quitar check {{n}}",
+        "gates": "Checks",
+        "gatesHelpLine": "Los checks se ejecutan en la rama integrada después de que se haya fusionado cada nodo del plan, antes de la revisión y el aterrizaje. Añade aquí la suite completa de pruebas y otros checks de todo el árbol, no a los nodos del plan.",
+        "addGate": "Añadir check",
+        "gatesUnsupportedHost": "Los checks no están disponibles en la versión de Orca de este host. Quita los checks de abajo para continuar."
+      },
+      "validation": {
+        "gateNameInvalid": "El nombre del check {{name}} debe contener solo letras minúsculas, dígitos o guiones, comenzar por una letra o un dígito y tener como máximo 40 caracteres.",
+        "gateCommandInvalid": "Introduce un comando para el check de hasta 8.192 caracteres.",
+        "gateTimeoutInvalid": "El tiempo de espera del check debe ser un número entero de segundos entre 10 y 14.400.",
+        "gateNameDuplicate": "Los nombres de los checks deben ser únicos.",
+        "gatesTooMany": "Los objetivos admiten como máximo 8 checks declarados.",
+        "gatesUnsupportedHost": "Los checks no están disponibles en la versión de Orca de este host. Quita todos los checks para continuar."
+      },
+      "detail": {
+        "noGateDeclared": "No se declaró ningún check para el objetivo.",
+        "checks": "Checks",
+        "lintCode": {
+          "duplicatesGate": "Duplica un check",
+          "noGateDeclared": "No se declaró ningún check"
+        }
+      }
+    }
+  }
+}

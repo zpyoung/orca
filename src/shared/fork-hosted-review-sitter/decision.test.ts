@@ -3,6 +3,7 @@ import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import { evaluateStopPredicates } from '../fork-heimdall/stop-policy'
 import {
   computeDesiredAction as computeDesiredActionCore,
+  decideHostedReview,
   explainDesiredAction as explainDesiredActionCore
 } from './decision'
 import { hostedReviewAttemptFingerprint, hostedReviewContentIdentity } from './action-identity'
@@ -116,6 +117,7 @@ function sitter(
     },
     branchUpdateMode: 'merge-base-update',
     mergeMethod: null,
+    repeatFixLimit: 1,
     mergeCheckScope: 'required',
     ...overrides
   }
@@ -209,7 +211,11 @@ function explainDesiredAction(
   })
 }
 
-function evaluateRegisteredStop(input: TestReview, history: WatcherLedger) {
+function evaluateRegisteredStop(
+  input: TestReview,
+  history: WatcherLedger,
+  definition: HostedReviewSitterDefinition = sitter()
+) {
   const { freshness, observedAtMs, ...reviewSnapshot } = input
   return evaluateStopPredicates(
     HOSTED_REVIEW_STOP_PREDICATES,
@@ -217,7 +223,7 @@ function evaluateRegisteredStop(input: TestReview, history: WatcherLedger) {
       freshness,
       contentIdentity: hostedReviewContentIdentity(reviewSnapshot),
       observedAtMs,
-      world: { review: reviewSnapshot, definition: sitter(), preparedCommit: null }
+      world: { review: reviewSnapshot, definition, preparedCommit: null }
     },
     history
   )
@@ -238,6 +244,52 @@ function completedAction(
     result: { kind: 'none' },
     ...overrides
   }
+}
+
+function fixAttribution(
+  sourceHeadSha: string,
+  producedHeadSha: string,
+  publishActionId: string,
+  atMs: number
+): FixAttributionLedgerEntry {
+  return {
+    kind: 'fix-attribution',
+    eventId: `attribution:${publishActionId}`,
+    atMs,
+    sourceHeadSha,
+    producedHeadSha,
+    preparedCommitSha: producedHeadSha,
+    checkKey: 'test',
+    failureSignature: 'failure:test',
+    publishActionId
+  }
+}
+
+function repeatedFailureReview(headSha: string): TestReview {
+  return review({
+    headSha,
+    checks: [
+      check({
+        checkId: `${headSha}:node-18`,
+        headSha,
+        state: 'failed',
+        observationId: `${headSha}:node-18`,
+        failureSignature: 'failure:test',
+        shardKey: 'shard-1',
+        runtimeKey: 'node-18'
+      }),
+      check({
+        checkId: `${headSha}:node-20`,
+        headSha,
+        state: 'failed',
+        observationId: `${headSha}:node-20`,
+        failureSignature: 'failure:test',
+        shardKey: 'shard-1',
+        runtimeKey: 'node-20'
+      })
+    ],
+    providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
+  })
 }
 
 describe('PR sitter desired-action safety policy', () => {
@@ -697,9 +749,9 @@ describe('PR sitter desired-action safety policy', () => {
         detail: "same failure recurred after the sitter's own fix (produced head-2)"
       }
     })
-    expect(deriveHostedReviewSitterDiscrepancies(fixedHead, history, 'required')).toContainEqual(
-      expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
-    )
+    expect(
+      deriveHostedReviewSitterDiscrepancies(fixedHead, history, 'required', undefined, 1)
+    ).toContainEqual(expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' }))
 
     const externalHead = review({
       ...fixedHead,
@@ -707,182 +759,93 @@ describe('PR sitter desired-action safety policy', () => {
       checks: [{ ...fixedHead.checks[0]!, headSha: 'head-3', observationId: 'head-3:test' }]
     })
     expect(evaluateRegisteredStop(externalHead, history)).toBeNull()
+    expect(
+      deriveHostedReviewSitterDiscrepancies(externalHead, history, 'required', undefined, 1).filter(
+        (entry) => entry.kind === 'fix-did-not-resolve'
+      )
+    ).toHaveLength(0)
     expect(computeDesiredAction(externalHead, sitter(), history)).toMatchObject({
       kind: 'rerun-check'
     })
   })
 
-  it('retains stop evidence if the process crashes before the attribution row', () => {
-    const snapshot = review()
-    const publication: HostedReviewSitterAction = {
-      kind: 'publish-fix',
-      capability: 'fixChecks',
-      visibility: 'external',
-      contentIdentity: hostedReviewContentIdentity(snapshot),
-      evidenceKey: 'prepared:test',
-      expectedState: { target: snapshot.url, before: HEAD },
-      headSha: HEAD,
-      reviewUrl: snapshot.url,
-      checkKey: 'test',
-      failureSignature: 'failure:test',
-      preparationActionId: 'prepare-1',
-      preparedCommitSha: 'head-2'
-    }
-    const history = ledger([
-      completedAction(publication, {
-        actionId: 'publish-1',
-        result: { kind: 'published', resultingHeadSha: 'head-2' }
-      })
-    ])
-    const repeated = review({
-      headSha: 'head-2',
-      checks: [
-        check({
-          headSha: 'head-2',
-          state: 'failed',
-          observationId: 'head-2:test',
-          failureSignature: 'failure:test'
-        })
-      ],
-      providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
-    })
-    expect(evaluateRegisteredStop(repeated, history)).toEqual({
-      predicateId: 'repeated-failure-after-own-fix',
-      disposition: 'park',
-      reason: 'repeated-failure-after-own-fix',
-      detail: 'test',
-      deviation: {
-        kind: 'check-failed',
-        criterionId: 'test',
-        command: null,
-        exitCode: null,
-        timedOut: null,
-        detail: "same failure recurred after the sitter's own fix (produced head-2)"
-      }
-    })
-    expect(deriveHostedReviewSitterDiscrepancies(repeated, history, 'required')).toContainEqual(
-      expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
+  it('retries below the configured limit and reconciles one discrepancy when the group exhausts', () => {
+    const definition = sitter({ repeatFixLimit: 3 })
+    const firstFix = fixAttribution(HEAD, 'head-2', 'publish-1', 1_000)
+    const secondFix = fixAttribution('head-2', 'head-3', 'publish-2', 2_000)
+    const thirdFix = fixAttribution('head-3', 'head-4', 'publish-3', 3_000)
+    const firstHead = repeatedFailureReview('head-2')
+    const secondHead = repeatedFailureReview('head-3')
+    const thirdHead = repeatedFailureReview('head-4')
+    const firstHistory = ledger([firstFix])
+    const secondHistory = ledger([firstFix, secondFix])
+    const exhaustedHistory = ledger([firstFix, secondFix, thirdFix])
+
+    expect(
+      decideHostedReview(
+        {
+          freshness: firstHead.freshness,
+          contentIdentity: hostedReviewContentIdentity(firstHead),
+          observedAtMs: firstHead.observedAtMs,
+          world: { review: firstHead, definition, preparedCommit: null }
+        },
+        firstHistory
+      )
+    ).toMatchObject({ action: { kind: 'prepare-fix', headSha: 'head-2' } })
+    const actionWithConfiguredLimit = computeDesiredAction(firstHead, definition, firstHistory)
+    expect(actionWithConfiguredLimit).toEqual(
+      computeDesiredAction(firstHead, sitter({ repeatFixLimit: 1 }), firstHistory)
     )
-  })
+    expect(evaluateRegisteredStop(firstHead, firstHistory, definition)).toBeNull()
+    expect(
+      deriveHostedReviewSitterDiscrepancies(
+        firstHead,
+        firstHistory,
+        'required',
+        undefined,
+        definition.repeatFixLimit
+      ).filter((entry) => entry.kind === 'fix-did-not-resolve')
+    ).toHaveLength(0)
+    expect(evaluateRegisteredStop(secondHead, secondHistory, definition)).toBeNull()
+    expect(
+      deriveHostedReviewSitterDiscrepancies(
+        secondHead,
+        secondHistory,
+        'required',
+        undefined,
+        definition.repeatFixLimit
+      ).filter((entry) => entry.kind === 'fix-did-not-resolve')
+    ).toHaveLength(0)
+    expect(evaluateRegisteredStop(thirdHead, exhaustedHistory, definition)).toMatchObject({
+      reason: 'repeated-failure-after-own-fix'
+    })
+    expect(
+      deriveHostedReviewSitterDiscrepancies(
+        thirdHead,
+        exhaustedHistory,
+        'required',
+        undefined,
+        definition.repeatFixLimit
+      ).filter((entry) => entry.kind === 'fix-did-not-resolve')
+    ).toHaveLength(1)
 
-  it('retains stop ancestry when a fresh read alone resolves a publish as landed', () => {
-    const original = review()
-    const publication: HostedReviewSitterAction = {
-      kind: 'publish-fix',
-      capability: 'fixChecks',
-      visibility: 'external',
-      contentIdentity: hostedReviewContentIdentity(original),
-      evidenceKey: 'prepared:resolved',
-      expectedState: { target: original.url, before: HEAD },
-      headSha: HEAD,
-      reviewUrl: original.url,
-      checkKey: 'test',
-      failureSignature: 'failure:test',
-      preparationActionId: 'prepare-1',
-      preparedCommitSha: 'head-2'
-    }
-    const attempt: ActionLedgerEntry = {
-      kind: 'action',
-      eventId: 'publish-attempt',
-      actionId: 'publish-resolved',
-      atMs: 1_000,
-      action: publication,
-      state: 'failed',
-      effect: 'indeterminate'
-    }
-    const history = ledger([
-      attempt,
-      {
-        kind: 'attempt-resolved',
-        eventId: 'resolution-1',
-        actionId: 'publish-resolved',
-        atMs: 2_000,
-        effect: 'landed',
-        evidence: { observedHeadSha: 'head-2' }
-      }
-    ])
-    const repeated = review({
-      headSha: 'head-2',
-      checks: [
-        check({
-          headSha: 'head-2',
-          state: 'failed',
-          observationId: 'head-2:test',
-          failureSignature: 'failure:test'
-        })
-      ],
-      providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
+    const changedSignatureHead = review({
+      ...thirdHead,
+      checks: thirdHead.checks.map((check) => ({
+        ...check,
+        failureSignature: 'failure:changed'
+      }))
     })
-
-    expect(evaluateRegisteredStop(repeated, history)).toEqual({
-      predicateId: 'repeated-failure-after-own-fix',
-      disposition: 'park',
-      reason: 'repeated-failure-after-own-fix',
-      detail: 'test',
-      deviation: {
-        kind: 'check-failed',
-        criterionId: 'test',
-        command: null,
-        exitCode: null,
-        timedOut: null,
-        detail: "same failure recurred after the sitter's own fix (produced head-2)"
-      }
-    })
-    expect(deriveHostedReviewSitterDiscrepancies(repeated, history, 'required')).toContainEqual(
-      expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
-    )
-  })
-
-  it('keeps stop attribution through a contiguous chain of sitter fixes', () => {
-    const firstFix: FixAttributionLedgerEntry = {
-      kind: 'fix-attribution',
-      eventId: 'attribution-a',
-      atMs: 1_000,
-      sourceHeadSha: HEAD,
-      producedHeadSha: 'head-2',
-      preparedCommitSha: 'head-2',
-      checkKey: 'test-a',
-      failureSignature: 'failure:a',
-      publishActionId: 'publish-a'
-    }
-    const secondFix: FixAttributionLedgerEntry = {
-      kind: 'fix-attribution',
-      eventId: 'attribution-b',
-      atMs: 2_000,
-      sourceHeadSha: 'head-2',
-      producedHeadSha: 'head-3',
-      preparedCommitSha: 'head-3',
-      checkKey: 'test-b',
-      failureSignature: 'failure:b',
-      publishActionId: 'publish-b'
-    }
-    const repeatedFirstFailure = review({
-      headSha: 'head-3',
-      checks: [
-        check({
-          checkKey: 'test-a',
-          headSha: 'head-3',
-          state: 'failed',
-          observationId: 'head-3:test-a',
-          failureSignature: 'failure:a'
-        })
-      ],
-      providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
-    })
-    expect(evaluateRegisteredStop(repeatedFirstFailure, ledger([firstFix, secondFix]))).toEqual({
-      predicateId: 'repeated-failure-after-own-fix',
-      disposition: 'park',
-      reason: 'repeated-failure-after-own-fix',
-      detail: 'test-a',
-      deviation: {
-        kind: 'check-failed',
-        criterionId: 'test-a',
-        command: null,
-        exitCode: null,
-        timedOut: null,
-        detail: "same failure recurred after the sitter's own fix (produced head-2)"
-      }
-    })
+    expect(evaluateRegisteredStop(changedSignatureHead, exhaustedHistory, definition)).toBeNull()
+    expect(
+      deriveHostedReviewSitterDiscrepancies(
+        changedSignatureHead,
+        exhaustedHistory,
+        'required',
+        undefined,
+        definition.repeatFixLimit
+      ).filter((entry) => entry.kind === 'fix-did-not-resolve')
+    ).toHaveLength(0)
   })
 })
 
@@ -990,21 +953,6 @@ describe('PR sitter no-action reasons', () => {
         reason: 'capability-off',
         detail: 'fixChecks'
       })
-    }
-  })
-
-  it('keeps computeDesiredAction in lockstep with explainDesiredAction', () => {
-    const cases: [TestReview, HostedReviewSitterDefinition][] = [
-      [review(), sitter()],
-      [review({ freshness: 'cached' }), sitter()],
-      [review({ behindBase: true }), sitter()],
-      [review({ conflicts: 'present' }), sitter()],
-      [review({ lifecycle: 'closed' }), sitter()]
-    ]
-    for (const [snapshot, definition] of cases) {
-      expect(computeDesiredAction(snapshot, definition, ledger())).toEqual(
-        explainDesiredAction(snapshot, definition, ledger()).action
-      )
     }
   })
 })

@@ -9,6 +9,7 @@ import {
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
   type RuntimeCapability
 } from '../../shared/protocol-version'
+import { HEIMDALL_PIPELINE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall-pipeline/capability'
 
 /**
  * What the desktop renderer advertises when it calls its own main process over `runtime:call`.
@@ -31,6 +32,7 @@ export const DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES: readonly RuntimeCapab
   AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
   CLAUDE_STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
+  ...HEIMDALL_PIPELINE_CLIENT_CAPABILITIES,
   // Without this `supportsAgentLaunch` refuses the renderer outright, while the same renderer
   // targeting a remote host is admitted — the asymmetry this constant exists to close.
   AGENT_LAUNCH_RUNTIME_CAPABILITY

@@ -112,18 +112,18 @@
     {
       "name": "orca-heimdall",
       "sourcePath": "skills/orca-heimdall",
-      "releaseRevision": 1,
-      "packageDigest": "3620e94da60672b586875617c5866d1784c0e1660093a27130edc866d010a243",
-      "gitTreeSha": "545548501ab08aa149d766a8d99af00824c43611",
+      "releaseRevision": 2,
+      "packageDigest": "2ddae58b261acbf1d5f03371075ead450e32e092339463076f81d8291503d671",
+      "gitTreeSha": "f20f75e04f6c1f148d204b62b7cb43a323dbc03b",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 2807,
+          "size": 2823,
           "executable": false,
           "classification": "text",
-          "exactSha256": "9c1901990ce40f13e0e3d378831fc0d7953000c0eaa42f8bec9f8d48c306d6f4",
-          "textNormalizedSha256": "9c1901990ce40f13e0e3d378831fc0d7953000c0eaa42f8bec9f8d48c306d6f4",
-          "identitySha256": "9c1901990ce40f13e0e3d378831fc0d7953000c0eaa42f8bec9f8d48c306d6f4"
+          "exactSha256": "02eacf88d776dbb56fbf06732ec0f8b1281baff2de8b1ee2a37074144baa8741",
+          "textNormalizedSha256": "02eacf88d776dbb56fbf06732ec0f8b1281baff2de8b1ee2a37074144baa8741",
+          "identitySha256": "02eacf88d776dbb56fbf06732ec0f8b1281baff2de8b1ee2a37074144baa8741"
         }
       ]
     },

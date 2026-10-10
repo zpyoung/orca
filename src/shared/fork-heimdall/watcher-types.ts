@@ -2,6 +2,8 @@ import { z } from 'zod'
 import type { AutomationSchedulerOwner } from '../automations-types'
 import { parseExecutionHostId, type ExecutionHostId } from '../execution-host'
 import { BudgetExhaustionSchema, BudgetPolicySchema, BudgetStateSchema } from './budget'
+import { PipelinePinSchema } from '../fork-heimdall-pipeline/pipeline-pin'
+import { PipelineSourceSnapshotSchema } from '../fork-heimdall-pipeline/pipeline-source'
 import { WatcherOwnerConfigSchema } from './owner/owner-config'
 
 const IdSchema = z
@@ -10,7 +12,7 @@ const IdSchema = z
   .refine((value) => value.trim().length > 0)
 const TimestampSchema = z.number().int().nonnegative()
 
-export const WatcherKindIdSchema = z.enum(['hosted-review', 'objective'])
+export const WatcherKindIdSchema = z.enum(['hosted-review', 'objective', 'pipeline'])
 export type WatcherKindId = z.infer<typeof WatcherKindIdSchema>
 
 export const CapabilityModeSchema = z.enum(['off', 'gated', 'on'])
@@ -46,6 +48,14 @@ export const CoordinatorIdentitySchema = z
   .strict()
 export type CoordinatorIdentity = z.infer<typeof CoordinatorIdentitySchema>
 
+/** Confirms an enrollment workspace is scoped to its execution host. */
+export function watcherEnrollmentWorkspaceScopeMatches(value: {
+  workspaceKey: WorkspaceKey
+  executionHostId: ExecutionHostId
+}): boolean {
+  return value.workspaceKey.startsWith(`${value.executionHostId}::`)
+}
+
 export const WatcherEnrollmentSchema = z
   .object({
     watcherId: IdSchema,
@@ -70,10 +80,7 @@ export const WatcherEnrollmentSchema = z
     owner: WatcherOwnerConfigSchema.optional()
   })
   .strict()
-  .refine(
-    (value) => value.workspaceKey.startsWith(`${value.executionHostId}::`),
-    'workspaceKey must be scoped to executionHostId'
-  )
+  .refine(watcherEnrollmentWorkspaceScopeMatches, 'workspaceKey must be scoped to executionHostId')
 export type WatcherEnrollment = z.infer<typeof WatcherEnrollmentSchema>
 
 export const WatcherParkReasonSchema = z.discriminatedUnion('kind', [
@@ -170,7 +177,11 @@ export const EnrollInputSchema = z
     /** Candidate owning-agent selection; re-validated at authorization, never trusted as-is. */
     owner: WatcherOwnerConfigSchema.optional(),
     /** Kept out of `capabilities` so kind-owned strict capability schemas never see this key. */
-    ownerInterventionCapability: CapabilityModeSchema.optional()
+    ownerInterventionCapability: CapabilityModeSchema.optional(),
+    /** Built-in pipeline version display pin; stripped for hosts without pipeline support. */
+    pipelinePin: PipelinePinSchema.optional(),
+    /** Original source for a repo or personal pipeline routed through an existing kind. */
+    pipelineSource: PipelineSourceSnapshotSchema.optional()
   })
   .strict()
 export type EnrollInput = z.infer<typeof EnrollInputSchema>

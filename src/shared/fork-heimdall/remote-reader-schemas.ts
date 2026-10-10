@@ -1,6 +1,18 @@
-import type { z } from 'zod'
+import { z } from 'zod'
+import { openEnum } from '../zod-salvage'
 import { EnrollSuccessSchema, HeimdallSubscriptionEventSchema } from './api'
-import { WatcherCommandResultSchema, WatcherDetailSchema } from './fleet-types'
+import {
+  HeimdallFleetSnapshotSchema,
+  WatcherCommandResultSchema,
+  WatcherDetailSchema,
+  WatcherFleetEntrySchema
+} from './fleet-types'
+import {
+  WatcherEnrollmentSchema,
+  WatcherKindIdSchema,
+  WatcherListEntrySchema,
+  watcherEnrollmentWorkspaceScopeMatches
+} from './watcher-types'
 
 type TraversableDefinition = z.ZodType['def'] & {
   // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- zod's object def names its field map `shape`.
@@ -140,10 +152,59 @@ export function remoteReaderSchema<T extends z.ZodType>(schema: T): T {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: visit reproduces each node's def.type/shape, so the returned schema is structurally the same variant as the input T.
   return visit(schema) as T
 }
+const READER_WATCHER_KIND_VALUES = [...WatcherKindIdSchema.options, 'unknown'] as const
+export const WatcherKindIdReaderSchema = openEnum(READER_WATCHER_KIND_VALUES, 'unknown')
+export type WatcherKindIdReader = z.infer<typeof WatcherKindIdReaderSchema>
 
-export const WatcherDetailReaderSchema = remoteReaderSchema(WatcherDetailSchema)
-export const EnrollSuccessReaderSchema = remoteReaderSchema(EnrollSuccessSchema)
-export const WatcherCommandResultReaderSchema = remoteReaderSchema(WatcherCommandResultSchema)
-export const HeimdallSubscriptionEventReaderSchema = remoteReaderSchema(
-  HeimdallSubscriptionEventSchema
+const WatcherEnrollmentReaderSchema = z
+  .object({
+    ...WatcherEnrollmentSchema.shape,
+    kind: WatcherKindIdReaderSchema
+  })
+  .strict()
+  .refine(watcherEnrollmentWorkspaceScopeMatches, 'workspaceKey must be scoped to executionHostId')
+const WatcherListEntryReaderSchema = WatcherListEntrySchema.extend({
+  enrollment: WatcherEnrollmentReaderSchema
+})
+export type WatcherListEntryReader = z.infer<typeof WatcherListEntryReaderSchema>
+
+const WatcherFleetEntryReaderSchema = WatcherFleetEntrySchema.extend({
+  entry: WatcherListEntryReaderSchema
+})
+export type WatcherFleetEntryReader = z.infer<typeof WatcherFleetEntryReaderSchema>
+
+export const HeimdallFleetSnapshotReaderSchema = remoteReaderSchema(
+  HeimdallFleetSnapshotSchema.extend({
+    entries: z.array(WatcherFleetEntryReaderSchema)
+  })
 )
+export type HeimdallFleetSnapshotReader = z.infer<typeof HeimdallFleetSnapshotReaderSchema>
+
+export const WatcherDetailReaderSchema = remoteReaderSchema(
+  WatcherDetailSchema.extend({ watcher: WatcherFleetEntryReaderSchema })
+)
+export type WatcherDetailReader = z.infer<typeof WatcherDetailReaderSchema>
+
+export const EnrollSuccessReaderSchema = remoteReaderSchema(
+  z.discriminatedUnion('status', [
+    EnrollSuccessSchema.options[0].extend({ entry: WatcherListEntryReaderSchema }),
+    EnrollSuccessSchema.options[1].extend({ entry: WatcherListEntryReaderSchema })
+  ])
+)
+export type EnrollSuccessReader = z.infer<typeof EnrollSuccessReaderSchema>
+
+const HeimdallSubscriptionEventReaderInputSchema = z.discriminatedUnion('type', [
+  HeimdallSubscriptionEventSchema.options[0].extend({
+    snapshot: HeimdallFleetSnapshotReaderSchema
+  }),
+  HeimdallSubscriptionEventSchema.options[1].extend({
+    snapshot: HeimdallFleetSnapshotReaderSchema
+  }),
+  HeimdallSubscriptionEventSchema.options[2]
+])
+export const HeimdallSubscriptionEventReaderSchema = remoteReaderSchema(
+  HeimdallSubscriptionEventReaderInputSchema
+)
+export type HeimdallSubscriptionEventReader = z.infer<typeof HeimdallSubscriptionEventReaderSchema>
+
+export const WatcherCommandResultReaderSchema = remoteReaderSchema(WatcherCommandResultSchema)

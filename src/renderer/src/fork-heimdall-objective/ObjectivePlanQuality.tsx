@@ -178,7 +178,7 @@ function Gates({
   if (noGateDeclared) {
     return (
       <p className="rounded-md border border-border bg-muted/10 px-2.5 py-2 text-xs text-muted-foreground">
-        {translate('fork.heimdallObjective.detail.noGateDeclared', 'No objective gate declared.')}
+        {translate('fork.heimdallObjective.detail.noGateDeclared', 'No objective check declared.')}
       </p>
     )
   }
@@ -186,26 +186,31 @@ function Gates({
     return null
   }
   return (
-    <ul className="space-y-1.5">
-      {gates.map((gate) => (
-        <li
-          key={gate.name}
-          className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/10 px-2.5 py-2 text-xs text-foreground"
-        >
-          <span className="font-mono">{gate.name}</span>
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-            {gate.command}
-          </span>
-          <Badge
-            variant={
-              gate.lastResult ? (gate.lastResult.pass ? 'secondary' : 'destructive') : 'outline'
-            }
+    <section className="space-y-1.5">
+      <h5 className="text-[11px] font-semibold text-muted-foreground">
+        {translate('fork.heimdallObjective.detail.checks', 'Checks')}
+      </h5>
+      <ul className="space-y-1.5">
+        {gates.map((gate) => (
+          <li
+            key={gate.name}
+            className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/10 px-2.5 py-2 text-xs text-foreground"
           >
-            {objectiveGateResultLabel(gate.lastResult)}
-          </Badge>
-        </li>
-      ))}
-    </ul>
+            <span className="font-mono">{gate.name}</span>
+            <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+              {gate.command}
+            </span>
+            <Badge
+              variant={
+                gate.lastResult ? (gate.lastResult.pass ? 'secondary' : 'destructive') : 'outline'
+              }
+            >
+              {objectiveGateResultLabel(gate.lastResult)}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

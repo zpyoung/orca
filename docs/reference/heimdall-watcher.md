@@ -2,8 +2,9 @@
 
 Heimdall is a deterministic reconciler kernel that supervises long-running **watchers**: durable
 enrollments that wake on their own pulse, read the world, decide what to do, and act under gates and
-budgets. Two kinds ship — `hosted-review` (a PR/MR sitter) and `objective` (drives a goal to a stated
-landing bar across many tasks) — plus a fleet dashboard over both.
+budgets. The two built-in kinds are `hosted-review` (a PR/MR sitter) and `objective` (drives a goal
+to a stated landing bar across many tasks); custom graph runs use kind `pipeline`. The fleet
+dashboard surfaces all three.
 
 The kernel is deterministic: it owns pulse scheduling, gating, leases, budgets, the ledger, and stop
 policy. LLM agents are dispatched only for judgment the kernel cannot make itself, and every action
@@ -355,21 +356,21 @@ reads the answer. It runs only on the desktop for a local workspace, and records
 Escalations are ledger entries with an open/acknowledged/resolved status. Some need you; some are a
 record of something that happened.
 
-| Kind                         | Needs you? | What it means                                                     |
-| ---------------------------- | ---------- | ----------------------------------------------------------------- |
-| `awaiting-approval`          | **yes**    | a `gated` capability wants an action approved                     |
-| `worker-question`            | **yes**    | a worker is blocked on a question; answer it from the detail pane |
+| Kind                         | Needs you? | What it means                                                          |
+| ---------------------------- | ---------- | ---------------------------------------------------------------------- |
+| `awaiting-approval`          | **yes**    | a `gated` capability wants an action approved                          |
+| `worker-question`            | **yes**    | a worker is blocked on a question; answer it from the detail pane      |
 | `worker-escalation`          | **yes**    | a worker requested intervention, or asked in prose (`prose-question:`) |
-| `park-budget`                | **yes**    | budget spent; raise it, then resume                               |
-| `park-worker-question`       | **yes**    | parked because of the above question                              |
-| `park-worker-escalation`     | **yes**    | parked because of the above escalation                            |
-| `park-configuration-error`   | **yes**    | durable workspace or authority configuration no longer matches    |
-| `park-coordinator-seat-lost` | **yes**    | orchestration ownership lost                                      |
-| `park-stop-predicate`        | sometimes  | resume if you disagree with the stop condition                    |
-| `invalid-kind-payload`       | **yes**    | the enrollment is malformed; commands are refused on it           |
-| `control-disarm`             | no         | records an explicit disarm                                        |
-| `malformed-ledger-entry`     | no         | diagnostic: a ledger append failed validation                     |
-| `handoff-refused`            | no         | records a refused objective → sitter handoff                      |
+| `park-budget`                | **yes**    | budget spent; raise it, then resume                                    |
+| `park-worker-question`       | **yes**    | parked because of the above question                                   |
+| `park-worker-escalation`     | **yes**    | parked because of the above escalation                                 |
+| `park-configuration-error`   | **yes**    | durable workspace or authority configuration no longer matches         |
+| `park-coordinator-seat-lost` | **yes**    | orchestration ownership lost                                           |
+| `park-stop-predicate`        | sometimes  | resume if you disagree with the stop condition                         |
+| `invalid-kind-payload`       | **yes**    | the enrollment is malformed; commands are refused on it                |
+| `control-disarm`             | no         | records an explicit disarm                                             |
+| `malformed-ledger-entry`     | no         | diagnostic: a ledger append failed validation                          |
+| `handoff-refused`            | no         | records a refused objective → sitter handoff                           |
 
 The detail pane lists only `open` and `escalated` ones (`HeimdallDetailPane.tsx:162-170`).
 
@@ -472,7 +473,7 @@ checks, and merges — each a separately gated capability.
 | `merge`            | off / gated / on                                    | **off**            | authorizes the merge API call                                  |
 | Branch update mode | merge base into branch / rebase onto base           | merge-base-update  |                                                                |
 | Merge method       | repository default / merge commit / squash / rebase | repository default |                                                                |
-| Merge check scope  | all checks / required checks only                  | all checks         | checks on the current review head must pass before merge       |
+| Merge check scope  | all checks / required checks only                   | all checks         | checks on the current review head must pass before merge       |
 | Active budget      | hours > 0, step 0.25                                | 4                  | no upper bound; counts only while a worker or action is active |
 
 All four capabilities default to `off` (`HostedReviewSitterPanel.tsx:43-48`), so a freshly armed
@@ -838,9 +839,9 @@ Every tick the objective decides at most one action (`objective-actions.ts`):
 Some ticks deliberately take no action even though checks or gates are due. These surface in the
 decision trace as a named no-action reason, not an error:
 
-| Reason                      | Meaning                                                                                     |
-| ---------------------------- | --------------------------------------------------------------------------------------------- |
-| `read-only-worker-in-flight` | a plan-review, reviewer, or integrator dispatch is running or its outcome is still unknown; new checks and gates wait for it to land |
+| Reason                       | Meaning                                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `read-only-worker-in-flight` | a plan-review, reviewer, or integrator dispatch is running or its outcome is still unknown; new checks and gates wait for it to land  |
 | `check-evidence-stale`       | a check or gate's evidence no longer matches the workspace content it ran against; it is re-issued at the current content, not failed |
 
 `check-evidence-stale` retries are capped: a criterion that keeps drifting out from under its own
@@ -1029,6 +1030,188 @@ rather than a fresh one (`remainingBudget`, `:63-70`), `branchUpdateMode` is har
 (every current-head check). Overrides touch capabilities only. The review body is the objective
 text followed by every plan criterion as an acceptance checklist (`renderReviewBody`, `:92-101`).
 
+## Pipeline files and graph runs
+
+A pipeline is a version-1 YAML graph run by the Heimdall pipeline interpreter. The built-in
+`builtin:objective` and `builtin:pr-sitter` pipelines are read-only composites; duplicate one to
+customize it.
+
+| Scope      | Reference                                | Files                                                                       |
+| ---------- | ---------------------------------------- | --------------------------------------------------------------------------- |
+| Built-in   | `builtin:objective`, `builtin:pr-sitter` | Shipped with Orca; no workspace file.                                       |
+| Repository | Bare id such as `bugfix`                 | `.orca/pipelines/<id>.yaml` and `.orca/pipelines/<id>.layout.json`.         |
+| Personal   | `user:<id>`                              | `<profile>/pipelines/<id>.yaml` and `<profile>/pipelines/<id>.layout.json`. |
+
+Personal pipelines are client-local and are not account-synced. Repo and personal ids do not shadow
+one another. The id must match the lowercase YAML basename (`[a-z][a-z0-9-]{0,62}`). The layout
+sidecar stores canvas positions only. The CLI accepts a bare repo id, `user:<id>`, `builtin:<id>`,
+or a repo path: `.orca/pipelines/<id>.yaml` and `pipelines/<id>.yaml` are accepted path spellings
+for the same repo pipeline. Absolute paths must remain inside the selected worktree.
+
+The root document uses `version: 1`, `id`, `name`, optional typed `inputs`, and 1–64 `nodes`.
+Inputs are `text`, `number` or `boolean`; `task` is an implicit required text input unless declared.
+Each dependency is written on its target node as `after:`; there is no top-level `edges` list.
+Known node types are Agent, Check, Script, Decision, Loop, Swarm, Merge, Human gate, Land,
+Objective and PR sitter. An Objective node must be the only node. A PR sitter needs a Land
+predecessor. Validation is shared by the canvas, run form, CLI and host, so malformed structure,
+missing fields and workspace/host-unsupported nodes are caught before enrollment or execution.
+
+`Check` is a shell pass/fail step, not a human approval. `gate` names only the Human gate node;
+Objective `checks:` are shell checks. Passing a Human gate never grants a capability. A folder
+workspace can author and run folder-compatible nodes, but Validate rejects Land, Merge and PR
+sitter there; Swarm with `worktree: own` is also unsupported because folder children share the
+folder.
+
+### Merge conflict recovery
+
+`Merge` applies completed Swarm children in dependency order under the `integrate` capability. If
+an owned child worktree still conflicts, Orca dispatches one private per-child
+`pipeline-resolve-merge-conflict` action using the `agent` capability. The strict resolver report
+must contain `resolved: true`; that claim alone is insufficient. Orca also verifies the Git index
+has no unmerged paths, conflict markers are gone, and protected pipeline files are unchanged.
+Shared or folder children have no private worktree, so their conflicts go directly to escalation.
+Already-applied children stay applied.
+
+Resolution never applies the child itself. After clean preparation or verified resolution, Merge
+proposes a fresh `integrate` action under the normal capability gate. `integrate` defaults to gated
+when not otherwise requested, and the run starter may explicitly choose another grant; a previous
+conflict approval does not approve this new integration.
+
+Minimal `bugfix.yaml`:
+
+```yaml
+version: 1
+id: bugfix
+name: Bugfix
+inputs:
+  priority:
+    type: number
+    default: 2
+nodes:
+  - id: fix
+    type: agent
+    harness: codex
+    prompt: Fix $run.inputs.task
+  - id: check
+    type: check
+    command: git diff --check
+    after:
+      - fix
+```
+
+### Canvas editing and repository tracking
+
+The canvas Graph view is the authoring surface. YAML view is a read-only preview and reflects
+current graph edits; use an external editor to edit YAML. Save writes both YAML and layout even for
+an empty or invalid graph. Run remains disabled until the shared validator reports no errors. If
+the graph has unsaved changes, choose Save and run or Cancel; the run resolves the saved source,
+never the unsaved draft. Replacing a syntactically broken source from the canvas requires explicit
+confirmation when rendering would replace the original file. A missing or stale layout is
+auto-laid out and rewritten on save.
+
+The first save of a new draft uses its authored id as the filename and retargets the open tab.
+An occupied destination is refused rather than overwritten. Editing the id of an existing saved
+pipeline does not rename its file; restore the matching id or create a separate pipeline.
+
+On a new repo pipeline save, Orca checks whether Git ignores its YAML. If a root `.gitignore`
+contains the exact bare `.orca` entry (the Orca issue-command rule), auto-tracking rewrites that
+entry as `.orca/*` and adds `!.orca/pipelines/`; other entries are not auto-edited. If Git still
+ignores the file, the canvas offers an explicit **Re-include pipelines** action. Only after that
+click can exact `.orca/` rules be changed to `.orca/*` and the exception added. Other patterns may
+still keep the file ignored; if so, save a personal copy instead. Folder workspaces, built-ins and
+personal files do not edit the repository `.gitignore`.
+
+During execution, `.orca/pipelines/**` is protected from Agent workers (including Swarm children)
+and PR-sitter workers. A detected change is rejected like an out-of-territory write rather than
+published.
+
+### Pinned runs and execution ownership
+
+Every pipeline run is pinned to the saved scope, id and document hash. Custom pipeline runs carry
+their source in the pipeline payload; repo/personal copies carry the original source text. For a
+copied Objective or PR-sitter pipeline, pin/source metadata travel beside the unchanged native
+watcher payload; the payload and native settings are not rewritten. Before enrollment or re-arm,
+the host validates source, hash, id, route and settings, stores the original source, and uses it for
+run identity and later reads—not just display. It never substitutes the current file or a built-in.
+Re-arming a custom `pipeline` watcher cannot change its pin identity, document/source or run inputs.
+A copied repo/personal Objective/PR-sitter watcher also cannot change its pin, source, native
+settings or run inputs; grant and budget changes remain allowed. After the prior watcher is
+terminal, start a new run for a different snapshot or inputs. An older host that cannot preserve
+required source-bearing pin data refuses instead of silently dropping it. Display-only built-in
+pins do not require copied source.
+
+Personal files stay on the client profile. Their source text travels with enrollment, so a paired
+runtime host does not read the client profile and owns the run independently of the UI connection.
+For a direct-SSH workspace, the engine runs in the desktop client: disconnecting pauses the run,
+running agents stay live, and reconnecting resumes it. The pipeline CLI create path accepts only
+a workspace local to the runtime it calls; it refuses SSH and other-runtime-owned workspaces
+without local fallback.
+
+Heimdall creates worker terminals in the background unless the caller explicitly requests
+presentation, focus or activation. This does not bypass agent readiness: first-run consent,
+sign-in and other blocking prompts must be resolved before the task is submitted. Inspect the
+terminal on its execution host; a readiness timeout alone does not identify the blocking prompt.
+
+The read-only Run graph shows node state, elapsed time, attempts or loop rounds, and turns.
+When present, a validated Agent report summary is separate nullable metadata, not a declared node
+output.
+
+### Headless create and pipeline choices
+
+```text
+orca heimdall create --pipeline <ref|path> --spec <task text> [--worktree <selector>] [--input name=value]... [--cap name=mode]... [--hours <n>] [--turns <n>] [--owner <agent>] [--owner-model <m>] [--owner-effort <e>] [--json]
+```
+
+`--worktree` defaults to `active`. Here `--spec` is plain text for required `task` (or the goal
+text for a sole Objective pipeline); it is not the JSON `--spec` accepted by the objective and
+hosted-review create leaves. Repeat `--input name=value` for other declared inputs; YAML defaults
+are applied and unknown names or missing required values refuse before enrollment. Text values
+remain strings, numbers must be finite and booleans exactly `true` or `false`; use `--spec` for
+`task`. Validation errors are listed individually with node id when available; invalid pipelines
+create no watcher.
+
+Repeat `--cap <key>=<off|gated|on>` to override a run grant. YAML `capabilities` are requests, not
+grants; the person starting the run chooses actual grants through the run form or `--cap`.
+Custom-graph keys are `agent`, `check`, `script`, `integrate`, `push`, `land`, `updateBranch`,
+`resolveConflicts`, `fixChecks` and `merge`. Objective-routed graphs accept `plan`, `implement`,
+`review`, `check` and `land`; they use Objective defaults (`plan: gated`, `implement/review/check: on`,
+and `land: on` for `files-on-disk`, otherwise `gated`). PR-sitter-routed graphs accept
+`updateBranch`, `resolveConflicts`, `fixChecks` and `merge`; absent requested modes for these four
+capabilities default to `gated` (the standalone hosted-review create leaf still defaults all four
+to `off`). A custom graph's required node capabilities default to gated when not requested. A
+`push: on` or `merge: on` request is clamped to gated unless the run starter explicitly raises it
+through the run form or `--cap`. Generic pipeline and Objective-routed creates default to four
+active hours and 40 turns; a PR-sitter-routed create defaults to four hours and unlimited turns.
+`--owner` supports `claude`; `--owner-model` and `--owner-effort` require it.
+
+```text
+orca heimdall create --pipeline .orca/pipelines/bugfix.yaml --worktree active --spec 'fix the flaky login test' --input priority=2 --cap agent=on --cap check=on --json
+```
+
+For a pipeline gate or node decision, the same `approve` command answers the open choice.
+`--choice` defaults to `approve`; the choices depend on the pending decision:
+
+| Pending decision                                                        | Choices                                                                           |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Human gate                                                              | `approve`, `abort`; add `send-back` when a target is configured.                  |
+| Retries exhausted                                                       | `retry`, `skip`, `abort`; add `send-back` when `onFail.sendBackTo` is configured. |
+| Node time limit                                                         | `extend`, `retry`, `skip`, `abort`.                                               |
+| Loop escalation or maximum rounds                                       | `accept`, `one-more-round`, `abort`.                                              |
+| Merge conflict                                                          | `retry`, `skip`, `abort`.                                                         |
+| Swarm lint, configuration, or repeated sitter failure after its own fix | `retry`, `abort`.                                                                 |
+
+`send-back` requires a non-empty `--comment` (up to 4,000 characters); `extend` requires
+`--extend-minutes` from 1 to 1440. Ordinary capability approvals remain approvals and do not accept
+non-`approve` choices. Take ids from `show`; the first answer wins.
+
+Desktop detail and canvas answers receive OS user, host, time, and surface attribution at their
+first local runtime hop. The CLI supplies its own attribution. Forwarded runtime answers preserve
+that original attribution instead of stamping the execution host as the person who answered.
+
+```text
+orca heimdall approve <watcherId> <escalationId> --choice send-back --comment 'split step 6'
+```
+
 ## Reading the fleet page
 
 The header shows `{active} active · {attention} need attention` plus **New objective** and a refresh
@@ -1053,8 +1236,9 @@ orca heimdall show <watcherId> [--json]
 orca heimdall objective <watcherId> [--json]
 orca heimdall create objective --objective <text> [--worktree <selector>] [--hours <n|none>] [--turns <n|none>] [--spec <json|@file>] [--json]
 orca heimdall create hosted-review [--worktree <selector>] [--hours <n|none>] [--turns <n|none>] [--spec <json|@file>] [--json]
+orca heimdall create --pipeline <ref|path> --spec <task text> [--worktree <selector>] [--input name=value]... [--cap name=mode]... [--hours <n>] [--turns <n>] [--owner <agent>] [--owner-model <m>] [--owner-effort <e>] [--json]
 orca heimdall pause|resume|disarm|rm <watcherId> [--json]
-orca heimdall approve <watcherId> <escalationId> [--json]
+orca heimdall approve <watcherId> <escalationId> [--choice <choice>] [--comment <text>] [--extend-minutes <n>] [--json]
 orca heimdall answer <watcherId> <messageId> --body <text> [--json]
 orca heimdall answer-escalation <watcherId> <escalationId> --body <text> [--json]
 orca heimdall budget <watcherId> [--hours <n|none>] [--turns <n|none>] [--json]
@@ -1064,7 +1248,8 @@ orca heimdall debug <watcherId> [--out <path>] [--json]
 ```
 
 Objective creation requires either `--objective <text>` or `--objective-file <path>`; the latter
-reads UTF-8 text from the file.
+reads UTF-8 text from the file. On the pipeline create leaf, `--spec` is plain task text rather
+than JSON.
 
 `create` defaults `--worktree` to `active`, resolved from the CLI's local working directory. On
 a paired runtime, supply an explicit selector for a workspace local to that runtime; the client
@@ -1074,10 +1259,11 @@ without local fallback. Objective defaults match the enrollment form: standard t
 landing bar, concurrency 3, whole-workspace territory (`**`), 4 active hours, and 40 turns. Its
 default capabilities are `plan: gated`, `implement/review/check/land: on`; `land` is `gated` for any
 other landing bar. Hosted-review defaults all four capabilities off, 4 active hours, and unlimited
-turns. Use repeatable `--cap <key>=<off|gated|on>` for per-kind capabilities. Both kinds accept
-`--hours` and `--turns`; hosted-review also accepts `--branch-update` and `--merge-method`. Pass a
-partial `EnrollInput` through `--spec <json|@file>`; explicit flags win. `--owner claude` (with
-optional `--owner-model` and `--owner-effort`) sets owner interventions to `gated`.
+turns. Use repeatable `--cap <key>=<off|gated|on>` for the Objective and hosted-review create
+leaves. Both accept `--hours` and `--turns`; hosted-review also accepts `--branch-update` and
+`--merge-method`. The Objective and hosted-review leaves accept a partial `EnrollInput` through
+JSON `--spec <json|@file>`; explicit flags win. `--owner claude` (with optional `--owner-model` and
+`--owner-effort`) sets owner interventions to `gated`.
 
 In hosted-review `--spec`, set `kindPayload.mergeCheckScope` to `"all"` (the default) or
 `"required"`. The runtime must advertise `heimdall.hosted-review-check-scope.v1` for `"all"`; if it
@@ -1105,17 +1291,17 @@ See the bundled `orca-heimdall` skill guide for complete create flags/specs and 
 Nine commands, all routed through `heimdall:command` and fenced by owner identity and a command
 revision, so a stale or wrong-owner request is refused (`control-plane.ts:107-131,400-431`).
 
-| Command             | Precondition                          | Effect                                                                                  |
-| ------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pause`             | active                                 | waits for the in-flight tick, commits `paused`, releases the lease                       |
-| `resume`            | paused or auto-parked                  | re-enables; **refuses** if budget is still exhausted or a worker question is open        |
-| `disarm`            | not already disarmed                   | stops the current enrollment generation, resolves open escalations, releases the lease   |
-| `approve`           | not disabled or paused                 | approves one action scope and reschedules immediately                                    |
-| `adjust-budget`     | none                                    | commits a new budget and updates the live status                                         |
-| `answer-question`   | question still open                    | answers the worker and un-parks the watcher                                              |
-| `answer-escalation` | parked on that exact owner escalation  | reopens the deviation with a fresh retry-once budget, records your reply, and un-parks    |
-| `set-concurrency`   | objective watcher                      | commits a new cap; lowering drains, raising applies next tick; folders stay at 1         |
-| `stop-worker`       | exact process identity matches         | stops one worker                                                                          |
+| Command             | Precondition                          | Effect                                                                                 |
+| ------------------- | ------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pause`             | active                                | waits for the in-flight tick, commits `paused`, releases the lease                     |
+| `resume`            | paused or auto-parked                 | re-enables; **refuses** if budget is still exhausted or a worker question is open      |
+| `disarm`            | not already disarmed                  | stops the current enrollment generation, resolves open escalations, releases the lease |
+| `approve`           | not disabled or paused                | approves one action scope and reschedules immediately                                  |
+| `adjust-budget`     | none                                  | commits a new budget and updates the live status                                       |
+| `answer-question`   | question still open                   | answers the worker and un-parks the watcher                                            |
+| `answer-escalation` | parked on that exact owner escalation | reopens the deviation with a fresh retry-once budget, records your reply, and un-parks |
+| `set-concurrency`   | objective watcher                     | commits a new cap; lowering drains, raising applies next tick; folders stay at 1       |
+| `stop-worker`       | exact process identity matches        | stops one worker                                                                       |
 
 **Disarm cannot be undone with Resume.** `resume` requires `paused` or an automatic park. A later
 `enroll` for the same workspace re-arms the stable watcher record as a new budget generation while
@@ -1182,11 +1368,16 @@ Caveats worth knowing before you rely on paired reads:
 
 ## State on disk, and resetting
 
-| What                                                                          | Where                                                                                                                                                        |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Kernel DB (enrollments, ledger, tick traces, terminal summaries — both kinds) | `<profile>/fork-heimdall/heimdall.db` (`database.ts:187`)                                                                                                    |
-| Objective plans and reports                                                   | `<profile>/fork-heimdall-objective/objective.db`                                                                                                             |
-| Workspace lease holder                                                        | Git: `<absolute-git-dir>/orca-heimdall/lease/epoch-<n>/holder.json`; folder: `<workspace>/.orca/heimdall/lease/epoch-<n>/holder.json`, on the execution host |
+| What                                                                     | Where                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Kernel DB (enrollments, ledger, tick traces and terminal summaries)      | `<profile>/fork-heimdall/heimdall.db` (`database.ts:187`)                                                                                                    |
+| Pipeline pins, copied source, node outputs and nullable report summaries | `<profile>/fork-heimdall-pipeline/pipeline.db`                                                                                                               |
+| Objective plans and reports                                              | `<profile>/fork-heimdall-objective/objective.db`                                                                                                             |
+| Workspace lease holder                                                   | Git: `<absolute-git-dir>/orca-heimdall/lease/epoch-<n>/holder.json`; folder: `<workspace>/.orca/heimdall/lease/epoch-<n>/holder.json`, on the execution host |
+
+`pipeline.db` schema v3 keeps copied `source_text` and `report_summary` in separate nullable fields.
+`report_summary` is independent of `outputs_json` and is never injected into declared outputs;
+existing rows without either nullable value remain readable.
 
 The objective database is schema v5: `plan_patch` (repair patches), `plan_review` (plan-review
 verdicts), and `gate_attempt` (objective gate results) are additive over v4, so an older build still
@@ -1201,7 +1392,8 @@ an interrupted lease still self-heals after its TTL.
 
 ```sh
 rm -rf ~/Library/Application\ Support/orca-dev/fork-heimdall \
-       ~/Library/Application\ Support/orca-dev/fork-heimdall-objective
+       ~/Library/Application\ Support/orca-dev/fork-heimdall-objective \
+       ~/Library/Application\ Support/orca-dev/fork-heimdall-pipeline
 ```
 
 Leave `orchestration.db` alone — orphaned run rows are inert and it holds unrelated state.

@@ -1,6 +1,6 @@
 import type React from 'react'
 
-export type HeimdallPillTone = 'warning' | 'success' | 'neutral'
+export type HeimdallPillTone = 'warning' | 'success' | 'neutral' | 'destructive'
 
 type HeimdallTonePillProps = Omit<React.ComponentProps<'span'>, 'className'> & {
   tone: HeimdallPillTone
@@ -13,7 +13,8 @@ const PILL_TONE: Record<HeimdallPillTone, string> = {
   warning:
     'border-status-warning-border bg-status-warning-background text-status-warning-foreground',
   success: 'border-status-success-border bg-status-success-background text-status-success',
-  neutral: 'border-border bg-muted text-muted-foreground'
+  neutral: 'border-border bg-muted text-muted-foreground',
+  destructive: 'border-destructive/30 bg-destructive/10 text-destructive'
 }
 
 /**

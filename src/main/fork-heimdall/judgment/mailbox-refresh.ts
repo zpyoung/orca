@@ -22,6 +22,10 @@ export function captureJudgmentMailboxBaseline(
     return null
   }
   const judgment = snapshot.world.judgment
+  if (judgment === undefined) {
+    // kinds without judgment still decide from facts their worker settlement just persisted
+    return new Set(ledger.entries.map((entry) => entry.eventId))
+  }
   if (!isRecord(judgment)) {
     return null
   }

@@ -1,14 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, ChevronRight, Loader2 } from 'lucide-react'
-import { HeimdallTonePill } from '@/fork-heimdall/heimdall-tone-pill'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
@@ -19,6 +9,10 @@ import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherCommandResult } from '../../../shared/fork-heimdall/fleet-types'
 import type { EnrollInput } from '../../../shared/fork-heimdall/watcher-types'
 import type {
+  WatcherFleetEntryReader,
+  WatcherListEntryReader
+} from '../../../shared/fork-heimdall/remote-reader-schemas'
+import type {
   HostedReviewBranchUpdateMode,
   HostedReviewEnrollmentPayload,
   HostedReviewMergeCheckScope,
@@ -26,12 +20,8 @@ import type {
   HostedReviewSitterCapabilities
 } from '../../../shared/fork-hosted-review-sitter/types'
 import { isActiveHostedReviewSitter } from './active-sitter-registry'
-import { HostedReviewSitterEnrollmentForm } from './HostedReviewSitterEnrollmentForm'
+import { HostedReviewSitterPanelDialog } from './HostedReviewSitterPanelDialog'
 import { assertClipboardTextWriteWithinLimit } from '../../../shared/clipboard-text'
-import { HostedReviewSitterStatusContent } from './HostedReviewSitterStatusContent'
-import { hostedReviewSitterStatusLabel } from './hosted-review-sitter-format'
-import { formatHeimdallAge } from '@/fork-heimdall/fleet-format'
-import { isHeimdallAttentionRow } from '@/fork-heimdall/fleet-selectors'
 import {
   awaitingApprovalScope,
   describeError,
@@ -91,8 +81,11 @@ function HostedReviewSitterPanelContent({
         null)
       : null
   )
-  const entries = useMemo(() => fleet?.entries.map((row) => row.entry) ?? null, [fleet])
-  const currentFleetRow = useMemo(() => {
+  const entries: WatcherListEntryReader[] | null = useMemo(
+    () => fleet?.entries.map((row) => row.entry) ?? null,
+    [fleet]
+  )
+  const currentFleetRow: WatcherFleetEntryReader | null = useMemo(() => {
     if (runtimeEnvironmentId && !runtimeEnvironment) {
       return null
     }
@@ -122,7 +115,7 @@ function HostedReviewSitterPanelContent({
     runtimeEnvironmentId,
     worktreeId
   ])
-  const currentEntry = currentFleetRow?.entry ?? null
+  const currentEntry: WatcherListEntryReader | null = currentFleetRow?.entry ?? null
   const currentPayload = currentEntry ? hostedReviewPayload(currentEntry) : null
   const ownerCapabilities: HostedReviewSitterCapabilities = {
     updateBranch:
@@ -147,7 +140,10 @@ function HostedReviewSitterPanelContent({
   const lostContact =
     currentFleetRow?.contact === 'unverifiable' || currentEntry?.status.state === 'unreachable'
   const commandReadOnlyReason = currentFleetRow?.readOnlyReason ?? null
-  const controlsReadOnly = lostContact || commandReadOnlyReason !== null
+  const controlsReadOnly =
+    lostContact ||
+    commandReadOnlyReason !== null ||
+    (currentEntry !== null && currentPayload === null)
   const [ledger, setLedger] = useState<WatcherLedger | null>(null)
   const [serviceError, setServiceError] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -216,7 +212,8 @@ function HostedReviewSitterPanelContent({
     void refresh()
   }, [refresh])
 
-  const currentEntryIsActive = currentEntry !== null && isActiveHostedReviewSitter(currentEntry)
+  const currentEntryIsActive =
+    currentEntry !== null && currentPayload !== null && isActiveHostedReviewSitter(currentEntry)
   const approvalScope = useMemo(() => awaitingApprovalScope(ledger), [ledger])
 
   useEffect(() => {
@@ -354,7 +351,7 @@ function HostedReviewSitterPanelContent({
   }
 
   const approveCurrentAction = (): void => {
-    if (!api || !currentFleetRow || !approvalScope || controlsReadOnly) {
+    if (!api || !currentFleetRow || !currentPayload || !approvalScope || controlsReadOnly) {
       return
     }
     void runMutation('approve', () =>
@@ -391,159 +388,56 @@ function HostedReviewSitterPanelContent({
               'The worktree path is unavailable.'
             )
           : null
-  const statusNeedsAttention = currentFleetRow ? isHeimdallAttentionRow(currentFleetRow) : false
 
   return (
-    <section
-      className="border-b border-border bg-muted/10 px-3 py-2"
-      aria-label={translate('fork.hostedReviewSitter.title', 'PR Sitter')}
-    >
-      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
-        <DialogTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <Bot className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-            <span className="text-xs font-medium text-foreground">
-              {translate('fork.hostedReviewSitter.title', 'PR Sitter')}
-            </span>
-            {currentEntry ? (
-              <HeimdallTonePill tone={statusNeedsAttention || lostContact ? 'warning' : 'neutral'}>
-                <span className="text-[10px]">
-                  {hostedReviewSitterStatusLabel(
-                    lostContact ? 'unreachable' : currentEntry.status.state
-                  )}
-                </span>
-              </HeimdallTonePill>
-            ) : null}
-            {entries === null && !unavailableReason ? (
-              <Loader2 className="size-3 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-            ) : null}
-            <ChevronRight className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{translate('fork.hostedReviewSitter.title', 'PR Sitter')}</DialogTitle>
-            <DialogDescription>
-              {reviewProvider === 'gitlab'
-                ? translate(
-                    'fork.hostedReviewSitter.enrollment.descriptionGitLab',
-                    'Watch this merge request and choose which actions Orca may take.'
-                  )
-                : translate(
-                    'fork.hostedReviewSitter.enrollment.descriptionGitHub',
-                    'Watch this pull request and choose which actions Orca may take.'
-                  )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="scrollbar-sleek max-h-[60vh] overflow-y-auto">
-            {unavailableReason ? (
-              <div
-                className="mt-2 rounded-md border border-border bg-background/60 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground"
-                role="status"
-              >
-                <span className="font-medium text-foreground">
-                  {translate('fork.hostedReviewSitter.unavailable.title', 'Unavailable.')}
-                </span>{' '}
-                {unavailableReason}
-              </div>
-            ) : entries === null ? (
-              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" aria-hidden />
-                {translate('fork.hostedReviewSitter.loading', 'Loading sitter status…')}
-              </div>
-            ) : (
-              <>
-                {lostContact && currentFleetRow ? (
-                  <p
-                    className="mb-2 rounded-md border border-status-warning-border bg-status-warning-background px-3 py-2 text-xs text-status-warning-foreground"
-                    role="status"
-                  >
-                    {translate(
-                      'fork.heimdall.detail.lostContact',
-                      'Last confirmed {{age}}; the owner cannot currently be reached. The watcher may still be running.',
-                      { age: formatHeimdallAge(currentFleetRow.observedAtMs) }
-                    )}
-                  </p>
-                ) : null}
-                {currentEntry ? (
-                  <HostedReviewSitterStatusContent
-                    entry={currentEntry}
-                    ledger={ledger}
-                    approvalScope={approvalScope}
-                    ledgerOpen={ledgerOpen}
-                    readOnly={controlsReadOnly}
-                    readOnlyReason={commandReadOnlyReason}
-                    busy={busyAction !== null}
-                    stopping={busyAction === 'disarm'}
-                    approving={busyAction === 'approve'}
-                    active={currentEntryIsActive}
-                    copyingDebugReport={busyAction === 'debugReport'}
-                    debugReportCopied={debugReportCopied}
-                    onLedgerOpenChange={setLedgerOpen}
-                    onStop={disarmCurrent}
-                    onApprove={approveCurrentAction}
-                    onCopyDebugReport={copyDebugReport}
-                  />
-                ) : null}
-                {!currentEntryIsActive ? (
-                  <HostedReviewSitterEnrollmentForm
-                    capabilities={capabilities}
-                    branchUpdateMode={branchUpdateMode}
-                    mergeMethod={mergeMethod}
-                    mergeCheckScope={mergeCheckScope}
-                    activeBudgetHours={activeBudgetHours}
-                    activeElsewhereCount={activeEntries.length}
-                    blockedReason={enrollBlockedReason}
-                    busy={busyAction !== null}
-                    arming={busyAction === 'enroll'}
-                    rearming={currentEntry !== null}
-                    onCapabilitiesChange={(nextCapabilities) => {
-                      const changedCapability = HOSTED_REVIEW_CAPABILITIES.find(
-                        (capability) => nextCapabilities[capability] !== capabilities[capability]
-                      )
-                      if (changedCapability) {
-                        setCapabilityOverrides((current) => ({
-                          ...current,
-                          [changedCapability]: nextCapabilities[changedCapability]
-                        }))
-                      }
-                    }}
-                    onBranchUpdateModeChange={setBranchUpdateModeOverride}
-                    onMergeMethodChange={setMergeMethodOverride}
-                    onMergeCheckScopeChange={setMergeCheckScopeOverride}
-                    onActiveBudgetHoursChange={setActiveBudgetHoursOverride}
-                    onArm={enroll}
-                  />
-                ) : null}
-              </>
-            )}
-
-            {mutationError ? (
-              <div
-                className={
-                  mutationTone === 'refused'
-                    ? 'mt-2 rounded-md border border-status-warning-border bg-status-warning-background px-2.5 py-2 text-[10px] leading-relaxed text-status-warning-foreground'
-                    : mutationTone === 'indeterminate'
-                      ? 'mt-2 rounded-md border border-border bg-muted px-2.5 py-2 text-[10px] leading-relaxed text-foreground'
-                      : 'mt-2 text-[10px] leading-relaxed text-destructive'
-                }
-                role={mutationTone === 'error' ? 'alert' : 'status'}
-              >
-                {mutationError}
-              </div>
-            ) : null}
-            {serviceError && entries !== null ? (
-              <div className="mt-2 text-[10px] leading-relaxed text-destructive" role="alert">
-                {serviceError}
-              </div>
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </section>
+    <HostedReviewSitterPanelDialog
+      open={configOpen}
+      onOpenChange={setConfigOpen}
+      reviewProvider={reviewProvider}
+      unavailableReason={unavailableReason}
+      entries={entries}
+      lostContact={lostContact}
+      currentFleetRow={currentFleetRow}
+      currentEntry={currentEntry}
+      ledger={ledger}
+      approvalScope={approvalScope}
+      ledgerOpen={ledgerOpen}
+      onLedgerOpenChange={setLedgerOpen}
+      controlsReadOnly={controlsReadOnly}
+      commandReadOnlyReason={commandReadOnlyReason}
+      busyAction={busyAction}
+      debugReportCopied={debugReportCopied}
+      currentEntryIsActive={currentEntryIsActive}
+      onDisarm={disarmCurrent}
+      onApprove={approveCurrentAction}
+      onCopyDebugReport={copyDebugReport}
+      capabilities={capabilities}
+      branchUpdateMode={branchUpdateMode}
+      mergeMethod={mergeMethod}
+      mergeCheckScope={mergeCheckScope}
+      activeBudgetHours={activeBudgetHours}
+      activeElsewhereCount={activeEntries.length}
+      enrollBlockedReason={enrollBlockedReason}
+      onCapabilitiesChange={(nextCapabilities) => {
+        const changedCapability = HOSTED_REVIEW_CAPABILITIES.find(
+          (capability) => nextCapabilities[capability] !== capabilities[capability]
+        )
+        if (changedCapability) {
+          setCapabilityOverrides((current) => ({
+            ...current,
+            [changedCapability]: nextCapabilities[changedCapability]
+          }))
+        }
+      }}
+      onBranchUpdateModeChange={setBranchUpdateModeOverride}
+      onMergeMethodChange={setMergeMethodOverride}
+      onMergeCheckScopeChange={setMergeCheckScopeOverride}
+      onActiveBudgetHoursChange={setActiveBudgetHoursOverride}
+      onArm={enroll}
+      mutationError={mutationError}
+      mutationTone={mutationTone}
+      serviceError={serviceError}
+    />
   )
 }
 

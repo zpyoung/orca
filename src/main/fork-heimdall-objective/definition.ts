@@ -24,9 +24,9 @@ import type { Store } from '../persistence'
 import { getAutomationSchedulerOwnerForExecutionHost } from '../persistence/scheduling-automations/automation-context-migration'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {
-  createObjectiveEnrollmentWorktree,
-  objectiveEnrollmentWorktreeRollback
-} from './enrollment-worktree'
+  createEnrollmentWorktree,
+  enrollmentWorktreeRollback
+} from '../fork-heimdall/enrollment-worktree'
 import {
   defaultObjectiveForgeAccess,
   objectiveForgeContext,
@@ -260,12 +260,16 @@ export async function authorizeObjectiveEnrollment(
       }
       let worktreeId = input.worktreeId
       if (newWorktree) {
-        const created = await createObjectiveEnrollmentWorktree(runtime, repo, newWorktree)
+        const created = await createEnrollmentWorktree(runtime, repo, newWorktree, {
+          label: 'Objective',
+          diagnosticPrefix: 'Objective'
+        })
         worktreeId = created.worktree.id
-        rollbackCreatedWorktree = objectiveEnrollmentWorktreeRollback(
+        rollbackCreatedWorktree = enrollmentWorktreeRollback(
           runtime,
           worktreeId,
-          getRepoExecutionHostId(repo)
+          getRepoExecutionHostId(repo),
+          'Objective'
         )
         scope?.onAbandoned(rollbackCreatedWorktree)
       }

@@ -5,6 +5,7 @@ import type { ActionOutcome, EffectCertaintyResolution } from './effect-certaint
 import type { GateVerdict } from './gate'
 import type {
   AttemptEntry,
+  EvidenceEntry,
   KernelAction as LedgerKernelAction,
   WatcherLedger
 } from './ledger-types'
@@ -76,6 +77,7 @@ export type ExecuteContext<TWorld> = {
   lease: LeaseGuard
   ledger: WatcherLedger
   dispatchWorker(request: DispatchWorkerRequest): Promise<DispatchResult>
+  appendEvidence?(evidenceKind: string, payload: Readonly<Record<string, unknown>>): Promise<void>
 }
 
 export type PreflightContext = {
@@ -90,6 +92,16 @@ export type WorkerReportSubmission = Readonly<{
 export type SubmissionPreflightResult =
   | { status: 'accepted' }
   | { status: 'rejected'; code: string; reason: string }
+
+/** Completion context for a successful worker_done already accepted by the orchestration owner. */
+export type AcceptedWorkerCompletionContext = Readonly<{
+  attempt: AttemptEntry
+  dispatchId: string
+  evidence: EvidenceEntry
+  ledger: WatcherLedger
+  lease: LeaseGuard
+  result: unknown
+}>
 
 export type SubmissionAdapter<TWorld> = {
   preflightWorkerReport(
@@ -249,9 +261,9 @@ export type OwnerStateBriefContext = {
   deviation: Deviation
 }
 
-/** Why gate 1 (write territory), 2 (landing bar) or 4 (`sitterOverrides`) rejected an intervention. */
+/** Why a kind-specific or pipeline-choice gate rejected an owner intervention. */
 export type OwnerInterventionRejection = {
-  gate: 'write-territory' | 'landing-bar' | 'sitter-overrides'
+  gate: 'write-territory' | 'landing-bar' | 'sitter-overrides' | 'pipeline-choice'
   reason: string
 }
 
@@ -271,6 +283,8 @@ export type OwnerAdapter<TWorld, TAction extends KernelAction> = {
     maxBytes: number,
     context?: OwnerStateBriefContext
   ): OwnerStateBrief
+  /** Defaults to `park`; `kind-handles` lets the kind's decision loop handle escalated choices. */
+  humanEscalation?: 'park' | 'kind-handles'
   /** The kind-specific intervention vocabulary, appended to the five kind-agnostic moves. */
   describeInterventions(): string
   /**
@@ -308,12 +322,27 @@ export type WatcherKind<
   Decision<TWorld, TAction> &
   ActionExecutor<TWorld, TAction> & {
     concurrency?: KindConcurrencyPolicy<TWorld, TAction>
+    /**
+     * Resolves kind-owned completion facts before a successful worker_done settles as landed.
+     * Only a landed result permits generic settlement; other results remain indeterminate for the
+     * standard outcome recovery path. Return null when this kind does not own the action.
+     */
+    resolveAcceptedWorkerCompletion?(
+      completion: AcceptedWorkerCompletionContext
+    ): Promise<EffectCertaintyResolution | null>
+    /**
+     * Persists kind-owned projection facts at the terminal boundary, after a terminal predicate
+     * has fired and before the kernel compacts its ledger. This is not called during stop checks.
+     */
+    persistTerminalProjection?(snapshot: Snapshot<TWorld>, ledger: WatcherLedger): void
     stopPredicates?: readonly StopPredicate<TWorld>[]
     pacing?: PacingPolicy<TWorld>
     planner?: PlannerAdapter<TWorld>
     handoff?: HandoffAdapter<TWorld>
     debug?: KindDebugAdapter
     owner?: OwnerAdapter<TWorld, TAction>
+    /** Adds at most 4,096 characters of kind-specific context to a pending approval's reason. */
+    describeApproval?(snapshot: Snapshot<TWorld>, action: TAction): string | null
     submission?: SubmissionAdapter<TWorld>
   }
 

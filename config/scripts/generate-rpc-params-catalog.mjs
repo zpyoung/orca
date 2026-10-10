@@ -37,36 +37,69 @@ function scratchDir(prefix) {
 const posix = (value) => value.split(path.sep).join('/')
 const repoPath = (absolute) => posix(path.relative(REPO_ROOT, absolute))
 
-// Every module the catalog may import from: the extracted params modules plus the
-// pre-existing src/shared schemas the RPC methods already bind directly.
+// Every module the catalog may import: extracted params, pre-existing shared schemas
+// used by registered RPC methods, and shared schemas imported by an off-dir method
+// collection. Never follow arbitrary main-process helpers; that graph reaches far beyond
+// the registry and is not needed to identify params schema exports.
+function isWithin(directory, file) {
+  return file.startsWith(`${directory}${path.sep}`)
+}
+
+function resolveLocalModule(importer, specifier) {
+  const absolute = path.resolve(path.dirname(importer), specifier)
+  const candidates = path.extname(absolute)
+    ? [absolute]
+    : [`${absolute}.ts`, path.join(absolute, 'index.ts')]
+  return candidates.find((candidate) => existsSync(candidate) && candidate.endsWith('.ts'))
+}
+
+function localImports(source) {
+  const imports = []
+  for (const [, , bindings, , specifier] of source.matchAll(
+    /^\s*(import|export)\s+(?!['"])(?:type\s+)?([\s\S]*?)\s+from\s+(['"])(\.[^'"]+)\3/gm
+  )) {
+    imports.push({ bindings, specifier })
+  }
+  for (const [, , specifier] of source.matchAll(/^\s*import\s+(['"])(\.[^'"]+)\1/gm)) {
+    imports.push({ bindings: '', specifier })
+  }
+  return imports
+}
+
 function indexableModules() {
-  // Tests are excluded here for the same reason as the RPC_DIR walk below: bundling one pulls
-  // vitest into the CJS catalog build, which throws on require().
+  // Tests are excluded so an accidentally registered test import cannot pull vitest into
+  // the CJS catalog build, which throws on require().
   const modules = new Set(
     globSync('*.ts', { cwd: CONTRACT_DIR })
       .filter((name) => !name.endsWith('.test.ts'))
       .map((name) => path.join(CONTRACT_DIR, name))
   )
   modules.delete(OUTPUT_PATH)
-  for (const file of globSync('**/*.ts', { cwd: RPC_DIR })) {
-    if (file.endsWith('.test.ts')) {
-      continue
+
+  const visited = new Set()
+  function visit(file) {
+    if (visited.has(file) || file.endsWith('.test.ts')) {
+      return
     }
-    const source = readFileSync(path.join(RPC_DIR, file), 'utf8')
-    for (const [, specifier] of source.matchAll(/from\s+'(\.[^']+)'/g)) {
-      const resolved = `${path.resolve(path.dirname(path.join(RPC_DIR, file)), specifier)}.ts`
-      // Never re-add the generator's own output: a module under RPC_DIR may import the
-      // catalog for a type-only contract, and bundling a stale catalog makes regeneration
-      // crash in exactly the state that requires regenerating.
-      if (
-        resolved !== OUTPUT_PATH &&
-        resolved.startsWith(`${SHARED_DIR}${path.sep}`) &&
-        existsSync(resolved)
-      ) {
+    visited.add(file)
+    const source = readFileSync(file, 'utf8')
+    for (const { bindings, specifier } of localImports(source)) {
+      const resolved = resolveLocalModule(file, specifier)
+      if (!resolved || resolved === OUTPUT_PATH || resolved.endsWith('.test.ts')) {
+        continue
+      }
+      if (isWithin(SHARED_DIR, resolved)) {
         modules.add(resolved)
+      } else if (isWithin(RPC_DIR, resolved)) {
+        visit(resolved)
+      } else if (/\b[A-Za-z_$][\w$]*METHODS\b/.test(bindings)) {
+        // An explicit method collection is the bounded edge to an off-RPC registration
+        // module. Its shared imports are candidates; its main-process helpers are not.
+        visit(resolved)
       }
     }
   }
+  visit(REGISTRY_ENTRY)
   return [...modules].sort()
 }
 

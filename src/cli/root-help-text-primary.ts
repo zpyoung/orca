@@ -28,6 +28,7 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   '  heimdall show             Inspect a watcher and open escalations',
   '  heimdall objective        Inspect an objective plan and tasks',
   '  heimdall create           Enroll an objective or hosted-review watcher',
+  '  heimdall create --pipeline Start a pipeline run',
   '  heimdall pause            Pause a watcher',
   '  heimdall resume           Resume a watcher',
   '  heimdall disarm           Disarm a watcher',

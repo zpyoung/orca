@@ -18,7 +18,7 @@ import type {
   WatcherLedger
 } from '../../../shared/fork-heimdall/ledger-types'
 import { getHostedReviewEscalations } from '../../../shared/fork-hosted-review-sitter/ledger-adapter'
-import type { WatcherListEntry } from '../../../shared/fork-heimdall/watcher-types'
+import type { WatcherListEntryReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
 import {
   formatHostedReviewSitterDuration,
   formatHostedReviewSitterTime,
@@ -90,7 +90,7 @@ function latestEscalations(ledger: WatcherLedger | null): EscalationEntry[] {
   )
 }
 
-function entryStatusReason(entry: WatcherListEntry): string | null {
+function entryStatusReason(entry: WatcherListEntryReader): string | null {
   if (entry.status.reason) {
     return hostedReviewSitterStatusReason(entry.status.reason)
   }
@@ -116,7 +116,7 @@ function entryStatusReason(entry: WatcherListEntry): string | null {
 }
 
 export type HostedReviewSitterStatusContentProps = {
-  entry: WatcherListEntry
+  entry: WatcherListEntryReader
   ledger: WatcherLedger | null
   approvalScope: ApprovalScope | null
   ledgerOpen: boolean
@@ -151,7 +151,10 @@ export function HostedReviewSitterStatusContent({
   onStop,
   onApprove,
   onCopyDebugReport
-}: HostedReviewSitterStatusContentProps): React.JSX.Element {
+}: HostedReviewSitterStatusContentProps): React.JSX.Element | null {
+  if (entry.enrollment.kind !== 'hosted-review') {
+    return null
+  }
   const { enrollment, status } = entry
   const reason = entryStatusReason(entry)
   const statusNeedsAttention = status.state === 'escalated' || status.state === 'parked'
