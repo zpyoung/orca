@@ -12,7 +12,7 @@
 
 .pipeline-node-frame[data-visual-state='skipped'] {
   border-style: dashed;
-  opacity: 0.6;
+  border-color: color-mix(in srgb, var(--muted-foreground) 45%, var(--border));
 }
 
 /* a ring that fades in and out; opacity is the only animated property */
