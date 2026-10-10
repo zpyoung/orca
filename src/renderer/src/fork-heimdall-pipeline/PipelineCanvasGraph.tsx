@@ -187,30 +187,35 @@ export function PipelineCanvasGraph({
   )
   const onPaneClick = useCallback(() => selectNode(null), [selectNode])
   const getNodeMenuItems = useCallback(
-    (node: PipelineCanvasNode): PipelineNodeContextMenuItem[] => [
-      {
-        key: 'inspect',
-        label: translate('fork.heimdallPipeline.contextMenu.inspect', 'Inspect'),
-        onSelect: () => selectNode(node.id)
-      },
-      ...(readOnly
-        ? []
-        : [
-            {
-              key: 'delete',
-              label: translate('fork.heimdallPipeline.contextMenu.deleteNode', 'Delete node'),
-              destructive: true,
-              onSelect: () => {
-                removeNode(file.id, node.id)
-                if (selectedNodeIdRef.current === node.id) {
-                  selectNode(null)
+    (node: PipelineCanvasNode): PipelineNodeContextMenuItem[] => {
+      if (!draft.draftDocument.nodes.some((candidate) => candidate.id === node.id)) {
+        return []
+      }
+      return [
+        {
+          key: 'inspect',
+          label: translate('fork.heimdallPipeline.contextMenu.inspect', 'Inspect'),
+          onSelect: () => selectNode(node.id)
+        },
+        ...(readOnly
+          ? []
+          : [
+              {
+                key: 'delete',
+                label: translate('fork.heimdallPipeline.contextMenu.deleteNode', 'Delete node'),
+                destructive: true,
+                onSelect: () => {
+                  removeNode(file.id, node.id)
+                  if (selectedNodeIdRef.current === node.id) {
+                    selectNode(null)
+                  }
                 }
               }
-            }
-          ]),
-      copyNodeIdMenuItem(node.id)
-    ],
-    [file.id, readOnly, removeNode, selectNode]
+            ]),
+        copyNodeIdMenuItem(node.id)
+      ]
+    },
+    [draft.draftDocument.nodes, file.id, readOnly, removeNode, selectNode]
   )
   const onMoveEnd = useCallback<OnMoveEnd>(
     (_event, viewport) => setViewport(file.id, viewport),

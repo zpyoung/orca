@@ -6,6 +6,7 @@ import {
   type MouseEvent,
   type ReactNode
 } from 'react'
+import { toast } from 'sonner'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -25,7 +26,10 @@ type PipelineNodeContextMenuProps<TNode extends { id: string }> = Omit<
   HTMLAttributes<HTMLDivElement>,
   'children' | 'onContextMenu' | 'onContextMenuCapture'
 > & {
-  /** Items for the right-clicked node; read at render time so they never go stale while open. */
+  /**
+   * Items for the right-clicked node; read at render time so they never go stale while open.
+   * Return none once the node has left the graph, so a menu opened on it offers nothing.
+   */
   getItems: (node: TNode) => readonly PipelineNodeContextMenuItem[]
   /** Renders the flow; hand the given handler to React Flow's `onNodeContextMenu`. */
   children: (onNodeContextMenu: (event: MouseEvent, node: TNode) => void) => ReactNode
@@ -83,12 +87,23 @@ export function PipelineNodeContextMenu<TNode extends { id: string }>({
   )
 }
 
+async function copyNodeId(nodeId: string): Promise<void> {
+  try {
+    await window.api.ui.writeClipboardText(nodeId)
+  } catch {
+    toast.error(
+      translate('fork.heimdallPipeline.contextMenu.copyNodeIdFailed', "Couldn't copy the node ID")
+    )
+  }
+}
+
+/** Menu item that copies a node id and tells the user when the clipboard refuses the write. */
 export function copyNodeIdMenuItem(nodeId: string): PipelineNodeContextMenuItem {
   return {
     key: 'copy-node-id',
     label: translate('fork.heimdallPipeline.contextMenu.copyNodeId', 'Copy node ID'),
     onSelect: () => {
-      void window.api.ui.writeClipboardText(nodeId)
+      void copyNodeId(nodeId)
     }
   }
 }

@@ -257,8 +257,11 @@ function PipelineRunGraphFlow({
   }
 
   const getNodeMenuItems = (node: PipelineRunGraphNode): PipelineNodeContextMenuItem[] => {
-    const { runNode, sourceNode } =
-      nodes.find((candidate) => candidate.id === node.id)?.data ?? node.data
+    const current = nodes.find((candidate) => candidate.id === node.id)
+    if (!current) {
+      return []
+    }
+    const { runNode, sourceNode } = current.data
     const control = controlFor(runNode)
     return [
       ...(pipelineRunNodeOpensWorker({ runNode, sourceNode, isUnknownWatcher })

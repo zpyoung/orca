@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest'
 import { ReactFlowProvider } from '@xyflow/react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenFile } from '@/store/slices/editor'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
@@ -29,8 +29,9 @@ import {
 } from './pipeline-canvas-run-fixtures'
 import { usePipelineCanvasDraftStore } from './pipeline-canvas-draft-store'
 
-const { openWorker, resolveWorkerNavigation } = vi.hoisted(() => ({
+const { openWorker, resolveWorkerNavigation, toastError } = vi.hoisted(() => ({
   openWorker: vi.fn(),
+  toastError: vi.fn(),
   resolveWorkerNavigation: vi.fn(
     (navigation: { worktreeId: string; executionHostId: string; paneKey: string }) => navigation
   )
@@ -41,16 +42,21 @@ vi.mock('@/fork-heimdall/heimdall-worker-navigation', () => ({
   resolveHeimdallWorkerNavigation: resolveWorkerNavigation
 }))
 
+vi.mock('sonner', () => ({ toast: { error: toastError } }))
+
 const writeClipboardText = vi.fn().mockResolvedValue(undefined)
+const unhandledRejection = vi.fn()
 
 beforeEach(() => {
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: { ui: { writeClipboardText } }
   })
+  process.on('unhandledRejection', unhandledRejection)
 })
 
 afterEach(() => {
+  process.off('unhandledRejection', unhandledRejection)
   cleanup()
   vi.clearAllMocks()
   usePipelineCanvasDraftStore.setState(usePipelineCanvasDraftStore.getInitialState(), true)
@@ -144,8 +150,8 @@ describe('PipelineNodeContextMenu on the run graph', () => {
     })
   }
 
-  function renderRunGraph(view: PipelineRunView, ledger: WatcherLedger | null) {
-    return render(
+  function runGraphElement(view: PipelineRunView, ledger: WatcherLedger | null) {
+    return (
       <PipelineRunGraph
         view={view}
         surface="canvas-run"
@@ -154,6 +160,17 @@ describe('PipelineNodeContextMenu on the run graph', () => {
         onAnswer={vi.fn().mockResolvedValue({ status: 'applied', appliedAtMs: 100 })}
       />
     )
+  }
+
+  function renderRunGraph(view: PipelineRunView, ledger: WatcherLedger | null) {
+    return render(runGraphElement(view, ledger))
+  }
+
+  function withoutNode(view: PipelineRunView, instanceId: string): PipelineRunView {
+    return PipelineRunViewSchema.parse({
+      ...view,
+      nodes: view.nodes.filter((node) => node.instanceId !== instanceId)
+    })
   }
 
   it('offers the worker terminal and the node id for a running agent, and opens the worker', () => {
@@ -207,6 +224,55 @@ describe('PipelineNodeContextMenu on the run graph', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Copy node ID' }))
 
     expect(writeClipboardText).toHaveBeenCalledWith('approve')
+  })
+
+  it('copies the node id and reports a rejected clipboard write as an error toast', async () => {
+    writeClipboardText.mockRejectedValueOnce(new Error('clipboard denied'))
+    const view = viewWithBuild('done', false)
+    renderRunGraph(view, null)
+
+    fireEvent.contextMenu(screen.getByTestId('pipeline-run-node-approve'))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy node ID' }))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Couldn't copy the node ID"))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(unhandledRejection).not.toHaveBeenCalled()
+  })
+
+  it('shows no toast when the clipboard write succeeds', async () => {
+    const view = viewWithBuild('done', false)
+    renderRunGraph(view, null)
+
+    fireEvent.contextMenu(screen.getByTestId('pipeline-run-node-approve'))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy node ID' }))
+
+    await waitFor(() => expect(writeClipboardText).toHaveBeenCalledWith('approve'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing once the right-clicked worker node leaves the graph', () => {
+    const view = viewWithBuild('running', true)
+    const { rerender } = renderRunGraph(view, ledgerForRun(view))
+    fireEvent.contextMenu(screen.getByTestId('pipeline-run-node-build'))
+    expect(menuLabels()).toEqual(['Open worker terminal', 'Copy node ID'])
+
+    rerender(runGraphElement(withoutNode(view, 'build'), ledgerForRun(view)))
+
+    expect(screen.queryAllByRole('menuitem')).toEqual([])
+    expect(openWorker).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing once the right-clicked gate node leaves the graph', () => {
+    const view = viewWithBuild('done', false)
+    const { rerender } = renderRunGraph(view, ledgerForRun(view))
+    fireEvent.contextMenu(screen.getByTestId('pipeline-run-node-approve'))
+    expect(menuLabels()).toEqual(['Answer', 'Copy node ID'])
+
+    rerender(runGraphElement(withoutNode(view, 'approve'), ledgerForRun(view)))
+
+    expect(screen.queryAllByRole('menuitem')).toEqual([])
+    expect(screen.queryByTestId('pipeline-gate-dialog')).toBeNull()
   })
 
   it('opens no menu on the pane', () => {
@@ -349,6 +415,29 @@ describe('PipelineNodeContextMenu on the edit graph', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Copy node ID' }))
 
     expect(writeClipboardText).toHaveBeenCalledWith('check')
+  })
+
+  it('reports a rejected clipboard write as an error toast', async () => {
+    writeClipboardText.mockRejectedValueOnce(new Error('clipboard denied'))
+    const { container } = renderEditGraph(false)
+
+    fireEvent.contextMenu(flowNode(container, 'check'))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy node ID' }))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Couldn't copy the node ID"))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(unhandledRejection).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing once the right-clicked node is removed from the draft', () => {
+    const { container } = renderEditGraph(false, 'fix')
+    fireEvent.contextMenu(flowNode(container, 'fix'))
+    expect(menuLabels()).toEqual(['Inspect', 'Delete node', 'Copy node ID'])
+
+    act(() => usePipelineCanvasDraftStore.getState().removeNode(file.id, 'fix'))
+
+    expect(screen.queryAllByRole('menuitem')).toEqual([])
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 
   it('opens no menu on the pane', () => {
