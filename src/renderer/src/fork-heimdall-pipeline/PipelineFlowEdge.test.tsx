@@ -299,6 +299,18 @@ describe('PipelineFlowEdge', () => {
     expect(label).toHaveTextContent('tests pass')
   })
 
+  it('labels an empty condition with a visible pair of quotes so the pill is never blank', () => {
+    const { container, getByTestId } = renderEdge({ condition: '' })
+
+    expect(container.querySelector('path.pipeline-flow-edge__path')).toHaveAttribute(
+      'data-conditional',
+      'true'
+    )
+    const label = getByTestId('label-layer').querySelector('.pipeline-flow-edge__label')
+    expect(label).not.toBeNull()
+    expect(label?.textContent).toBe('""')
+  })
+
   it('renders the condition as text, never as markup', () => {
     const condition = '<img src="x" onerror="alert(1)"> & <b>bold</b>'
     const { getByTestId } = renderEdge({ condition })

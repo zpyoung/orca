@@ -59,6 +59,7 @@ function PipelineFlowEdge({
   })
   const reducedMotion = useSyncExternalStore(subscribeToReducedMotion, readReducedMotion)
   const condition = data?.condition
+  const conditionLabel = condition === '' ? '""' : condition
   const runState = data?.runState
   return (
     <>
@@ -70,15 +71,15 @@ function PipelineFlowEdge({
         data-run-state={runState}
         data-conditional={condition === undefined ? 'false' : 'true'}
       />
-      {condition ? (
+      {conditionLabel !== undefined ? (
         <EdgeLabelRenderer>
           <div
             className="pipeline-flow-edge__label"
             data-run-state={runState}
-            title={condition}
+            title={conditionLabel}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           >
-            {condition}
+            {conditionLabel}
           </div>
         </EdgeLabelRenderer>
       ) : null}
