@@ -238,6 +238,11 @@
           "updatingBranch": "Updating branch",
           "resolvingConflicts": "Resolving conflicts",
           "merging": "Merging"
+        },
+        "detail": {
+          "label": "Label",
+          "nodeId": "Node ID",
+          "instanceId": "Instance ID"
         }
       },
       "runForm": {
