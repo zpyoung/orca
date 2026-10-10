@@ -40,7 +40,7 @@ export function Field({
   htmlFor?: string
 }): JSX.Element {
   return (
-    <div className="pipeline-inspector__field">
+    <div className="grid min-w-0 gap-1.5 [&>label]:text-xs">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
@@ -173,7 +173,7 @@ export function BooleanField({
 }): JSX.Element {
   const id = useId()
   return (
-    <div className="pipeline-inspector__boolean">
+    <div className="flex items-center gap-2 [&>label]:text-xs">
       <Checkbox
         id={id}
         checked={value}

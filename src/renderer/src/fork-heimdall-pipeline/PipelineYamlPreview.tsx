@@ -5,7 +5,7 @@ import { translate } from '@/i18n/i18n'
 export function PipelineYamlPreview({ text }: { text: string }): JSX.Element {
   return (
     <section
-      className="pipeline-yaml-preview"
+      className="flex min-h-0 flex-1 p-3"
       aria-label={translate('fork.heimdallPipeline.preview.title', 'YAML preview')}
     >
       <Textarea

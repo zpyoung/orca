@@ -18,19 +18,20 @@ export function PipelinePalette({
 }): JSX.Element {
   return (
     <aside
-      className="pipeline-palette scrollbar-sleek"
+      className="scrollbar-sleek flex min-h-0 flex-col gap-3 overflow-auto border-r border-border bg-card p-3 text-card-foreground"
       aria-label={translate('fork.heimdallPipeline.palette.title', 'Node palette')}
     >
-      <h2 className="pipeline-palette__heading">
+      <h2 className="text-[13px] font-semibold">
         {translate('fork.heimdallPipeline.palette.title', 'Nodes')}
       </h2>
-      <div className="pipeline-palette__items">
+      <div className="grid gap-1.5">
         {PIPELINE_NODE_TYPES.map((type) => (
           <Button
             key={type}
             type="button"
             variant="outline"
             size="sm"
+            className="cursor-grab justify-start active:cursor-grabbing"
             disabled={readOnly}
             draggable={!readOnly}
             data-pipeline-node-type={type}

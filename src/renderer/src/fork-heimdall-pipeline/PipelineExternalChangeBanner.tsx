@@ -11,7 +11,10 @@ export function PipelineExternalChangeBanner({
   onKeepMine: () => void
 }): JSX.Element {
   return (
-    <div className="pipeline-external-change" role="alert">
+    <div
+      className="flex items-center gap-3 rounded-md border border-status-warning-border bg-status-warning-background px-3 py-2 text-[13px] text-status-warning-foreground"
+      role="alert"
+    >
       <TriangleAlert
         aria-hidden="true"
         className="size-4 shrink-0 text-status-warning-foreground"

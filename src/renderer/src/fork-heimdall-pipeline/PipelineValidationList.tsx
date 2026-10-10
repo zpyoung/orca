@@ -16,10 +16,10 @@ export function PipelineValidationList({
   }
   return (
     <section
-      className="pipeline-validation-list scrollbar-sleek"
+      className="scrollbar-sleek max-h-36 overflow-auto rounded-md border border-destructive bg-destructive px-3 py-2 text-destructive-foreground"
       aria-label={translate('fork.heimdallPipeline.validation.title', 'Validation errors')}
     >
-      <div className="pipeline-validation-list__heading">
+      <div className="flex items-center gap-1.5 text-xs font-semibold">
         <AlertTriangle aria-hidden="true" className="size-4 text-destructive" />
         <span>
           {translate('fork.heimdallPipeline.validation.count', '{{value0}} validation errors', {
@@ -27,19 +27,19 @@ export function PipelineValidationList({
           })}
         </span>
       </div>
-      <ul className="pipeline-validation-list__items">
+      <ul className="mt-1.5 grid gap-1 text-xs">
         {errors.map((error) => {
           const nodeId = error.nodeId
           return (
-            <li key={JSON.stringify(error)}>
+            <li key={JSON.stringify(error)} className="flex items-baseline gap-2">
               {nodeId && onSelectNode ? (
                 <Button variant="link" size="xs" onClick={() => onSelectNode(nodeId)}>
                   {nodeId}
                 </Button>
               ) : nodeId ? (
-                <span className="pipeline-validation-list__node">{nodeId}</span>
+                <span className="flex-none font-mono text-xs">{nodeId}</span>
               ) : (
-                <span className="pipeline-validation-list__node">
+                <span className="flex-none font-mono text-xs">
                   {translate('fork.heimdallPipeline.validation.pipeline', 'Pipeline')}
                 </span>
               )}

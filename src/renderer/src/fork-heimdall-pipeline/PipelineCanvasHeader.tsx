@@ -63,8 +63,8 @@ export function PipelineCanvasHeader({
       ? '—'
       : String(selectedRun.runNumber)
   return (
-    <header className="pipeline-canvas-header">
-      <div className="pipeline-canvas-header__identity">
+    <header className="flex min-h-12 items-center justify-between gap-4 border-b border-border px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
         <Input
           aria-label={translate('fork.heimdallPipeline.header.name', 'Pipeline name')}
           value={name}
@@ -82,7 +82,10 @@ export function PipelineCanvasHeader({
           </Badge>
         ) : null}
         {dirty ? (
-          <span className="pipeline-canvas-header__dirty" role="status">
+          <span
+            className="flex min-w-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground"
+            role="status"
+          >
             {translate('fork.heimdallPipeline.header.edited', 'Edited')}
           </span>
         ) : null}
@@ -92,7 +95,7 @@ export function PipelineCanvasHeader({
           </Badge>
         ) : null}
       </div>
-      <div className="pipeline-canvas-header__actions">
+      <div className="flex min-w-0 items-center gap-2">
         <ToggleGroup
           type="single"
           size="sm"
