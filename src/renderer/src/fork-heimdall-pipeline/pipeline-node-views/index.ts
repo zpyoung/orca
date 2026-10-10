@@ -3,6 +3,7 @@ export {
   type PipelineCanvasNode,
   type PipelineCanvasNodeData
 } from './PipelineNodeCard'
+export { PipelineNodeStatusGlyph } from './PipelineNodeStatusGlyph'
 export { UnknownNodeView, type UnknownPipelineNodeData } from './UnknownNodeView'
 export {
   AgentNodeView,

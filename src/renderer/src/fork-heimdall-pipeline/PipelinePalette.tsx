@@ -6,6 +6,7 @@ import {
   type NodeType
 } from '../../../shared/fork-heimdall-pipeline/document-schema'
 import { getPipelineNodeTypeLabel } from './pipeline-node-views/PipelineNodeCard'
+import { PIPELINE_NODE_TYPE_ICONS } from './pipeline-node-views/pipeline-node-type-icons'
 
 export const PIPELINE_NODE_DRAG_TYPE = 'application/x-orca-heimdall-pipeline-node'
 
@@ -25,25 +26,29 @@ export function PipelinePalette({
         {translate('fork.heimdallPipeline.palette.title', 'Nodes')}
       </h2>
       <div className="grid gap-1.5">
-        {PIPELINE_NODE_TYPES.map((type) => (
-          <Button
-            key={type}
-            type="button"
-            variant="outline"
-            size="sm"
-            className="cursor-grab justify-start active:cursor-grabbing"
-            disabled={readOnly}
-            draggable={!readOnly}
-            data-pipeline-node-type={type}
-            onClick={() => onAddNode(type)}
-            onDragStart={(event) => {
-              event.dataTransfer.setData(PIPELINE_NODE_DRAG_TYPE, type)
-              event.dataTransfer.effectAllowed = 'move'
-            }}
-          >
-            {getPipelineNodeTypeLabel(type)}
-          </Button>
-        ))}
+        {PIPELINE_NODE_TYPES.map((type) => {
+          const TypeIcon = PIPELINE_NODE_TYPE_ICONS[type]
+          return (
+            <Button
+              key={type}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="cursor-grab justify-start active:cursor-grabbing"
+              disabled={readOnly}
+              draggable={!readOnly}
+              data-pipeline-node-type={type}
+              onClick={() => onAddNode(type)}
+              onDragStart={(event) => {
+                event.dataTransfer.setData(PIPELINE_NODE_DRAG_TYPE, type)
+                event.dataTransfer.effectAllowed = 'move'
+              }}
+            >
+              <TypeIcon aria-hidden="true" />
+              {getPipelineNodeTypeLabel(type)}
+            </Button>
+          )
+        })}
       </div>
     </aside>
   )

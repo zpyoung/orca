@@ -1,0 +1,50 @@
+.pipeline-node-frame[data-visual-state='running'] {
+  border-color: color-mix(in srgb, var(--status-warning) 60%, var(--border));
+}
+
+.pipeline-node-frame[data-visual-state='done'] {
+  border-color: color-mix(in srgb, var(--status-success) 50%, var(--border));
+}
+
+.pipeline-node-frame[data-visual-state='failed'] {
+  border-color: var(--destructive);
+}
+
+.pipeline-node-frame[data-visual-state='skipped'] {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+/* a ring that fades in and out; opacity is the only animated property */
+.pipeline-node-frame[data-visual-state='needs-you']::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px solid var(--status-warning);
+  border-radius: calc(var(--radius-xl) + 2px);
+  pointer-events: none;
+  animation: pipeline-node-needs-you-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pipeline-node-needs-you-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-node-frame[data-visual-state='needs-you']::after {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+/* the glyph is the only state cue legible when zoomed out, so it grows */
+.pipeline-node-frame[data-lod='far'] .pipeline-node-glyph {
+  width: 1.75rem;
+  height: 1.75rem;
+}
