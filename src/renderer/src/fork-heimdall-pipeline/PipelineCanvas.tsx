@@ -1,4 +1,4 @@
-import type { JSX } from 'react'
+import type { JSX, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '@xyflow/react/dist/style.css'
 import './pipeline-canvas.css'
@@ -62,6 +62,23 @@ import {
 import { PipelineCanvasRunDialogs } from './PipelineCanvasRunDialogs'
 import { usePipelineCanvasSaveSession } from './pipeline-canvas-save-session'
 import { pipelineIdFromRef, usePipelineCanvasSourceSession } from './pipeline-canvas-source-session'
+
+function PipelineCanvasMessage({
+  role,
+  children
+}: {
+  role: 'alert' | 'status'
+  children: ReactNode
+}): JSX.Element {
+  return (
+    <div
+      className="flex h-full items-center justify-center p-6 text-center text-muted-foreground"
+      role={role}
+    >
+      {children}
+    </div>
+  )
+}
 
 function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
   const pipeline = file.pipeline
@@ -305,17 +322,13 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
   }, [draft, pipeline, trackRepoCopy])
 
   if (loadError) {
-    return (
-      <div className="pipeline-canvas__empty" role="alert">
-        {loadError}
-      </div>
-    )
+    return <PipelineCanvasMessage role="alert">{loadError}</PipelineCanvasMessage>
   }
   if (!loaded || !draft) {
     return (
-      <div className="pipeline-canvas__empty" role="status">
+      <PipelineCanvasMessage role="status">
         {translate('fork.heimdallPipeline.tab.loading', 'Loading pipeline canvas…')}
-      </div>
+      </PipelineCanvasMessage>
     )
   }
 
@@ -343,7 +356,10 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
   }
 
   return (
-    <div className="pipeline-canvas" data-pipeline-scope={savedScope}>
+    <div
+      className="flex size-full min-h-0 flex-col overflow-hidden bg-background text-foreground"
+      data-pipeline-scope={savedScope}
+    >
       <PipelineCanvasHeader
         name={draft.draftDocument.name}
         dirty={draft.dirty}
@@ -385,7 +401,7 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
         </p>
       ) : null}
       {draft.banner === 'external-change' ? (
-        <div className="pipeline-canvas__alerts">
+        <div className="flex min-h-0 flex-col gap-2 px-3 py-2">
           <PipelineExternalChangeBanner
             onReload={() => usePipelineCanvasDraftStore.getState().reload(file.id)}
             onKeepMine={() => usePipelineCanvasDraftStore.getState().keepMine(file.id)}
@@ -398,13 +414,11 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
       {mode === 'run' ? (
         <div className="p-3">
           {runViewLoading && runRow?.target.watcherId !== selectedRunId ? (
-            <div className="pipeline-canvas__empty" role="status">
+            <PipelineCanvasMessage role="status">
               {translate('fork.heimdallPipeline.runGraph.loading', 'Loading pinned run…')}
-            </div>
+            </PipelineCanvasMessage>
           ) : runViewError ? (
-            <div className="pipeline-canvas__empty" role="alert">
-              {runViewError}
-            </div>
+            <PipelineCanvasMessage role="alert">{runViewError}</PipelineCanvasMessage>
           ) : runView && runRow ? (
             <PipelineRunGraph
               view={runView}
@@ -416,18 +430,18 @@ function PipelineCanvasBody({ file }: { file: OpenFile }): JSX.Element {
               onAnswered={refreshRun}
             />
           ) : (
-            <div className="pipeline-canvas__empty" role="status">
+            <PipelineCanvasMessage role="status">
               {translate(
                 'fork.heimdallPipeline.runGraph.selectRun',
                 'Select a live pipeline run to view its pinned graph.'
               )}
-            </div>
+            </PipelineCanvasMessage>
           )}
         </div>
       ) : view === 'yaml' ? (
         <PipelineYamlPreview text={previewText} />
       ) : (
-        <div className="pipeline-canvas__workspace">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(11rem,14rem)_minmax(0,1fr)_minmax(16rem,20rem)] max-lg:grid-cols-[minmax(9rem,11rem)_minmax(0,1fr)]">
           <PipelinePalette readOnly={readOnly} onAddNode={addNode} />
           <PipelineCanvasGraph
             file={file}
