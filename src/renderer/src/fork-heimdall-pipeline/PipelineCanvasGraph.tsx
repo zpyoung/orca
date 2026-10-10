@@ -16,8 +16,7 @@ import { translate } from '@/i18n/i18n'
 import type { OpenFile } from '@/store/slices/editor'
 import {
   PIPELINE_NODE_TYPES,
-  type NodeType,
-  type PipelineDocument
+  type NodeType
 } from '../../../shared/fork-heimdall-pipeline/document-schema'
 import {
   usePipelineCanvasDraftStore,
@@ -28,27 +27,10 @@ import {
   PipelineNodeContextMenu,
   type PipelineNodeContextMenuItem
 } from './PipelineNodeContextMenu'
+import { buildEditFlowEdges, pipelineEdgeTypes } from './PipelineFlowEdge'
 import { PIPELINE_NODE_DRAG_TYPE } from './PipelinePalette'
+import { validationMessagesByNode } from './pipeline-node-validation-messages'
 import { pipelineCanvasNodeTypes, type PipelineCanvasNode } from './pipeline-node-views'
-
-function buildFlowEdges(document: PipelineDocument): Edge[] {
-  const edges: Edge[] = []
-  for (const target of document.nodes) {
-    for (const [index, dependency] of (target.after ?? []).entries()) {
-      const source = typeof dependency === 'string' ? dependency : dependency.node
-      edges.push({
-        id: `${source}:${target.id}:${index}`,
-        source,
-        target: target.id,
-        sourceHandle: 'pipeline-output',
-        targetHandle: 'pipeline-input',
-        type: 'smoothstep',
-        ...(typeof dependency === 'string' ? {} : { label: dependency.when })
-      })
-    }
-  }
-  return edges
-}
 
 export function PipelineCanvasGraph({
   file,
@@ -80,20 +62,27 @@ export function PipelineCanvasGraph({
     },
     [onSelectNode]
   )
+  const validationMessages = useMemo(
+    () => validationMessagesByNode(draft.validation),
+    [draft.validation]
+  )
   const nodes = useMemo<PipelineCanvasNode[]>(
     () =>
-      draft.draftDocument.nodes.map((node) => ({
-        id: node.id,
-        type: node.type,
-        position: draft.layout.nodes[node.id] ?? { x: 0, y: 0 },
-        data: { node },
-        selected: node.id === selectedNodeId,
-        draggable: !readOnly,
-        connectable: !readOnly
-      })),
-    [draft.draftDocument.nodes, draft.layout.nodes, readOnly, selectedNodeId]
+      draft.draftDocument.nodes.map((node) => {
+        const messages = validationMessages.get(node.id)
+        return {
+          id: node.id,
+          type: node.type,
+          position: draft.layout.nodes[node.id] ?? { x: 0, y: 0 },
+          data: messages ? { node, validationMessages: messages } : { node },
+          selected: node.id === selectedNodeId,
+          draggable: !readOnly,
+          connectable: !readOnly
+        }
+      }),
+    [draft.draftDocument.nodes, draft.layout.nodes, readOnly, selectedNodeId, validationMessages]
   )
-  const edges = useMemo(() => buildFlowEdges(draft.draftDocument), [draft.draftDocument])
+  const edges = useMemo(() => buildEditFlowEdges(draft.draftDocument), [draft.draftDocument])
   const selectedNode = draft.draftDocument.nodes.find((node) => node.id === selectedNodeId) ?? null
 
   const onNodesChange = useCallback(
@@ -239,6 +228,7 @@ export function PipelineCanvasGraph({
             nodes={nodes}
             edges={edges}
             nodeTypes={pipelineCanvasNodeTypes}
+            edgeTypes={pipelineEdgeTypes}
             defaultViewport={draft.layout.viewport}
             fitView={nodes.length > 0 && !draft.layout.viewport}
             minZoom={0.2}
