@@ -296,6 +296,133 @@ describe('PipelineRunGraph', () => {
     expect(resolveWorkerNavigation).toHaveBeenCalledWith(navigation, 'remote-owner')
     expect(openWorker).toHaveBeenCalledWith(navigation)
   })
+
+  describe('keyboard activation', () => {
+    const workerNavigation: WatcherWorkerNavigation = {
+      worktreeId: 'worktree-1',
+      executionHostId: LOCAL_EXECUTION_HOST_ID,
+      paneKey: 'tab-1:leaf-1'
+    }
+
+    function runningAgentView(): PipelineRunView {
+      return makeView({
+        document: documentWith([
+          { id: 'build', type: 'agent', harness: 'codex', prompt: 'Build the feature' }
+        ]),
+        nodes: [graphNode({ id: 'build', type: 'agent', status: 'running', workerNavigation })]
+      })
+    }
+
+    it('opens the running agent worker when Enter is pressed on the focused node', () => {
+      render(<PipelineRunGraph view={runningAgentView()} surface="heimdall-detail" />)
+
+      const trigger = screen.getByTestId('pipeline-run-node-build')
+      expect(trigger).toHaveAttribute('role', 'button')
+      expect(trigger).toHaveAttribute('aria-label', 'build, Running')
+      expect(trigger).toHaveAttribute('tabindex', '0')
+      trigger.focus()
+      fireEvent.keyDown(trigger, { key: 'Enter' })
+
+      expect(openWorker).toHaveBeenCalledTimes(1)
+      expect(openWorker).toHaveBeenCalledWith(workerNavigation)
+    })
+
+    it('opens a waiting gate when Space is pressed and keeps the page from scrolling', async () => {
+      const scope = {
+        actionKind: 'pipeline-pass-gate',
+        contentIdentity: `pipeline:sha256:${'1'.repeat(64)}`,
+        evidenceKey: makePipelineNodeEvidenceKey({
+          instanceId: 'approve',
+          epoch: 0,
+          attempt: 1,
+          cause: 'gate'
+        })
+      }
+      const ledger = WatcherLedgerSchema.parse({
+        watcherId: 'watcher-1',
+        entries: [
+          {
+            eventId: 'event-1',
+            watcherId: 'watcher-1',
+            atMs: 10,
+            origin: 'owner',
+            class: 'fact',
+            kind: 'escalation',
+            escalationId: 'escalation-1',
+            escalationKind: 'awaiting-approval',
+            status: 'open',
+            foldCount: 1,
+            approvalScope: scope
+          }
+        ]
+      })
+      const view = makeView({
+        document: documentWith([
+          { id: 'build', type: 'agent', harness: 'codex', prompt: 'Build the feature' },
+          { id: 'approve', type: 'gate', label: 'Review the result', sendBackTo: 'build' }
+        ]),
+        nodes: [
+          graphNode({
+            id: 'approve',
+            type: 'gate',
+            label: 'Review the result',
+            status: 'waiting',
+            waitingFor: 'gate',
+            escalationId: 'escalation-1'
+          })
+        ]
+      })
+
+      render(
+        <PipelineRunGraph
+          view={view}
+          surface="canvas-run"
+          row={rowForKind('pipeline')}
+          ledger={ledger}
+          onAnswer={vi.fn()}
+        />
+      )
+      const trigger = screen.getByTestId('pipeline-run-node-approve')
+      expect(trigger).toHaveAttribute('aria-label', 'Review the result, Waiting')
+      const notPrevented = fireEvent.keyDown(trigger, { key: ' ' })
+
+      expect(notPrevented).toBe(false)
+      expect(await screen.findByTestId('pipeline-gate-dialog')).toBeInTheDocument()
+    })
+
+    it('does nothing when Enter is pressed on a node with no action', () => {
+      const view = makeView({
+        document: documentWith([{ id: 'lint', type: 'check', command: 'true' }]),
+        nodes: [graphNode({ id: 'lint', type: 'check', status: 'pending' })]
+      })
+
+      render(
+        <PipelineRunGraph view={view} surface="heimdall-detail" row={rowForKind('pipeline')} />
+      )
+      const trigger = screen.getByTestId('pipeline-run-node-lint')
+
+      expect(() => fireEvent.keyDown(trigger, { key: 'Enter' })).not.toThrow()
+      expect(openWorker).not.toHaveBeenCalled()
+      expect(screen.queryByTestId('pipeline-gate-dialog')).toBeNull()
+      expect(screen.queryByTestId('pipeline-capability-approval-dialog')).toBeNull()
+    })
+
+    it('ignores key repeats, modifier combos, and other keys', () => {
+      render(<PipelineRunGraph view={runningAgentView()} surface="heimdall-detail" />)
+      const trigger = screen.getByTestId('pipeline-run-node-build')
+
+      fireEvent.keyDown(trigger, { key: 'Enter', repeat: true })
+      fireEvent.keyDown(trigger, { key: 'Enter', ctrlKey: true })
+      fireEvent.keyDown(trigger, { key: ' ', metaKey: true })
+      fireEvent.keyDown(trigger, { key: 'Enter', altKey: true })
+      fireEvent.keyDown(trigger, { key: 'Enter', shiftKey: true })
+      const tabNotPrevented = fireEvent.keyDown(trigger, { key: 'Tab' })
+
+      expect(openWorker).not.toHaveBeenCalled()
+      expect(tabNotPrevented).toBe(true)
+    })
+  })
+
   it('renders the pinned Swarm configuration and nests expanded children beneath it', () => {
     const view = makeView({
       document: documentWith([

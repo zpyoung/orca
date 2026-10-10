@@ -1,9 +1,9 @@
-import type { JSX, ReactNode } from 'react'
+import type { JSX, KeyboardEvent, ReactNode } from 'react'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { formatHeimdallJson } from '@/fork-heimdall/fleet-format'
 import { translate } from '@/i18n/i18n'
 import type { PipelineRunNodeView } from '../../../shared/fork-heimdall-pipeline/run-view-types'
-import { COST_FORMAT } from './pipeline-run-node-format'
+import { COST_FORMAT, statusLabel } from './pipeline-run-node-format'
 
 type PipelineRunNodeDetailProps = {
   runNode: PipelineRunNodeView
@@ -38,8 +38,30 @@ function UsageEstimate({
 }
 
 /**
+ * Enter and Space on the focus stop replay as a click, so the graph's node click handler stays the
+ * only place that decides what activating a run node does.
+ */
+function activateOnEnterOrSpace(event: KeyboardEvent<HTMLDivElement>): void {
+  if (
+    (event.key !== 'Enter' && event.key !== ' ') ||
+    event.target !== event.currentTarget ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    event.shiftKey
+  ) {
+    return
+  }
+  event.preventDefault()
+  if (!event.repeat) {
+    event.currentTarget.click()
+  }
+}
+
+/**
  * Wraps a run card so the long detail the compact face leaves out opens on hover and on keyboard
- * focus. The wrapper is the focus stop because run nodes are emitted with `focusable: false`.
+ * focus, and so Enter or Space activates the node like a click. The wrapper is the focus stop
+ * because run nodes are emitted with `focusable: false`.
  */
 export function PipelineRunNodeDetail({
   runNode,
@@ -53,7 +75,10 @@ export function PipelineRunNodeDetail({
       <HoverCardTrigger asChild>
         <div
           className="min-w-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          role="button"
+          aria-label={`${fullLabel}, ${statusLabel(runNode.status)}`}
           tabIndex={0}
+          onKeyDown={activateOnEnterOrSpace}
           data-testid={`pipeline-run-node-${runNode.instanceId}`}
           data-node-instance={runNode.instanceId}
         >
