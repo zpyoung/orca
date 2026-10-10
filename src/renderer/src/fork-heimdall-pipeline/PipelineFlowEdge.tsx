@@ -1,10 +1,11 @@
-import { useSyncExternalStore, type ComponentType, type JSX } from 'react'
+import { useSyncExternalStore, type JSX } from 'react'
 import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
   type Edge,
-  type EdgeProps
+  type EdgeProps,
+  type EdgeTypes
 } from '@xyflow/react'
 import type { PipelineDocument } from '../../../shared/fork-heimdall-pipeline/document-schema'
 import type {
@@ -90,9 +91,7 @@ function PipelineFlowEdge({
   )
 }
 
-export const pipelineEdgeTypes: {
-  pipeline: ComponentType<EdgeProps<Edge<PipelineFlowEdgeData>>>
-} = { pipeline: PipelineFlowEdge }
+export const pipelineEdgeTypes = { pipeline: PipelineFlowEdge } satisfies EdgeTypes
 
 /** Builds the editor's dependency edges from each node's `after` entries, conditional ones carrying their `when`. */
 export function buildEditFlowEdges(document: PipelineDocument): Edge<PipelineFlowEdgeData>[] {
