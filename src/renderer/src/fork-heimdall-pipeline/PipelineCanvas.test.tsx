@@ -61,11 +61,19 @@ vi.mock('@xyflow/react', () => {
     nodes: FlowNode[]
     nodeTypes: Record<string, NodeView>
     onNodeClick?: (event: unknown, node: FlowNode) => void
+    onNodeContextMenu?: (event: unknown, node: FlowNode) => void
     children?: ReactNode
     'aria-label'?: string
   }
 
-  const ReactFlow = ({ nodes, nodeTypes, onNodeClick, children, 'aria-label': label }: FlowProps) =>
+  const ReactFlow = ({
+    nodes,
+    nodeTypes,
+    onNodeClick,
+    onNodeContextMenu,
+    children,
+    'aria-label': label
+  }: FlowProps) =>
     createElement(
       'div',
       { role: 'application', 'aria-label': label },
@@ -78,7 +86,8 @@ vi.mock('@xyflow/react', () => {
             type: 'button',
             'aria-label': `Select node ${node.id}`,
             'aria-pressed': node.selected,
-            onClick: (event: unknown) => onNodeClick?.(event, node)
+            onClick: (event: unknown) => onNodeClick?.(event, node),
+            onContextMenu: (event: unknown) => onNodeContextMenu?.(event, node)
           },
           createElement(NodeRenderer, {
             id: node.id,
@@ -408,6 +417,74 @@ describe('PipelineCanvas graph surface', () => {
       worktreeId,
       id: 'objective-3'
     })
+  })
+  it('offers Inspect, Delete node and Copy node ID on a right-clicked node, and inspects it', async () => {
+    const file = pipelineFile('repo')
+    seedWorkspace(file)
+    pipelineMocks.readRepoPipeline.mockResolvedValue({
+      yamlText: renderNewPipeline(repoDocument()),
+      layoutText: null,
+      layout: null,
+      signature: { mtime: 10, sha256: 'repo-draft' }
+    })
+    render(<PipelineCanvas file={file} />)
+    const graph = await screen.findByRole('application', { name: 'Pipeline graph' })
+    const inspector = screen.getByRole('complementary', { name: 'Inspector' })
+
+    fireEvent.contextMenu(within(graph).getByRole('button', { name: 'Select node fix' }))
+
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Inspect',
+      'Delete node',
+      'Copy node ID'
+    ])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Inspect' }))
+    expect(within(inspector).getByRole('heading', { name: 'fix' })).toBeInTheDocument()
+    expect(within(graph).getByRole('button', { name: 'Select node fix' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
+  it('deletes the right-clicked node from the draft and clears its selection', async () => {
+    const file = pipelineFile('repo')
+    seedWorkspace(file)
+    pipelineMocks.readRepoPipeline.mockResolvedValue({
+      yamlText: renderNewPipeline(repoDocument()),
+      layoutText: null,
+      layout: null,
+      signature: { mtime: 10, sha256: 'repo-draft' }
+    })
+    render(<PipelineCanvas file={file} />)
+    const graph = await screen.findByRole('application', { name: 'Pipeline graph' })
+    const inspector = screen.getByRole('complementary', { name: 'Inspector' })
+    fireEvent.click(within(graph).getByRole('button', { name: 'Select node fix' }))
+    expect(within(inspector).getByRole('heading', { name: 'fix' })).toBeInTheDocument()
+
+    fireEvent.contextMenu(within(graph).getByRole('button', { name: 'Select node fix' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete node' }))
+
+    expect(within(graph).queryByRole('button', { name: 'Select node fix' })).not.toBeInTheDocument()
+    expect(within(inspector).queryByRole('heading', { name: 'fix' })).not.toBeInTheDocument()
+    expect(within(graph).getByRole('button', { name: 'Select node workers' })).toBeInTheDocument()
+  })
+
+  it('hides Delete node on a read-only graph and copies the node id', async () => {
+    const writeClipboardText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ui: { writeClipboardText } }
+    })
+    const file = pipelineFile('builtin')
+    seedWorkspace(file)
+    render(<PipelineCanvas file={file} />)
+    const graph = await screen.findByRole('application', { name: 'Pipeline graph' })
+
+    fireEvent.contextMenu(within(graph).getByRole('button', { name: 'Select node objective' }))
+
+    expect(screen.queryByRole('menuitem', { name: 'Delete node' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy node ID' }))
+    expect(writeClipboardText).toHaveBeenCalledWith('objective')
   })
   it('shows only the selected pinned graph, scopes answers to its fleet owner fence, and returns to Edit mode', async () => {
     const file = pipelineFile('repo')

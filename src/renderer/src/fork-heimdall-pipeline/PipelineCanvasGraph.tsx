@@ -23,6 +23,11 @@ import {
   usePipelineCanvasDraftStore,
   type PipelineCanvasDraft
 } from './pipeline-canvas-draft-store'
+import {
+  copyNodeIdMenuItem,
+  PipelineNodeContextMenu,
+  type PipelineNodeContextMenuItem
+} from './PipelineNodeContextMenu'
 import { PIPELINE_NODE_DRAG_TYPE } from './PipelinePalette'
 import { pipelineCanvasNodeTypes, type PipelineCanvasNode } from './pipeline-node-views'
 
@@ -181,51 +186,84 @@ export function PipelineCanvasGraph({
     [selectNode]
   )
   const onPaneClick = useCallback(() => selectNode(null), [selectNode])
+  const getNodeMenuItems = useCallback(
+    (node: PipelineCanvasNode): PipelineNodeContextMenuItem[] => [
+      {
+        key: 'inspect',
+        label: translate('fork.heimdallPipeline.contextMenu.inspect', 'Inspect'),
+        onSelect: () => selectNode(node.id)
+      },
+      ...(readOnly
+        ? []
+        : [
+            {
+              key: 'delete',
+              label: translate('fork.heimdallPipeline.contextMenu.deleteNode', 'Delete node'),
+              destructive: true,
+              onSelect: () => {
+                removeNode(file.id, node.id)
+                if (selectedNodeIdRef.current === node.id) {
+                  selectNode(null)
+                }
+              }
+            }
+          ]),
+      copyNodeIdMenuItem(node.id)
+    ],
+    [file.id, readOnly, removeNode, selectNode]
+  )
   const onMoveEnd = useCallback<OnMoveEnd>(
     (_event, viewport) => setViewport(file.id, viewport),
     [file.id, setViewport]
   )
 
   return (
-    <div
+    <PipelineNodeContextMenu<PipelineCanvasNode>
       className="pipeline-flow"
+      getItems={getNodeMenuItems}
       onDrop={onDrop}
       onDragOver={(event) => {
         event.preventDefault()
         event.dataTransfer.dropEffect = 'move'
       }}
     >
-      <ReactFlow<PipelineCanvasNode, Edge>
-        key={file.id}
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={pipelineCanvasNodeTypes}
-        defaultViewport={draft.layout.viewport}
-        fitView={nodes.length > 0 && !draft.layout.viewport}
-        nodesConnectable={!readOnly}
-        elementsSelectable
-        deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
-        onMoveEnd={onMoveEnd}
-        aria-label={translate('fork.heimdallPipeline.canvas.graph', 'Pipeline graph')}
-      >
-        <Background gap={24} size={1} />
-        <Controls position="bottom-right" />
-        <MiniMap pannable zoomable position="bottom-left" />
-      </ReactFlow>
-      {nodes.length === 0 ? (
-        <div className="pipeline-canvas__empty">
-          {translate(
-            'fork.heimdallPipeline.canvas.empty',
-            'Add a node from the palette to start this graph.'
-          )}
-        </div>
-      ) : null}
-      {selectedNode ? <span className="sr-only">{selectedNode.id}</span> : null}
-    </div>
+      {(onNodeContextMenu) => (
+        <>
+          <ReactFlow<PipelineCanvasNode, Edge>
+            key={file.id}
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={pipelineCanvasNodeTypes}
+            defaultViewport={draft.layout.viewport}
+            fitView={nodes.length > 0 && !draft.layout.viewport}
+            minZoom={0.2}
+            nodesConnectable={!readOnly}
+            elementsSelectable
+            deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onNodeContextMenu={onNodeContextMenu}
+            onPaneClick={onPaneClick}
+            onMoveEnd={onMoveEnd}
+            aria-label={translate('fork.heimdallPipeline.canvas.graph', 'Pipeline graph')}
+          >
+            <Background gap={24} size={1} />
+            <Controls position="bottom-right" />
+            <MiniMap pannable zoomable position="bottom-left" />
+          </ReactFlow>
+          {nodes.length === 0 ? (
+            <div className="pipeline-canvas__empty">
+              {translate(
+                'fork.heimdallPipeline.canvas.empty',
+                'Add a node from the palette to start this graph.'
+              )}
+            </div>
+          ) : null}
+          {selectedNode ? <span className="sr-only">{selectedNode.id}</span> : null}
+        </>
+      )}
+    </PipelineNodeContextMenu>
   )
 }
