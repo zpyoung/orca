@@ -8,11 +8,81 @@ import {
 } from './identity'
 import { ledger as buildLedger, world as buildWorld } from './judgment-test-world'
 import { expandJudgmentState } from './state-normalization'
+import { projectBoundedJudgmentState } from './state-budget'
+
+function projectedPlan(state: JudgmentState): ObjectiveWorld['plan'] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: judgment state preserves the objective plan object shape, whose projection is intentionally typed as unknown.
+  return state.objective.plan as ObjectiveWorld['plan']
+}
 
 const watcherId = 'budget-watcher'
 
 function world(): ObjectiveWorld {
   return buildWorld({ withCapabilities: true })
+}
+
+function planRevision(
+  id: string,
+  number: number,
+  status: 'draft' | 'rejected',
+  createdAtMs: number,
+  createdByDispatchId: string | null = null
+): ObjectiveWorld['plan']['revisions'][number] {
+  return { id, number, status, digest: id, createdByDispatchId, createdAtMs, approvedAtMs: null }
+}
+
+function worldWithDraftCriterion(input: {
+  body: string
+  checkCommand: string
+  lastCheck?: ObjectiveWorld['plan']['nodes'][number]['criteria'][number]['lastCheck']
+  rejectedHistory?: boolean
+}): ObjectiveWorld {
+  const current = world()
+  const hasRejectedHistory = input.rejectedHistory ?? false
+  current.plan.revisions = [
+    ...(hasRejectedHistory ? [planRevision('revision-rejected', 1, 'rejected', 1)] : []),
+    planRevision('revision-draft', hasRejectedHistory ? 2 : 1, 'draft', hasRejectedHistory ? 20 : 1)
+  ]
+  const draftNode: ObjectiveWorld['plan']['nodes'][number] = {
+    revisionId: 'revision-draft',
+    taskKey: 'draft-task',
+    deps: [],
+    orchestrationTaskId: 'task-draft',
+    dispatchId: 'dispatch-draft',
+    state: 'pending',
+    criteria: [
+      {
+        id: 'criterion-live',
+        ordinal: 0,
+        body: input.body,
+        shellCheckable: true,
+        checkCommand: input.checkCommand,
+        lastCheck: input.lastCheck ?? null,
+        lastReview: input.lastCheck ? 'pass' : null
+      }
+    ]
+  }
+  const rejectedNode: ObjectiveWorld['plan']['nodes'][number] = {
+    revisionId: 'revision-rejected',
+    taskKey: 'rejected-task',
+    deps: [],
+    orchestrationTaskId: 'task-rejected',
+    dispatchId: 'dispatch-rejected',
+    state: 'failed',
+    criteria: [
+      {
+        id: 'criterion-rejected',
+        ordinal: 0,
+        body: 'old '.repeat(2_000),
+        shellCheckable: false,
+        checkCommand: null,
+        lastCheck: null,
+        lastReview: null
+      }
+    ]
+  }
+  current.plan.nodes = [...(hasRejectedHistory ? [rejectedNode] : []), draftNode]
+  return current
 }
 
 function ledger(entries: WatcherLedger['entries']): WatcherLedger {
@@ -463,13 +533,519 @@ describe('judgment state budget', () => {
     const initial = world()
     initial.contract = { ...initial.contract, existingPlan: '界'.repeat(1_000) }
     const initialFull = computeJudgmentIdentity('content-1', initial, ledger([]))
-    const unavailable = computeJudgmentIdentity('content-1', initial, ledger([]), {
+    const unavailable = projectBoundedJudgmentState('content-1', initial, ledger([]), {
       maxStateBytes: initialFull.serializedBytes - 1
     })
+    const unavailableState = expandJudgmentState<JudgmentState>(unavailable.state)
     expect(unavailable.fitsStateBudget).toBe(false)
     expect(unavailable.truncation).toBeNull()
-    expect(expanded(unavailable).objective.contract.existingPlan).toBe(
-      initial.contract.existingPlan
+    expect(unavailableState.objective.contract.existingPlan).toBe(initial.contract.existingPlan)
+  })
+
+  it('drops a rejected revision, its padded node, and its planner, ingest, and review attempts', () => {
+    const current = world()
+    current.plan.revisions = [
+      planRevision('revision-rejected', 1, 'rejected', 1, 'planner-rejected'),
+      planRevision('revision-draft', 2, 'draft', 20)
+    ]
+    current.plan.nodes = [
+      {
+        revisionId: 'revision-rejected',
+        taskKey: 'rejected-node',
+        deps: [],
+        orchestrationTaskId: 'task-rejected',
+        dispatchId: 'node-rejected',
+        state: 'failed',
+        criteria: [
+          {
+            id: 'criterion-rejected',
+            ordinal: 0,
+            body: 'obsolete criterion '.repeat(300),
+            shellCheckable: false,
+            checkCommand: null,
+            lastCheck: null,
+            lastReview: null
+          }
+        ]
+      }
+    ]
+    const planner: WatcherLedger['entries'][number] = {
+      eventId: 'event-planner-rejected',
+      watcherId,
+      atMs: 2,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-planner-rejected',
+      fingerprint: 'fingerprint-planner-rejected',
+      action: {
+        kind: 'dispatch-planner',
+        capability: 'plan',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey: 'planner-rejected',
+        revisionNumber: 1,
+        reason: 'initial'
+      },
+      state: 'settled',
+      effect: 'landed',
+      dispatchId: 'planner-rejected'
+    }
+    const ingestion: WatcherLedger['entries'][number] = {
+      eventId: 'event-ingest-rejected',
+      watcherId,
+      atMs: 3,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-ingest-rejected',
+      fingerprint: 'fingerprint-ingest-rejected',
+      action: {
+        kind: 'ingest-plan',
+        capability: 'plan',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey: 'ingest-rejected',
+        recovery: 'replay-safe',
+        dispatchId: 'planner-rejected',
+        revisionNumber: 1,
+        reportPath: 'reports/rejected-plan.json'
+      },
+      state: 'settled',
+      effect: 'landed',
+      dispatchId: 'planner-rejected'
+    }
+    const review: WatcherLedger['entries'][number] = {
+      eventId: 'event-review-rejected',
+      watcherId,
+      atMs: 4,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-review-rejected',
+      fingerprint: 'fingerprint-review-rejected',
+      action: {
+        kind: 'dispatch-reviewer',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey: 'review-rejected',
+        revisionId: 'revision-rejected'
+      },
+      state: 'settled',
+      effect: 'landed',
+      dispatchId: 'review-rejected'
+    }
+    const entries = [planner, ingestion, review]
+    const full = computeJudgmentIdentity('content-1', current, ledger(entries))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger(entries), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const state = expanded(bounded)
+    const plan = projectedPlan(state)
+
+    expect(bounded.fitsStateBudget).toBe(true)
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-draft'])
+    expect(plan.nodes).toEqual([])
+    expect(state.ledger.attempts).toEqual([])
+    expect(bounded.truncation?.omitted).toMatchObject({
+      revisions: 1,
+      nodes: 1,
+      attempts: 3
+    })
+  })
+
+  it('keeps a rejected revision pinned by an unresolved attempt', () => {
+    const current = world()
+    current.plan.revisions = [planRevision('revision-rejected', 1, 'rejected', 1)]
+    const unresolved = attempt({
+      id: 'unresolved-rejected',
+      evidenceKey: 'unresolved-rejected',
+      dispatchId: 'rejected-dispatch',
+      revisionId: 'revision-rejected',
+      state: 'running',
+      atMs: 2
+    })
+    const full = computeJudgmentIdentity('content-1', current, ledger([unresolved]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([unresolved]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const state = expanded(bounded)
+    const plan = projectedPlan(state)
+
+    expect(bounded.fitsStateBudget).toBe(false)
+    expect(bounded.truncation).toBeNull()
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-rejected'])
+    expect(state.ledger.attempts).toMatchObject([{ attemptId: 'unresolved-rejected' }])
+  })
+
+  it('keeps a rejected revision pinned by an unresolved plan-review dispatch', () => {
+    const current = world()
+    current.plan.revisions = [planRevision('revision-rejected', 1, 'rejected', 1)]
+    current.plan.planReviews = [
+      {
+        id: 'review-rejected',
+        targetKind: 'revision',
+        targetId: 'revision-rejected',
+        round: 1,
+        dispatchId: 'plan-review',
+        verdict: 'revise',
+        reportDigest: 'report-rejected',
+        createdAtMs: 2
+      }
+    ]
+    // no revisionId on the action, so only the plan review's dispatch ties it to the revision
+    const unresolved = attempt({
+      id: 'unresolved-plan-review',
+      evidenceKey: 'unresolved-plan-review',
+      dispatchId: 'plan-review',
+      state: 'running',
+      atMs: 3
+    })
+    const full = computeJudgmentIdentity('content-1', current, ledger([unresolved]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([unresolved]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const plan = projectedPlan(expanded(bounded))
+
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-rejected'])
+    expect(plan.planReviews?.map((review) => review.id)).toEqual(['review-rejected'])
+  })
+
+  it('keeps a rejected revision pinned by an active escalation', () => {
+    const current = world()
+    current.plan.revisions = [
+      planRevision('revision-rejected', 1, 'rejected', 1, 'rejected-dispatch')
+    ]
+    const escalation: EvidenceEntry = {
+      eventId: 'active-rejected-escalation',
+      watcherId,
+      atMs: 2,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'evidence',
+      evidenceKind: 'orchestration-mailbox',
+      payload: {
+        type: 'escalation',
+        body: 'Review remains unresolved',
+        payload: { dispatchId: 'rejected-dispatch' }
+      }
+    }
+    const full = computeJudgmentIdentity('content-1', current, ledger([escalation]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([escalation]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const state = expanded(bounded)
+    const plan = projectedPlan(state)
+
+    expect(bounded.fitsStateBudget).toBe(false)
+    expect(bounded.truncation).toBeNull()
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-rejected'])
+    expect(state.ledger.latestEscalation).toMatchObject({
+      body: 'Review remains unresolved'
+    })
+  })
+
+  it('omits an existing plan seed when only a draft revision exists', () => {
+    const current = world()
+    current.contract.existingPlan = 'existing plan seed '.repeat(300)
+    current.plan.revisions = [planRevision('revision-draft', 1, 'draft', 1)]
+    const full = computeJudgmentIdentity('content-1', current, ledger([]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const state = expanded(bounded)
+    const plan = projectedPlan(state)
+
+    expect(bounded.fitsStateBudget).toBe(true)
+    expect(state.objective.contract.existingPlan).toBeUndefined()
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-draft'])
+    expect(bounded.truncation?.omitted).toMatchObject({ existingPlan: 1, revisions: 0 })
+  })
+
+  it('drops rejected revision patches and reviews while retaining gate attempts and omission counts', () => {
+    const current = world()
+    current.plan.revisions = [
+      planRevision('revision-rejected', 1, 'rejected', 1),
+      planRevision('revision-draft', 2, 'draft', 20)
+    ]
+    const rejectedPatch: NonNullable<ObjectiveWorld['plan']['patches']>[number] = {
+      id: 'patch-rejected',
+      revisionId: 'revision-rejected',
+      createdByDispatchId: 'repair-rejected',
+      repairOrdinal: 1,
+      digest: 'rejected-patch',
+      status: 'rejected',
+      rejection: 'The repair was rejected',
+      touchedTaskKeys: ['old-task'],
+      createdAtMs: 2,
+      resolvedAtMs: 3
+    }
+    const draftPatch: NonNullable<ObjectiveWorld['plan']['patches']>[number] = {
+      id: 'patch-draft',
+      revisionId: 'revision-draft',
+      createdByDispatchId: 'repair-draft',
+      repairOrdinal: 1,
+      digest: 'draft-patch',
+      status: 'pending',
+      rejection: null,
+      touchedTaskKeys: ['current-task'],
+      createdAtMs: 21,
+      resolvedAtMs: null
+    }
+    const rejectedRevisionReview: NonNullable<ObjectiveWorld['plan']['planReviews']>[number] = {
+      id: 'review-rejected-revision',
+      targetKind: 'revision',
+      targetId: 'revision-rejected',
+      round: 1,
+      dispatchId: 'review-rejected-revision',
+      verdict: 'revise',
+      reportDigest: 'report-rejected-revision',
+      createdAtMs: 4
+    }
+    const rejectedPatchReview: NonNullable<ObjectiveWorld['plan']['planReviews']>[number] = {
+      id: 'review-rejected-patch',
+      targetKind: 'patch',
+      targetId: 'patch-rejected',
+      round: 1,
+      dispatchId: 'review-rejected-patch',
+      verdict: 'revise',
+      reportDigest: 'report-rejected-patch',
+      createdAtMs: 5
+    }
+    const draftRevisionReview: NonNullable<ObjectiveWorld['plan']['planReviews']>[number] = {
+      id: 'review-draft-revision',
+      targetKind: 'revision',
+      targetId: 'revision-draft',
+      round: 1,
+      dispatchId: 'review-draft-revision',
+      verdict: 'approve',
+      reportDigest: 'report-draft-revision',
+      createdAtMs: 22
+    }
+    const draftPatchReview: NonNullable<ObjectiveWorld['plan']['planReviews']>[number] = {
+      id: 'review-draft-patch',
+      targetKind: 'patch',
+      targetId: 'patch-draft',
+      round: 1,
+      dispatchId: 'review-draft-patch',
+      verdict: 'escalate',
+      reportDigest: 'report-draft-patch',
+      createdAtMs: 23
+    }
+    const gateAttempts = [
+      {
+        gateName: 'unit',
+        contentIdentity: 'content-1',
+        executionHostId: 'host-1',
+        command: 'pnpm test',
+        exitCode: 0,
+        timedOut: false,
+        stdoutTail: 'passed',
+        stderrTail: null,
+        startedAtMs: 6,
+        completedAtMs: 7
+      },
+      {
+        gateName: 'typecheck',
+        contentIdentity: 'content-2',
+        executionHostId: 'host-2',
+        command: 'pnpm typecheck',
+        exitCode: 1,
+        timedOut: false,
+        stdoutTail: null,
+        stderrTail: 'failed',
+        startedAtMs: 24,
+        completedAtMs: 25
+      }
+    ]
+    current.plan.patches = [rejectedPatch, draftPatch]
+    current.plan.planReviews = [
+      rejectedRevisionReview,
+      rejectedPatchReview,
+      draftRevisionReview,
+      draftPatchReview
+    ]
+    current.plan.gateAttempts = gateAttempts
+
+    const full = computeJudgmentIdentity('content-1', current, ledger([]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const plan = projectedPlan(expanded(bounded))
+
+    expect(bounded.fitsStateBudget).toBe(true)
+    expect(plan.patches?.map(({ id, revisionId }) => ({ id, revisionId }))).toEqual([
+      { id: 'patch-draft', revisionId: 'revision-draft' }
+    ])
+    expect(plan.planReviews?.map(({ id, targetId }) => ({ id, targetId }))).toEqual([
+      { id: 'review-draft-revision', targetId: 'revision-draft' },
+      { id: 'review-draft-patch', targetId: 'patch-draft' }
+    ])
+    expect(
+      plan.gateAttempts?.map(
+        ({
+          gateName,
+          contentIdentity,
+          executionHostId,
+          command,
+          exitCode,
+          timedOut,
+          stdoutTail,
+          stderrTail
+        }) => ({
+          gateName,
+          contentIdentity,
+          executionHostId,
+          command,
+          exitCode,
+          timedOut,
+          stdoutTail,
+          stderrTail
+        })
+      )
+    ).toEqual([
+      {
+        gateName: 'unit',
+        contentIdentity: 'content-1',
+        executionHostId: 'host-1',
+        command: 'pnpm test',
+        exitCode: 0,
+        timedOut: false,
+        stdoutTail: 'passed',
+        stderrTail: null
+      },
+      {
+        gateName: 'typecheck',
+        contentIdentity: 'content-2',
+        executionHostId: 'host-2',
+        command: 'pnpm typecheck',
+        exitCode: 1,
+        timedOut: false,
+        stdoutTail: null,
+        stderrTail: 'failed'
+      }
+    ])
+    expect(bounded.truncation?.omitted).toMatchObject({
+      patches: 1,
+      planReviews: 2,
+      clippedCriterionStrings: 0,
+      criterionCodeUnitCap: 0
+    })
+  })
+
+  it('omits an existing plan before a newer rejected revision', () => {
+    const current = world()
+    current.contract.existingPlan = 'seed '.repeat(300)
+    current.plan.revisions = [planRevision('revision-rejected', 1, 'rejected', 100)]
+    const full = computeJudgmentIdentity('content-1', current, ledger([]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const plan = projectedPlan(expanded(bounded))
+
+    expect(bounded.fitsStateBudget).toBe(true)
+    expect(expanded(bounded).objective.contract.existingPlan).toBeUndefined()
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-rejected'])
+    expect(bounded.truncation?.omitted).toMatchObject({
+      existingPlan: 1,
+      revisions: 0
+    })
+  })
+
+  it('clips only retained draft criterion strings after omission is insufficient', () => {
+    const body = 'b'.repeat(8_192)
+    const checkCommand = 'c'.repeat(8_192)
+    const lastCheck = {
+      contentIdentity: 'content-1',
+      exitCode: 0,
+      timedOut: false,
+      atMs: 2
+    }
+    const current = worldWithDraftCriterion({ body, checkCommand, lastCheck })
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: 4_096
+    })
+    const plan = projectedPlan(expanded(bounded))
+    const retainedCriterion = plan.nodes[0]?.criteria[0]
+    const criterionCap = bounded.truncation?.omitted.criterionCodeUnitCap ?? 0
+
+    expect(bounded.fitsStateBudget).toBe(true)
+    expect(bounded.truncation?.version).toBe(2)
+    expect(bounded.truncation?.omitted.clippedCriterionStrings).toBe(2)
+    expect(criterionCap).toBeGreaterThanOrEqual(256)
+    expect(criterionCap).toBeLessThan(8_192)
+    expect(bounded.truncationNotice).toContain(
+      `clipped 2 criterion string(s) to ${criterionCap} code units`
     )
+    expect(retainedCriterion).toMatchObject({
+      id: 'criterion-live',
+      body: `${body.slice(0, criterionCap)}…`,
+      checkCommand: `${checkCommand.slice(0, criterionCap)}…`,
+      lastCheck: { contentIdentity: 'content-1', exitCode: 0, timedOut: false }
+    })
+    expect(retainedCriterion?.body).toHaveLength(criterionCap + 1)
+    expect(retainedCriterion?.checkCommand).toHaveLength(criterionCap + 1)
+  })
+
+  it('does not clip a live draft when omitting a rejected revision makes the state fit', () => {
+    const body = 'draft body '.repeat(700)
+    const checkCommand = 'pnpm check '.repeat(700)
+    const current = worldWithDraftCriterion({ body, checkCommand, rejectedHistory: true })
+    const full = computeJudgmentIdentity('content-1', current, ledger([]))
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: full.serializedBytes - 1
+    })
+    const plan = projectedPlan(expanded(bounded))
+    const retainedCriterion = plan.nodes[0]?.criteria[0]
+
+    expect(bounded.fitsStateBudget).toBe(true)
+    expect(plan.revisions.map((revision) => revision.id)).toEqual(['revision-draft'])
+    expect(plan.nodes.map((node) => node.revisionId)).toEqual(['revision-draft'])
+    expect(retainedCriterion?.body).toBe(body)
+    expect(retainedCriterion?.checkCommand).toBe(checkCommand)
+    expect(bounded.truncation?.omitted.clippedCriterionStrings).toBe(0)
+    expect(bounded.truncation?.omitted.criterionCodeUnitCap).toBe(0)
+  })
+
+  it('keeps the 256-code-unit clipping floor even when the mandatory state still overflows', () => {
+    const body = 'b'.repeat(8_192)
+    const checkCommand = 'c'.repeat(8_192)
+    const lastCheck = {
+      contentIdentity: 'content-1',
+      exitCode: 0,
+      timedOut: false,
+      atMs: 2
+    }
+    const current = worldWithDraftCriterion({ body, checkCommand, lastCheck })
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: 256
+    })
+    const plan = projectedPlan(expanded(bounded))
+    const retainedCriterion = plan.nodes[0]?.criteria[0]
+
+    expect(bounded.fitsStateBudget).toBe(false)
+    expect(bounded.truncation?.omitted.clippedCriterionStrings).toBe(2)
+    expect(bounded.truncation?.omitted.criterionCodeUnitCap).toBe(256)
+    expect(retainedCriterion).toMatchObject({
+      id: 'criterion-live',
+      body: `${body.slice(0, 256)}…`,
+      checkCommand: `${checkCommand.slice(0, 256)}…`,
+      lastCheck: { contentIdentity: 'content-1', exitCode: 0, timedOut: false }
+    })
+    expect(retainedCriterion?.body).toHaveLength(257)
+    expect(retainedCriterion?.checkCommand).toHaveLength(257)
+  })
+
+  it('never splits a surrogate pair at the clipping cap', () => {
+    // 255 ASCII units put the emoji's high surrogate exactly at code unit 256
+    const body = `${'b'.repeat(255)}${'😀'.repeat(4_000)}`
+    const current = worldWithDraftCriterion({ body, checkCommand: 'c'.repeat(8_192) })
+    const bounded = computeJudgmentIdentity('content-1', current, ledger([]), {
+      maxStateBytes: 256
+    })
+    const retainedBody = projectedPlan(expanded(bounded)).nodes[0]?.criteria[0]?.body
+
+    expect(retainedBody).toBe(`${'b'.repeat(255)}…`)
   })
 })

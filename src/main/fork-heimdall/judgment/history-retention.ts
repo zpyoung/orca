@@ -1,4 +1,6 @@
+import { activeObjectiveRevision } from '../../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/detail-types'
+import { lineageBaseIdentity } from '../../../shared/fork-heimdall-objective/landing-ladder'
 import {
   numberField,
   stableJson,
@@ -19,6 +21,7 @@ export type OmissionUnit = {
   escalationKeys: readonly string[]
   reportKeys: readonly string[]
   judgmentReportIndexes: readonly number[]
+  gateAttemptIndexes: readonly number[]
   subjectIds: readonly string[]
 }
 
@@ -43,6 +46,7 @@ function emptyUnit(ordinal: number): OmissionUnit {
     escalationKeys: [],
     reportKeys: [],
     judgmentReportIndexes: [],
+    gateAttemptIndexes: [],
     subjectIds: []
   }
 }
@@ -99,11 +103,7 @@ function reportWasConsumed(candidate: SubjectGroup, world: ObjectiveWorld): bool
 }
 
 function isObsoletePlannerHistory(candidate: SubjectGroup, world: ObjectiveWorld): boolean {
-  const activeNumber = world.plan.revisions.reduce(
-    (highest, revision) =>
-      revision.status === 'approved' ? Math.max(highest, revision.number) : highest,
-    0
-  )
+  const activeNumber = activeObjectiveRevision(world)?.number ?? 0
   if (
     activeNumber === 0 ||
     candidate.attempts.some(
@@ -127,14 +127,12 @@ function isObsoletePlannerHistory(candidate: SubjectGroup, world: ObjectiveWorld
 
 export function buildOmissionUnits(
   world: ObjectiveWorld,
-  ledger: LedgerProjection
+  ledger: LedgerProjection,
+  contentIdentity: string
 ): OmissionUnit[] {
   const units: OmissionUnit[] = []
   let ordinal = 0
-  if (
-    world.contract.existingPlan !== undefined &&
-    world.plan.revisions.some((revision) => revision.status === 'approved')
-  ) {
+  if (world.contract.existingPlan !== undefined && world.plan.revisions.length > 0) {
     units.push({ ...emptyUnit(ordinal++), existingPlan: true })
   }
 
@@ -143,11 +141,11 @@ export function buildOmissionUnits(
   const claimedJudgmentReports = new Set<number>()
   const escalation = activeEscalationIds(ledger)
   const protectedRevisionSubjects = new Set<string>()
-  const superseded = [...world.plan.revisions]
-    .filter((revision) => revision.status === 'superseded')
+  const historicalRevisions = [...world.plan.revisions]
+    .filter((revision) => revision.status === 'superseded' || revision.status === 'rejected')
     .sort((left, right) => left.number - right.number)
 
-  for (const revision of superseded) {
+  for (const revision of historicalRevisions) {
     const subjects = new Set<string>()
     if (revision.createdByDispatchId) {
       subjects.add(revision.createdByDispatchId)
@@ -161,6 +159,19 @@ export function buildOmissionUnits(
       if (verdict.revisionId === revision.id) {
         subjects.add(verdict.dispatchId)
       }
+    }
+    const patches = (world.plan.patches ?? []).filter((patch) => patch.revisionId === revision.id)
+    const patchIds = new Set(patches.map((patch) => patch.id))
+    const planReviews = (world.plan.planReviews ?? []).filter(
+      (review) =>
+        (review.targetKind === 'revision' && review.targetId === revision.id) ||
+        (review.targetKind === 'patch' && patchIds.has(review.targetId))
+    )
+    for (const patch of patches) {
+      subjects.add(patch.createdByDispatchId)
+    }
+    for (const review of planReviews) {
+      subjects.add(review.dispatchId)
     }
     const attemptKeys = new Set<string>()
     for (const attempt of ledger.attempts) {
@@ -218,7 +229,9 @@ export function buildOmissionUnits(
         .map((verdict) => verdict.atMs),
       ...world.plan.landing
         .filter((record) => record.revisionId === revision.id)
-        .map((record) => record.atMs)
+        .map((record) => record.atMs),
+      ...patches.map((patch) => patch.resolvedAtMs ?? patch.createdAtMs),
+      ...planReviews.map((review) => review.createdAtMs)
     )
     const newest = [
       { atMs: planAtMs, sourceIndex: revision.number },
@@ -239,6 +252,7 @@ export function buildOmissionUnits(
       escalationKeys: [],
       reportKeys,
       judgmentReportIndexes,
+      gateAttemptIndexes: [],
       subjectIds: [...subjects]
     })
   }
@@ -311,7 +325,25 @@ export function buildOmissionUnits(
       escalationKeys: [],
       reportKeys: candidate.reports.map((report) => report.key),
       judgmentReportIndexes: candidate.judgmentReportIndexes,
+      gateAttemptIndexes: [],
       subjectIds: [candidate.subjectId]
+    })
+  }
+
+  // gates are evaluated against the lineage base identity, so only that and the raw identity are live
+  const liveGateIdentities = new Set([
+    contentIdentity,
+    lineageBaseIdentity(world.plan.landing, contentIdentity)
+  ])
+  for (const [index, gateAttempt] of (world.plan.gateAttempts ?? []).entries()) {
+    if (gateAttempt.completedAtMs === null || liveGateIdentities.has(gateAttempt.contentIdentity)) {
+      continue
+    }
+    history.push({
+      ...emptyUnit(ordinal++),
+      atMs: gateAttempt.completedAtMs,
+      sourceIndex: index,
+      gateAttemptIndexes: [index]
     })
   }
 
