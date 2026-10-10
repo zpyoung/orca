@@ -52,7 +52,7 @@ function calculatedLayers(
   return layers
 }
 
-/** Place unpositioned nodes in deterministic dependency layers while retaining valid saved points. */
+/** Place unpositioned nodes in deterministic top-to-bottom dependency layers while retaining valid saved points. */
 export function layeredLayout(document: PipelineDocument, stored?: PipelineLayout): PipelineLayout {
   const parsed = stored === undefined ? null : PipelineLayoutSchema.safeParse(stored)
   const storedLayout = parsed?.success ? parsed.data : null
@@ -103,8 +103,8 @@ export function layeredLayout(document: PipelineDocument, stored?: PipelineLayou
   const positions: Record<string, Point> = {}
   for (const node of document.nodes) {
     const calculated = {
-      x: (layers.get(node.id) ?? 0) * 280,
-      y: (orderByNode.get(node.id) ?? 0) * 120
+      x: (orderByNode.get(node.id) ?? 0) * 280,
+      y: (layers.get(node.id) ?? 0) * 160
     }
     const point = storedLayout?.nodes[node.id]
     positions[node.id] =

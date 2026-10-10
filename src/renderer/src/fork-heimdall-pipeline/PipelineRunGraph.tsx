@@ -79,9 +79,9 @@ function flowPositions(
     if (!runNode || runNode.parentInstanceId) {
       continue
     }
-    const position = { ...(baseLayout.nodes[runNode.nodeId] ?? { x: 0, y: index * 120 }) }
+    const position = { ...(baseLayout.nodes[runNode.nodeId] ?? { x: index * 280, y: 0 }) }
     while (occupied.has(`${position.x}:${position.y}`)) {
-      position.y += 120
+      position.x += 280
     }
     occupied.add(`${position.x}:${position.y}`)
     positions.set(runNode.instanceId, position)
@@ -95,8 +95,8 @@ function flowPositions(
     const childIndex = childIndexByParent.get(runNode.parentInstanceId) ?? 0
     childIndexByParent.set(runNode.parentInstanceId, childIndex + 1)
     positions.set(runNode.instanceId, {
-      x: parentPosition.x,
-      y: parentPosition.y + 150 + childIndex * 120
+      x: parentPosition.x + 300 + childIndex * 280,
+      y: parentPosition.y
     })
   }
   return positions

@@ -31,7 +31,7 @@ function check(id: string, command: string, after?: PipelineCheckNode['after']):
 }
 
 describe('layeredLayout', () => {
-  it('places the Bugfix chain in successive columns on one row', () => {
+  it('places the Bugfix chain in successive rows of one column', () => {
     const result = layeredLayout(
       documentWith([
         agent('repro'),
@@ -43,22 +43,22 @@ describe('layeredLayout', () => {
 
     expect(result.nodes).toEqual({
       repro: { x: 0, y: 0 },
-      fix: { x: 280, y: 0 },
-      check: { x: 560, y: 0 },
-      land: { x: 840, y: 0 }
+      fix: { x: 0, y: 160 },
+      check: { x: 0, y: 320 },
+      land: { x: 0, y: 480 }
     })
   })
 
-  it('orders a diamond by predecessor position and gives its join the first row', () => {
+  it('orders a diamond by predecessor position and gives its join the first column', () => {
     const result = layeredLayout(
       documentWith([agent('a'), agent('b', ['a']), agent('c', ['a']), agent('d', ['b', 'c'])])
     )
 
     expect(result.nodes).toEqual({
       a: { x: 0, y: 0 },
-      b: { x: 280, y: 0 },
-      c: { x: 280, y: 120 },
-      d: { x: 560, y: 0 }
+      b: { x: 0, y: 160 },
+      c: { x: 280, y: 160 },
+      d: { x: 0, y: 320 }
     })
   })
 
@@ -74,7 +74,7 @@ describe('layeredLayout', () => {
 
     expect(result).toEqual({
       version: 1,
-      nodes: { a: { x: 44, y: 88 }, b: { x: 280, y: 0 } },
+      nodes: { a: { x: 44, y: 88 }, b: { x: 0, y: 160 } },
       viewport: { x: 10, y: 20, zoom: 1.25 }
     })
   })
