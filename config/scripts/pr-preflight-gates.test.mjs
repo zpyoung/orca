@@ -48,7 +48,9 @@ it('requires physical preflight success before publishing shards and admitting c
   expect(steps[upload].with.name).toBe('unit-selection-attempt-${{ github.run_attempt }}')
   expect(preflight.outputs.shards).toBe('${{ steps.unit-plan.outputs.shards }}')
   expect(workflow.jobs.test.with.shards).toBe('${{ needs.preflight.outputs.shards }}')
-  for (const job of ['test', 'package', 'package_windows']) {
+  // This fork removed the Windows PR packaging lane.
+  expect(workflow.jobs.package_windows).toBeUndefined()
+  for (const job of ['test', 'package']) {
     expect(workflow.jobs[job].needs).toEqual(['code_paths', 'preflight'])
   }
   for (const result of ['success', 'failure', 'cancelled', 'skipped']) {

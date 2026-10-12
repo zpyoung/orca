@@ -2,7 +2,7 @@
 // what the updater resolves on any path: the stable Latest feed, the RC prerelease feed, or the
 // build picker.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getVersionChannel } from '../shared/release-channel'
+import { getVersionChannel, MAIN_RELEASE_REPO } from '../shared/release-channel'
 import { installNetRequestFetchAdapter } from './updater-net-request.fixture'
 
 const { netFetchMock, netRequestMock } = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ function atomFeed(tags: readonly string[]): string {
   const entries = tags
     .map(
       (tag) =>
-        `<entry><link rel="alternate" type="text/html" href="https://github.com/stablyai/orca/releases/tag/${tag}"/><title>${tag}</title></entry>`
+        `<entry><link rel="alternate" type="text/html" href="https://github.com/${MAIN_RELEASE_REPO}/releases/tag/${tag}"/><title>${tag}</title></entry>`
     )
     .join('')
   return `<?xml version="1.0" encoding="UTF-8"?><feed>${entries}</feed>`
@@ -38,7 +38,7 @@ function atomFeed(tags: readonly string[]): string {
 
 function serveFeed(tags: readonly string[]): void {
   netFetchMock.mockImplementation((url: string) => {
-    if (url === 'https://github.com/stablyai/orca/releases.atom') {
+    if (url === `https://github.com/${MAIN_RELEASE_REPO}/releases.atom`) {
       return Promise.resolve({ ok: true, text: () => Promise.resolve(atomFeed(tags)) })
     }
     const manifest = url.match(/\/releases\/download\/v([^/]+)\/latest(?:-[a-z]+)?\.yml$/)
@@ -62,7 +62,7 @@ function apiRelease(tag: string, assets: readonly string[]) {
     tag_name: tag,
     draft: false,
     published_at: '2026-10-01T00:00:00Z',
-    html_url: `https://github.com/stablyai/orca/releases/tag/${tag}`,
+    html_url: `https://github.com/${MAIN_RELEASE_REPO}/releases/tag/${tag}`,
     assets: assets.map((name) => ({ name }))
   }
 }
