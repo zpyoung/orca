@@ -126,6 +126,21 @@ structured sessions as well as Heimdall owners; a fork-only launch workaround wo
 
 **Status:** pending-upstream. Not yet submitted.
 
+## Relay workflow inventory v1.4.224
+
+**What:** v1.4.224's release cut (`6ad7ac240e`) copied `cloud-operate-relay-production-cell-flags.yml`
+from main, but not main's matching updates to the two relay workflow inventory tests, so the tag
+fails `the copy carries every relay workflow` (26 !== 25) and the production identity reader list.
+The fork aligns both tests with the 26 workflows the release ships.
+
+**Paths:**
+
+- `cloud/dev/scripts/relay-public-workflow-contract.test.mjs`
+- `cloud/dev/scripts/relay-production-identity-boundaries.test.mjs`
+
+**Status:** pending-upstream. Resolves on its own when a stable tag carries main's test update; drop
+both exceptions at that sync.
+
 ## Warning status tokens
 
 **What:** adds the warning foreground role to the canonical light/dark theme and Tailwind bindings.

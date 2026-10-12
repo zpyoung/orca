@@ -6336,6 +6336,18 @@
       "reason": "Exercises upstream's transcript prompt recall (useNativeChatComposerRecall), which the fork composer replaces with its own per-pane history; the fork's equivalent coverage is in fork-agent-composer.",
       "status": "permanent",
       "deleted": true
+    },
+    {
+      "path": "cloud/dev/scripts/relay-public-workflow-contract.test.mjs",
+      "reason": "v1.4.224's release cut copied cloud-operate-relay-production-cell-flags.yml from main without main's matching test update, so the tag fails its own relay workflow inventory; this aligns the test with the workflows the release ships.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#relay-workflow-inventory-v1-4-224"
+    },
+    {
+      "path": "cloud/dev/scripts/relay-production-identity-boundaries.test.mjs",
+      "reason": "v1.4.224's release cut copied cloud-operate-relay-production-cell-flags.yml from main without main's matching test update, so the tag fails its own relay workflow inventory; this aligns the test with the workflows the release ships.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#relay-workflow-inventory-v1-4-224"
     }
   ],
   "residuals": {
