@@ -20,7 +20,7 @@ describe('direct work-item launch settings', () => {
   it('applies recipe launch options without catalog defaults', () => {
     const result = buildDirectWorkItemAgentStartupPlan({
       agent: 'codex',
-      agentArgs: '--model raw-model',
+      agentArgs: '--verbose',
       launchOptions: { model: 'recipe-model', optionValues: { effort: 'high' } },
       draftContent: 'Review issue 42',
       promptDelivery: 'draft',
@@ -30,6 +30,21 @@ describe('direct work-item launch settings', () => {
 
     expect(result.startupPlan?.launchCommand).toContain("'-m' 'recipe-model'")
     expect(result.startupPlan?.launchCommand).toContain("'-c' 'model_reasoning_effort=high'")
+    expect(result.startupPlan?.launchCommand).toContain("'--verbose'")
+  })
+
+  it('lets a raw model argument replace the recipe model instead of repeating the flag', () => {
+    const result = buildDirectWorkItemAgentStartupPlan({
+      agent: 'codex',
+      agentArgs: '--model raw-model',
+      launchOptions: { model: 'recipe-model', optionValues: { effort: 'high' } },
+      draftContent: 'Review issue 42',
+      promptDelivery: 'draft',
+      settings,
+      launchPlatform: 'darwin'
+    })
+
     expect(result.startupPlan?.launchCommand).toContain("'--model' 'raw-model'")
+    expect(result.startupPlan?.launchCommand).not.toContain('recipe-model')
   })
 })

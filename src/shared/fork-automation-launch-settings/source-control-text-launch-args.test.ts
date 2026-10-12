@@ -10,9 +10,19 @@ describe('resolveSourceControlTextLaunchAgentArgs', () => {
       resolveSourceControlTextLaunchAgentArgs({
         agentId: 'claude',
         launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } },
+        agentArgs: '--verbose'
+      })
+    ).toBe("'--model' 'sonnet' '--effort' 'high' '--verbose'")
+  })
+
+  it('lets a raw model argument replace the structured model instead of repeating the flag', () => {
+    expect(
+      resolveSourceControlTextLaunchAgentArgs({
+        agentId: 'claude',
+        launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } },
         agentArgs: '--model opus'
       })
-    ).toBe("'--model' 'sonnet' '--effort' 'high' '--model' 'opus'")
+    ).toBe("'--model' 'opus'")
   })
 
   it('preserves malformed raw input so the one-shot planner rejects it', () => {
@@ -43,16 +53,30 @@ describe('materializeSourceControlTextGenerationParams', () => {
         agentId: 'codex',
         model: 'global-model',
         thinkingLevel: 'medium',
-        agentArgs: '--model raw-model',
+        agentArgs: '--verbose',
         launchOptions: { model: 'recipe-model', optionValues: { effort: 'high' } }
       })
     ).toEqual({
       agentId: 'codex',
       model: 'recipe-model',
       thinkingLevel: 'high',
-      agentArgs: "'-m' 'recipe-model' '-c' 'model_reasoning_effort=high' '--model' 'raw-model'",
-      recipeAgentArgs: '--model raw-model',
+      agentArgs: "'-m' 'recipe-model' '-c' 'model_reasoning_effort=high' '--verbose'",
+      recipeAgentArgs: '--verbose',
       launchOptions: { model: 'recipe-model', optionValues: { effort: 'high' } }
+    })
+  })
+
+  it('keeps a raw model argument in place of the recipe model flags', () => {
+    expect(
+      materializeSourceControlTextGenerationParams({
+        agentId: 'codex',
+        model: 'global-model',
+        agentArgs: '--model raw-model',
+        launchOptions: { model: 'recipe-model', optionValues: { effort: 'high' } }
+      })
+    ).toMatchObject({
+      agentArgs: "'--model' 'raw-model'",
+      recipeAgentArgs: '--model raw-model'
     })
   })
 

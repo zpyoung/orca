@@ -271,7 +271,8 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "          const launchSettings = runtime.buildAutomationRunLaunchSettings(automation, target.repo)",
+        "import { automationRunLaunchSettingsFor } from './fork-automation-launch-settings/run-launch-settings-for-dispatch'",
+        "          const launchSettings = automationRunLaunchSettingsFor(runtime, automation, target.repo)",
         "              launchOverrides: automation.launchOverrides ?? undefined",
         "            launchSettings"
       ]
@@ -8343,7 +8344,7 @@
       "removed": 1
     },
     "src/renderer/src/components/right-sidebar/use-create-pull-request-field-generation.ts": {
-      "added": 14,
+      "added": 15,
       "removed": 2
     },
     "src/renderer/src/components/right-sidebar/useSavedSourceControlAgentActionAutoStart.ts": {
@@ -8607,7 +8608,7 @@
       "removed": 1
     },
     "src/main/automations/runtime-automation-service.ts": {
-      "added": 5,
+      "added": 6,
       "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatUserMessageRow.tsx": {

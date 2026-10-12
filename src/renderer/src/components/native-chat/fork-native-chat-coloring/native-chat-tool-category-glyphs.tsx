@@ -31,11 +31,15 @@ export function NativeChatToolCategoryDots({
   blocks
 }: {
   blocks: NativeChatBlock[]
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const categories = distinctToolCategories(blocks)
+  if (categories.length === 0) {
+    return null
+  }
 
+  // One header slot, like upstream's marks, so the dots sit on the summary's first line.
   return (
-    <>
+    <span className="flex h-[1lh] shrink-0 items-center gap-1">
       {categories.map((category) => (
         <span
           key={category}
@@ -44,7 +48,7 @@ export function NativeChatToolCategoryDots({
           className={cn('size-1.5 shrink-0 rounded-full', DOT_CLASS_BY_CATEGORY[category])}
         />
       ))}
-    </>
+    </span>
   )
 }
 

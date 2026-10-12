@@ -241,7 +241,6 @@ export function NativeChatToolRun({
               />
             </span>
           ) : null}
-          <NativeChatToolCategoryDots blocks={blocks} />
           {/* Keep the collapsed header bounded; the tool detail carries the full command. */}
           <span
             className={cn(
@@ -253,6 +252,7 @@ export function NativeChatToolRun({
           >
             {runSentence ?? fallbackLabel}
           </span>
+          <NativeChatToolCategoryDots blocks={blocks} />
           <NativeChatToolRunCallCounts
             failed={failedCallCount}
             interrupted={interruptedCallCount}

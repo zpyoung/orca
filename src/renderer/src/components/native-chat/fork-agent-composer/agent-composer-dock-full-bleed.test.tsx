@@ -80,7 +80,7 @@ function renderField(layout?: 'dock'): {
     />
   )
 
-  const card = document.querySelector('[data-native-file-drop-target]') as HTMLElement
+  const card = document.querySelector('.border-chat-composer-border') as HTMLElement
   const widthWrapper = card.parentElement as HTMLElement
   const paddingWrapper = widthWrapper.parentElement as HTMLElement
   return { widthWrapper, paddingWrapper, card }
@@ -98,7 +98,7 @@ describe('agent composer dock layout', () => {
     }
     expect(widthWrapper).toHaveClass('w-full')
     expect(card).toHaveClass('rounded-none')
-    expect(card).not.toHaveClass('rounded-lg')
+    expect(card).not.toHaveClass('rounded-xl')
   })
 
   it('keeps the centered padded card in the chat layout', () => {
@@ -106,7 +106,7 @@ describe('agent composer dock layout', () => {
 
     expect(paddingWrapper).toHaveClass('px-3', 'pt-2', 'pb-4', 'sm:px-4')
     expect(widthWrapper).toHaveClass('mx-auto', 'max-w-(--chat-content-max-width)')
-    expect(card).toHaveClass('rounded-lg')
+    expect(card).toHaveClass('rounded-xl')
     expect(card).not.toHaveClass('rounded-none')
   })
 })

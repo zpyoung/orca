@@ -115,7 +115,8 @@ export function useCreatePullRequestFieldGeneration({
       const resolvedParams =
         overrides?.sourceControlAiResolvedParams ??
         (resolvedPullRequestAi?.ok ? resolvedPullRequestAi.value.params : undefined)
-      const effectiveOverrides = resolvedParams
+      // Only saved structured choices need client-side materialization; the host resolves the rest.
+      const effectiveOverrides = resolvedParams?.launchOptions
         ? {
             ...overrides,
             sourceControlAiResolvedParams:

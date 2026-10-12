@@ -16,6 +16,7 @@ import {
 } from '../../shared/tui-agent-config'
 import { buildHeadlessAutomationWorktreeCreateArgs } from './headless-workspace-create'
 import { createRuntimeAutomationRunTerminalObserver } from './runtime-terminal-run-observer'
+import { automationRunLaunchSettingsFor } from './fork-automation-launch-settings/run-launch-settings-for-dispatch'
 
 const MAX_REMEMBERED_LAUNCHES = 256
 
@@ -57,7 +58,7 @@ export function createRuntimeAutomationService(input: {
           let terminalPtyId: string | null = null
           let workspaceId: string
           let workspaceDisplayName: string | null = null
-          const launchSettings = runtime.buildAutomationRunLaunchSettings(automation, target.repo)
+          const launchSettings = automationRunLaunchSettingsFor(runtime, automation, target.repo)
           if (automation.workspaceMode === 'new_per_run') {
             const created = await runtime.createManagedWorktree(
               buildHeadlessAutomationWorktreeCreateArgs({ automation, run, repo: target.repo })

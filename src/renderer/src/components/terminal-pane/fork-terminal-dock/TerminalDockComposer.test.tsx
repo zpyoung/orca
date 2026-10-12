@@ -46,6 +46,11 @@ const mocks = vi.hoisted(() => ({
   ]
 }))
 
+vi.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+}))
 vi.mock('../../../store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({ agentStatusByPaneKey: { 'pane-1': mocks.status } })
