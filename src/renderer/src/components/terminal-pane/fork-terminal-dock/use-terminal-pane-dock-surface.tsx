@@ -86,10 +86,12 @@ export function useTerminalPaneDockSurface(controller: TerminalPaneController): 
   // still pick up a later-confirmed verdict. The subscription lives in the Surface because
   // upstream pins the controller chain's per-pane store-subscription count.
   const remoteConptyUnverified = useAppStore((store) =>
-    resolveRemoteDockConptyUnverified({
-      executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
-      state: store
-    })
+    store.settings?.experimentalTerminalDock === true
+      ? resolveRemoteDockConptyUnverified({
+          executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
+          state: store
+        })
+      : null
   )
   useEffect(() => {
     const manager = managerRef.current

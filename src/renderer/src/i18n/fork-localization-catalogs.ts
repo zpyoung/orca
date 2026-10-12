@@ -4,15 +4,10 @@ import relayJA from '../components/native-chat/fork-native-chat-relay/locales/ja
 import relayES from '../components/native-chat/fork-native-chat-relay/locales/es.json'
 import relayEN from '../components/native-chat/fork-native-chat-relay/locales/en.json'
 import worktreeGroupsEN from '../components/sidebar/fork-worktree-groups/locales/en.json'
-import en from '../components/native-chat/fork-native-chat-width/locales/en.json'
 import worktreeGroupsES from '../components/sidebar/fork-worktree-groups/locales/es.json'
-import es from '../components/native-chat/fork-native-chat-width/locales/es.json'
 import worktreeGroupsJA from '../components/sidebar/fork-worktree-groups/locales/ja.json'
-import ja from '../components/native-chat/fork-native-chat-width/locales/ja.json'
 import worktreeGroupsKO from '../components/sidebar/fork-worktree-groups/locales/ko.json'
-import ko from '../components/native-chat/fork-native-chat-width/locales/ko.json'
 import worktreeGroupsZH from '../components/sidebar/fork-worktree-groups/locales/zh.json'
-import zh from '../components/native-chat/fork-native-chat-width/locales/zh.json'
 
 import dockEN from '../components/terminal-pane/fork-terminal-dock/locales/en.json'
 import dockES from '../components/terminal-pane/fork-terminal-dock/locales/es.json'
@@ -117,7 +112,6 @@ type ForkCatalogRegistrar = {
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
   en: [
     relayEN,
-    en,
     worktreeGroupsEN,
     dockEN,
     dockSettingsEN,
@@ -141,7 +135,6 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
   ],
   es: [
     relayES,
-    es,
     worktreeGroupsES,
     dockES,
     dockSettingsES,
@@ -166,7 +159,6 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
   fr: [heimdallCatalogs.fr, heimdallObjectiveCatalogs.fr],
   ja: [
     relayJA,
-    ja,
     worktreeGroupsJA,
     dockJA,
     dockSettingsJA,
@@ -190,7 +182,6 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
   ],
   ko: [
     relayKO,
-    ko,
     worktreeGroupsKO,
     dockKO,
     dockSettingsKO,
@@ -214,7 +205,6 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
   ],
   zh: [
     relayZH,
-    zh,
     worktreeGroupsZH,
     dockZH,
     dockSettingsZH,

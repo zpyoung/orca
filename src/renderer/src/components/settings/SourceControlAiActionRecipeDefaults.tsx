@@ -212,7 +212,7 @@ export function SourceControlAiActionRecipeDefaults({
               draftValue={actionRecipeDraftState.values[actionId]}
               baseValue={actionRecipeDraftState.baseValues[actionId]}
               defaultTuiAgent={defaultTuiAgent}
-              isSavingRecipe={savingActionRecipeIds[actionId] === true}
+              isSavingTemplate={savingActionRecipeIds[actionId] === true}
               repoOverrideNote={
                 <SourceControlActionRepoOverrideNote
                   summary={overrideSummary}

@@ -14,6 +14,7 @@ function remoteDiffContentBudget(
 export const GIT_DIFF_METHODS = [
   defineMethod({
     name: 'git.diff',
+    permission: 'workspace',
     params: GitDiff,
     handler: async (params, { runtime, clientKind, requestId, signal }) =>
       runtime.getRuntimeGitDiff(
@@ -27,6 +28,7 @@ export const GIT_DIFF_METHODS = [
   }),
   defineMethod({
     name: 'git.branchDiff',
+    permission: 'workspace',
     params: GitBranchDiff,
     handler: async (params, { runtime, clientKind, requestId }) =>
       runtime.getRuntimeGitBranchDiff(
@@ -39,6 +41,7 @@ export const GIT_DIFF_METHODS = [
   }),
   defineMethod({
     name: 'git.commitDiff',
+    permission: 'workspace',
     params: GitCommitDiff,
     handler: async (params, { runtime, clientKind, requestId }) =>
       runtime.getRuntimeGitCommitDiff(

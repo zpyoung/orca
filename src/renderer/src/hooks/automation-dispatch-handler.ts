@@ -169,6 +169,7 @@ export async function handleAutomationDispatchRequest({
       agent: automation.agentId,
       worktreeId: worktree.id,
       prompt: automation.prompt,
+      ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
       launchOverrides: automation.launchOverrides ?? null,
       launchSource: 'unknown',
       title: run.title,
@@ -199,7 +200,7 @@ export async function handleAutomationDispatchRequest({
       agentId: automation.agentId,
       overrides: automation.launchOverrides,
       effectiveAgentArgs: result.effectiveAgentArgs ?? '',
-      agentArgsSource: automation.launchOverrides?.agentArgs?.trim() ? 'explicit' : 'inherited',
+      agentArgsSource: automation.extraAgentArgs?.trim() ? 'explicit' : 'inherited',
       shell: result.startupShell
     })
     completion.observeAgentStatus(result.paneKey, dispatchStartedAt)

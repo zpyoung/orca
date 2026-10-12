@@ -1,7 +1,5 @@
-import {
-  normalizeAgentLaunchOverrides,
-  type AgentLaunchOverrides
-} from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { normalizeAutomationLaunchOverrides } from '../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
 import {
   findCatalogModel,
   findCatalogOption,
@@ -13,7 +11,7 @@ import type { TuiAgent } from '../../../shared/tui-agent'
 import type { RuntimeClient } from '../../runtime-client'
 import { RuntimeClientError } from '../../runtime-client'
 
-export const AUTOMATION_LAUNCH_OVERRIDE_FLAGS = ['model', 'effort', 'agent-args'] as const
+export const AUTOMATION_LAUNCH_OVERRIDE_FLAGS = ['model', 'effort'] as const
 const INHERIT_VALUE = 'inherit'
 
 type LaunchOverrideFlag = (typeof AUTOMATION_LAUNCH_OVERRIDE_FLAGS)[number]
@@ -37,7 +35,7 @@ export function hasAutomationLaunchOverrideFlags(flags: Map<string, string | boo
   return AUTOMATION_LAUNCH_OVERRIDE_FLAGS.some((flag) => flags.has(flag))
 }
 
-function validateLaunchSelection(agent: TuiAgent, value: AgentLaunchOverrides): void {
+function validateLaunchSelection(agent: TuiAgent, value: AgentLaunchOptionSelection): void {
   const modelId = value.model
   if (!modelId) {
     if (value.optionValues?.effort !== undefined) {
@@ -82,24 +80,19 @@ function validateLaunchSelection(agent: TuiAgent, value: AgentLaunchOverrides): 
 
 /** Clear structured launch selections after an automation changes agents. */
 export function resetAutomationLaunchOverridesForAgentChange(
-  current: AgentLaunchOverrides | null | undefined
-): AgentLaunchOverrides | null | undefined {
-  const normalized = normalizeAgentLaunchOverrides(current)
-  if (!normalized?.model && !normalized?.optionValues) {
-    return undefined
-  }
-  return normalizeAgentLaunchOverrides({ agentArgs: normalized.agentArgs }) ?? null
+  current: AgentLaunchOptionSelection | null | undefined
+): null | undefined {
+  return normalizeAutomationLaunchOverrides(current) ? null : undefined
 }
 
 /** Parse create-time automation launch flags into a normalized override. */
 export function getAutomationLaunchOverridesForCreate(
   flags: Map<string, string | boolean>,
   agent: TuiAgent
-): AgentLaunchOverrides | undefined {
+): AgentLaunchOptionSelection | undefined {
   const model = readFlag(flags, 'model')
   const effort = readFlag(flags, 'effort')
-  const agentArgs = readFlag(flags, 'agent-args')
-  if ([model, effort, agentArgs].includes(INHERIT_VALUE)) {
+  if ([model, effort].includes(INHERIT_VALUE)) {
     throw new RuntimeClientError(
       'invalid_argument',
       'The inherit value is only supported by automations edit.'
@@ -108,10 +101,9 @@ export function getAutomationLaunchOverridesForCreate(
   if (effort && !model) {
     throw new RuntimeClientError('invalid_argument', '--effort requires --model')
   }
-  const value = normalizeAgentLaunchOverrides({
+  const value = normalizeAutomationLaunchOverrides({
     model,
-    ...(effort ? { optionValues: { effort } } : {}),
-    agentArgs
+    ...(effort ? { optionValues: { effort } } : {})
   })
   if (value) {
     validateLaunchSelection(agent, value)
@@ -123,15 +115,14 @@ export function getAutomationLaunchOverridesForCreate(
 export function getAutomationLaunchOverridesForEdit(args: {
   flags: Map<string, string | boolean>
   agent: TuiAgent
-  current: AgentLaunchOverrides | null | undefined
-}): AgentLaunchOverrides | null | undefined {
+  current: AgentLaunchOptionSelection | null | undefined
+}): AgentLaunchOptionSelection | null | undefined {
   if (!hasAutomationLaunchOverrideFlags(args.flags)) {
     return undefined
   }
-  const next = normalizeAgentLaunchOverrides(args.current) ?? {}
+  const next = normalizeAutomationLaunchOverrides(args.current) ?? {}
   const model = readFlag(args.flags, 'model')
   const effort = readFlag(args.flags, 'effort')
-  const agentArgs = readFlag(args.flags, 'agent-args')
   if (model !== undefined) {
     if (model === INHERIT_VALUE) {
       delete next.model
@@ -151,14 +142,7 @@ export function getAutomationLaunchOverridesForEdit(args: {
       next.optionValues = { ...next.optionValues, effort }
     }
   }
-  if (agentArgs !== undefined) {
-    if (agentArgs === INHERIT_VALUE) {
-      delete next.agentArgs
-    } else {
-      next.agentArgs = agentArgs
-    }
-  }
-  const normalized = normalizeAgentLaunchOverrides(next)
+  const normalized = normalizeAutomationLaunchOverrides(next)
   if (
     (model !== undefined && model !== INHERIT_VALUE) ||
     (effort !== undefined && effort !== INHERIT_VALUE)

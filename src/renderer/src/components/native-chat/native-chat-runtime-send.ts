@@ -35,6 +35,7 @@ import {
   waitForNativeChatPtyIdle
 } from './native-chat-pty-send-queue'
 import { clearConfirmDurationMs } from './fork-agent-composer/native-chat-runtime-clear'
+import type { NativeChatSendOptions as NativeChatDeliveryOptions } from './native-chat-input-clear'
 
 export { NATIVE_CHAT_ADVANCE_BUFFER_MS, NATIVE_CHAT_QUESTION_STEP_MS, NATIVE_CHAT_SUBMIT_DELAY_MS }
 export { invalidateNativeChatPtySends, resetNativeChatPtySendQueuesForTests }
@@ -45,16 +46,8 @@ export {
 
 export const NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS = 300
 
-export type NativeChatSendOptions = {
-  /** Bytes that empty the agent's input line. Defaults to a single Ctrl+U. */
-  clearInput?: string
-  /**
-   * Observed check that the input line is now empty.
-   * Supplied only for launch-draft replacement; when it reports "not cleared"
-   * the send widens to a maximal burst before writing the body rather than
-   * pasting on top of residue.
-   */
-  confirmCleared?: () => boolean
+/** Upstream's options, including its per-write delivery callbacks, plus the fork's outcome. */
+export type NativeChatSendOptions = NativeChatDeliveryOptions & {
   /**
    * Observed check, after the submit CR, of whether the TUI's input line
    * emptied. Absent means the send is unobservable, not failed.
@@ -67,7 +60,8 @@ export type NativeChatSendOptions = {
 /** Cancels an in-flight send's pending pty writes (the delayed Enter, and any
  *  later question bodies/Enters). Safe to call after the send completes. */
 export type NativeChatSendHandle = {
-  cancel: () => void
+  /** `keepInput` skips the unsubmitted-input clear, e.g. while a dialog owns the agent's input. */
+  cancel: (keepInput?: boolean) => void
   /** Time after which every scheduled write has fired and the handle can drop. */
   settleAfterMs: number
   /** Actual completion, which can outlive the nominal schedule if the renderer stalls. */
@@ -82,6 +76,8 @@ const NOOP_NATIVE_CHAT_SEND_HANDLE: NativeChatSendHandle = {
 }
 
 function rejectQuarantinedNativeChatSend(options?: NativeChatSendOptions): NativeChatSendHandle {
+  options?.onWriteRejected?.()
+  options?.onDeliverySettled?.(false)
   options?.onOutcome?.('may-not-have-sent')
   return NOOP_NATIVE_CHAT_SEND_HANDLE
 }
@@ -154,10 +150,25 @@ export function sendNativeChatMessageWithImageAttachments(
   imagePaths: readonly string[],
   options?: NativeChatSendOptions
 ): NativeChatSendHandle {
+  return sendNativeChatImagePastes(
+    target,
+    text,
+    imagePaths.map(buildNativeChatImagePasteBytes),
+    options
+  )
+}
+
+/** Image pastes already framed for the target agent, then the text body and Enter. */
+export function sendNativeChatImagePastes(
+  target: NativeChatResolvedTarget,
+  text: string,
+  imagePastes: readonly string[],
+  options?: NativeChatSendOptions
+): NativeChatSendHandle {
   if (isTerminalInputQuarantined(target.terminalTabId)) {
     return rejectQuarantinedNativeChatSend(options)
   }
-  if (imagePaths.length === 0) {
+  if (imagePastes.length === 0) {
     return sendNativeChatMessage(target, text, options)
   }
   const trimmedText = text.trim()
@@ -168,8 +179,15 @@ export function sendNativeChatMessageWithImageAttachments(
       (trimmedText.length > 0
         ? NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
         : NATIVE_CHAT_SUBMIT_DELAY_MS) + clearConfirmDurationMs(options),
-    chunks: imagePaths.map(buildNativeChatImagePasteBytes),
-    afterAccepted: ({ isCancelled, markSubmitted, reportOutcome, delayGuarded, submit }) => {
+    chunks: imagePastes,
+    afterAccepted: ({
+      isCancelled,
+      markSubmitted,
+      reportOutcome,
+      delayGuarded,
+      delivery,
+      submit
+    }) => {
       if (trimmedText.length === 0) {
         submit()
         return
@@ -182,7 +200,8 @@ export function sendNativeChatMessageWithImageAttachments(
           isCancelled,
           markSubmitted,
           reportOutcome,
-          submit
+          submit,
+          delivery
         )
       })
     }

@@ -54,32 +54,26 @@ describe('NativeChatToolRun coloring', () => {
     expect(container.querySelectorAll('[data-tool-category-dot]')).toHaveLength(0)
   })
 
-  it('renders the recognized-tool glyph and color class on a ToolLine', () => {
+  it('colors the glyph of a recognized tool on a ToolLine', () => {
     const blocks: NativeChatBlock[] = [{ type: 'tool-call', name: 'Bash', input: '{}' }]
 
     const { container } = render(<NativeChatToolRun blocks={blocks} expandSignal />)
 
-    expect(container.querySelector('[data-tool-category-glyph="exec"]')).toBeInTheDocument()
-    // Why: the run header repeats each member's name, so the row's own <code> is
-    // the only unambiguous handle on the coloured element.
-    const code = container.querySelector('code')
-    expect(code?.textContent).toBe('Bash')
-    expect(code?.className).toContain('text-tool-exec')
+    const row = container.querySelector('[class*="group/tool-line"]')
+    expect(row?.querySelector('[class*="text-tool-exec"]')).toBeInTheDocument()
   })
 
-  it('renders neither glyph nor color class for an unrecognized tool name', () => {
+  it('leaves an unrecognized tool name uncolored', () => {
     const blocks: NativeChatBlock[] = [{ type: 'tool-call', name: 'SomeMcpTool', input: '{}' }]
 
     const { container } = render(<NativeChatToolRun blocks={blocks} expandSignal />)
 
-    expect(container.querySelector('[data-tool-category-glyph]')).toBeNull()
-    const code = container.querySelector('code')
-    expect(code?.textContent).toBe('SomeMcpTool')
-    expect(code?.className).not.toMatch(/text-tool-/)
-    expect(code?.className).toContain('text-foreground/90')
+    const row = container.querySelector('[class*="group/tool-line"]')
+    expect(row).toBeInTheDocument()
+    expect(row?.querySelector('[class*="text-tool-"]')).toBeNull()
   })
 
-  it('folds a tool result into its call row without a glyph of its own', () => {
+  it('folds a tool result into its call row', () => {
     const blocks: NativeChatBlock[] = [
       { type: 'tool-call', name: 'Bash', input: '{}' },
       { type: 'tool-result', output: 'done', isError: false }
@@ -87,8 +81,7 @@ describe('NativeChatToolRun coloring', () => {
 
     const { container } = render(<NativeChatToolRun blocks={blocks} expandSignal />)
 
-    const glyphs = container.querySelectorAll('[data-tool-category-glyph]')
-    expect(glyphs).toHaveLength(1)
+    expect(container.querySelectorAll('[class*="group/tool-line"]')).toHaveLength(1)
     expect(screen.queryByText('Result')).toBeNull()
   })
 })

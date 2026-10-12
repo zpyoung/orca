@@ -2,7 +2,7 @@ import React from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { filterEnabledTuiAgents } from '../../../../shared/tui-agent-selection'
-import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type {
   AutomationSchedulePreset,
   AutomationWorkspaceMode
@@ -40,7 +40,9 @@ export type AutomationDraft = {
   name: string
   prompt: string
   agentId: TuiAgent
-  launchOverrides: AgentLaunchOverrides
+  /** Saved as-is; empty means none. */
+  extraAgentArgs: string
+  launchOverrides: AgentLaunchOptionSelection
   projectId: string
   workspaceMode: AutomationWorkspaceMode
   workspaceId: string

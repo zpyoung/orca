@@ -86,7 +86,6 @@ describe('orca cli automation launch overrides', () => {
         'sonnet',
         '--effort',
         'high',
-        '--agent-args=--verbose',
         '--json'
       ],
       '/tmp/repo'
@@ -99,8 +98,7 @@ describe('orca cli automation launch overrides', () => {
         agentId: 'claude',
         launchOverrides: {
           model: 'sonnet',
-          optionValues: { effort: 'high' },
-          agentArgs: '--verbose'
+          optionValues: { effort: 'high' }
         }
       })
     )
@@ -125,7 +123,7 @@ describe('orca cli automation launch overrides', () => {
     )
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
-    await main(['automations', 'edit', 'auto-1', '--agent-args=--verbose', '--json'], '/tmp/repo')
+    await main(['automations', 'edit', 'auto-1', '--model=inherit', '--json'], '/tmp/repo')
 
     expect(callMock).toHaveBeenNthCalledWith(1, 'status.get')
     expect(callMock).toHaveBeenNthCalledWith(2, 'automation.show', { id: 'auto-1' })
@@ -136,11 +134,7 @@ describe('orca cli automation launch overrides', () => {
       expect.objectContaining({
         id: 'auto-1',
         updates: expect.objectContaining({
-          launchOverrides: {
-            model: 'sonnet',
-            optionValues: { effort: 'high' },
-            agentArgs: '--verbose'
-          }
+          launchOverrides: { optionValues: { effort: 'high' } }
         })
       })
     )
@@ -155,8 +149,7 @@ describe('orca cli automation launch overrides', () => {
           agentId: 'claude',
           launchOverrides: {
             model: 'sonnet',
-            optionValues: { effort: 'high' },
-            agentArgs: '--verbose'
+            optionValues: { effort: 'high' }
           }
         }
       }),
@@ -179,7 +172,7 @@ describe('orca cli automation launch overrides', () => {
         id: 'auto-1',
         updates: expect.objectContaining({
           agentId: 'gemini',
-          launchOverrides: { agentArgs: '--verbose' }
+          launchOverrides: null
         })
       })
     )

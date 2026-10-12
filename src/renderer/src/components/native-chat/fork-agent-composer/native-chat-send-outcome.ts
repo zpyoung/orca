@@ -3,8 +3,11 @@
 // observation poll. Split out of native-chat-runtime-send.ts to keep that
 // file's clear/body/Enter sequencing at a readable size.
 
-import { sendRuntimePtyInputAcceptance } from '@/runtime/runtime-terminal-inspection'
-import type { RuntimeSettings } from '../native-chat-runtime-send'
+import {
+  sendRuntimePtyInputAcceptance,
+  sendRuntimePtyInputDelivery
+} from '@/runtime/runtime-terminal-inspection'
+import type { NativeChatSendOptions, RuntimeSettings } from '../native-chat-runtime-send'
 import { NATIVE_CHAT_SUBMIT } from '../native-chat-send'
 
 /**
@@ -20,6 +23,92 @@ export const NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS = 4
 /** Gap between each observation poll; keeps the total window under the ~3s
  *  bound while giving a lagging TUI redraw more than one chance to catch up. */
 export const NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS = 900
+
+/**
+ * Upstream's per-write delivery reporting for one send. Present only when the
+ * caller asked for it; without it a lost acknowledgment reads as a failed write.
+ */
+export type NativeChatDeliveryObserver = {
+  /** The host refused a write; nothing after it is sent. */
+  rejected: () => void
+  /** A write's acknowledgment was lost. The send continues past it, never resending it. */
+  unconfirmed: () => void
+  /** Every write has settled; reports whether all of them were acknowledged. */
+  settled: () => void
+  /** The send was invalidated mid-flight: it settles unacknowledged without claiming a refusal. */
+  abandoned: () => void
+  /** Whether the caller waits on settlement, so each write asks the host for the provider's ack. */
+  settlesWrites: boolean
+}
+
+export function createDeliveryObserver(
+  options: NativeChatSendOptions | undefined
+): NativeChatDeliveryObserver | undefined {
+  if (!options?.onWriteRejected && !options?.onWriteUnconfirmed && !options?.onDeliverySettled) {
+    return undefined
+  }
+  let acknowledged = true
+  let reportedUnconfirmed = false
+  let settled = false
+  const settle = (delivered: boolean): void => {
+    if (settled) {
+      return
+    }
+    settled = true
+    options.onDeliverySettled?.(delivered)
+  }
+  return {
+    rejected: () => {
+      options.onWriteRejected?.()
+      settle(false)
+    },
+    unconfirmed: () => {
+      acknowledged = false
+      if (!reportedUnconfirmed) {
+        reportedUnconfirmed = true
+        options.onWriteUnconfirmed?.()
+      }
+    },
+    settled: () => settle(acknowledged),
+    abandoned: () => settle(false),
+    settlesWrites: options.onDeliverySettled !== undefined
+  }
+}
+
+/** One observed write: true when the send may continue past it. */
+export async function sendObservedWrite(
+  settings: RuntimeSettings,
+  ptyId: string,
+  data: string,
+  isCancelled: (() => boolean) | undefined,
+  delivery: NativeChatDeliveryObserver | undefined
+): Promise<boolean> {
+  // Why: the submit CR is never cancelled once its delay fires, so it carries no check.
+  const cancelArgs = isCancelled ? ([isCancelled] as const) : ([] as const)
+  if (!delivery) {
+    return sendRuntimePtyInputAcceptance(settings, ptyId, data, 'driving', ...cancelArgs)
+  }
+  const result = await sendRuntimePtyInputDelivery(
+    settings,
+    ptyId,
+    data,
+    'driving',
+    isCancelled,
+    delivery.settlesWrites ? { requireWriteSettlement: true } : undefined
+  )
+  if (isCancelled?.()) {
+    return false
+  }
+  if (result === 'unverifiable') {
+    delivery.unconfirmed()
+    return true
+  }
+  if (result === 'refused') {
+    delivery.rejected()
+    return false
+  }
+  return true
+}
 
 /** Wraps an optional `onOutcome` so it reports at most once per send. */
 export function createOutcomeReporter(
@@ -114,11 +203,12 @@ export async function submitAndObserve(
   ptyId: string,
   markSubmitted: () => void,
   reportOutcome: (outcome: SendOutcome) => void,
-  confirmSubmitted: (() => boolean) | undefined
+  confirmSubmitted: (() => boolean) | undefined,
+  delivery?: NativeChatDeliveryObserver
 ): Promise<void> {
   let sent = true
   try {
-    sent = await sendRuntimePtyInputAcceptance(settings, ptyId, NATIVE_CHAT_SUBMIT, 'driving')
+    sent = await sendObservedWrite(settings, ptyId, NATIVE_CHAT_SUBMIT, undefined, delivery)
   } catch {
     sent = false
   } finally {
@@ -128,5 +218,6 @@ export async function submitAndObserve(
     reportOutcome('may-not-have-sent')
     return
   }
+  delivery?.settled()
   observeSendOutcome(confirmSubmitted, reportOutcome)
 }

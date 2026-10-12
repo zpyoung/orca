@@ -73,7 +73,7 @@ describe.each(CATALOG_CASES)('resolveAgentLaunchOverrides ($agent)', (catalogCas
     })
   })
 
-  it('appends a shadowing effort argument and drops its applied value', () => {
+  it('drops the shadowed effort argument and appends the raw one', () => {
     expect(
       resolveAgentLaunchOverrides(catalogCase.agent, {
         model: catalogCase.model,
@@ -81,12 +81,12 @@ describe.each(CATALOG_CASES)('resolveAgentLaunchOverrides ($agent)', (catalogCas
         agentArgs: catalogCase.rawEffort
       })
     ).toEqual({
-      args: [...catalogCase.modelArgs, ...catalogCase.effortArgs, ...catalogCase.rawEffortTokens],
+      args: [...catalogCase.modelArgs, ...catalogCase.rawEffortTokens],
       applied: { model: catalogCase.model }
     })
   })
 
-  it('appends a shadowing model argument and drops every applied value', () => {
+  it('drops every shadowed structured argument and appends the raw model', () => {
     expect(
       resolveAgentLaunchOverrides(catalogCase.agent, {
         model: catalogCase.model,
@@ -94,7 +94,7 @@ describe.each(CATALOG_CASES)('resolveAgentLaunchOverrides ($agent)', (catalogCas
         agentArgs: catalogCase.rawModel
       })
     ).toEqual({
-      args: [...catalogCase.modelArgs, ...catalogCase.effortArgs, ...catalogCase.rawModelTokens],
+      args: [...catalogCase.rawModelTokens],
       applied: {}
     })
   })

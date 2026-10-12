@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/main/native-chat/transcript-watch.ts
-// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 import { extname } from 'node:path'
 import type { NativeChatMessage } from '../../../shared/native-chat-types'
 import {
@@ -9,10 +9,11 @@ import {
 } from '../host-readable-transcript-path'
 import { resolveSessionFilePath } from '../session-file-resolver'
 import { installTranscriptWatcher } from '../transcript-watch-engine'
-import type {
-  NativeChatTranscriptSubscription,
-  NativeChatTranscriptTailReader,
-  SubscribeNativeChatTranscriptArgs
+import {
+  UNFLUSHED_SETTLE_MS,
+  type NativeChatTranscriptSubscription,
+  type NativeChatTranscriptTailReader,
+  type SubscribeNativeChatTranscriptArgs
 } from '../transcript-watch-contract'
 import { WslTranscriptFsError, wslTranscriptFsRefusal } from '../wsl-transcript-fs-gate'
 import { observeRunningWslDistros } from '../wsl-transcript-running-observer'
@@ -54,7 +55,6 @@ const FALLBACK_RESOLVE_POLL_MS = 5_000
 // delay — a fresh session that has yet to be prompted never flushes, so the
 // spinner is permanent. Long enough that a merely slow resolve still wins the
 // race and paints history directly.
-const UNFLUSHED_SETTLE_MS = 1_500
 
 function exactTranscriptPath(args: TranscriptWatchSubscriptionArgs): string | null {
   const path = args.transcriptPath?.trim()

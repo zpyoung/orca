@@ -51,7 +51,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -66,7 +65,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -80,7 +78,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('user', 'u1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -95,7 +92,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', 'see `inlineCode` here')])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -111,7 +107,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
       />
     )
 
@@ -124,25 +119,9 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('user', 'u1', 'hello')])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
       />
     )
 
     expect(container.querySelector('.bg-chat-user-surface')).not.toBeNull()
-  })
-
-  it('uses the tool-search border color for reasoning messages', () => {
-    const { container } = render(
-      <NativeChatMessageList
-        session={sessionWith([messageWith('reasoning', 'r1', 'thinking')])}
-        isWorking={false}
-        expandSignal={false}
-        fontScale={1}
-      />
-    )
-
-    expect(container.querySelector('.border-l-2')?.className).toContain(
-      '[border-left-color:color-mix(in_srgb,var(--tool-search)_55%,transparent)]'
-    )
   })
 })

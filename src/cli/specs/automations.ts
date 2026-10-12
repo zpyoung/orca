@@ -13,7 +13,7 @@ const AUTOMATION_TARGET_FLAGS = [
 ]
 const AUTOMATION_SCHEDULE_FLAGS = ['trigger', 'schedule', 'time', 'day', 'timezone']
 const AUTOMATION_PRECHECK_FLAGS = ['precheck', 'precheck-timeout']
-const AUTOMATION_LAUNCH_FLAGS = ['model', 'effort', 'agent-args']
+const AUTOMATION_LAUNCH_FLAGS = ['model', 'effort']
 const AUTOMATION_STATE_FLAGS = [
   'enabled',
   'disabled',
@@ -42,12 +42,13 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     path: ['automations', 'create'],
     summary: 'Create a scheduled Orca automation',
     usage:
-      'orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--model <id>] [--effort <value>] [--agent-args <args>] [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
+      'orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--model <id>] [--effort <value>] [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'name',
       'prompt',
       'provider',
+      'extra-agent-args',
       ...AUTOMATION_LAUNCH_FLAGS,
       ...AUTOMATION_PRECHECK_FLAGS,
       ...AUTOMATION_TARGET_FLAGS,
@@ -62,27 +63,30 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       'Use --source-context with a JSON TaskSourceContext when task/provider data should come from a specific host/account; pass null on edit to clear it.',
       'Use --workspace to run in an existing worktree; otherwise the automation creates a new worktree per run.',
       'Use --precheck to run a bounded command before scheduled runs; exit code 0 continues, anything else records a skipped run.',
-      'Use --model and optional --effort for structured launch settings. Raw --agent-args apply last and can override those settings.',
-      'On edit, pass inherit to --model, --effort, or --agent-args to clear that saved value.',
-      'Use --reuse-session only with existing-workspace automations to submit later runs to the previous live automation session when it is still available. Use --fresh-session to disable reuse.'
+      'Use --model and optional --effort for structured launch settings.',
+      'On edit, pass inherit to --model or --effort to clear that saved value.',
+      'Use --reuse-session only with existing-workspace automations to submit later runs to the previous live automation session when it is still available. Use --fresh-session to disable reuse.',
+      'Use --extra-agent-args="--model opus --effort high" to add arguments after the host\'s default agent Arguments on each fresh run. Only model, effort, and a few safe options are accepted (Claude, Codex, CodeBuddy, Cursor, Grok, OMP); extras cannot be combined with --reuse-session. On edit, --extra-agent-args= clears them.'
     ],
     examples: [
       'orca automations create --name "Daily review" --trigger daily --prompt "Review open changes" --provider codex',
       'orca automations create --name "Weekday triage" --trigger "0 9 * * 1-5" --prompt "Triage issues" --provider claude --repo my-repo',
-      'orca automations create --name "PR review" --trigger hourly --precheck "gh pr list --json number -q .[0].number" --prompt "Review requested PRs" --provider codex'
+      'orca automations create --name "PR review" --trigger hourly --precheck "gh pr list --json number -q .[0].number" --prompt "Review requested PRs" --provider codex',
+      'orca automations create --name "Docs pass" --trigger daily --prompt "Tidy the docs" --provider claude --extra-agent-args="--model opus --effort high --add-dir docs"'
     ]
   },
   {
     path: ['automations', 'edit'],
     summary: 'Edit an Orca automation',
     usage:
-      'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--model <id|inherit>] [--effort <value|inherit>] [--agent-args <args|inherit>] [--json]',
+      'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--model <id|inherit>] [--effort <value|inherit>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'id',
       'name',
       'prompt',
       'provider',
+      'extra-agent-args',
       ...AUTOMATION_LAUNCH_FLAGS,
       ...AUTOMATION_PRECHECK_FLAGS,
       ...AUTOMATION_TARGET_FLAGS,
@@ -92,7 +96,8 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     positionalArgs: ['id'],
     examples: [
       'orca automations edit 2f9e... --disabled',
-      'orca automations edit --id 2f9e... --trigger "30 * * * *" --json'
+      'orca automations edit --id 2f9e... --trigger "30 * * * *" --json',
+      'orca automations edit 2f9e... --extra-agent-args='
     ]
   },
   {

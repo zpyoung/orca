@@ -46,6 +46,7 @@ async function readRemoteObjectiveDetail(
 export const HEIMDALL_OBJECTIVE_METHODS = [
   defineMethod({
     name: HEIMDALL_CHANNELS.objectiveDetail,
+    permission: 'workspace',
     params: WatcherTargetSchema,
     handler: async (target, context) => {
       const { runtime, clientKind } = context

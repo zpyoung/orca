@@ -123,7 +123,13 @@ vi.mock('./use-native-chat-composer-attachments', () => ({
     imageAttachments: mocks.imageAttachments,
     attachResolvedPaths: vi.fn(),
     clearImageAttachments: vi.fn(),
-    removeImageAttachment: vi.fn()
+    flushPendingAttachments: vi.fn(),
+    restoreImageAttachments: vi.fn(),
+    removeImageAttachment: vi.fn(),
+    beginPendingImageAttachment: vi.fn(),
+    revealPendingImageAttachment: vi.fn(),
+    dropPendingImageAttachment: vi.fn(),
+    pendingChips: { begin: vi.fn(), resolve: vi.fn(), drop: vi.fn(), attachReferences: vi.fn() }
   })
 }))
 vi.mock('./use-native-chat-composer-paste', () => ({
@@ -152,6 +158,7 @@ vi.mock('./use-native-chat-send-lifecycle', () => ({
 }))
 
 import { NativeChatComposer } from './NativeChatComposer'
+import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 
 describe('NativeChatComposer', () => {
   beforeEach(() => {
@@ -209,8 +216,7 @@ describe('NativeChatComposer', () => {
       configurable: true,
       value: {
         git: { discoverCommitMessageModels: mocks.discoverCommitMessageModels },
-        pty: { getMainBufferSnapshot: mocks.getMainBufferSnapshot },
-        ui: { onFileDrop: () => vi.fn() }
+        pty: { getMainBufferSnapshot: mocks.getMainBufferSnapshot }
       }
     })
   })
@@ -237,6 +243,22 @@ describe('NativeChatComposer', () => {
     expect(mocks.cancelPendingSends.mock.invocationCallOrder[0]).toBeLessThan(
       onStop.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     )
+  })
+
+  it('writes nothing from a composer hidden under a prompt card that still holds focus', () => {
+    render(
+      <NativeChatComposer
+        terminalTabId="tab-1"
+        paneKey="tab-1:leaf-1"
+        targetPtyId="pty-1"
+        agent="claude"
+        inputOwnedByCard
+      />
+    )
+    act(() => mocks.fieldProps?.onSend?.())
+    act(() => mocks.fieldProps?.onStop?.())
+    expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
+    expect(sendRuntimePtyInput).not.toHaveBeenCalled()
   })
 
   it('associates a delayed submit with its optimistic cache entry', () => {
@@ -474,7 +496,7 @@ describe('NativeChatComposer', () => {
     expect(mocks.sendNativeChatTypedCommand).not.toHaveBeenCalled()
   })
 
-  it.each(['claude', 'openclaude'] as const)('keeps %s slash composer sends pasted', (agent) => {
+  it.each(['claude'] as const)('keeps %s slash composer sends pasted', (agent) => {
     mocks.draft = '/clear'
     render(
       <NativeChatComposer

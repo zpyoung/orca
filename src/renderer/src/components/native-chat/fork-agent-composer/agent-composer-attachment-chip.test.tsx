@@ -27,7 +27,7 @@ vi.mock('./AgentComposerActions', () => ({
 }))
 
 vi.mock('../NativeChatAutocompleteMenus', () => ({
-  NativeChatMentionHint: () => null,
+  NativeChatMentionMenu: () => null,
   NativeChatPickerMenu: () => null
 }))
 
@@ -38,6 +38,7 @@ const stubImeEnterGesture = {
   isComposing: () => false,
   ownsKeyDown: () => false,
   onKeyUp: () => {},
+  onCompositionEnd: () => {},
   reset: () => {},
   setComposing: () => {}
 }
@@ -59,7 +60,7 @@ function renderFieldWithAttachments(imageAttachments: AgentComposerImageAttachme
   render(
     <AgentComposerField
       terminalTabId="tab-1"
-      paneKey="pane-1"
+      draftScopeKey="pane-1"
       textareaRef={createRef<HTMLTextAreaElement>()}
       draft=""
       disabled={false}
@@ -67,7 +68,7 @@ function renderFieldWithAttachments(imageAttachments: AgentComposerImageAttachme
       canSend
       autocomplete={{ mode: 'none' }}
       activeSuggestion={0}
-      notice={null}
+      notices={[]}
       imageAttachments={imageAttachments}
       sendButtonDisabled={false}
       isWorking={false}
@@ -84,7 +85,8 @@ function renderFieldWithAttachments(imageAttachments: AgentComposerImageAttachme
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}
       onRetrySkills={vi.fn()}
-      onAcceptMention={vi.fn()}
+      onChooseMentionFile={vi.fn()}
+      mentionFiles={{ files: [], loading: false, failed: false }}
       onRemoveImageAttachment={vi.fn()}
       onAttach={vi.fn()}
       onDictationToggle={vi.fn()}
@@ -122,7 +124,17 @@ describe('agent composer attachment chip', () => {
     await screen.findByAltText('one.png')
     await screen.findByAltText('two.png')
     expect(loadLocalImageAbsolutePath).toHaveBeenCalledTimes(2)
-    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith('/local/one.png')
-    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith('/local/two.png')
+    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith(
+      '/local/one.png',
+      undefined,
+      undefined,
+      { kind: 'chat-image' }
+    )
+    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith(
+      '/local/two.png',
+      undefined,
+      undefined,
+      { kind: 'chat-image' }
+    )
   })
 })

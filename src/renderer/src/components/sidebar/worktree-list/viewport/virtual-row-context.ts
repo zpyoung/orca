@@ -145,6 +145,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       newCardStyle: args.newCardStyle,
       settings: args.settings,
       activeWorktreeId: props.activeWorktreeId,
+      activeWorkspaceExecutionHostId: props.activeWorkspaceExecutionHostId,
       currentWorktreeId: props.currentWorktreeId,
       selectedWorktreeIds: props.selectedWorktreeIds,
       repoMap: props.repoMap,

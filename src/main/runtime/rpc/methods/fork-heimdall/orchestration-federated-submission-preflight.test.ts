@@ -100,8 +100,7 @@ describe('Heimdall federated submission preflight', () => {
           method,
           params,
           orchestrationContractVersion: envelope?.orchestrationContractVersion,
-          orchestrationRequestId: envelope?.orchestrationRequestId,
-          orchestrationCapability: envelope?.orchestrationCapability
+          orchestrationRequestId: envelope?.orchestrationRequestId
         })
       }
     }
@@ -180,11 +179,6 @@ describe('Heimdall federated submission preflight', () => {
     if (!dispatch) {
       throw new Error('Federated fixture did not create a Dispatch')
     }
-    const prompt = vi.mocked(workerRuntime.sendTerminalAgentPrompt).mock.calls[0]?.[1] ?? ''
-    const capability = prompt.match(/--dispatch-capability (dcap_[A-Za-z0-9_-]+)/)?.[1]
-    if (!capability) {
-      throw new Error('Federated fixture did not issue a Dispatch capability')
-    }
     const preflight = vi.fn().mockResolvedValueOnce(REJECTION).mockResolvedValue(ACCEPTED)
     bindOrchestrationSubmissionPreflight(homeRuntime, preflight)
 
@@ -194,7 +188,6 @@ describe('Heimdall federated submission preflight', () => {
         authToken: 'worker-local-token',
         orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
         orchestrationRequestId: requestId,
-        orchestrationCapability: capability,
         method: 'orchestration.send',
         params: {
           from: 'term_windows_worker',
@@ -303,11 +296,6 @@ describe('Heimdall federated submission preflight', () => {
     if (!dispatch) {
       throw new Error('Federated fixture did not create a Dispatch')
     }
-    const prompt = vi.mocked(workerRuntime.sendTerminalAgentPrompt).mock.calls[0]?.[1] ?? ''
-    const capability = prompt.match(/--dispatch-capability (dcap_[A-Za-z0-9_-]+)/)?.[1]
-    if (!capability) {
-      throw new Error('Federated fixture did not issue a Dispatch capability')
-    }
     const preflight = vi.fn().mockResolvedValue(REJECTION)
     bindOrchestrationSubmissionPreflight(homeRuntime, preflight)
     const sent = workerDispatcher.dispatch({
@@ -315,7 +303,6 @@ describe('Heimdall federated submission preflight', () => {
       authToken: 'worker-local-token',
       orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
       orchestrationRequestId: 'epoch_fenced_rejected_report',
-      orchestrationCapability: capability,
       method: 'orchestration.send',
       params: {
         from: 'term_windows_worker',
@@ -389,11 +376,6 @@ describe('Heimdall federated submission preflight', () => {
         throw new Error('Federated fixture did not create a Dispatch')
       }
       expect(homeDb.getFederatedDispatch(dispatch.id)?.protocol_version).toBe(protocolVersion)
-      const prompt = vi.mocked(workerRuntime.sendTerminalAgentPrompt).mock.calls[0]?.[1] ?? ''
-      const capability = prompt.match(/--dispatch-capability (dcap_[A-Za-z0-9_-]+)/)?.[1]
-      if (!capability) {
-        throw new Error('Federated fixture did not issue a Dispatch capability')
-      }
       const preflight = vi.fn().mockResolvedValue(REJECTION)
       bindOrchestrationSubmissionPreflight(homeRuntime, preflight)
 
@@ -402,7 +384,6 @@ describe('Heimdall federated submission preflight', () => {
         authToken: 'worker-local-token',
         orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
         orchestrationRequestId: `legacy_protocol_${protocolVersion}_rejected_report`,
-        orchestrationCapability: capability,
         method: 'orchestration.send',
         params: {
           from: 'term_windows_worker',

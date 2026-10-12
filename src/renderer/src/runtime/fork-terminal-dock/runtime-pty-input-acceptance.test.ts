@@ -21,7 +21,6 @@ describe('runtime terminal input acceptance', () => {
   const runtimeTransportCall = vi.fn()
   const localWrite = vi.fn()
   const localWriteAccepted = vi.fn()
-  const localWriteInputAccepted = vi.fn()
   const localForeground = vi.fn()
   const localHasChildren = vi.fn()
   const localInspect = vi.fn()
@@ -43,7 +42,6 @@ describe('runtime terminal input acceptance', () => {
         pty: {
           write: localWrite,
           writeAccepted: localWriteAccepted,
-          writeInputAccepted: localWriteInputAccepted,
           getForegroundProcess: localForeground,
           hasChildProcesses: localHasChildren,
           inspectProcess: localInspect
@@ -155,7 +153,7 @@ describe('runtime terminal input acceptance', () => {
     })
 
     it('resolves true and records the owning pane when main accepts a local write', async () => {
-      localWriteInputAccepted.mockResolvedValue(true)
+      localWriteAccepted.mockResolvedValue(true)
       useAppStore.setState({
         settings: { experimentalAgentHibernation: true } as never,
         terminalLayoutsByTabId: {
@@ -177,7 +175,9 @@ describe('runtime terminal input acceptance', () => {
         )
       ).resolves.toBe(true)
 
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
+      expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving', {
+        requireWriteSettlement: true
+      })
       expect(localWrite).not.toHaveBeenCalled()
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
         expect.any(Number)
@@ -185,7 +185,7 @@ describe('runtime terminal input acceptance', () => {
     })
 
     it('resolves false without recording input when main rejects a local write', async () => {
-      localWriteInputAccepted.mockResolvedValue(false)
+      localWriteAccepted.mockResolvedValue(false)
 
       await expect(
         sendRuntimePtyInputAcceptance(
@@ -196,7 +196,9 @@ describe('runtime terminal input acceptance', () => {
         )
       ).resolves.toBe(false)
 
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
+      expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving', {
+        requireWriteSettlement: true
+      })
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey).toEqual({})
     })
 
@@ -206,7 +208,7 @@ describe('runtime terminal input acceptance', () => {
       ).toBe(true)
 
       expect(localWrite).toHaveBeenCalledWith('local-pty', 'x', 'driving')
-      expect(localWriteInputAccepted).not.toHaveBeenCalled()
+      expect(localWriteAccepted).not.toHaveBeenCalled()
     })
 
     it('does not dispatch the local ack IPC when cancelled during deferred size validation', async () => {
@@ -226,7 +228,7 @@ describe('runtime terminal input acceptance', () => {
         await vi.runAllTimersAsync()
 
         await expect(accepted).resolves.toBe(false)
-        expect(localWriteInputAccepted).not.toHaveBeenCalled()
+        expect(localWriteAccepted).not.toHaveBeenCalled()
       } finally {
         vi.useRealTimers()
       }
@@ -256,7 +258,7 @@ describe('runtime terminal input acceptance', () => {
     })
 
     it('dispatches normally when isCancelled is omitted or stays false', async () => {
-      localWriteInputAccepted.mockResolvedValue(true)
+      localWriteAccepted.mockResolvedValue(true)
 
       await expect(
         sendRuntimePtyInputAcceptance(
@@ -267,7 +269,9 @@ describe('runtime terminal input acceptance', () => {
           () => false
         )
       ).resolves.toBe(true)
-      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
+      expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving', {
+        requireWriteSettlement: true
+      })
     })
   })
 })

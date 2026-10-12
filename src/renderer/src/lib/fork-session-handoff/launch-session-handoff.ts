@@ -26,6 +26,7 @@ import {
 } from './handoff-delivery-evidence'
 import { enrichSessionLineage, recordSessionLineage } from './session-lineage-actions'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 
 export type LaunchForkSessionHandoffArgs = {
   agent: TuiAgent
@@ -200,6 +201,7 @@ export async function launchForkSessionHandoff(
   let launchResult: LaunchAgentInNewTabResult
   try {
     launchResult = dependencies.launchAgent({
+      requestId: newAgentLaunchRequestId(),
       agent: args.agent,
       worktreeId: args.target.worktreeId,
       ...(args.groupId ? { groupId: args.groupId } : {}),
@@ -286,16 +288,8 @@ function resolveCollaborators(
       ((agent, state) => isTuiAgentEnabled(agent, state.settings?.disabledTuiAgents)),
     markAgentTrusted:
       overrides.markAgentTrusted ??
-      (async ({ preset, workspacePath, connectionId }) => {
-        if (!window.api.agentTrust?.markTrusted) {
-          return
-        }
-        await window.api.agentTrust.markTrusted({
-          preset,
-          workspacePath,
-          ...(connectionId ? { connectionId } : {})
-        })
-      }),
+      // Why: the main process pre-trusts the workspace on every fresh agent spawn, honouring the user's setting.
+      (async () => undefined),
     launchAgent: overrides.launchAgent ?? launchAgentInNewTab,
     submitPrompt: overrides.submitPrompt ?? submitPromptToAgentPty,
     resolveDeliveryEvidence: overrides.resolveDeliveryEvidence ?? resolveHandoffDeliveryEvidence,

@@ -201,7 +201,6 @@ async function dispatchLedger(
     authToken: 'remote-cli',
     method,
     params,
-    orchestrationCapability: envelope?.orchestrationCapability,
     orchestrationContractVersion: method.startsWith('orchestration.')
       ? ORCHESTRATION_CONTRACT_VERSION
       : undefined,

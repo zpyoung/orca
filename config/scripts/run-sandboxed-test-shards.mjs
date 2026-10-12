@@ -54,7 +54,10 @@ const IMAGE_CONTEXT_ROOTS = [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   // install-electron-package-binary.mjs re-exports its zip extractor from here.
-  'src/shared/zip-extractor-command.ts'
+  'src/shared/zip-extractor-command.ts',
+  // script-child-process.mjs bundles run-process.ts and its import closure.
+  'src/shared/child-process',
+  'src/shared/growing-byte-buffer.ts'
 ]
 
 /** Matches the serialized shell-contract selection in pr.yml. */
@@ -68,7 +71,9 @@ const SHELL_CONTRACT_SPECS = [
   'src/main/pty/codex-shell-no-daemon.test.ts',
   'src/main/pty/omp-shell-wrapper-alias-safety.test.ts',
   'src/main/pty/omp-shell-wrapper.node-pty.test.ts',
+  'src/main/fish-xdg-data-dirs-handoff.test.ts',
   'src/main/shell-startup-feature-channel.test.ts',
+  'src/main/zsh-deferred-startup-line-init.live-shell.test.ts',
   'src/main/terminal-history-fish-session.node-pty.test.ts',
   'src/main/zsh-scoped-histfile.live-shell.test.ts',
   'src/main/zsh-startup-hook-user-config-equivalence.live-shell.test.ts',

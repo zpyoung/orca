@@ -9,7 +9,8 @@
 import { subscribeTerminalInputQuarantine } from '../terminal-pane/terminal-input-quarantine'
 
 export type NativeChatPtySendQueueHandle = {
-  cancel: () => void
+  /** `keepInput` skips the unsubmitted-input clear, e.g. while a dialog owns the agent's input. */
+  cancel: (keepInput?: boolean) => void
   /** Invalidates pending writes without sending a cleanup control to the PTY. */
   invalidate: () => void
   settleAfterMs: number
@@ -27,7 +28,8 @@ export type EnqueueNativeChatPtySendOptions = {
    * are dropped if the PTY is invalidated meanwhile.
    */
   onCancelUnsubmitted?: (delay: (ms: number, fn: () => void) => void) => Promise<void> | void
-  /** Called for quarantine invalidation; must not write to the PTY. */
+  /** Called when a started send is abandoned without a cleanup write (quarantine invalidation
+   *  or a `keepInput` cancel); must not write to the PTY. */
   onInvalidate?: () => void
 }
 
@@ -209,7 +211,7 @@ export function enqueueNativeChatPtySend(
     dropHandle()
   }
 
-  const cancel = (mode: 'cancel' | 'invalidate'): void => {
+  const cancel = (mode: 'cancel' | 'keep-input' | 'invalidate'): void => {
     if (cancelled) {
       if (mode === 'invalidate' && cleaningUp) {
         for (const timer of timers) {
@@ -232,7 +234,7 @@ export function enqueueNativeChatPtySend(
     if (!shouldClear) {
       finishEntry()
       dropHandle()
-      if (mode === 'invalidate') {
+      if (mode === 'invalidate' || (mode === 'keep-input' && bodyStarted && !submitted)) {
         options?.onInvalidate?.()
       }
       return
@@ -253,7 +255,7 @@ export function enqueueNativeChatPtySend(
     }
   }
   const createdHandle: NativeChatPtySendQueueHandle = {
-    cancel: () => cancel('cancel'),
+    cancel: (keepInput = false) => cancel(keepInput ? 'keep-input' : 'cancel'),
     invalidate: () => cancel('invalidate'),
     settleAfterMs,
     settled,

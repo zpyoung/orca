@@ -11,9 +11,11 @@ import type { ResolveSourceControlAiResult } from '../../../../shared/source-con
 import type { SourceControlAiPrCreationDefaults } from '../../../../shared/source-control-ai-types'
 import type { PullRequestFieldRevisions } from '@/store/slices/pull-request-generation'
 import { materializeSourceControlTextGenerationParams } from '../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
+import type { PullRequestGenerationOptions } from '@/store/slices/pull-request-generation-auto-submit'
 import { stripBaseRef } from './create-pull-request-base-ref-normalization'
 import type {
   GenerationSeed,
+  PullRequestGenerationOutcome,
   PullRequestDraftFields,
   UseCreatePullRequestDialogFieldsOptions
 } from './create-pull-request-dialog-field-model'
@@ -54,7 +56,10 @@ type CreatePullRequestFieldGenerationResult = {
   effectiveGenerateError: string | null
   generateDisabled: boolean
   generateDisabledReason: string | undefined
-  handleGenerate: (overrides?: RuntimeGeneratePullRequestFieldsOverrides) => Promise<void>
+  handleGenerate: (
+    overrides?: RuntimeGeneratePullRequestFieldsOverrides,
+    options?: PullRequestGenerationOptions
+  ) => Promise<PullRequestGenerationOutcome | void>
   handleCancelGenerate: () => void
 }
 
@@ -100,14 +105,18 @@ export function useCreatePullRequestFieldGeneration({
   const generateDisabled = !effectiveGenerating && Boolean(generateDisabledReason)
 
   const handleGenerate = useCallback(
-    async (overrides?: RuntimeGeneratePullRequestFieldsOverrides): Promise<void> => {
+    async (
+      overrides?: RuntimeGeneratePullRequestFieldsOverrides,
+      options?: PullRequestGenerationOptions
+    ): Promise<PullRequestGenerationOutcome | void> => {
       if (!worktreePath || !base.trim() || effectiveGenerating || generateDisabled) {
         return
       }
       const resolvedParams =
         overrides?.sourceControlAiResolvedParams ??
         (resolvedPullRequestAi?.ok ? resolvedPullRequestAi.value.params : undefined)
-      const effectiveOverrides = resolvedParams
+      // Only saved structured choices need client-side materialization; the host resolves the rest.
+      const effectiveOverrides = resolvedParams?.launchOptions
         ? {
             ...overrides,
             sourceControlAiResolvedParams:
@@ -115,12 +124,12 @@ export function useCreatePullRequestFieldGeneration({
           }
         : overrides
       if (generation) {
-        generation.onGenerate(
+        return await generation.onGenerate(
           { base, title, body, draft },
           { ...fieldRevisionsRef.current },
-          effectiveOverrides
+          effectiveOverrides,
+          options
         )
-        return
       }
       const requestId = generationRequestIdRef.current + 1
       generationRequestIdRef.current = requestId
@@ -160,31 +169,33 @@ export function useCreatePullRequestFieldGeneration({
         }
         const isCurrentRequest = generationRequestIdRef.current === requestId
         if (!isCurrentRequest) {
-          return
+          return { result: null }
         }
         if (!result.success) {
           if (result.canceled) {
             setGenerateError(null)
-            return
+            return { result: null }
           }
           setGenerateError(result.error)
-          return
+          return { result: null }
         }
 
         const currentSeed = generationSeedRef.current
         if (!currentSeed || currentSeed.requestId !== requestId) {
-          return
+          return { result: null }
         }
-        applyGeneratedFields(result.fields, currentSeed.fieldRevisions)
+        const shownFields = applyGeneratedFields(result.fields, currentSeed.fieldRevisions)
         useAppStore.getState().recordFeatureInteraction('ai-pr-generation')
         setGenerateError(null)
+        return { result: shownFields }
       } catch (error) {
         if (generationRequestIdRef.current !== requestId) {
-          return
+          return { result: null }
         }
         setGenerateError(
           error instanceof Error ? error.message : 'Failed to generate pull request details'
         )
+        return { result: null }
       } finally {
         if (generationRequestIdRef.current === requestId) {
           generateInFlightRef.current = false

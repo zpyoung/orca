@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,

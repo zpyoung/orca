@@ -33,6 +33,7 @@ export function installMultiplexCleanup(
     stream.ackPendingOutputBytes = 0
     stream.ackPendingOutputOverflowed = false
     stream.ackRecoverySnapshotInFlight = false
+    stream.ackRecoveryHistoryOwed = false
     stream.unsubscribeData()
     stream.unsubscribeResize()
     stream.unsubscribeFit()

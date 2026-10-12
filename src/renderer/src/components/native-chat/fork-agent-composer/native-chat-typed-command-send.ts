@@ -45,13 +45,9 @@ export async function typeNativeChatCommand(
         if (invalidated) {
           return 'rejected'
         }
-        return (await sendRuntimePtyInputVerified(
-          target.settings,
-          target.ptyId,
-          key,
-          'driving',
-          () => invalidated || signal?.aborted === true
-        ))
+        return (await sendRuntimePtyInputVerified(target.settings, target.ptyId, key, 'driving', {
+          isCancelled: () => invalidated || signal?.aborted === true
+        }))
           ? 'accepted'
           : 'rejected'
       }
@@ -89,13 +85,9 @@ export function sendNativeChatTypedCommand(
           if (isCancelled()) {
             return 'rejected'
           }
-          return (await sendRuntimePtyInputVerified(
-            target.settings,
-            target.ptyId,
-            key,
-            'driving',
-            () => isCancelled() || controller.signal.aborted
-          ))
+          return (await sendRuntimePtyInputVerified(target.settings, target.ptyId, key, 'driving', {
+            isCancelled: () => isCancelled() || controller.signal.aborted
+          }))
             ? 'accepted'
             : 'rejected'
         }

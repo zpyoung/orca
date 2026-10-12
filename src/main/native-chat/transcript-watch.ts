@@ -1,3 +1,5 @@
+import { subscribeOpenCodeNativeChatTranscript } from './transcript-opencode-subscribe'
+import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
 import type { NativeChatMessage } from '../../shared/native-chat-types'
 import { subscribeNativeChatTranscriptWithDecoder } from './fork-native-chat-relay/transcript-watch-subscription'
 import type {
@@ -30,7 +32,8 @@ const defaultTailReader: NativeChatTranscriptTailReader = (args) => {
     args.includeTrailingLine,
     args.endOffset,
     args.decodeCompanion,
-    args.signal
+    args.signal,
+    args.onConsumedBoundary
   )
 }
 
@@ -43,6 +46,10 @@ export async function subscribeNativeChatTranscript(
   args: SubscribeNativeChatTranscriptArgs,
   setupSignal?: AbortSignal
 ): Promise<NativeChatTranscriptSubscription> {
+  setupSignal?.throwIfAborted()
+  if (resolveNativeChatTranscriptAgent(args.agent) === 'opencode') {
+    return subscribeOpenCodeNativeChatTranscript(args, setupSignal)
+  }
   const decode: ((line: string, fallbackId: string) => NativeChatMessage | null) | null =
     nativeChatLineDecoderForAgent(args.agent)
   if (!decode) {

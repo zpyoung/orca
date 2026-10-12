@@ -63,6 +63,7 @@ export function useAutomationEditorActions({
       name: '',
       prompt: '',
       agentId: defaultAgent,
+      extraAgentArgs: '',
       launchOverrides: {},
       projectId: target.projectId,
       workspaceMode: 'existing',

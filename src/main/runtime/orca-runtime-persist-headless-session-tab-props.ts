@@ -118,6 +118,7 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
     worktreeId: string,
     tabId: string,
     props: {
+      title?: string
       color?: string | null
       isPinned?: boolean
       viewMode?: 'terminal' | 'chat'
@@ -139,6 +140,7 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
       changed = true
       return {
         ...tab,
+        ...(props.title !== undefined ? { title: props.title } : {}),
         ...(props.color !== undefined ? { color: props.color } : {}),
         ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
         ...(props.viewMode !== undefined ? { viewMode: props.viewMode } : {}),

@@ -7,6 +7,7 @@ import {
 } from '@/components/editor/useLocalImageSrc'
 import { useAppStore } from '@/store'
 import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
+import { chatImageAccess } from '@/lib/local-file-access'
 import { findTerminalTabWorktreeId } from '../native-chat-file-link'
 import { attachmentPreviewSourcePath } from './agent-composer-attachment-preview'
 
@@ -74,14 +75,13 @@ function useAttachmentThumbnailSource(path: string, terminalTabId: string): stri
         attachmentPreviewConnectionId(terminalTabId),
         path
       )
-      // Attaching is the user gesture that authorizes the read; images picked,
-      // dropped, or pasted from outside a worktree are otherwise denied.
+      let url: string | null = null
       try {
-        await window.api.fs.authorizeExternalPath({ targetPath: previewPath })
+        // Why chat-image: attachments from outside a worktree are otherwise denied.
+        url = await loadLocalImageAbsolutePath(previewPath, undefined, undefined, chatImageAccess())
       } catch {
-        // already-authorized paths and unavailable IPC both just fall through to the read
+        // An unreadable preview shows the chip without a thumbnail.
       }
-      const url = await loadLocalImageAbsolutePath(previewPath)
       if (!cancelled) {
         setSource(url ?? undefined)
       }

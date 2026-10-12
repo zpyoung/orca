@@ -3,9 +3,12 @@
 // the caller is allowed to schedule the submit CR, so a rejected/suppressed
 // write can never be followed by a CR as if the body had landed.
 
-import { sendRuntimePtyInputAcceptance } from '@/runtime/runtime-terminal-inspection'
 import type { RuntimeSettings } from '../native-chat-runtime-send'
-import type { SendOutcome } from './native-chat-send-outcome'
+import {
+  sendObservedWrite,
+  type NativeChatDeliveryObserver,
+  type SendOutcome
+} from './native-chat-send-outcome'
 
 /**
  * Sends `chunks` one at a time, stopping at the first rejection or
@@ -17,7 +20,8 @@ export function sendBodyAccepted(
   settings: RuntimeSettings,
   ptyId: string,
   chunks: readonly string[],
-  isCancelled: () => boolean
+  isCancelled: () => boolean,
+  delivery?: NativeChatDeliveryObserver
 ): Promise<boolean> {
   return chunks.reduce<Promise<boolean>>(
     (chain, bytes) =>
@@ -25,7 +29,7 @@ export function sendBodyAccepted(
         if (!ok || isCancelled()) {
           return false
         }
-        return sendRuntimePtyInputAcceptance(settings, ptyId, bytes, 'driving', isCancelled)
+        return sendObservedWrite(settings, ptyId, bytes, isCancelled, delivery)
       }),
     Promise.resolve(true)
   )
@@ -44,9 +48,10 @@ export function runBodyAcceptedThen(
   isCancelled: () => boolean,
   markSubmitted: () => void,
   reportOutcome: (outcome: SendOutcome) => void,
-  onAccepted: () => void
+  onAccepted: () => void,
+  delivery?: NativeChatDeliveryObserver
 ): void {
-  sendBodyAccepted(settings, ptyId, chunks, isCancelled)
+  sendBodyAccepted(settings, ptyId, chunks, isCancelled, delivery)
     .then((accepted) => {
       if (isCancelled()) {
         reportOutcome('may-not-have-sent')

@@ -1,22 +1,9 @@
-import React from 'react'
-import { Eye, Globe, Pencil, Search, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   categorizeNativeChatTool,
   type NativeChatToolCategory
 } from '../../../../../shared/fork-native-chat-coloring/native-chat-tool-category'
 import { isToolCallBlock, type NativeChatBlock } from '../../../../../shared/native-chat-types'
-
-const GLYPH_BY_CATEGORY: Record<
-  NativeChatToolCategory,
-  React.ComponentType<{ className?: string }>
-> = {
-  read: Eye,
-  write: Pencil,
-  exec: Terminal,
-  search: Search,
-  net: Globe
-}
 
 const TEXT_CLASS_BY_CATEGORY: Record<NativeChatToolCategory, string> = {
   read: 'text-tool-read',
@@ -34,48 +21,25 @@ const DOT_CLASS_BY_CATEGORY: Record<NativeChatToolCategory, string> = {
   net: 'bg-tool-net'
 }
 
-export function NativeChatToolName({
-  name,
-  children
-}: {
-  name: string
-  children?: React.ReactNode
-}): React.JSX.Element {
+/** The category's text color for a recognized tool name, else undefined so the row keeps upstream's. */
+export function nativeChatToolCategoryTextClass(name: string): string | undefined {
   const category = categorizeNativeChatTool(name)
-  const Glyph = category ? GLYPH_BY_CATEGORY[category] : null
-
-  return (
-    <>
-      {category && Glyph ? (
-        <Glyph
-          className={cn('size-3.5 shrink-0', TEXT_CLASS_BY_CATEGORY[category])}
-          aria-hidden="true"
-          data-tool-category-glyph={category}
-        />
-      ) : null}
-      <code
-        className={cn(
-          'min-w-0 truncate font-mono text-xs font-semibold transition-colors',
-          category
-            ? TEXT_CLASS_BY_CATEGORY[category]
-            : 'text-foreground/90 group-hover/tool-line:text-foreground'
-        )}
-      >
-        {children ?? name}
-      </code>
-    </>
-  )
+  return category ? TEXT_CLASS_BY_CATEGORY[category] : undefined
 }
 
 export function NativeChatToolCategoryDots({
   blocks
 }: {
   blocks: NativeChatBlock[]
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const categories = distinctToolCategories(blocks)
+  if (categories.length === 0) {
+    return null
+  }
 
+  // One header slot, like upstream's marks, so the dots sit on the summary's first line.
   return (
-    <>
+    <span className="flex h-[1lh] shrink-0 items-center gap-1">
       {categories.map((category) => (
         <span
           key={category}
@@ -84,7 +48,7 @@ export function NativeChatToolCategoryDots({
           className={cn('size-1.5 shrink-0 rounded-full', DOT_CLASS_BY_CATEGORY[category])}
         />
       ))}
-    </>
+    </span>
   )
 }
 

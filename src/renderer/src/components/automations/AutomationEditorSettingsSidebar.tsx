@@ -21,6 +21,7 @@ import { AutomationSessionField } from './AutomationSessionField'
 import { AutomationSetupDecisionField } from './AutomationSetupDecisionField'
 import { AutomationWorkspaceField } from './AutomationWorkspaceField'
 import { AutomationDestinationField } from './AutomationDestinationField'
+import { AutomationExtraAgentArgsField } from './AutomationExtraAgentArgsField'
 import type { AutomationCreateDestinationControl } from './use-automation-create-destination'
 import type { AutomationDraft } from './AutomationEditorDialog'
 
@@ -102,6 +103,7 @@ export function AutomationEditorSettingsSidebar({
                 launchOverridesGate={launchOverridesGate}
                 onDraftChange={onDraftChange}
               />
+              <AutomationExtraAgentArgsField draft={draft} onDraftChange={onDraftChange} />
             </div>
           </div>
         </div>

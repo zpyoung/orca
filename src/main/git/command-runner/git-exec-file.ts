@@ -26,6 +26,8 @@ import { buildNetworkSshPolicyEnv } from './git-ssh-policy-env'
 import { nonInteractiveGitEnv, untranslatedGitOutputEnv } from './git-process-env'
 import { acquireGitAdmission } from './git-subprocess-admission'
 import { GitCommandTimeoutError, gitCommandTimeoutMs } from './git-command-timeout'
+import { classifyGitCommand } from '../../../shared/git-command-classification'
+import { createAbortError } from './abort-error'
 
 /**
  * Async git command execution. Drop-in replacement for
@@ -62,16 +64,19 @@ async function gitExecFileAsyncUnlocked(
         false,
         effectiveOptions.captureWslLoginShellOutput
       )
-      const policy = effectiveOptions.useConfiguredSshCommandForNetwork
-        ? await buildNetworkSshPolicyEnv(effectiveOptions)
-        : { env: nonInteractiveGitEnv(effectiveOptions.env), mode: 'default' as const }
-      const grant = await acquireGitAdmission({
-        args,
-        cwd: options.cwd,
-        wslDistro: options.wslDistro,
-        tier: options.admissionTier,
-        signal: options.signal
-      })
+      const policy =
+        effectiveOptions.useConfiguredSshCommandForNetwork || classifyGitCommand(args) === 'network'
+          ? await buildNetworkSshPolicyEnv(effectiveOptions, args)
+          : { env: nonInteractiveGitEnv(effectiveOptions.env), mode: 'default' as const }
+      const grant = options.admissionExempt
+        ? { queueWaitMs: 0, release: () => {} }
+        : await acquireGitAdmission({
+            args,
+            cwd: options.cwd,
+            wslDistro: options.wslDistro,
+            tier: options.admissionTier,
+            signal: options.admissionSignal ?? options.signal
+          })
       span?.setAttribute('git.queue_wait_ms', grant.queueWaitMs)
       const timeoutMs = gitCommandTimeoutMs(args, options.timeout, options.timeoutMsForTest)
       const terminationState: { current: Promise<void> | null } = { current: null }
@@ -149,6 +154,10 @@ async function gitExecFileAsyncUnlocked(
         }
       }
       try {
+        options.admissionSignal?.throwIfAborted()
+        if (options.canStart?.() === false) {
+          throw createAbortError()
+        }
         return await runCapturedCommand()
       } finally {
         const termination = terminationState.current
@@ -229,23 +238,23 @@ export async function gitExecFileAsyncBuffer(
       termination = new Promise<void>((resolve) => {
         reportTerminated = resolve
       })
-      const result = await execFileCapture(resolved.binary, resolved.args, {
+      const { stdout } = await execFileCapture(resolved.binary, resolved.args, {
         cwd: resolved.cwd,
         encoding: 'buffer',
+        signal: options.signal,
         maxBuffer: options.maxBuffer,
         timeout: timeoutMs,
         env: untranslatedGitOutputEnv(options.env),
         admissionTier: options.admissionTier,
-        signal: options.signal,
         onChildTerminated: reportTerminated,
         ...(timeoutMs === undefined
           ? {}
           : { createTimeoutError: () => new GitCommandTimeoutError(timeoutMs) })
       })
-      if (!Buffer.isBuffer(result.stdout)) {
-        throw new TypeError('Expected buffered git output')
+      if (!Buffer.isBuffer(stdout)) {
+        throw new Error('Git buffer capture returned text instead of bytes')
       }
-      return { stdout: readCapturedGitBuffer(result.stdout, resolved) }
+      return { stdout: readCapturedGitBuffer(stdout, resolved) }
     } finally {
       if (termination) {
         void termination.then(grant.release)

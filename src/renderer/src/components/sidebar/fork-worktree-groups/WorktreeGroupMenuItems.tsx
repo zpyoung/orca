@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx,src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx
-// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 import React, { useCallback, useState } from 'react'
 import { CircleX, FolderInput, FolderPlus } from 'lucide-react'
 import {

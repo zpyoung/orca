@@ -5,10 +5,12 @@ import {
 import { NATIVE_CHAT_SUBMIT_DELAY_MS } from '../../../../../shared/native-chat-answer-stepping'
 import { runBodyAcceptedThen } from './native-chat-runtime-send-acceptance'
 import {
+  createDeliveryObserver,
   createOutcomeReporter,
   guardedDelay,
   runOutcomeGuarded,
   submitAndObserve,
+  type NativeChatDeliveryObserver,
   type SendOutcome
 } from './native-chat-send-outcome'
 import { clearThenWrite, clearUnsubmittedAgentInput } from './native-chat-runtime-clear'
@@ -25,10 +27,10 @@ const withQueuedCancelOutcome = (
   reportOutcome: (outcome: SendOutcome) => void
 ): NativeChatPtySendQueueHandle => ({
   ...handle,
-  cancel: () => {
+  cancel: (keepInput) => {
     const startedBeforeCancel = handle.bodyStarted()
     try {
-      handle.cancel()
+      handle.cancel(keepInput)
     } finally {
       if (!startedBeforeCancel) {
         reportOutcome('may-not-have-sent')
@@ -62,6 +64,8 @@ export type NativeChatBodySendContext = {
   markSubmitted: () => void
   reportOutcome: (outcome: SendOutcome) => void
   delayGuarded: (ms: number, fn: () => void) => void
+  /** Per-write delivery reporting the caller asked for, if any; pass it to follow-up body writes. */
+  delivery: NativeChatDeliveryObserver | undefined
   /** Schedules the submit CR from the actual body write: an overdue clear-confirm
    *  callback must not collapse the required body-to-Enter gap after a stall. */
   submit: () => void
@@ -91,6 +95,7 @@ export function enqueueNativeChatBodySend(args: {
     afterAccepted
   } = args
   const reportOutcome = createOutcomeReporter(options?.onOutcome)
+  const delivery = createDeliveryObserver(options)
   const handle = enqueueNativeChatPtySend(
     ptyId,
     durationMs,
@@ -107,7 +112,8 @@ export function enqueueNativeChatBodySend(args: {
             ptyId,
             markSubmitted,
             reportOutcome,
-            options?.confirmSubmitted
+            options?.confirmSubmitted,
+            delivery
           )
         })
       }
@@ -131,11 +137,19 @@ export function enqueueNativeChatBodySend(args: {
               reportOutcome,
               () => {
                 if (afterAccepted) {
-                  afterAccepted({ isCancelled, markSubmitted, reportOutcome, delayGuarded, submit })
+                  afterAccepted({
+                    isCancelled,
+                    markSubmitted,
+                    reportOutcome,
+                    delayGuarded,
+                    delivery,
+                    submit
+                  })
                   return
                 }
                 submit()
-              }
+              },
+              delivery
             )
           },
           () => {
@@ -151,7 +165,10 @@ export function enqueueNativeChatBodySend(args: {
         bestEffortCancelClear(settings, ptyId, options, reportOutcome, cleanupDelay),
       // Quarantine owns the replacement shell: report for draft restoration,
       // but never send the ordinary Ctrl+U cleanup into that new endpoint.
-      onInvalidate: () => reportOutcome('may-not-have-sent')
+      onInvalidate: () => {
+        delivery?.abandoned()
+        reportOutcome('may-not-have-sent')
+      }
     }
   )
   return withQueuedCancelOutcome(handle, reportOutcome)

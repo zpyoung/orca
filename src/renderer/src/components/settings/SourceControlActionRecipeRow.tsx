@@ -9,12 +9,13 @@ import type { CustomAgentId } from '../../../../shared/commit-message-agent-spec
 import { CUSTOM_AGENT_ID, isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
 import {
   SOURCE_CONTROL_ACTION_LABELS,
-  type SourceControlActionId
+  type AiActionId
 } from '../../../../shared/source-control-ai-actions'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
 import { AgentLaunchOverridesFields } from '../fork-automation-launch-settings/AgentLaunchOverridesFields'
 import { Button } from '../ui/button'
+import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import {
@@ -24,7 +25,7 @@ import {
 } from './source-control-ai-action-recipe-draft'
 import {
   getActionDescriptions,
-  SOURCE_CONTROL_TEXT_ACTION_ID_SET,
+  AI_TEXT_ACTION_ID_SET,
   getAgentCatalogForAction,
   getSourceControlActionAgentSupportText,
   getSourceControlActionAgentWarningText,
@@ -34,24 +35,22 @@ import { translate } from '@/i18n/i18n'
 
 const DEFAULT_AGENT_VALUE = '__default_agent__'
 
-type SourceControlActionRecipeRowProps = {
-  actionId: SourceControlActionId
+type SourceControlActionRecipeRowProps<ActionId extends AiActionId> = {
+  actionId: ActionId
   selectedAgent: TuiAgent | CustomAgentId | null
   draftValue: ActionRecipeDraftValue
   baseValue: ActionRecipeDraftValue
   defaultTuiAgent: GlobalSettings['defaultTuiAgent']
-  isSavingRecipe: boolean
+  isSavingTemplate: boolean
+  hasUnsavedChanges?: boolean
   repoOverrideNote?: React.ReactNode
-  onAgentChange: (actionId: SourceControlActionId, value: string) => void
-  onTemplateChange: (actionId: SourceControlActionId, value: string) => void
-  onAgentArgsChange: (actionId: SourceControlActionId, value: string) => void
-  onLaunchOptionsChange: (
-    actionId: SourceControlActionId,
-    value: AgentLaunchOptionSelection
-  ) => void
-  onAppendVariable: (actionId: SourceControlActionId, variable: string) => void
-  onDiscard: (actionId: SourceControlActionId) => void
-  onSave: (actionId: SourceControlActionId) => void
+  onAgentChange: (actionId: ActionId, value: string) => void
+  onTemplateChange: (actionId: ActionId, value: string) => void
+  onAgentArgsChange: (actionId: ActionId, value: string) => void
+  onLaunchOptionsChange?: (actionId: ActionId, value: AgentLaunchOptionSelection) => void
+  onAppendVariable: (actionId: ActionId, variable: string) => void
+  onDiscard: (actionId: ActionId) => void
+  onSave: (actionId: ActionId) => void
 }
 
 function resolveAgentArgsPlaceholderAgent(
@@ -64,13 +63,20 @@ function resolveAgentArgsPlaceholderAgent(
   return defaultTuiAgent && defaultTuiAgent !== 'blank' ? defaultTuiAgent : null
 }
 
-export function SourceControlActionRecipeRow({
+function getActionLabel(actionId: AiActionId): string {
+  return actionId === 'conversationName'
+    ? translate('settings.chat.names.recipe', 'Chat name')
+    : SOURCE_CONTROL_ACTION_LABELS[actionId]
+}
+
+export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
   actionId,
   selectedAgent,
   draftValue,
   baseValue,
   defaultTuiAgent,
-  isSavingRecipe,
+  isSavingTemplate,
+  hasUnsavedChanges,
   repoOverrideNote,
   onAgentChange,
   onTemplateChange,
@@ -79,8 +85,9 @@ export function SourceControlActionRecipeRow({
   onAppendVariable,
   onDiscard,
   onSave
-}: SourceControlActionRecipeRowProps): React.JSX.Element {
-  const recipeDirty = JSON.stringify(draftValue) !== JSON.stringify(baseValue)
+}: SourceControlActionRecipeRowProps<ActionId>): React.JSX.Element {
+  const templateDirty =
+    hasUnsavedChanges ?? JSON.stringify(draftValue) !== JSON.stringify(baseValue)
   const launchAgent = resolveAgentArgsPlaceholderAgent(selectedAgent, defaultTuiAgent)
   const launchOverrides = actionRecipeDraftToAgentLaunchOverrides(draftValue)
   const onLaunchOverridesChange = (
@@ -93,7 +100,7 @@ export function SourceControlActionRecipeRow({
     }
     const nextLaunchOptions = agentLaunchOptionSelectionFromOverrides(next)
     if (JSON.stringify(nextLaunchOptions) !== JSON.stringify(draftValue.launchOptions)) {
-      onLaunchOptionsChange(actionId, nextLaunchOptions)
+      onLaunchOptionsChange?.(actionId, nextLaunchOptions)
     }
   }
   const agentArgsPlaceholder = getSourceControlAgentArgsPlaceholder(launchAgent)
@@ -105,9 +112,7 @@ export function SourceControlActionRecipeRow({
     <div className="rounded-md border border-border px-3 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-0.5">
-          <p className="text-xs font-medium text-foreground">
-            {SOURCE_CONTROL_ACTION_LABELS[actionId]}
-          </p>
+          <p className="text-xs font-medium text-foreground">{getActionLabel(actionId)}</p>
           <p className="text-[11px] text-muted-foreground">{getActionDescriptions()[actionId]}</p>
         </div>
         <div className="w-full shrink-0 space-y-1 sm:w-[220px]">
@@ -128,7 +133,7 @@ export function SourceControlActionRecipeRow({
                   )}
                 </span>
               </SelectItem>
-              {SOURCE_CONTROL_TEXT_ACTION_ID_SET.has(actionId) ? (
+              {AI_TEXT_ACTION_ID_SET.has(actionId) ? (
                 <SelectItem value={CUSTOM_AGENT_ID}>
                   <span className="flex items-center gap-2">
                     <Terminal className="size-3.5 text-muted-foreground" />
@@ -157,13 +162,31 @@ export function SourceControlActionRecipeRow({
         </div>
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-[220px_1fr]">
-        <AgentLaunchOverridesFields
-          agent={launchAgent}
-          value={launchOverrides}
-          onChange={onLaunchOverridesChange}
-          agentArgsPlaceholder={agentArgsPlaceholder}
-          idPrefix={`source-control-action-${actionId}`}
-        />
+        {onLaunchOptionsChange ? (
+          <AgentLaunchOverridesFields
+            agent={launchAgent}
+            value={launchOverrides}
+            onChange={onLaunchOverridesChange}
+            agentArgsPlaceholder={agentArgsPlaceholder}
+            idPrefix={`source-control-action-${actionId}`}
+          />
+        ) : (
+          <div className="space-y-2">
+            <Label className="text-[11px] text-muted-foreground">
+              {translate(
+                'auto.components.settings.SourceControlAiActionRecipeDefaults.2cb4bb7e5d',
+                'CLI arguments'
+              )}
+            </Label>
+            <Input
+              value={draftValue.agentArgs}
+              spellCheck={false}
+              placeholder={agentArgsPlaceholder}
+              onChange={(event) => onAgentArgsChange(actionId, event.target.value)}
+              className="h-8 font-mono text-xs"
+            />
+          </div>
+        )}
         <div className="space-y-2">
           <Label className="text-[11px] text-muted-foreground">
             {translate(
@@ -188,7 +211,7 @@ export function SourceControlActionRecipeRow({
         {repoOverrideNote}
         <div className="flex items-center justify-between gap-3">
           <p className="text-[11px] text-muted-foreground">
-            {recipeDirty
+            {templateDirty
               ? translate(
                   'auto.components.settings.SourceControlAiActionRecipeDefaults.817128d94e',
                   'Unsaved changes'
@@ -199,13 +222,13 @@ export function SourceControlActionRecipeRow({
                 )}
           </p>
           <div className="flex items-center gap-2">
-            {recipeDirty ? (
+            {templateDirty ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="xs"
                 onClick={() => onDiscard(actionId)}
-                disabled={isSavingRecipe}
+                disabled={isSavingTemplate}
               >
                 {translate(
                   'auto.components.settings.SourceControlAiActionRecipeDefaults.b3914ecbbc',
@@ -218,9 +241,9 @@ export function SourceControlActionRecipeRow({
               variant="secondary"
               size="xs"
               onClick={() => onSave(actionId)}
-              disabled={!recipeDirty || isSavingRecipe}
+              disabled={!templateDirty || isSavingTemplate}
             >
-              {isSavingRecipe
+              {isSavingTemplate
                 ? translate(
                     'auto.components.settings.SourceControlAiActionRecipeDefaults.4f549a5fa8',
                     'Saving...'

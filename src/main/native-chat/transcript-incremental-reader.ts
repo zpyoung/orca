@@ -2,7 +2,8 @@ import type { NativeChatMessage } from '../../shared/native-chat-types'
 import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
 import { transcriptFallbackId } from './transcript-fallback-id'
-import { openTranscriptReadStream, wslGatedStat } from './wsl-transcript-fs-access'
+import { extendTranscriptBoundary } from './transcript-file-version'
+import { openTranscriptReadStream, transcriptFileStat } from './wsl-transcript-fs-access'
 
 const APPEND_BATCH_MESSAGE_LIMIT = 40
 const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024
@@ -11,6 +12,7 @@ type NativeChatLineDecoder = (line: string, fallbackId: string) => NativeChatMes
 
 export type IncrementalTranscriptState = {
   offset: number
+  boundary: Buffer
   pendingChunks: Buffer[]
   pendingStart: number
   pendingBytes: number
@@ -20,6 +22,7 @@ export type IncrementalTranscriptState = {
 export function createIncrementalTranscriptState(): IncrementalTranscriptState {
   return {
     offset: 0,
+    boundary: Buffer.alloc(0),
     pendingChunks: [],
     pendingStart: 0,
     pendingBytes: 0,
@@ -29,6 +32,7 @@ export function createIncrementalTranscriptState(): IncrementalTranscriptState {
 
 export function resetIncrementalTranscriptState(state: IncrementalTranscriptState): void {
   state.offset = 0
+  state.boundary = Buffer.alloc(0)
   state.pendingChunks.length = 0
   state.pendingStart = 0
   state.pendingBytes = 0
@@ -44,7 +48,7 @@ export async function readIncrementalTranscriptMessages(
   onCompanion?: (companion: NativeChatTranscriptCompanion) => void,
   signal?: AbortSignal
 ): Promise<NativeChatMessage[]> {
-  const end = (await wslGatedStat(filePath, 'exact', signal)).size
+  const end = (await transcriptFileStat(filePath, 'exact', signal)).size
   if (end <= state.offset) {
     return []
   }
@@ -75,6 +79,7 @@ export async function readIncrementalTranscriptMessages(
       }
       absoluteOffset += chunk.length
       state.offset = absoluteOffset
+      state.boundary = extendTranscriptBoundary(state.boundary, chunk)
     }
     return messages
   } finally {
@@ -104,7 +109,10 @@ export async function readIncrementalTranscriptMessages(
   }
 
   function decodeLine(): void {
-    let line = Buffer.concat(state.pendingChunks).toString('utf8')
+    // These owned bytes are decoded synchronously; a single part needs no copy.
+    const bytes =
+      state.pendingChunks.length === 1 ? state.pendingChunks[0] : Buffer.concat(state.pendingChunks)
+    let line = bytes.toString('utf8')
     if (line.endsWith('\r')) {
       line = line.slice(0, -1)
     }

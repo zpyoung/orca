@@ -4,6 +4,7 @@ import { useAppStore } from '@/store'
 import { emitTerminalDockToggled } from '@/lib/fork-terminal-dock/terminal-dock-telemetry'
 import type { AgentType } from '../../../../../shared/agent-status-types'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
+import type { Tab } from '../../../../../shared/tab-types'
 import { getCachedUnifiedTerminalTabForWorktree } from '../terminal-unified-tab-lookup'
 import { useTerminalDockAgentLatch } from './terminal-pane-dock-agent-latch'
 import { useTerminalDockLocalFallback } from './use-terminal-dock-local-fallback'
@@ -13,6 +14,18 @@ import { useTerminalDockPassthrough } from './use-terminal-dock-passthrough'
 import { useTerminalDockPtyBindingRevision } from './use-terminal-dock-pty-binding-revision'
 import { useTerminalDockShortcutListener } from './use-terminal-dock-shortcut-listener'
 import type { PtyTransportRecoveryState } from '../pty-transport-types'
+
+// Why: upstream's own suites drive TerminalPaneSurface with store doubles that carry no tab
+// catalog; an absent one means no dock state, not a crash.
+function unifiedTerminalTab(
+  state: { unifiedTabsByWorktree?: Record<string, Tab[]> },
+  worktreeId: string,
+  tabId: string
+): Tab | null {
+  return state.unifiedTabsByWorktree
+    ? getCachedUnifiedTerminalTabForWorktree(state.unifiedTabsByWorktree, worktreeId, tabId)
+    : null
+}
 
 export type UseTerminalPaneDockArgs = {
   tabId: string
@@ -73,9 +86,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const { tabId, worktreeId, enabled, managerRef, containerRef } = args
 
   const terminalDockByPaneKey = useAppStore(
-    (store) =>
-      getCachedUnifiedTerminalTabForWorktree(store.unifiedTabsByWorktree, worktreeId, tabId)
-        ?.terminalDockByPaneKey
+    (store) => unifiedTerminalTab(store, worktreeId, tabId)?.terminalDockByPaneKey
   )
   const setTabTerminalDockState = useAppStore((store) => store.setTabTerminalDockState)
   const autoDockNewPanes = useAppStore(
@@ -138,11 +149,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   )
 
   const resolveUnifiedTabId = useCallback((): string | null => {
-    const state = useAppStore.getState()
-    return (
-      getCachedUnifiedTerminalTabForWorktree(state.unifiedTabsByWorktree, worktreeId, tabId)?.id ??
-      null
-    )
+    return unifiedTerminalTab(useAppStore.getState(), worktreeId, tabId)?.id ?? null
   }, [tabId, worktreeId])
 
   const applyDockState = useCallback(

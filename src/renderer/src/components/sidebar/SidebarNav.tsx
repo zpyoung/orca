@@ -17,8 +17,6 @@ import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { HeimdallSidebarNavEntry } from '@/fork-heimdall/HeimdallSidebarNavEntry'
 
-export { getSetupGuideSidebarEntryReady, shouldShowSetupGuideEntry } from './SetupGuideSidebarEntry'
-
 export function shouldShowMobileButton(
   settings: Partial<Pick<GlobalSettings, 'showMobileButton'>> | null | undefined
 ): boolean {

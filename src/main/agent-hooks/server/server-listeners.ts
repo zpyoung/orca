@@ -1,3 +1,4 @@
+import { isTmuxInnerSubject } from '../../../shared/tmux-agent-hook-owner'
 import type {
   AgentStatusClearIpcPayload,
   AgentStatusIpcPayload
@@ -26,6 +27,14 @@ import { sessionInfoService } from '../../fork-session-info/session-info-service
 const UNORDERED_STATUS_ROW = Number.MAX_SAFE_INTEGER
 
 export abstract class AgentHookServerListeners extends AgentHookServerState {
+  setStartupPromptClaimListener(
+    listener: (body: unknown) => boolean | 'pending',
+    clear: () => void
+  ): void {
+    this.onStartupPromptClaim = listener
+    this.clearStartupPromptClaims = clear
+  }
+
   // Why: every status emit must reach plugins too, so a new early-return path
   // upstream cannot silently leave the plugin tap behind the main-window fanout.
   protected emitEnrichedStatus(enriched: EnrichedAgentHookEventPayload): void {
@@ -58,7 +67,7 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
       })
     }
     for (const parent of this.canonicalStatusStore.getParents()) {
-      if (!parent.status) {
+      if (!parent.status || isTmuxInnerSubject(parent.subject)) {
         continue
       }
       rows.push({

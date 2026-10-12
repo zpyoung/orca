@@ -1,13 +1,19 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
 import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'
+import { isMacPlatform } from '../native-chat-shortcut'
+import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
 
 export type UseAgentComposerKeyDownArgs = {
   autocomplete: ComposerAutocomplete
+  mentionFiles: NativeChatMentionFiles
+  completeMention: (path: string) => void
   activeSuggestion: number
   draft: string
+  /** Image chips count as composer content, like typed text. */
+  hasAttachments?: boolean
   history: HistoryState
   isComposing: () => boolean
   completePickerItem: (item: NativeChatPickerItem) => void
@@ -15,6 +21,9 @@ export type UseAgentComposerKeyDownArgs = {
   dismissPicker: (triggerKey: string) => void
   interrupt: () => void
   send: () => void
+  /** Cmd/Ctrl+Enter from an empty composer: send the newest queued draft now; false falls
+   *  through to send. */
+  steerQueued?: (() => boolean) | undefined
   setActiveSuggestion: Dispatch<SetStateAction<number>>
   setDraft: Dispatch<SetStateAction<string>>
   setCaret: Dispatch<SetStateAction<number>>
@@ -23,8 +32,11 @@ export type UseAgentComposerKeyDownArgs = {
 
 export function useAgentComposerKeyDown({
   autocomplete,
+  mentionFiles,
+  completeMention,
   activeSuggestion,
   draft,
+  hasAttachments = false,
   history,
   isComposing,
   completePickerItem,
@@ -32,6 +44,7 @@ export function useAgentComposerKeyDown({
   dismissPicker,
   interrupt,
   send,
+  steerQueued,
   setActiveSuggestion,
   setDraft,
   setCaret,
@@ -52,8 +65,8 @@ export function useAgentComposerKeyDown({
         return
       }
 
-      if (autocomplete.mode === 'slash') {
-        const items = autocomplete.items
+      if (autocomplete.mode !== 'none') {
+        const items = autocomplete.mode === 'slash' ? autocomplete.items : mentionFiles.files
         if (event.key === 'ArrowDown' && items.length > 0) {
           event.preventDefault()
           setActiveSuggestion((index) => (index + 1) % items.length)
@@ -64,9 +77,16 @@ export function useAgentComposerKeyDown({
           setActiveSuggestion((index) => (index - 1 + items.length) % items.length)
           return
         }
-        if ((event.key === 'Enter' || event.key === 'Tab') && items.length > 0) {
+        // Shift keeps its own meaning: a newline for Enter, focus back for Tab.
+        const picks = (event.key === 'Enter' || event.key === 'Tab') && !event.shiftKey
+        if (picks && items.length > 0) {
           event.preventDefault()
-          const item = items[activeSuggestion] ?? items[0]
+          if (autocomplete.mode === 'mention') {
+            const { files } = mentionFiles
+            completeMention(files[Math.min(activeSuggestion, files.length - 1)])
+            return
+          }
+          const item = autocomplete.items[activeSuggestion] ?? autocomplete.items[0]
           // A mid-prompt command is part of the sentence being written, so Enter
           // completes the token instead of sending the command on its own.
           if (event.key === 'Enter' && item.kind === 'command' && autocomplete.dispatchable) {
@@ -74,6 +94,11 @@ export function useAgentComposerKeyDown({
           } else {
             completePickerItem(item)
           }
+          return
+        }
+        // Why: the files are still on their way, so Enter here is a pick that came early, not a send.
+        if (picks && autocomplete.mode === 'mention' && mentionFiles.loading) {
+          event.preventDefault()
           return
         }
         if (event.key === 'Escape') {
@@ -89,6 +114,14 @@ export function useAgentComposerKeyDown({
         return
       }
       if (event.key === 'Enter' && !event.shiftKey) {
+        // Platform primary modifier only (AGENTS.md): ⌘ on Mac, Ctrl elsewhere.
+        const steerChord = isMacPlatform() ? event.metaKey : event.ctrlKey
+        // Only from an empty composer: the chord never sends a card past what the user just wrote.
+        const composerEmpty = draft.trim() === '' && !hasAttachments
+        if (steerChord && composerEmpty && steerQueued?.()) {
+          event.preventDefault()
+          return
+        }
         event.preventDefault()
         send()
         return
@@ -116,14 +149,18 @@ export function useAgentComposerKeyDown({
     [
       activeSuggestion,
       autocomplete,
+      completeMention,
       completePickerItem,
       dismissPicker,
       dispatchPickerCommand,
       draft,
+      hasAttachments,
       history,
       interrupt,
       isComposing,
+      mentionFiles,
       send,
+      steerQueued,
       setActiveSuggestion,
       setCaret,
       setDraft,

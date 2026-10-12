@@ -15,12 +15,8 @@ vi.mock('./AgentComposerActions', () => ({
 }))
 
 vi.mock('../NativeChatAutocompleteMenus', () => ({
-  NativeChatMentionHint: () => null,
+  NativeChatMentionMenu: () => null,
   NativeChatPickerMenu: () => null
-}))
-
-vi.mock('../fork-native-chat-width/use-native-chat-width', () => ({
-  useNativeChatWidthClassName: () => 'max-w-4xl'
 }))
 
 import { AgentComposerField } from './AgentComposerField'
@@ -30,6 +26,7 @@ const stubImeEnterGesture = {
   isComposing: () => false,
   ownsKeyDown: () => false,
   onKeyUp: () => {},
+  onCompositionEnd: () => {},
   reset: () => {},
   setComposing: () => {}
 }
@@ -44,7 +41,7 @@ function renderField(layout?: 'dock'): {
   render(
     <AgentComposerField
       terminalTabId="tab-1"
-      paneKey="pane-1"
+      draftScopeKey="pane-1"
       textareaRef={createRef<HTMLTextAreaElement>()}
       draft=""
       disabled={false}
@@ -53,7 +50,7 @@ function renderField(layout?: 'dock'): {
       layout={layout}
       autocomplete={{ mode: 'none' }}
       activeSuggestion={0}
-      notice={null}
+      notices={[]}
       imageAttachments={[]}
       sendButtonDisabled={false}
       isWorking={false}
@@ -70,7 +67,8 @@ function renderField(layout?: 'dock'): {
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}
       onRetrySkills={vi.fn()}
-      onAcceptMention={vi.fn()}
+      onChooseMentionFile={vi.fn()}
+      mentionFiles={{ files: [], loading: false, failed: false }}
       onRemoveImageAttachment={vi.fn()}
       onAttach={vi.fn()}
       onDictationToggle={vi.fn()}
@@ -82,7 +80,7 @@ function renderField(layout?: 'dock'): {
     />
   )
 
-  const card = document.querySelector('[data-native-file-drop-target]') as HTMLElement
+  const card = document.querySelector('.border-chat-composer-border') as HTMLElement
   const widthWrapper = card.parentElement as HTMLElement
   const paddingWrapper = widthWrapper.parentElement as HTMLElement
   return { widthWrapper, paddingWrapper, card }
@@ -95,20 +93,20 @@ describe('agent composer dock layout', () => {
     for (const className of ['px-3', 'pt-2', 'pb-2', 'pb-4', 'sm:px-4']) {
       expect(paddingWrapper).not.toHaveClass(className)
     }
-    for (const className of ['mx-auto', 'max-w-4xl']) {
+    for (const className of ['mx-auto', 'max-w-(--chat-content-max-width)']) {
       expect(widthWrapper).not.toHaveClass(className)
     }
     expect(widthWrapper).toHaveClass('w-full')
     expect(card).toHaveClass('rounded-none')
-    expect(card).not.toHaveClass('rounded-lg')
+    expect(card).not.toHaveClass('rounded-xl')
   })
 
   it('keeps the centered padded card in the chat layout', () => {
     const { widthWrapper, paddingWrapper, card } = renderField()
 
     expect(paddingWrapper).toHaveClass('px-3', 'pt-2', 'pb-4', 'sm:px-4')
-    expect(widthWrapper).toHaveClass('mx-auto', 'max-w-4xl')
-    expect(card).toHaveClass('rounded-lg')
+    expect(widthWrapper).toHaveClass('mx-auto', 'max-w-(--chat-content-max-width)')
+    expect(card).toHaveClass('rounded-xl')
     expect(card).not.toHaveClass('rounded-none')
   })
 })

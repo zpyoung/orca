@@ -1,3 +1,4 @@
+import { isAntigravityReferenceSession } from '../../../../shared/antigravity-session-origin'
 import type { AiVaultSubagentResumeActions } from './AiVaultSessionSubagents'
 import { useCallback } from 'react'
 import type React from 'react'
@@ -27,6 +28,7 @@ import type { AgentStatusState } from '../../../../shared/agent-status-types'
 import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'
 import type { AiVaultSearchHit } from '../../../../shared/ai-vault-search-types'
 import { AiVaultSearchEvidence } from './AiVaultSearchEvidence'
+import { useAiVaultSessionDisplayTitle } from './use-ai-vault-session-display-title'
 
 export function VaultSessionRow({
   session,
@@ -45,7 +47,8 @@ export function VaultSessionRow({
   onResume,
   onContinueInNewSession,
   onResumeInNewChat,
-  resumeLabel,
+  onResumeInNewCli,
+  resumeLabel: defaultResumeLabel,
   resumeActions,
   onResumeInWorktree,
   onResumeInNewTab,
@@ -75,6 +78,7 @@ export function VaultSessionRow({
   onResume: () => void
   onContinueInNewSession?: () => void
   onResumeInNewChat?: () => void
+  onResumeInNewCli?: () => void
   resumeLabel: string
   resumeActions: AiVaultSessionResumeActions
   onResumeInWorktree: () => void
@@ -89,7 +93,11 @@ export function VaultSessionRow({
   onRequestDelete?: (session: AiVaultSession) => void
   searchHit?: AiVaultSearchHit
 }) {
+  const resumeLabel = isAntigravityReferenceSession(session)
+    ? translate('aiVault.continueInCli', 'Continue in CLI')
+    : defaultResumeLabel
   const updatedAt = session.updatedAt ?? session.modifiedAt
+  const title = useAiVaultSessionDisplayTitle(session)
   const detailsId = getSessionDetailsId(session.id)
   const latestTurn = latestSessionConversationTurn(session)
   // Computed once so the dropdown menu and the context menu never disagree.
@@ -116,7 +124,7 @@ export function VaultSessionRow({
         agent: session.agent,
         sessionId: session.sessionId,
         ...(session.structuredSession ? { structuredSession: session.structuredSession } : {}),
-        title: session.title,
+        title,
         command: resumeStartup.command,
         sessionFilePath: session.filePath,
         sessionExecutionHostId: session.executionHostId,
@@ -131,7 +139,7 @@ export function VaultSessionRow({
       })
       window.dispatchEvent(new Event(AI_VAULT_SESSION_DRAG_START_EVENT))
     },
-    [realHomeResumeStartup, resumeDisabled, session, resumeStartup]
+    [realHomeResumeStartup, resumeDisabled, session, resumeStartup, title]
   )
 
   return (
@@ -176,7 +184,7 @@ export function VaultSessionRow({
                 window.dispatchEvent(new Event(AI_VAULT_SESSION_DRAG_END_EVENT))
               }}
             >
-              {session.title}
+              {title}
             </div>
             <SessionRowTrailingActions
               session={session}
@@ -194,6 +202,7 @@ export function VaultSessionRow({
               onResume={onResume}
               onContinueInNewSession={onContinueInNewSession}
               onResumeInNewChat={onResumeInNewChat}
+              onResumeInNewCli={onResumeInNewCli}
               onCopyResume={onCopyResume}
               onCopyId={onCopyId}
               onCopyPath={onCopyPath}
@@ -242,6 +251,7 @@ export function VaultSessionRow({
               subagentResume={subagentResume}
               onContinueInNewSession={onContinueInNewSession}
               onResumeInNewChat={onResumeInNewChat}
+              onResumeInNewCli={onResumeInNewCli}
               onOpenLog={onOpenLog}
             />
           ) : null}
@@ -259,6 +269,7 @@ export function VaultSessionRow({
           onResume={onResume}
           onContinueInNewSession={onContinueInNewSession}
           onResumeInNewChat={onResumeInNewChat}
+          onResumeInNewCli={onResumeInNewCli}
           onCopyResume={onCopyResume}
           onCopyId={onCopyId}
           onCopyPath={onCopyPath}

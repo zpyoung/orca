@@ -1,3 +1,6 @@
+export const DESKTOP_READ_WINDOW = 300
+export const UNFLUSHED_SETTLE_MS = 1_500
+
 import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
 import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { ResolveSessionFileOptions } from './session-file-resolver'
@@ -12,6 +15,7 @@ export type NativeChatTranscriptTailReader = (args: {
   decodeCompanion?: NativeChatTranscriptCompanionDecoder | null
   maxBytes?: number
   signal?: AbortSignal
+  onConsumedBoundary?: (boundary: Buffer) => void
 }) => Promise<{
   messages: NativeChatMessage[]
   companion?: NativeChatTranscriptCompanion

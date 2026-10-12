@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
-// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 // Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
 import { toast } from 'sonner'
@@ -7,6 +7,7 @@ import { getConnectionId } from '@/lib/connection-context'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { launchWorkItemDirect } from '@/lib/launch-work-item-direct'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import { CLIENT_PLATFORM } from '@/lib/new-workspace'
@@ -146,7 +147,12 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
   const attachedWorkspace =
     args.worktreeId || !args.item
       ? null
-      : findGithubPrWorkspaceAttachment(store.allWorktrees(), args.repoId, args.item.number)
+      : findGithubPrWorkspaceAttachment(
+          store.allWorktrees(),
+          args.repoId,
+          args.item.number,
+          args.item.url
+        )
   const targetWorktreeId = args.worktreeId ?? attachedWorkspace?.id ?? null
   if (targetWorktreeId) {
     const targetWorktree = store.allWorktrees().find((worktree) => worktree.id === targetWorktreeId)
@@ -238,6 +244,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     }
     let revealFailed = false
     const result = launchAgentInNewTab({
+      requestId: newAgentLaunchRequestId(),
       agent,
       worktreeId: targetWorktreeId,
       groupId: args.groupId ?? targetWorktreeId,

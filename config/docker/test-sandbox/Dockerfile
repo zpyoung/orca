@@ -94,6 +94,9 @@ RUN pnpm install --no-frozen-lockfile --no-prefer-frozen-lockfile --ignore-scrip
 COPY --chown=runner:runner config/scripts ./config/scripts
 # Why: install-electron-package-binary.mjs re-exports its zip extractor from src/shared.
 COPY --chown=runner:runner src/shared/zip-extractor-command.ts ./src/shared/zip-extractor-command.ts
+# Why: config/scripts/script-child-process.mjs bundles run-process.ts and its import closure.
+COPY --chown=runner:runner src/shared/child-process ./src/shared/child-process
+COPY --chown=runner:runner src/shared/growing-byte-buffer.ts ./src/shared/growing-byte-buffer.ts
 
 RUN node config/scripts/ensure-native-runtime.mjs --runtime=node \
   && node config/scripts/install-electron-package-binary.mjs \

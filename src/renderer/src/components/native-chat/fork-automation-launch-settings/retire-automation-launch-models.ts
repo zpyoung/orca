@@ -3,7 +3,7 @@ import {
   getAgentSessionOptionCatalog,
   type CatalogModel
 } from '../../../../../shared/agent-session-option-catalog'
-import { normalizeAgentLaunchOverrides } from '../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { normalizeAutomationLaunchOverrides } from '../../../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
 import {
   getAutomationListTarget,
   listAutomationsForTarget,
@@ -36,7 +36,7 @@ async function retireStaleAutomationModels(
     }
     const { model: _retiredModel, ...remaining } = automation.launchOverrides ?? {}
     await updateAutomationForTarget(automation, {
-      launchOverrides: normalizeAgentLaunchOverrides(remaining) ?? null
+      launchOverrides: normalizeAutomationLaunchOverrides(remaining) ?? null
     })
   }
 }

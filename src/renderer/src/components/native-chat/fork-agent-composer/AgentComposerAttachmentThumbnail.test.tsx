@@ -35,13 +35,9 @@ vi.mock('@/lib/connection-owner-resolution', () => ({
     worktreeId === null ? null : connectionIdByTab.get(worktreeId)
 }))
 
-const authorizeExternalPath = vi.fn(() => Promise.resolve())
+const CHAT_IMAGE_ACCESS = { kind: 'chat-image' }
 
 beforeEach(() => {
-  Object.defineProperty(window, 'api', {
-    configurable: true,
-    value: { fs: { authorizeExternalPath } }
-  })
   loadLocalImageAbsolutePath.mockResolvedValue('blob:orca/attachment')
 })
 
@@ -64,10 +60,15 @@ describe('AgentComposerAttachmentThumbnail', () => {
 
     const thumbnail = await screen.findByAltText('shot.png')
     expect(thumbnail).toHaveAttribute('src', 'blob:orca/attachment')
-    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith('/local/shot.png')
+    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith(
+      '/local/shot.png',
+      undefined,
+      undefined,
+      CHAT_IMAGE_ACCESS
+    )
   })
 
-  it('authorizes the attached path before reading it', async () => {
+  it('reads an attached path outside the worktree with chat-image access', async () => {
     render(
       <AgentComposerAttachmentThumbnail
         path="/outside/worktree/shot.png"
@@ -77,9 +78,12 @@ describe('AgentComposerAttachmentThumbnail', () => {
     )
 
     await screen.findByAltText('shot.png')
-    expect(authorizeExternalPath).toHaveBeenCalledWith({
-      targetPath: '/outside/worktree/shot.png'
-    })
+    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith(
+      '/outside/worktree/shot.png',
+      undefined,
+      undefined,
+      CHAT_IMAGE_ACCESS
+    )
   })
 
   it('reads an uploaded attachment from the local file it came from', async () => {
@@ -101,8 +105,12 @@ describe('AgentComposerAttachmentThumbnail', () => {
     )
 
     await screen.findByAltText('shot.png')
-    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith('/local/shot.png')
-    expect(authorizeExternalPath).toHaveBeenCalledWith({ targetPath: '/local/shot.png' })
+    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith(
+      '/local/shot.png',
+      undefined,
+      undefined,
+      CHAT_IMAGE_ACCESS
+    )
   })
 
   it('never shows another host image for the same remote path', async () => {
@@ -122,8 +130,15 @@ describe('AgentComposerAttachmentThumbnail', () => {
     )
 
     await waitFor(() => expect(loadLocalImageAbsolutePath).toHaveBeenCalled())
-    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith(remotePath)
-    expect(loadLocalImageAbsolutePath).not.toHaveBeenCalledWith('/local/a/secret.png')
+    expect(loadLocalImageAbsolutePath).toHaveBeenCalledWith(
+      remotePath,
+      undefined,
+      undefined,
+      CHAT_IMAGE_ACCESS
+    )
+    expect(loadLocalImageAbsolutePath.mock.calls.map(([path]) => path)).not.toContain(
+      '/local/a/secret.png'
+    )
   })
 
   it('keeps the icon when the image cannot be read', async () => {
@@ -140,19 +155,5 @@ describe('AgentComposerAttachmentThumbnail', () => {
     await waitFor(() => expect(loadLocalImageAbsolutePath).toHaveBeenCalled())
     expect(screen.queryByAltText('only.png')).not.toBeInTheDocument()
     expect(container.querySelector('svg')).toBeInTheDocument()
-  })
-
-  it('reads the image even when authorization rejects', async () => {
-    authorizeExternalPath.mockRejectedValueOnce(new Error('already authorized'))
-
-    render(
-      <AgentComposerAttachmentThumbnail
-        path="/local/shot.png"
-        label="shot.png"
-        terminalTabId="tab-1"
-      />
-    )
-
-    expect(await screen.findByAltText('shot.png')).toBeInTheDocument()
   })
 })

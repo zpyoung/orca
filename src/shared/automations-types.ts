@@ -1,4 +1,4 @@
-import type { AgentLaunchOverrides } from './fork-automation-launch-settings/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from './fork-automation-launch-settings/agent-launch-overrides'
 import type { AutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'
 import type { TuiAgent } from './tui-agent'
 import type { SetupDecision } from './worktree/create-types'
@@ -98,7 +98,9 @@ export type Automation = {
   prompt: string
   precheck: AutomationPrecheck | null
   agentId: TuiAgent
-  launchOverrides?: AgentLaunchOverrides | null
+  /** Saved text appended to the host's default agent Arguments on each fresh run; absent means none. */
+  extraAgentArgs?: string
+  launchOverrides?: AgentLaunchOptionSelection | null
   /** Why: runContext carries the logical project + host setup identity for
    *  multi-host projects; projectId remains only as the legacy repo-id storage
    *  field for pre-host-context automations.
@@ -187,7 +189,9 @@ export type AutomationCreateInput = {
   prompt: string
   precheck?: AutomationPrecheck | null
   agentId: TuiAgent
-  launchOverrides?: AgentLaunchOverrides | null
+  /** Empty or whitespace means no extras. */
+  extraAgentArgs?: string
+  launchOverrides?: AgentLaunchOptionSelection | null
   runContext?: WorkspaceRunContext | null
   sourceContext?: TaskSourceContext | null
   /** @deprecated Legacy repo-id compatibility field required for older stored
@@ -212,6 +216,7 @@ export type AutomationUpdateInput = Partial<
     | 'prompt'
     | 'precheck'
     | 'agentId'
+    | 'extraAgentArgs'
     | 'launchOverrides'
     | 'runContext'
     | 'sourceContext'

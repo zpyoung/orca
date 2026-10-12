@@ -15,6 +15,7 @@ import {
   type AutomationDispatchResult
 } from './automation-row-action-dispatch'
 import { buildDraftPrecheck } from './automation-draft-model'
+import { hasExtraAgentArgs } from '../../../../shared/automation-extra-agent-args'
 import { buildAutomationRunContextForRepo } from './automation-run-context'
 import {
   buildAutomationLaunchOverridesCreateFields,
@@ -172,6 +173,10 @@ export async function saveOrcaAutomation(
     prompt: draft.prompt,
     precheck,
     agentId: draft.agentId,
+    // Sent only when it carries or clears extras, so other edits stay legacy-shaped.
+    ...(hasExtraAgentArgs(draft.extraAgentArgs) || currentAutomation?.extraAgentArgs
+      ? { extraAgentArgs: draft.extraAgentArgs }
+      : {}),
     ...launchOverridesUpdateFields,
     runContext,
     projectId: draft.projectId,
@@ -192,6 +197,7 @@ export async function saveOrcaAutomation(
     prompt: draft.prompt,
     precheck,
     agentId: draft.agentId,
+    ...(hasExtraAgentArgs(draft.extraAgentArgs) ? { extraAgentArgs: draft.extraAgentArgs } : {}),
     ...launchOverridesCreateFields,
     runContext,
     projectId: draft.projectId,

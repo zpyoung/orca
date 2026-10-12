@@ -1,4 +1,4 @@
-import type { AgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { ParsedAgentStatusPayload } from '../../../shared/agent-status-types'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { TuiAgent } from '../../../shared/tui-agent'
@@ -10,7 +10,9 @@ export type LaunchAgentBackgroundSessionArgs = {
   agent: TuiAgent
   worktreeId: string
   prompt?: string
-  launchOverrides?: AgentLaunchOverrides | null
+  /** An automation's saved extras, merged over this host's default Arguments. */
+  extraAgentArgs?: string
+  launchOverrides?: AgentLaunchOptionSelection | null
   launchSource?: LaunchSource
   title?: string
   onData?: (chunk: string) => void

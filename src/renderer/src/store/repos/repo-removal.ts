@@ -4,7 +4,7 @@ import type { AppState } from '../types'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import { getWorktreeIdFromVisitKey, getWorktreeVisitKey } from '@/lib/worktree-visit-recency'
 import { omitSparsePresetsForRepos } from '../slices/sparse-presets'
-import { findRepoForHost, repoMatchesHostIdentity } from '../slices/repo-host-identity'
+import { repoMatchesHostIdentity } from '../slices/repo-host-identity'
 import {
   callRuntimeRpc,
   getActiveRuntimeTarget,
@@ -22,6 +22,10 @@ import type { RepoSlice } from './repo-state'
 import { ERROR_TOAST_DURATION } from './repo-state'
 import { mergeProjectCompatibilityForHostRepoChange } from './repo-catalog-identity'
 import { settingsForRepoOwner } from './owner-routing'
+import {
+  captureWorkspaceChatDraftKeys,
+  deleteWorkspaceChatDrafts
+} from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
 import { isLedgerRemovalConflict } from './ledger-removal-conflict'
 
 export function worktreeBelongsToHost(worktree: { hostId?: string }, hostId: string): boolean {
@@ -54,11 +58,10 @@ export function createRepoRemovalActions(
   return {
     removeProject: async (projectId, options) => {
       try {
-        // Why: pass an explicit hostId so a duplicate id across hosts resolves to the intended row, not the focused-host fallback.
-        const ownerRepo = findRepoForHost(get().repos, projectId, {
-          settings: get().settings,
-          hostId: options?.hostId
-        })
+        // Why: exact host match only; the unique-candidate/focused fallbacks could pick another host's row (#13071).
+        const ownerRepo = get().repos.find((repo) =>
+          repoMatchesHostIdentity(repo, projectId, options.hostId)
+        )
         if (!ownerRepo) {
           return
         }
@@ -76,26 +79,32 @@ export function createRepoRemovalActions(
             )
           }
         }
-        // Why: derive the target from the owner's settings (via options.hostId) so an SSH host removal never routes repo.rm to the focused runtime.
-        const target = getActiveRuntimeTarget(
-          settingsForRepoOwner(get(), projectId, options?.hostId)
+        // Why: derive the target from the owner row's host so an SSH host removal never routes repo.rm to the focused runtime.
+        const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), projectId, ownerHostId))
+        // Why before the host call: its announcement can start a listing refresh that drops these tabs.
+        const chatDraftKeys = captureWorkspaceChatDraftKeys(
+          get(),
+          getKnownRepoWorktreeIds(get(), projectId, ownerHostId).map((workspaceId) => ({
+            workspaceId,
+            executionHostId: ownerHostId
+          }))
         )
-        // Why: repos:remove is id-only and would delete every host's row; scope local removal to the owning host so cross-host duplicates keep other rows.
+        const expectedLedgers = options.expectedLedgers
+          ? { expectedLedgers: options.expectedLedgers }
+          : {}
+        // Why: the runtime resolves a bare id and rejects one registered on two hosts, so the
+        // ledger retention guard is skipped for cross-host duplicates.
         const idExistsOnOtherHost = get().repos.some(
           (repo) => repo.id === projectId && getRepoExecutionHostId(repo) !== ownerHostId
         )
-        const expectedLedgers = options?.expectedLedgers
-          ? { expectedLedgers: options.expectedLedgers }
-          : {}
         try {
+          // Why: always host-scoped; this catalog may be stale and miss a same-id row on another host (#13071).
           await (target.kind === 'local'
-            ? idExistsOnOtherHost
-              ? window.api.repos.removeForHost({
-                  repoId: projectId,
-                  hostId: ownerHostId,
-                  ...expectedLedgers
-                })
-              : window.api.repos.remove({ repoId: projectId, ...expectedLedgers })
+            ? window.api.repos.removeForHost({
+                repoId: projectId,
+                hostId: ownerHostId,
+                ...(idExistsOnOtherHost ? {} : expectedLedgers)
+              })
             : callRuntimeRpc(
                 target,
                 'repo.rm',
@@ -169,6 +178,7 @@ export function createRepoRemovalActions(
 
         // Why: use the canonical per-worktree purge to evict all worktree-scoped maps (hand-deletion leaked most); runs before the set() below so it still sees tabsByWorktree.
         get().purgeWorktreeTerminalState(purgeTargets)
+        deleteWorkspaceChatDrafts(chatDraftKeys)
         get().clearLocalDetectedAgentContextsForProjects(localAgentContextProjectIds)
 
         set((s) => {
@@ -285,12 +295,12 @@ export function createRepoRemovalActions(
       } catch (err) {
         // Why: the caller re-reads the ledger retention preview and retries, so a stale-preview
         // rejection must not be reported as a completed removal.
-        if (options?.expectedLedgers && isLedgerRemovalConflict(err)) {
+        if (options.expectedLedgers && isLedgerRemovalConflict(err)) {
           throw err
         }
         console.error('Failed to remove repo:', err)
         // Why: bulk and background callers aggregate their own failures, so only opted-in single-project entry points toast (#11994).
-        if (options?.errorFeedback === 'toast') {
+        if (options.errorFeedback === 'toast') {
           toast.error(
             translate('auto.store.slices.repos.removeProjectFailed', 'Failed to remove project'),
             {

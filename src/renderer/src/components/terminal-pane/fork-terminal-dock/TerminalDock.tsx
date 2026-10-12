@@ -9,6 +9,10 @@ import type { AgentComposerHandle } from '../../native-chat/fork-agent-composer/
 import { resolveComposerSendTier } from '../../native-chat/fork-agent-composer/composer-send-tier'
 import { DEFAULT_GUTTER_ROWS } from './terminal-dock-pane-state'
 import { useNativeChatPasteBridge } from '../../native-chat/use-native-chat-paste-bridge'
+import { NativeChatPaneFileDropSurface } from '../../native-chat/NativeChatPaneFileDropSurface'
+import { NATIVE_CHAT_APPEARANCE_ROOT_CLASS } from '../../native-chat/native-chat-appearance-style'
+import { useNativeChatStoreAppearanceStyle } from '../../native-chat/use-native-chat-store-appearance-style'
+import type { NativeChatComposerHandle } from '../../native-chat/native-chat-composer-types'
 
 // Row height mirrors the composer field's text-sm/leading-5 (20px) so a
 // gutterRows count tracks visible textarea lines; the remainder covers the
@@ -115,7 +119,7 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
           isLocalConptyBelowWrapMarkers: props.isLocalConptyBelowWrapMarkers ?? false
         })
       : 'input'
-    const composerRef = useRef<AgentComposerHandle>(null)
+    const composerRef = useRef<NativeChatComposerHandle>(null)
     // Why: the root only exists once auto-undock lets the dock render, and a ref mutation
     // would not re-run the bridge's subscribe effect — so track the node as state and hand
     // the bridge a fresh ref identity each time it appears.
@@ -125,6 +129,9 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
     // before a paste event exists; the root's data-native-chat-root marker makes it yield,
     // and this bridge is what then claims the event for the composer.
     const questionAnswerInputRef = useRef<HTMLInputElement>(null)
+    // Why: the dock's cards and composer sit outside the chat view's appearance root, so without
+    // this the chat width and type settings would not reach them.
+    const appearanceStyle = useNativeChatStoreAppearanceStyle()
     useNativeChatPasteBridge({ rootRef, composerRef, questionAnswerInputRef })
     // Why: exposes the mounted composer's imperative handle to the host so it can move
     // keyboard focus onto the dock (dock entry, passthrough exit) without reaching past this
@@ -186,18 +193,25 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
         </div>
         <div className="relative min-h-0 flex-1">
           <div className="h-full overflow-visible" inert={props.passthroughActive || undefined}>
-            <TerminalDockComposer
-              ref={composerRef}
-              terminalTabId={terminalTabId}
-              paneKey={paneKey}
-              targetPtyId={targetPtyId}
-              agent={agent}
-              canSend={disabledReason === null && !props.passthroughActive}
-              sendTier={sendTier}
-              readTerminalScreen={props.readTerminalScreen}
-              answerInputRef={questionAnswerInputRef}
-              onSendOutcome={(outcome) => emitTerminalDockSendOutcome({ outcome, agent })}
-            />
+            <div
+              className={cn(NATIVE_CHAT_APPEARANCE_ROOT_CLASS, 'h-full')}
+              style={appearanceStyle}
+            >
+              <NativeChatPaneFileDropSurface className="relative h-full">
+                <TerminalDockComposer
+                  ref={composerRef}
+                  terminalTabId={terminalTabId}
+                  paneKey={paneKey}
+                  targetPtyId={targetPtyId}
+                  agent={agent}
+                  canSend={disabledReason === null && !props.passthroughActive}
+                  sendTier={sendTier}
+                  readTerminalScreen={props.readTerminalScreen}
+                  answerInputRef={questionAnswerInputRef}
+                  onSendOutcome={(outcome) => emitTerminalDockSendOutcome({ outcome, agent })}
+                />
+              </NativeChatPaneFileDropSurface>
+            </div>
           </div>
           {props.passthroughActive ? (
             <div

@@ -89,8 +89,13 @@ describe('fitAndFocusPanes', () => {
     const pane = {
       leafId,
       terminal,
-      container: { querySelector: vi.fn(() => composer) }
+      container: {
+        querySelector: vi.fn((selector: string) =>
+          selector.includes('data-terminal-dock') ? composer : null
+        )
+      }
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fitAndFocusPanes reads only these members, and the focus path reads only a pane's terminal and container.
     const manager = {
       fitAllPanes: vi.fn(),
       getActivePane: () => pane,

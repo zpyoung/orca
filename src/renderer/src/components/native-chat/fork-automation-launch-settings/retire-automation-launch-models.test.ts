@@ -32,8 +32,7 @@ describe('retireAutomationLaunchModelsMissingFromDiscovery', () => {
         agentId: 'grok',
         launchOverrides: {
           model: 'retired',
-          optionValues: { effort: 'high' },
-          agentArgs: '--verbose'
+          optionValues: { effort: 'high' }
         }
       },
       { id: 'live', agentId: 'grok', launchOverrides: { model: 'grok-4.5' } },
@@ -47,8 +46,7 @@ describe('retireAutomationLaunchModelsMissingFromDiscovery', () => {
     expect(update).toHaveBeenCalledTimes(1)
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: 'stale' }), {
       launchOverrides: {
-        optionValues: { effort: 'high' },
-        agentArgs: '--verbose'
+        optionValues: { effort: 'high' }
       }
     })
   })

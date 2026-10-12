@@ -126,24 +126,20 @@ structured sessions as well as Heimdall owners; a fork-only launch workaround wo
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Wire compat Rule 1 strict schemas
+## Relay workflow inventory v1.4.224
 
-**What:** corrects Rule 1 of the remote wire-compatibility contract. It claimed every JSON payload
-is parsed with a decoder that ignores unknown keys, citing zod `.strip()` on RPC params. That holds
-only for a default schema. A `.strict()` schema rejects the entire payload on an unknown key, so
-adding an optional field to one is a breaking change, not a safe one.
+**What:** v1.4.224's release cut (`6ad7ac240e`) copied `cloud-operate-relay-production-cell-flags.yml`
+from main, but not main's matching updates to the two relay workflow inventory tests, so the tag
+fails `the copy carries every relay workflow` (26 !== 25) and the production identity reader list.
+The fork aligns both tests with the 26 workflows the release ships.
 
-**Why upstream, not isolated:** the rule is upstream's contract and the defect is upstream's. Two
-independent changes added an optional field to a strict schema on the same day, each believing they
-were complying with Rule 1 as written. A fork-local correction would leave upstream readers acting
-on the false premise.
+**Paths:**
 
-**Paths:** `docs/reference/remote-wire-compatibility.md`.
+- `cloud/dev/scripts/relay-public-workflow-contract.test.mjs`
+- `cloud/dev/scripts/relay-production-identity-boundaries.test.mjs`
 
-**Excluded when preparing the upstream PR:** the worked example cites `EnrollInputSchema`, which is
-fork-only. Replace it with an upstream strict request schema, or state the shape generically.
-
-**Status:** pending-upstream. Not yet submitted.
+**Status:** pending-upstream. Resolves on its own when a stable tag carries main's test update; drop
+both exceptions at that sync.
 
 ## Warning status tokens
 
@@ -581,7 +577,6 @@ namespace remains accepted, and only exact roots or dot-delimited children quali
 - `src/main/macos-press-and-hold-default.ts`
 - `src/main/macos-press-and-hold-default.test.ts`
 - `tests/e2e/macos-press-and-hold-startup.spec.ts`
-- `docs/reference/macos-press-and-hold.md`
 
 **Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
 continue to use `com.stablyai.orca` or a dot-suffixed child.
@@ -630,29 +625,6 @@ PTY binding, native-chat eligibility, send queue, and migrated consumers/tests. 
 remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.
-
-## Mobile workflow tests ahead of their release
-
-**Defect:** the v1.4.218 cut synced `.github/workflows/mobile.yml` from `main` (`4e93d96e4e`),
-which already carried #23732's workflow change, but left the release branch's tests at the older
-shape. The tag therefore fails its own suite: `mobile-recording-pin-checkout.test.mjs` reads a
-`recording-pin` job the synced workflow no longer has, and `mobile-release-check-scope.test.mjs`
-does not expect the newly gated `Summarize RPC recording changes` step.
-
-**Fork change:** none of its own. Mirrors `e594cb06af` (#23732) for the tests only: delete the
-recording-pin checkout test and exclude the summary step from the gated-step assertion. The
-workflow itself stays exactly as tagged.
-
-**Why upstream, not isolated:** both are upstream's own contract tests for an upstream workflow;
-the fix already exists on `main`.
-
-**Paths:**
-
-- `config/scripts/mobile-recording-pin-checkout.test.mjs` (deleted)
-- `config/scripts/mobile-release-check-scope.test.mjs`
-
-**Status:** merged upstream, awaiting a stable tag. Drop both exceptions at the first sync whose
-tag contains `e594cb06af`.
 
 ## Repeatable CLI flags are not globally exclusive
 

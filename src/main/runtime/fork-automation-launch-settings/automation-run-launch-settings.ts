@@ -3,20 +3,19 @@ import {
   buildAutomationRunLaunchSettings,
   type AutomationRunLaunchSettings
 } from '../../../shared/fork-automation-launch-settings/automation-run-launch-settings'
+import {
+  resolveAgentStartupPlanInputs,
+  type AgentStartupSettings
+} from '../../../shared/agent-startup-plan-inputs'
+import { hasExtraAgentArgs } from '../../../shared/automation-extra-agent-args'
 import { resolveTuiAgentLaunchArgs } from '../../../shared/tui-agent-launch-defaults'
-import type { TuiAgent } from '../../../shared/tui-agent'
 import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
-
-type AutomationLaunchSettings = {
-  agentDefaultArgs?: Partial<Record<TuiAgent, string>> | null
-  terminalWindowsShell?: string | null
-}
 
 /** Snapshot effective automation launch settings for a resolved execution host. */
 export function resolveAutomationRunLaunchSettings(args: {
   automation: Automation
-  settings: AutomationLaunchSettings
+  settings: AgentStartupSettings
   platform: NodeJS.Platform
   isRemote: boolean
 }): AutomationRunLaunchSettings | null {
@@ -32,14 +31,26 @@ export function resolveAutomationRunLaunchSettings(args: {
     args.automation.agentId,
     args.settings.agentDefaultArgs
   )
-  const effectiveAgentArgs = args.automation.launchOverrides?.agentArgs?.trim()
-    ? args.automation.launchOverrides.agentArgs
-    : inheritedAgentArgs
+  let effectiveAgentArgs = inheritedAgentArgs
+  if (hasExtraAgentArgs(args.automation.extraAgentArgs)) {
+    try {
+      effectiveAgentArgs =
+        resolveAgentStartupPlanInputs({
+          agent: args.automation.agentId,
+          settings: args.settings,
+          platform: args.platform,
+          isRemote: args.isRemote,
+          extraAgentArgs: args.automation.extraAgentArgs
+        }).agentArgs ?? inheritedAgentArgs
+    } catch {
+      // the launch itself reports invalid extras; the snapshot keeps the inherited arguments
+    }
+  }
   return buildAutomationRunLaunchSettings({
     agentId: args.automation.agentId,
     overrides: args.automation.launchOverrides,
     effectiveAgentArgs,
-    agentArgsSource: args.automation.launchOverrides?.agentArgs?.trim() ? 'explicit' : 'inherited',
+    agentArgsSource: hasExtraAgentArgs(args.automation.extraAgentArgs) ? 'explicit' : 'inherited',
     shell
   })
 }

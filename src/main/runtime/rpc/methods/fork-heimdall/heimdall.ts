@@ -42,6 +42,7 @@ export const HEIMDALL_METHODS = [
   ...HEIMDALL_OBJECTIVE_METHODS,
   defineMethod({
     name: HEIMDALL_CHANNELS.enroll,
+    permission: 'workspace',
     params: HeimdallEnrollRequestSchema.or(LegacyHeimdallEnrollRequestSchema),
     handler: async (request, context) => {
       const { runtime, clientKind } = context
@@ -71,6 +72,7 @@ export const HEIMDALL_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.fleet,
+    permission: 'workspace',
     params: EmptyHeimdallRequestSchema,
     handler: async (_params, context) => {
       const { runtime, clientKind } = context
@@ -83,6 +85,7 @@ export const HEIMDALL_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.detail,
+    permission: 'workspace',
     params: WatcherTargetSchema,
     handler: async (target, context) => {
       const { runtime, clientKind } = context
@@ -101,6 +104,7 @@ export const HEIMDALL_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.command,
+    permission: 'workspace',
     params: WatcherCommandRequestSchema,
     handler: (request, { runtime, clientKind }) => {
       if (clientKind === 'runtime') {
@@ -112,6 +116,7 @@ export const HEIMDALL_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.debugReport,
+    permission: 'workspace',
     params: WatcherTargetSchema.or(LegacyWatcherIdRequestSchema),
     handler: async (target, { runtime, clientKind }) => {
       if (!('connectionId' in target)) {
@@ -128,6 +133,7 @@ export const HEIMDALL_METHODS = [
   }),
   defineStreamingMethod({
     name: HEIMDALL_CHANNELS.subscribe,
+    permission: 'workspace',
     params: EmptyHeimdallRequestSchema,
     handler: async (_params, context, emit) => {
       const { runtime, clientKind, connectionId, signal } = context
@@ -189,6 +195,7 @@ export const HEIMDALL_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.unsubscribe,
+    permission: 'workspace',
     params: HeimdallUnsubscribeRequestSchema,
     handler: ({ subscriptionId }, { runtime }) => {
       runtime.cleanupSubscription(subscriptionId)

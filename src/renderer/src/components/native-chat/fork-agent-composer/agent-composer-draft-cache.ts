@@ -26,8 +26,8 @@ export const readAgentComposerDraftCache = draftCache.read
  * append lands after what is actually typed.
  */
 export function writeAgentComposerDraftCache(scopeKey: string, draft: string): void {
-  writeNativeChatDraftCache(scopeKey, draft)
   draftCache.write(scopeKey, draft)
+  writeNativeChatDraftCache(scopeKey, draft)
 }
 
 /**
@@ -38,6 +38,14 @@ export function adoptNativeChatDraftAppends(scopeKey: string): void {
   const appended = readNativeChatDraftCache(scopeKey)
   if (appended !== '' && appended !== draftCache.read(scopeKey)) {
     draftCache.write(scopeKey, appended)
+  }
+}
+
+/** Adopts the native-chat store's text when something other than this cache changed it. */
+export function adoptNativeChatDraftStoreText(scopeKey: string): void {
+  const stored = readNativeChatDraftCache(scopeKey)
+  if (stored !== draftCache.read(scopeKey)) {
+    draftCache.write(scopeKey, stored)
   }
 }
 

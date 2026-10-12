@@ -12,7 +12,7 @@ import {
 export type ActionRecipeDraftValue = {
   commandInputTemplate: string
   agentArgs: string
-  launchOptions: AgentLaunchOptionSelection
+  launchOptions?: AgentLaunchOptionSelection
 }
 
 export type ActionRecipeDraftState = {

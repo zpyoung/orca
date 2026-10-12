@@ -5,8 +5,13 @@ import { makePaneKey } from '../../../../shared/stable-pane-id'
 
 const mocks = vi.hoisted(() => ({
   storeState: {
+    activeView: 'terminal',
     activeWorktreeId: null as string | null,
-    activeTabId: null as string | null,
+    activeTab: null as { contentType: 'terminal'; entityId: string } | null,
+    getActiveTab: (_worktreeId: string): { contentType: 'terminal'; entityId: string } | null =>
+      mocks.storeState.activeTab,
+    settings: {},
+    floatingWorkspacePanelOpen: false,
     terminalLayoutsByTabId: {} as Record<string, { activeLeafId: string | null }>,
     worktreesByRepo: {} as Record<string, unknown[]>
   }
@@ -32,7 +37,7 @@ const PANE_KEY = makePaneKey(TAB_ID, LEAF_ID)
 
 function setPaneFocused(focused: boolean): void {
   mocks.storeState.activeWorktreeId = focused ? WORKTREE_ID : null
-  mocks.storeState.activeTabId = focused ? TAB_ID : null
+  mocks.storeState.activeTab = focused ? { contentType: 'terminal', entityId: TAB_ID } : null
   mocks.storeState.terminalLayoutsByTabId = focused ? { [TAB_ID]: { activeLeafId: LEAF_ID } } : {}
 }
 

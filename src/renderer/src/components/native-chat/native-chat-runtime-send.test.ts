@@ -38,6 +38,7 @@ import {
   NATIVE_CHAT_SUBMIT
 } from './native-chat-send'
 import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'
+import { sendNativeChatMessageWithImageAttachments as sendNativeChatMessageWithAgentImageAttachments } from './native-chat-runtime-image-send'
 
 const TAB = 'tab-runtime-send'
 const PTY = 'pty-1'
@@ -164,10 +165,6 @@ describe('sendNativeChatMessage', () => {
     handle.cancel()
 
     expect(sendRuntimePtyInput).not.toHaveBeenCalled()
-  })
-
-  it('matches orca-runtime writeTerminalAction Enter gap (500ms)', () => {
-    expect(NATIVE_CHAT_SUBMIT_DELAY_MS).toBe(500)
   })
 
   it('serializes rapid sends on the same PTY so bodies cannot glue before Enter', async () => {
@@ -545,7 +542,7 @@ describe('sendNativeChatMessageVerified', () => {
       PTY,
       buildNativeChatPasteBytes('/model sonnet'),
       'driving',
-      expect.any(Function)
+      { isCancelled: expect.any(Function) }
     )
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
@@ -556,7 +553,7 @@ describe('sendNativeChatMessageVerified', () => {
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving',
-      expect.any(Function)
+      { isCancelled: expect.any(Function) }
     )
     expect(
       sendRuntimePtyInputVerified.mock.calls.some(
@@ -598,7 +595,7 @@ describe('sendNativeChatMessageVerified', () => {
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving',
-      expect.any(Function)
+      { isCancelled: expect.any(Function) }
     )
   })
 
@@ -643,7 +640,7 @@ describe('sendNativeChatMessageVerified', () => {
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving',
-      expect.any(Function)
+      { isCancelled: expect.any(Function) }
     )
 
     // Only once the option command's CR has landed does the card's queued
@@ -861,6 +858,30 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
   })
 })
 
+describe('agent-aware image attachments', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    sendRuntimePtyInput.mockClear()
+    sendRuntimePtyInputAcceptance.mockClear()
+    resetNativeChatPtySendQueuesForTests()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    resetNativeChatPtySendQueuesForTests()
+  })
+
+  it('escapes a pasted image path with spaces, so an attachment agent sees one path', async () => {
+    sendNativeChatMessageWithAgentImageAttachments('codex', TARGET, '', [
+      '/Users/me/Library/Application Support/orca/native-chat-pastes/orca-paste-1-ab.png'
+    ])
+    await vi.advanceTimersByTimeAsync(0)
+    expectWriteOrder([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      '\x1b[200~/Users/me/Library/Application\\ Support/orca/native-chat-pastes/orca-paste-1-ab.png\x1b[201~'
+    ])
+  })
+})
+
 describe('empty prompt submit', () => {
   beforeEach(() => {
     sendRuntimePtyInput.mockClear()
@@ -943,6 +964,16 @@ describe('sendNativeChatAskAnswer', () => {
     expect(canceledSettled).not.toHaveBeenCalled()
   })
 
+  it('stops writing later key groups once a group is not acknowledged', async () => {
+    const onSettled = vi.fn()
+    sendRuntimePtyInputVerified.mockResolvedValueOnce(false)
+    const handle = sendNativeChatAskAnswer(TARGET, [{ raw: '1' }, { raw: '\r' }], onSettled)
+
+    await vi.advanceTimersByTimeAsync(handle.settleAfterMs)
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledOnce()
+    expect(onSettled).toHaveBeenCalledExactlyOnceWith(false)
+  })
+
   it('waits for remote acceptance before reporting delivery', async () => {
     const onSettled = vi.fn()
     let resolveAccepted!: (accepted: boolean) => void
@@ -955,16 +986,14 @@ describe('sendNativeChatAskAnswer', () => {
     const handle = sendNativeChatAskAnswer(TARGET, [{ raw: '2' }], onSettled)
     await vi.advanceTimersByTimeAsync(handle.settleAfterMs)
 
-    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      SETTINGS,
-      PTY,
-      '2',
-      'driving',
-      expect.any(Function)
-    )
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving', {
+      isCancelled: expect.any(Function),
+      requireWriteSettlement: true
+    })
     expect(onSettled).not.toHaveBeenCalled()
 
     resolveAccepted(true)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     await vi.waitFor(() => expect(onSettled).toHaveBeenCalledExactlyOnceWith(true))
   })
 })

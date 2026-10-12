@@ -145,6 +145,7 @@ export function usePersistedUIWriter(): void {
   const ui = useAppStore(
     useShallow((s): PersistedUIWriteBaseline => ({
       sidebarWidth: s.sidebarWidth,
+      sidebarOpen: s.sidebarOpen,
       rightSidebarOpen: s.rightSidebarOpen,
       rightSidebarTab: s.rightSidebarTab,
       rightSidebarExplorerView: s.rightSidebarExplorerView,
@@ -159,12 +160,15 @@ export function usePersistedUIWriter(): void {
       workspaceActivityCustomDays: s.workspaceActivityCustomDays,
       hideCompletedReviewWorkspaces: s.hideCompletedReviewWorkspaces,
       hidePassingCheckWorkspaces: s.hidePassingCheckWorkspaces,
+      workspaceHostScope: s.workspaceHostScope,
+      visibleWorkspaceHostIds: s.visibleWorkspaceHostIds,
       hideDefaultBranchWorkspace: s.hideDefaultBranchWorkspace,
       hideAutomationGeneratedWorkspaces: s.hideAutomationGeneratedWorkspaces,
       hideCliCreatedWorkspaces: s.hideCliCreatedWorkspaces,
       hideDetachedHeadWorkspaces: s.hideDetachedHeadWorkspaces,
       hideWorkspacesFromOtherDevices: s.hideWorkspacesFromOtherDevices,
       alwaysShowDefaultBranchWorkspace: s.alwaysShowDefaultBranchWorkspace,
+      explorerDisplayRootByWorktree: s.explorerDisplayRootByWorktree,
       showDotfilesByWorktree: s.showDotfilesByWorktree,
       filterRepoIds: s.filterRepoIds,
       // Why: dashboard auto-acks (fire on focus/visibility) and the in-memory ack cleanup

@@ -15,6 +15,21 @@ import { buildComposerSendOptions } from './composer-send-options'
 import type { AgentComposerImageAttachment } from './AgentComposerField'
 import type { AgentComposerCoreProps } from './agent-composer-types'
 import type { AgentComposerCoreState, AgentComposerHostBridges } from './AgentComposer'
+import type { NativeChatOptimisticSendOutcome } from '../native-chat-composer-types'
+
+/** Upstream's delivery reporting for a Claude chat echo: refused, or held unconfirmed. */
+function optimisticDeliveryOptions(
+  outcome: NativeChatOptimisticSendOutcome | undefined,
+  pendingId: string | undefined
+): Pick<NativeChatSendOptions, 'onWriteRejected' | 'onWriteUnconfirmed'> {
+  if (!outcome || !pendingId) {
+    return {}
+  }
+  return {
+    onWriteRejected: () => outcome.reject(pendingId),
+    onWriteUnconfirmed: () => outcome.holdUnconfirmed(pendingId)
+  }
+}
 
 /** Rebuilds an unsent send's payload into the draft so it survives a
  *  `may-not-have-sent` outcome, regardless of which host or tier sent it. */
@@ -24,7 +39,7 @@ export function createComposerPayloadRestore(args: {
   imageAttachments: readonly AgentComposerImageAttachment[]
   setDraft: (draft: string) => void
   setCaret: Dispatch<SetStateAction<number>>
-  setNotice: Dispatch<SetStateAction<string | null>>
+  setNotice: (notice: string | null) => void
   restoreImageAttachments?: (attachments: readonly AgentComposerImageAttachment[]) => void
 }): () => void {
   return () => {
@@ -89,8 +104,6 @@ export function useAgentComposerSend(
         props.onSendOutcome?.(outcome)
       }
     })
-    const sendOptions = mergeSendOptions(baseSendOptions, outcomeSendOptions)
-
     core.setHistory((previous) => pushHistory(previous, text))
     core.setDraft('')
     core.setCaret(0)
@@ -99,6 +112,12 @@ export function useAgentComposerSend(
     core.setNotice(null)
 
     const pendingId = classification === 'chat' ? onOptimisticSend?.(text, imagePaths) : undefined
+    const sendOptions = {
+      ...mergeSendOptions(baseSendOptions, outcomeSendOptions),
+      ...(props.agent === 'claude' && classification === 'chat'
+        ? optimisticDeliveryOptions(props.optimisticSendOutcome, pendingId)
+        : {})
+    }
     let pendingHandle: NativeChatSendHandle | null = null
     if (classification !== 'chat' && imagePaths.length === 0) {
       pendingHandle =

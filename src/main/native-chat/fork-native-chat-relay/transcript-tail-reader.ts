@@ -1,6 +1,7 @@
 // FORK-COPY-OF: src/main/native-chat/transcript-tail-reader.ts
-// FORK-COPY-SHA: 75ea50273328d9bd5465170d10a098711d61b5a4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 import { open, stat } from 'node:fs/promises'
+import { isENOENT } from '../../ipc/filesystem-path-containment'
 import type { AgentType, NativeChatMessage } from '../../../shared/native-chat-types'
 import {
   retainNativeChatTranscriptCompanion,
@@ -23,6 +24,17 @@ import { budgetNativeChatTailEntries } from './transcript-wire-budget'
 
 export const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024
 const TAIL_CHUNK_BYTES = 64 * 1024
+const BOUNDARY_FINGERPRINT_BYTES = 64
+
+// Inlined from transcript-file-version.ts, which pulls the WSL fs gate the relay bundle excludes.
+function extendTranscriptBoundary(previous: Buffer, chunk: Buffer): Buffer {
+  const chunkBytes = Math.min(chunk.length, BOUNDARY_FINGERPRINT_BYTES)
+  const previousBytes = Math.min(previous.length, BOUNDARY_FINGERPRINT_BYTES - chunkBytes)
+  const boundary = Buffer.allocUnsafeSlow(previousBytes + chunkBytes)
+  previous.copy(boundary, 0, previous.length - previousBytes)
+  chunk.copy(boundary, previousBytes, chunk.length - chunkBytes)
+  return boundary
+}
 
 export type NativeChatLineDecoder = (line: string, fallbackId: string) => NativeChatMessage | null
 
@@ -65,6 +77,7 @@ export type ReadNativeChatTranscriptTailFileArgs = {
    *  offset never skips what the ceiling removed. */
   maxBytes?: number
   signal?: AbortSignal
+  onConsumedBoundary?: (boundary: Buffer) => void
 }
 
 export async function readNativeChatTranscriptTailFile({
@@ -75,7 +88,8 @@ export async function readNativeChatTranscriptTailFile({
   endOffset,
   decodeCompanion,
   maxBytes,
-  signal
+  signal,
+  onConsumedBoundary
 }: ReadNativeChatTranscriptTailFileArgs): Promise<{
   messages: NativeChatMessage[]
   companion?: NativeChatTranscriptCompanion
@@ -117,6 +131,11 @@ export async function readNativeChatTranscriptTailFile({
     }
     ignoreNextMalformedRecord = finalByte[0] !== 0x0a
     let cursor = consumedTo - (finalByte[0] === 0x0a ? 1 : 0)
+    const finalBoundaryByte = finalByte[0] === 0x0a ? Buffer.from([finalByte[0]]) : Buffer.alloc(0)
+    let boundaryCaptured = false
+    if (cursor === 0) {
+      onConsumedBoundary?.(finalBoundaryByte)
+    }
     while (cursor > 0 && newestFirst.length <= limit) {
       signal?.throwIfAborted()
       const start = Math.max(0, cursor - TAIL_CHUNK_BYTES)
@@ -127,6 +146,10 @@ export async function readNativeChatTranscriptTailFile({
       // than stitch non-adjacent bytes into records.
       if (bytesRead < buffer.length) {
         break
+      }
+      if (!boundaryCaptured && onConsumedBoundary) {
+        onConsumedBoundary(extendTranscriptBoundary(buffer, finalBoundaryByte))
+        boundaryCaptured = true
       }
       let segmentEnd = bytesRead
       for (let index = bytesRead - 1; index >= 0 && newestFirst.length <= limit; index--) {
@@ -193,7 +216,9 @@ export async function readNativeChatTranscriptTailFile({
     lineOffset: number,
     messages: { message: NativeChatMessage; offset: number }[]
   ): void {
-    let line = Buffer.concat(reversedCopy(lineParts)).toString('utf8')
+    // Positional reads own these bytes; only multi-part records need joining in reverse order.
+    const bytes = lineParts.length === 1 ? lineParts[0] : Buffer.concat(reversedCopy(lineParts))
+    let line = bytes.toString('utf8')
     if (line.endsWith('\r')) {
       line = line.slice(0, -1)
     }
@@ -311,8 +336,6 @@ export async function readNativeChatTranscriptTail(
   } catch (error) {
     signal?.throwIfAborted()
     const message = error instanceof Error ? error.message : String(error)
-    return (error as NodeJS.ErrnoException | null)?.code === 'ENOENT'
-      ? { error: message, notFound: true }
-      : { error: message }
+    return isENOENT(error) ? { error: message, notFound: true } : { error: message }
   }
 }

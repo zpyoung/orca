@@ -139,6 +139,7 @@ export const LaunchOverrides = z
   .object({
     model: z.string().min(1).max(128).optional(),
     optionValues: LaunchOverrideOptionValues.optional(),
+    // Retired: older clients still send it; the store folds it into extraAgentArgs.
     agentArgs: z.string().max(4096).optional()
   })
   .optional()
@@ -196,12 +197,16 @@ export const AutomationRuns = z.object({
   cursor: OptionalString
 })
 
+// Why strict: null or a non-string must fail rather than fall back to "omitted", which preserves.
+const ExtraAgentArgs = z.string({ message: 'Extra agent arguments must be text.' }).optional()
+
 export const AutomationCreate = z.object({
   creationKey: OptionalString,
   name: requiredString('Missing automation name'),
   prompt: requiredString('Missing automation prompt'),
   precheck: AutomationPrecheck,
   agentId: TuiAgent,
+  extraAgentArgs: ExtraAgentArgs,
   launchOverrides: LaunchOverrides,
   runContext: WorkspaceRunContext,
   sourceContext: TaskSourceContext,
@@ -224,6 +229,7 @@ export const AutomationUpdateFields = z.object({
   prompt: OptionalString,
   precheck: AutomationPrecheck,
   agentId: TuiAgent.optional(),
+  extraAgentArgs: ExtraAgentArgs,
   launchOverrides: LaunchOverrides,
   runContext: WorkspaceRunContext,
   sourceContext: TaskSourceContext,

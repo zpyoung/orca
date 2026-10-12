@@ -9,13 +9,21 @@ import {
   type RefObject,
   type SetStateAction
 } from 'react'
-import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 import { useNativeChatComposerAppMenuSelection } from '../use-native-chat-composer-app-menu-selection'
 import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat-runtime-send'
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
 import { useNativeChatTypedInsertion } from '../use-native-chat-typed-insertion'
+import { useNativeChatComposerInterrupt } from '../use-native-chat-composer-interrupt'
+import { useNativeChatComposerNotice } from '../use-native-chat-composer-notice'
+import type { NativeChatComposerNotice } from '../native-chat-composer-notice'
+import { nativeChatImageSendBlock } from '../native-chat-image-reattach'
+import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
+import type { NativeChatComposerGoalMode } from '../use-native-chat-composer-submit'
+import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
+import type { NativeChatQueueResume } from '../native-chat-composer-primary-action'
+import type { NativeChatQueueSendConfirm } from '../use-native-chat-held-queue-composer-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 import { isTerminalInputQuarantined } from '../../terminal-pane/terminal-input-quarantine'
 import type {
@@ -40,13 +48,10 @@ import {
 } from './AgentComposerField'
 import type { AgentComposerCoreProps, AgentComposerHandle } from './agent-composer-types'
 
-// Why: a plain ESC byte is what the agent TUIs read as the interrupt key over a
-// PTY (matching how xterm forwards Escape).
-const ESC = '\x1b'
-
 const EMPTY_ATTACHMENTS: readonly AgentComposerImageAttachment[] = []
 const EMPTY_SNAPSHOT: SessionOptionDescriptor[] = []
 const DEFAULT_AUTOCOMPLETE: ComposerAutocomplete = { mode: 'none' }
+const NO_MENTION_FILES: NativeChatMentionFiles = { files: [], loading: false, failed: false }
 
 function noop(): void {}
 
@@ -64,14 +69,19 @@ export type AgentComposerCoreState = {
   setHistory: Dispatch<SetStateAction<HistoryState>>
   activeSuggestion: number
   setActiveSuggestion: Dispatch<SetStateAction<number>>
-  notice: string | null
-  setNotice: Dispatch<SetStateAction<string | null>>
+  notices: readonly NativeChatComposerNotice[]
+  setNotice: (text: string | null, errorText?: string) => void
+  /** Owner of the unsent draft and its attachments. */
+  draftScopeKey: string
   hasPty: boolean
   disabled: boolean
   resolveTarget: () => NativeChatResolvedTarget | null
   trackPendingSend: (handle: NativeChatSendHandle, pendingId?: string) => void
   interrupt: () => void
   insertTypedText: (text: string) => boolean
+  appendText: (text: string) => void
+  acceptsText: () => boolean
+  contains: (node: Node | null) => boolean
   focus: () => boolean
   syncCaret: (element: HTMLTextAreaElement) => void
 }
@@ -83,22 +93,26 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   const {
     terminalTabId,
     paneKey,
+    draftScopeKey = paneKey,
     targetPtyId,
     canSend = true,
     allowWithoutTarget = false,
     isWorking = false,
+    inputOwnedByCard = false,
     onStop,
-    onOptimisticSendCanceled
+    onOptimisticSendCanceled,
+    optimisticSendOutcome
   } = props
   const imeEnterGesture = useImeEnterGestureOwnership()
   const { draft, setDraft, flushDraftAppends } = useAgentComposerDraft(
-    paneKey,
+    draftScopeKey,
     imeEnterGesture.isComposing
   )
   const [caret, setCaret] = useState(draft.length)
+  // History stays per pane: a structured conversation's draft scope is shared across panes.
   const { history, setHistory } = useAgentComposerHistory(paneKey)
   const [activeSuggestion, setActiveSuggestion] = useState(0)
-  const [notice, setNotice] = useState<string | null>(null)
+  const { notices, setNotice } = useNativeChatComposerNotice(props.notices)
   // Why: v1.4.200 widened the app-menu ref to NativeChatComposerInput for upstream's
   // contenteditable editor. This composer's field is a real <textarea>, so the ref
   // only ever holds one, and the overlay and scroll sync need the element itself.
@@ -110,16 +124,17 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     terminalTabId,
     targetPtyId,
     onOptimisticSendCanceled,
+    { inputOwnedByCard, onPendingSendRetired: optimisticSendOutcome?.reject },
     canSend
   )
 
   // Place the caret at the end of the (possibly restored) draft when the
   // composer is reused for a different pane, adjusted during render so caret
   // and text stay consistent on the first paint after the switch.
-  const lastScopeKey = useRef(paneKey)
-  if (lastScopeKey.current !== paneKey) {
-    lastScopeKey.current = paneKey
-    setCaret(readAgentComposerDraftCache(paneKey).length)
+  const lastScopeKey = useRef(draftScopeKey)
+  if (lastScopeKey.current !== draftScopeKey) {
+    lastScopeKey.current = draftScopeKey
+    setCaret(readAgentComposerDraftCache(draftScopeKey).length)
   }
 
   const resolveTarget = useCallback((): NativeChatResolvedTarget | null => {
@@ -134,34 +149,60 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   }, [targetPtyId, terminalTabId])
 
   const hasPty = allowWithoutTarget || targetPtyId !== null
-  const disabled = (!allowWithoutTarget && targetPtyId === null) || !canSend
+  // Why inputOwnedByCard: the hidden field can still hold keyboard focus for a frame.
+  const disabled = allowWithoutTarget
+    ? !canSend
+    : targetPtyId === null || !canSend || inputOwnedByCard
 
   const syncCaret = useCallback((element: HTMLTextAreaElement) => {
     setCaret(element.selectionStart ?? element.value.length)
   }, [])
 
-  const { insertTypedText, focus } = useNativeChatTypedInsertion({
+  const {
+    insertTypedText: insertIntoDraft,
+    appendText: appendToDraft,
+    focus,
+    acceptsText,
+    contains
+  } = useNativeChatTypedInsertion({
     textareaRef,
     caret,
     draft,
     setDraft,
     setCaret,
-    setHistory,
     setActiveSuggestion
   })
+  const leaveHistory = useCallback(
+    () => setHistory((previous) => ({ entries: previous.entries, index: null })),
+    [setHistory]
+  )
+  const insertTypedText = useCallback(
+    (text: string): boolean => {
+      const inserted = insertIntoDraft(text)
+      if (inserted) {
+        leaveHistory()
+      }
+      return inserted
+    },
+    [insertIntoDraft, leaveHistory]
+  )
+  const appendText = useCallback(
+    (text: string): void => {
+      if (acceptsText()) {
+        leaveHistory()
+      }
+      appendToDraft(text)
+    },
+    [acceptsText, appendToDraft, leaveHistory]
+  )
 
-  const interrupt = useCallback(() => {
-    cancelPendingSends()
-    if (isWorking && onStop) {
-      onStop()
-      return
-    }
-    const target = resolveTarget()
-    if (!target) {
-      return
-    }
-    sendRuntimePtyInput(target.settings, target.ptyId, ESC, 'driving')
-  }, [cancelPendingSends, isWorking, onStop, resolveTarget])
+  const interrupt = useNativeChatComposerInterrupt({
+    inert: inputOwnedByCard,
+    cancelPendingSends,
+    isWorking,
+    onStop,
+    resolveTarget
+  })
 
   return {
     textareaRef,
@@ -175,14 +216,18 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     setHistory,
     activeSuggestion,
     setActiveSuggestion,
-    notice,
+    notices,
     setNotice,
+    draftScopeKey,
     hasPty,
     disabled,
     resolveTarget,
     trackPendingSend,
     interrupt,
     insertTypedText,
+    appendText,
+    acceptsText,
+    contains,
     focus,
     syncCaret
   }
@@ -203,7 +248,14 @@ export type AgentComposerHostBridges = {
   dismissPicker?: (triggerKey: string) => void
   handleDraftOrCaretChange?: (value: string, caret: number) => void
   dispatchPickerCommand?: (item: Extract<NativeChatPickerItem, { kind: 'command' }>) => void
-  onAcceptMention?: () => void
+  mentionFiles?: NativeChatMentionFiles
+  completeMention?: (path: string) => void
+  /** Cmd/Ctrl+Enter from an empty composer: send the newest queued draft now. */
+  steerQueued?: () => boolean
+  goalMode?: NativeChatComposerGoalMode
+  contextUsage?: NativeChatContextUsageSummary | null
+  queueResume?: NativeChatQueueResume
+  queueSendConfirm?: NativeChatQueueSendConfirm | null
 
   imageAttachments?: readonly AgentComposerImageAttachment[]
   onAttach?: () => void
@@ -224,6 +276,10 @@ export type AgentComposerHostBridges = {
   sessionOptionsSurface?: SessionOptionsSurface | null
   sessionOptionsSnapshot?: SessionOptionDescriptor[]
   isDispatchingSessionOption?: boolean
+  /** The host's transport has a send out; Send stays disabled until it settles. */
+  sendHeld?: boolean
+  /** Answers a command in the composer instead of sending it; true when it did. */
+  answerLocally?: (text: string) => boolean
 
   onSlashCommand?: (command: string) => void
   /** Replaces the PTY send entirely; for a host whose transport is not a PTY. */
@@ -258,17 +314,25 @@ export function useAgentComposerCompose(
   const imageAttachments = bridges?.imageAttachments ?? EMPTY_ATTACHMENTS
   const autocomplete = bridges?.autocomplete ?? DEFAULT_AUTOCOMPLETE
 
-  // A pasted image has no agent-readable path until its save lands; sending
-  // mid-save would ship the message without the image the chip promises.
-  const hasPendingAttachment = imageAttachments.some((attachment) => attachment.pending)
+  const imageBlock = nativeChatImageSendBlock(imageAttachments)
   const ptySend = useAgentComposerSend(core, props, bridges, imageAttachments)
-  const hostSend = bridges?.sendOverride ?? ptySend
+  const sendOverride = bridges?.sendOverride
+  const answerLocally = bridges?.answerLocally
+  const { sendDisabled } = props
   const send = useCallback(() => {
-    if (hasPendingAttachment) {
+    if (imageBlock.holdsSend) {
       return
     }
-    hostSend()
-  }, [hasPendingAttachment, hostSend])
+    if (sendOverride) {
+      sendOverride()
+      return
+    }
+    const answerable = core.resolveTarget() && !core.disabled && !sendDisabled
+    if (answerable && answerLocally?.(core.draft)) {
+      return
+    }
+    ptySend()
+  }, [answerLocally, core, imageBlock.holdsSend, ptySend, sendDisabled, sendOverride])
 
   const handleDraftChange = useCallback(
     (value: string, element: HTMLTextAreaElement) => {
@@ -281,17 +345,27 @@ export function useAgentComposerCompose(
     [core, bridges]
   )
 
+  const goalMode = bridges?.goalMode
+  const completeItem = bridges?.completeItem ?? noop
+  const dispatchPickerCommand = bridges?.dispatchPickerCommand ?? noop
+  const mentionFiles = bridges?.mentionFiles ?? NO_MENTION_FILES
   const handleKeyDown = useAgentComposerKeyDown({
     autocomplete,
+    mentionFiles,
+    completeMention: bridges?.completeMention ?? noop,
     activeSuggestion: core.activeSuggestion,
     draft: core.draft,
+    hasAttachments: imageAttachments.length > 0,
     history: core.history,
     isComposing: core.imeEnterGesture.isComposing,
-    completePickerItem: bridges?.completeItem ?? noop,
-    dispatchPickerCommand: bridges?.dispatchPickerCommand ?? noop,
+    completePickerItem: goalMode ? goalMode.interceptPick(completeItem) : completeItem,
+    dispatchPickerCommand: goalMode
+      ? goalMode.interceptPick(dispatchPickerCommand)
+      : dispatchPickerCommand,
     dismissPicker: bridges?.dismissPicker ?? noop,
     interrupt: core.interrupt,
     send,
+    ...(bridges?.steerQueued ? { steerQueued: bridges.steerQueued } : {}),
     setActiveSuggestion: core.setActiveSuggestion,
     setDraft: core.setDraft,
     setCaret: core.setCaret,
@@ -338,12 +412,13 @@ export function useAgentComposerCompose(
   const sendButtonDisabled =
     core.disabled ||
     props.sendDisabled ||
-    hasPendingAttachment ||
+    bridges?.sendHeld === true ||
+    imageBlock.holdsSend ||
     (core.draft.trim() === '' && imageAttachments.length === 0)
 
   const fieldProps: AgentComposerFieldProps = {
     terminalTabId: props.terminalTabId,
-    paneKey: props.paneKey,
+    draftScopeKey: core.draftScopeKey,
     textareaRef: core.textareaRef,
     draft: core.draft,
     disabled: core.disabled,
@@ -351,11 +426,15 @@ export function useAgentComposerCompose(
     canSend,
     layout: props.layout,
     autocomplete,
+    mentionFiles,
     activeSuggestion: core.activeSuggestion,
-    notice: core.notice,
+    notices: core.notices,
     imageAttachments,
     sendButtonDisabled,
+    sendBlockedReason: imageBlock.reason,
     isWorking,
+    isStopping: props.isStopping,
+    afterStop: props.afterStop,
     attachDisabled: core.disabled,
     dictationDisabled: core.disabled || (bridges?.dictationDisabled ?? true),
     isDictating: bridges?.isDictating ?? false,
@@ -380,9 +459,9 @@ export function useAgentComposerCompose(
     },
     onPaste: (event) => handlePasteEvent(event),
     pickerListboxId: bridges?.pickerListboxId ?? generatedListboxId,
-    onChoosePickerItem: bridges?.completeItem ?? noop,
+    onChoosePickerItem: goalMode ? goalMode.interceptPick(completeItem) : completeItem,
     onRetrySkills: bridges?.retrySkills ?? noop,
-    onAcceptMention: bridges?.onAcceptMention ?? noop,
+    onChooseMentionFile: bridges?.completeMention ?? noop,
     onRemoveImageAttachment: bridges?.onRemoveImageAttachment ?? noop,
     onAttach: bridges?.onAttach ?? noop,
     onDictationToggle: bridges?.onDictationToggle ?? noop,
@@ -390,8 +469,12 @@ export function useAgentComposerCompose(
     onDictationHoldEnd: bridges?.onDictationHoldEnd ?? noop,
     onSend: send,
     onStop: core.interrupt,
+    queueResume: bridges?.queueResume,
+    queueSendConfirm: bridges?.queueSendConfirm ?? null,
     sessionOptionsSurface: bridges?.sessionOptionsSurface ?? null,
-    sessionOptionsSnapshot: bridges?.sessionOptionsSnapshot ?? EMPTY_SNAPSHOT
+    sessionOptionsSnapshot: bridges?.sessionOptionsSnapshot ?? EMPTY_SNAPSHOT,
+    contextUsage: bridges?.contextUsage ?? null,
+    goalMode
   }
 
   return { fieldProps, handlePasteEvent, pasteFromClipboard }

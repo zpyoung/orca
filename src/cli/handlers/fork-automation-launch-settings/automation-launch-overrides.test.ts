@@ -13,14 +13,10 @@ const flags = (values: Record<string, string>): Map<string, string | boolean> =>
 describe('automation CLI launch overrides', () => {
   it('parses and validates create fields', () => {
     expect(
-      getAutomationLaunchOverridesForCreate(
-        flags({ model: 'sonnet', effort: 'high', 'agent-args': '--verbose' }),
-        'claude'
-      )
+      getAutomationLaunchOverridesForCreate(flags({ model: 'sonnet', effort: 'high' }), 'claude')
     ).toEqual({
       model: 'sonnet',
-      optionValues: { effort: 'high' },
-      agentArgs: '--verbose'
+      optionValues: { effort: 'high' }
     })
   })
 
@@ -48,28 +44,26 @@ describe('automation CLI launch overrides', () => {
     ).toEqual({ model: 'future-claude', optionValues: { effort: 'max' } })
   })
 
-  it('clears structured values and preserves raw arguments after an agent change', () => {
+  it('clears structured values after an agent change', () => {
     expect(
       resetAutomationLaunchOverridesForAgentChange({
         model: 'sonnet',
-        optionValues: { effort: 'high' },
-        agentArgs: '--verbose'
+        optionValues: { effort: 'high' }
       })
-    ).toEqual({ agentArgs: '--verbose' })
-    expect(resetAutomationLaunchOverridesForAgentChange({ agentArgs: '--verbose' })).toBeUndefined()
+    ).toBeNull()
+    expect(resetAutomationLaunchOverridesForAgentChange({})).toBeUndefined()
   })
 
   it('merges sparse edit fields without erasing unmentioned values', () => {
     expect(
       getAutomationLaunchOverridesForEdit({
-        flags: flags({ 'agent-args': '--verbose' }),
+        flags: flags({ effort: 'high' }),
         agent: 'claude',
-        current: { model: 'sonnet', optionValues: { effort: 'high' } }
+        current: { model: 'sonnet' }
       })
     ).toEqual({
       model: 'sonnet',
-      optionValues: { effort: 'high' },
-      agentArgs: '--verbose'
+      optionValues: { effort: 'high' }
     })
   })
 
@@ -78,9 +72,9 @@ describe('automation CLI launch overrides', () => {
       getAutomationLaunchOverridesForEdit({
         flags: flags({ model: 'inherit' }),
         agent: 'claude',
-        current: { model: 'sonnet', optionValues: { effort: 'high' }, agentArgs: '--verbose' }
+        current: { model: 'sonnet', optionValues: { effort: 'high' } }
       })
-    ).toEqual({ optionValues: { effort: 'high' }, agentArgs: '--verbose' })
+    ).toEqual({ optionValues: { effort: 'high' } })
     expect(
       getAutomationLaunchOverridesForEdit({
         flags: flags({ model: 'inherit', effort: 'inherit' }),
@@ -90,9 +84,9 @@ describe('automation CLI launch overrides', () => {
     ).toBeNull()
     expect(
       getAutomationLaunchOverridesForEdit({
-        flags: flags({ 'agent-args': 'inherit' }),
+        flags: flags({ effort: 'inherit' }),
         agent: 'claude',
-        current: { agentArgs: '--verbose' }
+        current: { optionValues: { effort: 'high' } }
       })
     ).toBeNull()
   })

@@ -34,6 +34,8 @@ import { NESTED_WORKER_DEPTH_EXCEEDED_CODE } from '../../../shared/nested-worker
 import { WORKTREE_CREATE_COLLISION_CODE } from '../../../shared/new-workspace/worktree-create-collision'
 import { AGENT_LAUNCH_PANE_ALREADY_LIVE_CODE } from '../../../shared/agent-launch-pane-already-live'
 import { AGENT_LAUNCH_SESSION_ALREADY_EXISTS_CODE } from '../../../shared/agent-launch-session-already-exists'
+import { AGENT_LAUNCH_TAB_CLOSED_CODE } from '../../../shared/agent-launch-tab-closed'
+import { AGENT_LAUNCH_TARGET_FORBIDDEN_CODE } from '../../../shared/agent-launch-target-forbidden'
 import { HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE } from '../../../shared/fork-heimdall/enrollment-refusal-error'
 
 export function successResponse(id: string, meta: RpcEnvelopeMeta, result: unknown): RpcSuccess {
@@ -68,6 +70,8 @@ const RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   WORKTREE_CREATE_COLLISION_CODE,
   AGENT_LAUNCH_PANE_ALREADY_LIVE_CODE,
   AGENT_LAUNCH_SESSION_ALREADY_EXISTS_CODE,
+  AGENT_LAUNCH_TAB_CLOSED_CODE,
+  AGENT_LAUNCH_TARGET_FORBIDDEN_CODE,
   'agent_launch_replay_unsupported',
   'runtime_unavailable',
   'selector_not_found',

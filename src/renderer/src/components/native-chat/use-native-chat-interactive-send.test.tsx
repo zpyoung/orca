@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   cancel: vi.fn(),
   inferQuestionAnswered: vi.fn(() => Promise.resolve(true)),
   sendRuntimePtyInput: vi.fn(),
+  sendRuntimePtyInputVerified: vi.fn((..._args: unknown[]) => Promise.resolve(true)),
   sendNativeChatAskAnswer: vi.fn(),
   sendNativeChatMessage: vi.fn(),
   // Mutable so a test can swap the live status between sendAnswer and settle.
@@ -32,7 +33,11 @@ vi.mock('../../store', () => ({
 }))
 
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
-  sendRuntimePtyInput: (...args: unknown[]) => mocks.sendRuntimePtyInput(...args)
+  sendRuntimePtyInput: (...args: unknown[]) => mocks.sendRuntimePtyInput(...args),
+  sendRuntimePtyInputVerified: (...args: unknown[]) => mocks.sendRuntimePtyInputVerified(...args)
+}))
+vi.mock('@/runtime/runtime-terminal-verified-input', () => ({
+  sendRuntimePtyInputVerified: (...args: unknown[]) => mocks.sendRuntimePtyInputVerified(...args)
 }))
 
 vi.mock('@/lib/agent-paste-draft', () => ({
@@ -79,12 +84,12 @@ describe('useNativeChatInteractiveSend', () => {
         settings: { terminalTabId: 'tab-1' }
       },
       'B',
-      { onOutcome: expect.any(Function) }
+      { onDeliverySettled: expect.any(Function) }
     )
     expect(mocks.sendNativeChatAskAnswer).not.toHaveBeenCalled()
   })
 
-  it('reports the send outcome to the card for a non-selector answer (r5-1)', () => {
+  it('reports the send outcome to the card for a non-selector answer', () => {
     const onDeliverySettled = vi.fn()
     const { result } = renderHook(() =>
       useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'grok')
@@ -94,14 +99,12 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => {
       sendResult = result.current.sendAnswer(PROMPT, [{ indices: [1] }], onDeliverySettled)
     })
-    // Why: a slow acceptance-gated CR must not race a nominal settle window —
-    // the card now always waits for the send's real outcome (r5-1).
-    expect(sendResult).toEqual({ settleAfterMs: 500, waitsForVerifiedDelivery: true })
+    expect(sendResult).toEqual({ settleAfterMs: 500 })
 
-    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onOutcome
-    expect(onOutcome).toBeTypeOf('function')
+    const settle = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onDeliverySettled
+    expect(settle).toBeTypeOf('function')
 
-    onOutcome('may-not-have-sent')
+    settle(false)
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(false)
   })
 
@@ -114,9 +117,9 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => {
       result.current.sendAnswer(PROMPT, [{ indices: [1] }], onDeliverySettled)
     })
-    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onOutcome
+    const settle = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onDeliverySettled
 
-    onOutcome('observed-cleared')
+    settle(true)
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(true)
   })
 
@@ -139,22 +142,6 @@ describe('useNativeChatInteractiveSend', () => {
       expect.any(Function)
     )
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
-  })
-
-  it('does not send a trailing Enter after Codex submits a multi-question answer', () => {
-    const prompt: AskPrompt = {
-      questions: [
-        { question: 'q1', multiSelect: false, options: [{ label: 'A' }, { label: 'B' }] },
-        { question: 'q2', multiSelect: false, options: [{ label: 'C' }, { label: 'D' }] }
-      ]
-    }
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'codex')
-    )
-
-    act(() => result.current.sendAnswer(prompt, [{ indices: [1] }, { indices: [0] }]))
-
-    expect(mocks.sendNativeChatAskAnswer.mock.calls[0]?.[1]).toEqual([{ raw: '2' }, { raw: '1' }])
   })
 
   it('routes a Claude answer through the option-number keystroke path', () => {
@@ -200,7 +187,7 @@ describe('useNativeChatInteractiveSend', () => {
       resultValue = result.current.sendAnswer(PROMPT, [{ indices: [] }])
     })
 
-    expect(resultValue).toEqual({ settleAfterMs: 0, waitsForVerifiedDelivery: false })
+    expect(resultValue).toEqual({ settleAfterMs: 0 })
     expect(mocks.sendNativeChatAskAnswer).not.toHaveBeenCalled()
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
   })
@@ -245,6 +232,74 @@ describe('useNativeChatInteractiveSend', () => {
       'driving'
     )
   })
+
+  it.each(['opencode', 'opencode2'] as const)(
+    'paces two Escape writes for %s Stop and cancels them on rebind',
+    (agent) => {
+      const { result, rerender } = renderHook(
+        ({ ptyId }) => useNativeChatInteractiveSend('tab-1', PANE_KEY, ptyId, agent),
+        { initialProps: { ptyId: 'pty-1' } }
+      )
+      act(() => result.current.cancel())
+      expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
+        {
+          terminalTabId: 'tab-1',
+          ptyId: 'pty-1',
+          settings: { terminalTabId: 'tab-1' }
+        },
+        [{ raw: '\x1b' }, { raw: '\x1b' }]
+      )
+      rerender({ ptyId: 'pty-2' })
+      expect(mocks.cancel).toHaveBeenCalledOnce()
+    }
+  )
+
+  it.each(['opencode', 'opencode2'] as const)(
+    'rejects a %s question with one acknowledged Escape and no delayed Stop',
+    async (agent) => {
+      const { result } = renderHook(() =>
+        useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', agent)
+      )
+      await expect(result.current.cancelAsk()).resolves.toBe(true)
+      expect(mocks.sendRuntimePtyInputVerified).toHaveBeenCalledExactlyOnceWith(
+        { terminalTabId: 'tab-1' },
+        'pty-1',
+        '\x1b',
+        'driving',
+        { requireWriteSettlement: true }
+      )
+      expect(mocks.sendRuntimePtyInput).not.toHaveBeenCalled()
+      expect(mocks.sendNativeChatAskAnswer).not.toHaveBeenCalled()
+    }
+  )
+
+  it('reports an Escape whose delivery is unknown as not delivered', async () => {
+    mocks.sendRuntimePtyInputVerified.mockRejectedValueOnce(new Error('timeout'))
+    const { result } = renderHook(() =>
+      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
+    )
+    await expect(result.current.cancelAsk()).resolves.toBe(false)
+  })
+
+  it.each(['opencode', 'opencode2'] as const)(
+    'delivers a non-default %s answer through selector keys',
+    (agent) => {
+      const { result } = renderHook(() =>
+        useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', agent)
+      )
+      act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
+      expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
+        {
+          terminalTabId: 'tab-1',
+          ptyId: 'pty-1',
+          settings: { terminalTabId: 'tab-1' }
+        },
+        [{ raw: '2' }],
+        expect.any(Function)
+      )
+      expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
+    }
+  )
 
   it('can cancel delayed writes without interrupting the replacement prompt', () => {
     const { result } = renderHook(() =>
@@ -325,7 +380,7 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => {
       sendResult = result.current.sendAnswer(PROMPT, [{ indices: [1] }], onDeliverySettled)
     })
-    expect(sendResult).toEqual({ settleAfterMs: 500, waitsForVerifiedDelivery: true })
+    expect(sendResult).toEqual({ settleAfterMs: 500 })
 
     const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[2]
     onSettled?.(false)
