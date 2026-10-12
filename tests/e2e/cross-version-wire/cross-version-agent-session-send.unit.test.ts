@@ -5,6 +5,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { resolveBaselineReleaseRef } from './release-checkout'
+import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'
 import { installableHost, structuredHostStub } from './structured-agent-session-host-fixture'
 import {
   resetOperationIds,
@@ -56,7 +57,11 @@ describe('a current client sending a message', () => {
   ])('is accepted for %s, under the fingerprint each build re-derives', async (_case, delivery) => {
     // Anti-vacuous: the release must have the method, or there is no older host to send to.
     expect(baseline.methodNames).toContain('agentSession.send')
-    for (const build of [current, baseline]) {
+    // A release that predates the queue capability rejects `delivery`; its clients never send it.
+    const sendsDelivery =
+      delivery === undefined ||
+      baseline.capabilities.includes(AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY)
+    for (const build of sendsDelivery ? [current, baseline] : [current]) {
       resetOperationIds()
       const hostCalls = structuredHostStub(SESSION, WORKSPACE)
       await build.installStructuredHost(installableHost(hostCalls))

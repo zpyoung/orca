@@ -187,6 +187,24 @@
   ],
   "seams": [
     {
+      "path": "tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "      if (!baseline.capabilities.includes(STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY)) {",
+        "        context.skip()"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-agent-session-send.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'",
+        "    for (const build of sendsDelivery ? [current, baseline] : [current]) {"
+      ]
+    },
+    {
       "path": "config/scripts/vitest-node-runtime-files.mjs",
       "feature": "fork-infra",
       "kind": "registration",
@@ -8650,6 +8668,14 @@
     "config/scripts/vitest-node-runtime-files.mjs": {
       "added": 2,
       "removed": 0
+    },
+    "tests/e2e/cross-version-wire/cross-version-agent-session-send.unit.test.ts": {
+      "added": 6,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts": {
+      "added": 5,
+      "removed": 1
     }
   }
 }
