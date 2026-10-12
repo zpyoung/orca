@@ -108,7 +108,7 @@ export function resolvePrCreationDefaults(
 export function resolveActionRecipeForTextOperation(
   source: SourceControlAiSettings,
   repoOverrides: RepoSourceControlAiOverrides | null | undefined,
-  operation: SourceControlAiOperation
+  operation: AiTextOperation
 ): SourceControlActionRecipe & { commandInputTemplate: string } {
   const globalRecipe = readSourceControlActionDefault(source.actions, operation)
   const repoRecipe =

@@ -93,12 +93,12 @@ describe('native-chat live quarantine hooks', () => {
     const onDeliverySettled = vi.fn()
     const { result } = renderHook(() => useNativeChatInteractiveSend(TAB, PANE_KEY, PTY, 'codex'))
 
-    let sendResult: { settleAfterMs: number; waitsForVerifiedDelivery: boolean } | undefined
+    let sendResult: { settleAfterMs: number } | undefined
     act(() => {
       sendResult = result.current.sendAnswer(PROMPT, [{ indices: [0] }], onDeliverySettled)
     })
 
-    expect(sendResult).toEqual({ settleAfterMs: 0, waitsForVerifiedDelivery: false })
+    expect(sendResult).toEqual({ settleAfterMs: 0 })
     expect(mocks.sendNativeChatAskAnswer).not.toHaveBeenCalled()
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(false)

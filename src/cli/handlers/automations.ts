@@ -52,6 +52,7 @@ import {
   getSourceContextFlag,
   getWorkspaceModeFlag
 } from './automation-handler-flags'
+import { getExtraAgentArgsFlag } from './automation-extra-agent-args-flag'
 import {
   assertAutomationLaunchOverridesRuntimeSupported,
   getAutomationLaunchOverridesForCreate,
@@ -215,6 +216,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       prompt: getRequiredStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
       agentId,
+      extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(launchOverrides ? { launchOverrides } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
@@ -228,6 +230,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
       ...schedule
     } satisfies AutomationCreateParams
+    await assertExtraAgentArgsSupported(client, create.extraAgentArgs)
     await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
     const destination = await resolveAutomationDestination(client, target)
     const result = await client.call<{ automation: Automation }>('automation.create', {
@@ -248,6 +251,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       prompt: getOptionalStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
       agentId,
+      extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
       repo: target.repo,
@@ -260,6 +264,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
       ...schedule
     } satisfies AutomationUpdateParams
+    await assertExtraAgentArgsSupported(client, updates.extraAgentArgs)
     const hasLaunchOverrideFlags = hasAutomationLaunchOverrideFlags(flags)
     // Why: the launch-override merge and the owner fence both need the saved record; read it once.
     let shown: AutomationShowResult | null = null

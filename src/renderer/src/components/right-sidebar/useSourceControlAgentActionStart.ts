@@ -116,8 +116,6 @@ export function useSourceControlAgentActionStart({
         commandInput,
         // Why: the check must judge the arguments the launch will really apply.
         agentArgs: agentArgsApply ? agentArgs : undefined,
-        launchOptions,
-        promptDelivery,
         detectedAgents: currentDetectedAgents,
         connectionUnavailable,
         launchPlatform,
@@ -127,7 +125,6 @@ export function useSourceControlAgentActionStart({
     [
       agentArgs,
       agentArgsApply,
-      launchOptions,
       commandInput,
       connectionUnavailable,
       refreshDetectedAgents,

@@ -39,10 +39,7 @@ import {
 } from './source-control-ai-settings'
 import { hasActionAgentRecipe } from './source-control-ai-command-template'
 import type { SourceControlActionRecipe } from './source-control-ai-actions'
-import type {
-  SourceControlAiOperation,
-  SourceControlAiPrCreationDefaults
-} from './source-control-ai-types'
+import type { AiTextOperation, SourceControlAiPrCreationDefaults } from './source-control-ai-types'
 
 export const DEFAULT_SOURCE_CONTROL_AI_PR_CREATION_DEFAULTS = DEFAULT_PR_CREATION_DEFAULTS
 

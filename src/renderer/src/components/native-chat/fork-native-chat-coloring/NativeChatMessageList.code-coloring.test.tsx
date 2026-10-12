@@ -51,7 +51,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -66,7 +65,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -80,7 +78,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('user', 'u1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -95,7 +92,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', 'see `inlineCode` here')])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
         onLinkClick={() => {}}
       />
     )
@@ -111,7 +107,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
       />
     )
 
@@ -124,7 +119,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('user', 'u1', 'hello')])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
       />
     )
 
@@ -137,7 +131,6 @@ describe('NativeChatMessageList code coloring', () => {
         session={sessionWith([messageWith('reasoning', 'r1', 'thinking')])}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
       />
     )
 

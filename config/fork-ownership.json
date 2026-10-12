@@ -192,6 +192,115 @@
   ],
   "seams": [
     {
+      "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-composer.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "  sendRuntimePtyInputDelivery: async (settings: unknown, id: string, data: string) =>",
+        "            terminalTabId: props.terminalTabId,",
+        "          const handle = sendNativeChatMessage(target, MESSAGE, {"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  from?: AgentMessageSource"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-queue-send-confirm.test.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import { changePrompt, promptValue } from './fork-agent-composer/composer-textarea.test-support'",
+        "vi.mock('./fork-agent-composer/AgentComposerActions', () => ({",
+        "  AgentComposerActions: ({ onSend }: { onSend: () => void }) => ("
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-external-attachments-destination.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["      terminalTabId: 'tab-1',"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-ime-file-drop.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["            terminalTabId: 'tab-1',"]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-ui-pairing-local-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "    workspaceActivityCustomDays: 30,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatAssistantMessageRow.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": ["          highlightCode"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatUserMessageRow.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": ["                highlightCode"]
+    },
+    {
+      "path": "src/main/automations/runtime-automation-service.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "          const launchSettings = runtime.buildAutomationRunLaunchSettings(automation, target.repo)",
+        "              launchOverrides: automation.launchOverrides ?? undefined",
+        "            launchSettings"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "          ? sendNativeChatTypedCommand(target, text)",
+        "          : sendNativeChatMessage(target, text, sendOptions)",
+        "        target,",
+        "      pendingHandle = sendNativeChatMessage(target, text, sendOptions)",
+        "      submitNativeChatPrompt(target)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "      resolveTarget: () => ({ terminalTabId: 'tab', ptyId: 'pty', settings: null }),",
+        "  const options = vi.mocked(sendNativeChatMessage).mock.calls[0]?.[2]",
+        "  vi.mocked(sendNativeChatMessageWithImageAttachments).mock.calls[0]?.[4]?.onWriteRejected?.()",
+        "  expect(vi.mocked(sendNativeChatMessage).mock.calls[0]?.[2]?.onWriteRejected).toBeUndefined()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-context-command.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["  const target = { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} }"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-submission-navigation.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "    resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId: 'pty-a', settings: null }),",
+        "        resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId, settings: null }),"
+      ]
+    },
+    {
       "path": "src/relay/git-exec-validator.ts",
       "feature": "heimdall-objective",
       "kind": "registration",
@@ -249,12 +358,6 @@
         "import { installRuntimeEnvironmentDiagnosticsHost } from '../host/fork-heimdall/runtime-environment-diagnostics-host'",
         "  installRuntimeEnvironmentDiagnosticsHost()"
       ]
-    },
-    {
-      "path": "src/main/startup/host-port-bootstrap-wiring.test.ts",
-      "feature": "heimdall",
-      "kind": "registration",
-      "lines": ["    'installRuntimeEnvironmentDiagnosticsHost()',"]
     },
     {
       "path": "src/main/providers/ssh-git-remote-sync-provider.ts",
@@ -530,18 +633,6 @@
       "feature": "heimdall",
       "kind": "passthrough",
       "lines": ["  | 'heimdall'"]
-    },
-    {
-      "path": "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts",
-      "feature": "hosted-review-sitter",
-      "kind": "registration",
-      "lines": ["  'src/renderer/src/fork-hosted-review-sitter/fix-checks-agent-launch.ts',"]
-    },
-    {
-      "path": "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts",
-      "feature": "heimdall",
-      "kind": "registration",
-      "lines": ["  'src/renderer/src/fork-heimdall/heimdall-worker-navigation.ts',"]
     },
     {
       "path": "src/main/startup/main-process-runtime-service.ts",
@@ -910,7 +1001,9 @@
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": ["      if (job === 'code_paths' || job === 'preflight' || job === 'fork_ownership_guard') {"]
+      "lines": [
+        "      if (job === 'code_paths' || job === 'preflight' || job === 'fork_ownership_guard') {"
+      ]
     },
     {
       "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
@@ -977,7 +1070,9 @@
       "path": "src/main/runtime/rpc/methods/native-chat-opencode-wire-page-budget.test.ts",
       "feature": "native-chat-session-options",
       "kind": "passthrough",
-      "lines": ["  state.watcher?.onAppend([], { lifecycle: { state: 'completed', turnId: 'turn', timestamp: 10 } })"]
+      "lines": [
+        "  state.watcher?.onAppend([], { lifecycle: { state: 'completed', turnId: 'turn', timestamp: 10 } })"
+      ]
     },
     {
       "path": "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts",
@@ -991,7 +1086,7 @@
       "kind": "passthrough",
       "lines": [
         "  args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },",
-        "            maxBytes: initialMaxBytes,"
+        "      maxBytes: initialMaxBytes,"
       ]
     },
     {
@@ -1276,7 +1371,7 @@
       "lines": [
         "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
         "  const widthClassName = useNativeChatWidthClassName()",
-        "      <div className={cn('mx-auto flex h-full min-h-0 max-h-full w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
+        "          widthClassName"
       ]
     },
     {
@@ -1296,23 +1391,6 @@
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": ["    vi.useRealTimers()", "    vi.useFakeTimers()"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": ["          resetSubmitting()", "  if (!showingCard) {"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatMessageRow.tsx",
-      "feature": "native-chat-coloring",
-      "kind": "registration",
-      "lines": [
-        "  nativeChatReasoningClassName,",
-        "  nativeChatUserMessageClassName",
-        "        <div className={nativeChatUserMessageClassName()}>",
-        "        isReasoning && nativeChatReasoningClassName(),"
-      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx",
@@ -1381,7 +1459,7 @@
       "kind": "import-swap",
       "lines": [
         "vi.mock('./fork-agent-composer/AgentComposerActions', () => ({",
-        "  AgentComposerActions: () => <div data-testid=\"composer-actions\" />"
+        "  AgentComposerActions: (props: { sendDisabled: boolean }) => {"
       ]
     },
     {
@@ -1429,15 +1507,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": [
-        "} from './fork-agent-composer/agent-composer-attachment-cache'",
-        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
@@ -1454,12 +1523,6 @@
         "} from './fork-native-chat-session-options/use-claude-startup-frame-revision'",
         "import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'"
       ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": ["import type { HistoryState } from './fork-agent-composer/agent-composer-history'"]
     },
     {
       "path": "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts",
@@ -1517,13 +1580,11 @@
         "import rehypeHighlight from 'rehype-highlight'",
         "  highlightCode?: boolean",
         "      highlightCode = false,",
-        "          ? highlightCode || renderCodeBlock",
-        "            ? createDocumentCommentMarkdownComponents(undefined, highlightCode, renderCodeBlock)",
-        "        ? createDocumentCommentMarkdownComponents(onLinkClick, highlightCode, renderCodeBlock)",
-        "    }, [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode])",
-        "      () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),",
-        "          highlightCode && 'native-chat-code [&_pre_code]:text-inherit',",
-        "          rehypePlugins={activeRehypePlugins}"
+        "          highlightCode",
+        "      [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode]",
+        "      return highlightCode ? [...plugins, rehypeHighlight] : plugins",
+        "    }, [extension, highlightCode])",
+        "              highlightCode && 'native-chat-code [&_pre_code]:text-inherit',"
       ]
     },
     {
@@ -1575,8 +1636,10 @@
       "kind": "passthrough",
       "lines": [
         "  highlightCode?: boolean,",
-        "      ) : highlightCode ? (",
-        "        <code className=\"rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]\">"
+        "import { isMermaidFence } from './comment-mermaid-fence'",
+        "    code: highlightCode",
+        "            <code className=\"rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]\">",
+        "    return onLinkClick || highlightCode || renderCodeBlock"
       ]
     },
     {
@@ -1686,7 +1749,7 @@
       "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts",
       "feature": "worktree-groups",
       "kind": "passthrough",
-      "lines": ["  visibleProjectGroupsForRows: readonly ProjectGroup[]"]
+      "lines": ["  visibleProjectGroupsForRows?: readonly ProjectGroup[]"]
     },
     {
       "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts",
@@ -1698,7 +1761,7 @@
       "path": "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts",
       "feature": "worktree-groups",
       "kind": "passthrough",
-      "lines": ["  visibleProjectGroupsForRows: readonly ProjectGroup[]"]
+      "lines": ["  visibleProjectGroupsForRows?: readonly ProjectGroup[]"]
     },
     {
       "path": "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts",
@@ -1761,7 +1824,7 @@
       "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx",
       "feature": "native-chat-width",
       "kind": "passthrough",
-      "lines": ["vi.mock('../../store', () => ({"]
+      "lines": ["    updateSettings: vi.fn(),"]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx",
@@ -3392,7 +3455,6 @@
       "feature": "agent-composer",
       "kind": "import-swap",
       "lines": [
-        "import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'",
         "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
       ]
     },
@@ -3698,17 +3760,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/web/web-preload-api-ui.test.ts",
-      "feature": "workspace-activity-window",
-      "kind": "passthrough",
-      "lines": [
-        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
-        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
-        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'",
-        "    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES"
-      ]
-    },
-    {
       "path": "src/shared/pairing-local-ui-fields.test.ts",
       "feature": "workspace-activity-window",
       "kind": "passthrough",
@@ -3860,7 +3911,7 @@
         "      const notificationOptions =",
         "        request.source === 'pending-ask' && request.title && request.body",
         "          ? { title: request.title, body: request.body }",
-        "          : buildNotificationOptions(request)",
+        "          : buildNotificationOptions(request, translateMain)",
         "      // no mobile push for pending asks in v1",
         "        request.source !== 'pending-ask'"
       ]
@@ -3883,9 +3934,7 @@
       "path": "src/main/ipc/repos/repo-catalog-handlers.ts",
       "feature": "project-ledger",
       "kind": "registration",
-      "lines": [
-        "      args: { repoId: string; expectedLedgers?: { ledgerId: string; revision: number }[] }"
-      ]
+      "lines": ["        expectedLedgers?: { ledgerId: string; revision: number }[]"]
     },
     {
       "path": "src/main/ipc/repos/repo-ipc-arg-schemas.ts",
@@ -4014,9 +4063,7 @@
       "path": "src/main/runtime/runtime-repository-settings-controller.ts",
       "feature": "project-ledger",
       "kind": "registration",
-      "lines": [
-        "      ? await this.deps.withCatalogRemoval({ repoId: repo.id }, options?.expectedLedgers, operation)"
-      ]
+      "lines": ["          options?.expectedLedgers,"]
     },
     {
       "path": "src/main/runtime/runtime-rpc/runtime-rpc-websocket-dispatch.ts",
@@ -4216,9 +4263,7 @@
       "path": "src/renderer/src/store/repos/repo-removal.ts",
       "feature": "project-ledger",
       "kind": "registration",
-      "lines": [
-        "              : window.api.repos.remove({ repoId: projectId, ...expectedLedgers })"
-      ]
+      "lines": ["                ...(idExistsOnOtherHost ? {} : expectedLedgers)"]
     },
     {
       "path": "src/renderer/src/store/repos/repo-state.ts",
@@ -4477,21 +4522,6 @@
       ]
     },
     {
-      "path": "src/main/ipc/desktop-renderer-runtime-capabilities.test.ts",
-      "feature": "heimdall",
-      "kind": "registration",
-      "lines": [
-        "import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall/capability'",
-        "  ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES"
-      ]
-    },
-    {
-      "path": "src/main/proxy-guarded-fetch-call-site-audit.test.ts",
-      "feature": "heimdall",
-      "kind": "registration",
-      "lines": ["  ['main/fork-heimdall/judgment/client.ts', 1]"]
-    },
-    {
       "path": "src/main/daemon/serialize-grid-transcript-replay.test.ts",
       "feature": "fork-infra",
       "kind": "registration",
@@ -4668,14 +4698,6 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": ["      recipeAgentArgs: '--model gpt-5.5',"]
-    },
-    {
-      "path": "src/renderer/src/components/right-sidebar/buildSourceControlAgentDeliveryPlan.ts",
-      "feature": "automation-launch-settings",
-      "kind": "passthrough",
-      "lines": [
-        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
-      ]
     },
     {
       "path": "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.test.ts",
@@ -4970,12 +4992,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/lib/source-control-agent-action-plan.ts",
-      "feature": "automation-launch-settings",
-      "kind": "passthrough",
-      "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
-    },
-    {
       "path": "src/shared/agent-session-host-authority.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
@@ -5192,7 +5208,9 @@
       "path": "src/main/runtime/rpc/methods/orchestration/worker/worker-launch-preferences.test.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": ["    expect(resolveAgentSessionOptionLaunch('omp', { model }, [], false)).toEqual({"]
+      "lines": [
+        "    expect(resolveAgentSessionOptionLaunch('omp', { model }, [], false)).toEqual({"
+      ]
     },
     {
       "path": "src/main/runtime/runtime-worktree-agent-startup.ts",
@@ -5201,15 +5219,6 @@
       "lines": [
         "} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'",
         "    ...(args.startupLaunchOverrides ? { launchOverrides: args.startupLaunchOverrides } : {}),"
-      ]
-    },
-    {
-      "path": "src/main/startup/main-process-automations.ts",
-      "feature": "automation-launch-settings",
-      "kind": "passthrough",
-      "lines": [
-        "          const launchSettings = runtime.buildAutomationRunLaunchSettings(automation, target.repo)",
-        "              launchOverrides: automation.launchOverrides ?? undefined"
       ]
     },
     {
@@ -5305,14 +5314,6 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["const PRE_CHANGE_REF = 'v1.4.216-rc.0.zy01'"]
-    },
-    {
-      "path": "config/scripts/localization-package-contract.test.mjs",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": [
-        "      'pnpm run verify:localization-catalog && pnpm run verify:localization-runtime-catalog'"
-      ]
     }
   ],
   "exceptions": [
@@ -5438,9 +5439,8 @@
     },
     {
       "path": "docs/reference/remote-wire-compatibility.md",
-      "reason": "Rule 1 stated that every JSON payload is parsed with a decoder that ignores unknown keys, which is false for a `.strict()` schema: the strict side rejects the whole payload instead. Two independent changes shipped the same wire regression while believing they complied. The corrected rule names the strict-vs-default condition and how to check it, and belongs upstream because the defect is upstream's.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#wire-compat-rule-1-strict-schemas"
+      "reason": "Upstream deleted this contract in v1.4.224, but the fork's AGENTS.md still points at it; it keeps the fork's strict-schema correction to Rule 1 (a `.strict()` schema rejects an unknown key) and upstream's last viewer-activation section.",
+      "status": "permanent"
     },
     {
       "path": "src/renderer/src/assets/main.css",
@@ -5813,15 +5813,21 @@
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-runtime-image-send.ts",
-      "status": "permanent",
-      "deleted": true,
-      "reason": "Upstream extracted the image-attachment send out of native-chat-runtime-send.ts; the fork's copy still owns that function for the agent-composer core, so restoring upstream's module would ship two send paths over one PTY."
+      "reason": "Keeps upstream's agent-aware image paste on the quarantine-scoped send target: one send path per PTY, so every image write is observed and invalidated with its terminal tab.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
     },
     {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts",
+      "path": "src/renderer/src/components/native-chat/native-chat-observed-send.ts",
+      "reason": "Upstream's per-write delivery observation runs on the fork's quarantine-scoped body send (fork-agent-composer/native-chat-send-outcome.ts); this copy enqueues without a terminal tab, so quarantine could not invalidate it.",
       "status": "permanent",
-      "deleted": true,
-      "reason": "Upstream's chat-only PTY send hook; fork-agent-composer's useAgentComposerSend already serves both the chat pane and the terminal dock."
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-observed-send.test.ts",
+      "reason": "Upstream's delivery-uncertainty coverage, run against the fork's quarantine-scoped send target and transport.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
@@ -5879,7 +5885,7 @@
     },
     {
       "path": "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-rows.ts",
-      "reason": "Sidebar-density fix: corrects the host-header row-height estimate so it matches the rendered h-8 + pt-1 height at the tighter 2px row gap.",
+      "reason": "Sidebar density: tighter 24px group header and 2px row gap. The host-header height fix is upstream as of v1.4.224.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#sidebar-density"
     },
@@ -5913,11 +5919,6 @@
     {
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx",
-      "reason": "Hook-level coverage of upstream's composer drop scoping against the fork's own composer field, which publishes the scope key in place of the deleted upstream field.",
       "status": "permanent"
     },
     {
@@ -5981,11 +5982,6 @@
       "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
     },
     {
-      "path": "config/scripts/client-hosted-browser-package-coverage.test.mjs",
-      "reason": "Contracts for the fork's PR packaging policy; upstream's Windows PR job must not be required by a macOS-only release fork.",
-      "status": "permanent"
-    },
-    {
       "path": "config/scripts/pr-code-change-scope.test.mjs",
       "reason": "Retains upstream classifier behavior while dropping source-pinning assertions for the Windows PR job absent from the fork-owned workflow.",
       "status": "permanent"
@@ -6036,11 +6032,6 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/mobile-web-bundle-packaging-workflow-contract.test.mjs",
-      "status": "permanent",
-      "reason": "Packaging-job census for the fork-owned workflow set, which omits pr.yml's Windows packaging job; upstream's inventory names a job this fork does not run."
-    },
-    {
       "path": "config/scripts/publish-complete-draft-releases.mjs",
       "reason": "Widens the upstream draft-RC recovery selector to recognize this fork's exact .zyNN release suffix while preserving its bot, draft, current-ref, and asset-completeness gates.",
       "status": "pending-upstream",
@@ -6070,9 +6061,8 @@
     },
     {
       "path": "docs/reference/macos-press-and-hold.md",
-      "reason": "Documents bug-35's fork packaged domain commands, continued upstream/dev-domain support, and automatic retry of earlier foreign-bundle decisions; ships with the startup fix.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
+      "reason": "Upstream deleted this doc in v1.4.224; it still documents bug-35's fork packaged domain commands and the automatic retry of earlier foreign-bundle decisions.",
+      "status": "permanent"
     },
     {
       "path": "src/main/macos-press-and-hold-default.test.ts",
@@ -6397,9 +6387,36 @@
       "reason": "Removes an invalid global assertion that CLI flags are exclusive; Heimdall create commands legitimately use repeatable flags.",
       "status": "pending-upstream",
       "ledger": "bug-253"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.paste-remount.test.tsx",
+      "reason": "Upstream's paste-remount coverage, run against the fork composer field and actions (textarea, not upstream's rich-text editor).",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-prompt-recall.test.tsx",
+      "reason": "Exercises upstream's transcript prompt recall (useNativeChatComposerRecall), which the fork composer replaces with its own per-pane history; the fork's equivalent coverage is in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
     }
   ],
   "residuals": {
+    "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts": {
+      "added": 5,
+      "removed": 6
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.test.tsx": {
+      "added": 4,
+      "removed": 4
+    },
+    "src/renderer/src/components/native-chat/native-chat-context-command.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-submission-navigation.test.tsx": {
+      "added": 3,
+      "removed": 3
+    },
     "src/relay/git-exec-validator.ts": {
       "added": 4,
       "removed": 0
@@ -6426,10 +6443,6 @@
     },
     "src/main/startup/main-process-preflight.ts": {
       "added": 2,
-      "removed": 0
-    },
-    "src/main/startup/host-port-bootstrap-wiring.test.ts": {
-      "added": 1,
       "removed": 0
     },
     "src/main/providers/ssh-git-remote-sync-provider.ts": {
@@ -6479,10 +6492,6 @@
     "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx": {
       "added": 4,
       "removed": 7
-    },
-    "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts": {
-      "added": 2,
-      "removed": 0
     },
     ".gitignore": {
       "added": 14,
@@ -7016,16 +7025,8 @@
       "added": 21,
       "removed": 0
     },
-    "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx": {
-      "added": 20,
-      "removed": 30
-    },
     "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
       "added": 5,
-      "removed": 2
-    },
-    "src/renderer/src/components/native-chat/NativeChatMessageRow.tsx": {
-      "added": 8,
       "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx": {
@@ -7084,10 +7085,6 @@
       "added": 12,
       "removed": 3
     },
-    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 93,
-      "removed": 72
-    },
     "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
       "added": 4,
       "removed": 5
@@ -7103,10 +7100,6 @@
     "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
       "added": 2,
       "removed": 2
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts": {
-      "added": 1,
-      "removed": 1
     },
     "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
       "added": 3,
@@ -7684,10 +7677,6 @@
       "added": 2,
       "removed": 0
     },
-    "src/renderer/src/web/web-preload-api-ui.test.ts": {
-      "added": 10,
-      "removed": 2
-    },
     "src/shared/artifacts.ts": {
       "added": 12,
       "removed": 0
@@ -8228,14 +8217,6 @@
       "added": 3,
       "removed": 1
     },
-    "src/main/ipc/desktop-renderer-runtime-capabilities.test.ts": {
-      "added": 4,
-      "removed": 1
-    },
-    "src/main/proxy-guarded-fetch-call-site-audit.test.ts": {
-      "added": 2,
-      "removed": 1
-    },
     "src/main/daemon/serialize-grid-transcript-replay.test.ts": {
       "added": 1,
       "removed": 0
@@ -8343,10 +8324,6 @@
     "src/renderer/src/components/right-sidebar/SourceControlTextGenerationDialog.test.ts": {
       "added": 1,
       "removed": 0
-    },
-    "src/renderer/src/components/right-sidebar/buildSourceControlAgentDeliveryPlan.ts": {
-      "added": 20,
-      "removed": 8
     },
     "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.test.ts": {
       "added": 5,
@@ -8512,10 +8489,6 @@
       "added": 11,
       "removed": 2
     },
-    "src/renderer/src/lib/source-control-agent-action-plan.ts": {
-      "added": 7,
-      "removed": 1
-    },
     "src/renderer/src/runtime/web-runtime-session-types.ts": {
       "added": 2,
       "removed": 0
@@ -8616,10 +8589,6 @@
       "added": 25,
       "removed": 9
     },
-    "src/main/startup/main-process-automations.ts": {
-      "added": 4,
-      "removed": 1
-    },
     "src/renderer/src/components/automations/AutomationRunDetailsPage.tsx": {
       "added": 21,
       "removed": 7
@@ -8680,9 +8649,41 @@
       "added": 1,
       "removed": 1
     },
-    "config/scripts/localization-package-contract.test.mjs": {
-      "added": 1,
-      "removed": 1
+    "src/main/automations/runtime-automation-service.ts": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatUserMessageRow.tsx": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatAssistantMessageRow.tsx": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/renderer/src/web/web-preload-api-ui-pairing-local-fields.test.ts": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-ime-file-drop.test.tsx": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/native-chat-external-attachments-destination.test.tsx": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/native-chat-queue-send-confirm.test.tsx": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts": {
+      "added": 0,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-composer.test.tsx": {
+      "added": 0,
+      "removed": 0
     }
   }
 }

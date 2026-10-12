@@ -173,6 +173,10 @@ export async function saveOrcaAutomation(
     prompt: draft.prompt,
     precheck,
     agentId: draft.agentId,
+    // Sent only when it carries or clears extras, so other edits stay legacy-shaped.
+    ...(hasExtraAgentArgs(draft.extraAgentArgs) || currentAutomation?.extraAgentArgs
+      ? { extraAgentArgs: draft.extraAgentArgs }
+      : {}),
     ...launchOverridesUpdateFields,
     runContext,
     projectId: draft.projectId,
@@ -193,6 +197,7 @@ export async function saveOrcaAutomation(
     prompt: draft.prompt,
     precheck,
     agentId: draft.agentId,
+    ...(hasExtraAgentArgs(draft.extraAgentArgs) ? { extraAgentArgs: draft.extraAgentArgs } : {}),
     ...launchOverridesCreateFields,
     runContext,
     projectId: draft.projectId,

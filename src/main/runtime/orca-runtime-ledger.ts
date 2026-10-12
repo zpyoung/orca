@@ -1,6 +1,6 @@
 import { basename, dirname } from 'node:path'
 import { readdir } from 'node:fs/promises'
-import { OrcaRuntimeWithResolveWaiter } from './orca-runtime-resolve-waiter'
+import { OrcaRuntimeWithMigrationCatalog } from './orca-runtime-migration-catalog'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import type { Worktree } from '../../shared/worktree/types'
 import {
@@ -32,11 +32,11 @@ import type {
 } from './runtime-ledger-catalog-removal'
 
 /** Owns the profile-scoped ledger store and keeps its catalog in step with the repo graph. */
-export class OrcaRuntimeWithLedger extends OrcaRuntimeWithResolveWaiter {
+export class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCatalog {
   private readonly ledgerService: LedgerRuntimeService | null
   private ledgerCatalogReconcileQueue: Promise<void> = Promise.resolve()
 
-  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithResolveWaiter>) {
+  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithMigrationCatalog>) {
     super(...args)
     const store = args[0]
     const dataFile = store?.getDataFile?.()

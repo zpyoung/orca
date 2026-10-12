@@ -28,6 +28,7 @@ import {
   getManagedStatusLineScript,
   removeManagedStatusLine
 } from '../fork-session-info/session-info-statusline-chaining'
+import { refuseProfileAtDefaultHome } from './claude-profile-hook-target'
 import {
   applyManagedHooks,
   applyManagedStatusLine,

@@ -28,6 +28,7 @@ import type {
   AgentSessionModelOption
 } from '../../../../shared/agent-session-wire'
 import { useAppStore } from '@/store'
+import { findKnownWorktreeById } from '@/store/slices/worktrees/listing/detected-worktree-meta'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
 import type { Automation } from '../../../../shared/automations-types'
 

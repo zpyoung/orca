@@ -84,12 +84,12 @@ describe('useNativeChatInteractiveSend', () => {
         settings: { terminalTabId: 'tab-1' }
       },
       'B',
-      { onOutcome: expect.any(Function) }
+      { onDeliverySettled: expect.any(Function) }
     )
     expect(mocks.sendNativeChatAskAnswer).not.toHaveBeenCalled()
   })
 
-  it('reports the send outcome to the card for a non-selector answer (r5-1)', () => {
+  it('reports the send outcome to the card for a non-selector answer', () => {
     const onDeliverySettled = vi.fn()
     const { result } = renderHook(() =>
       useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'grok')
@@ -99,14 +99,12 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => {
       sendResult = result.current.sendAnswer(PROMPT, [{ indices: [1] }], onDeliverySettled)
     })
-    // Why: a slow acceptance-gated CR must not race a nominal settle window —
-    // the card now always waits for the send's real outcome (r5-1).
-    expect(sendResult).toEqual({ settleAfterMs: 500, waitsForVerifiedDelivery: true })
+    expect(sendResult).toEqual({ settleAfterMs: 500 })
 
-    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onOutcome
-    expect(onOutcome).toBeTypeOf('function')
+    const settle = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onDeliverySettled
+    expect(settle).toBeTypeOf('function')
 
-    onOutcome('may-not-have-sent')
+    settle(false)
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(false)
   })
 
@@ -119,9 +117,9 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => {
       result.current.sendAnswer(PROMPT, [{ indices: [1] }], onDeliverySettled)
     })
-    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onOutcome
+    const settle = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onDeliverySettled
 
-    onOutcome('observed-cleared')
+    settle(true)
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(true)
   })
 

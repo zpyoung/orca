@@ -45,6 +45,7 @@ import type { FeedbackDraftSlice } from './slices/feedback-draft'
 import type { TaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import type { TerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
+import type { StructuredSessionLaunchDirectorySlice } from './slices/structured-session-launch-directories'
 import type { AsksSlice } from './slices/fork-ask-question-tool/asks'
 import type { LedgerSlice } from './slices/ledger'
 import type { HeimdallFleetSlice } from './slices/fork-heimdall/fleet'
@@ -94,6 +95,7 @@ export type AppState = RepoSlice &
   TaskCreationDraftsSlice &
   RemoteServerUpdatesSlice &
   TerminalQuickCommandHostsSlice &
+  StructuredSessionLaunchDirectorySlice &
   LedgerSlice &
   AsksSlice &
   HeimdallFleetSlice

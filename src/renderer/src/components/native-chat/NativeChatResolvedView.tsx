@@ -10,6 +10,10 @@ import { isNativeChatTranscriptUnsettled } from './fork-native-chat-relay/use-na
 import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
 import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
 import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
+import {
+  useNativeChatInteractiveSendReveal,
+  useNativeChatRevealLatest
+} from './use-native-chat-reveal-latest'
 import { useNativeChatLaunchPromptDeliveryNotice } from './use-native-chat-launch-prompt-delivery-notice'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontSize } from './use-native-chat-font-size'
@@ -25,10 +29,7 @@ import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send
 import { shouldClearNativeChatWorkingSuppression } from './native-chat-working-suppression'
 import { resolveNativeChatTerminalTurn } from './native-chat-terminal-turn'
 import { useNativeChatTerminalTurnTiming } from './use-native-chat-terminal-turn-timing'
-import {
-  pendingSendsAsMessages,
-  shouldPruneLaunchPrompt
-} from './native-chat-pending'
+import { pendingSendsAsMessages, shouldPruneLaunchPrompt } from './native-chat-pending'
 import { useNativeChatPendingDelivery } from './use-native-chat-pending-delivery'
 import {
   appendCommandMarkerCache,
@@ -48,7 +49,7 @@ import {
   useNativeChatContextMenu
 } from './use-native-chat-context-menu'
 import {
-  selectNativeChatRuntimeEnvironmentId,
+  createNativeChatRuntimeSelector,
   selectNativeChatSshConnectionId
 } from './fork-native-chat-relay/native-chat-runtime-owner'
 import { useNativeChatPasteBridge } from './use-native-chat-paste-bridge'
@@ -79,9 +80,8 @@ export function NativeChatResolvedView({
 }: NativeChatResolvedViewProps): React.JSX.Element {
   // Primitive owner selection (no useShallow): routes the pane's read/subscribe to
   // the remote runtime host for a runtime-owned pane; null keeps the local path.
-  const runtimeEnvironmentId = useAppStore((s) =>
-    selectNativeChatRuntimeEnvironmentId(s, terminalTabId)
-  )
+  const selectOwner = useMemo(() => createNativeChatRuntimeSelector(terminalTabId), [terminalTabId])
+  const runtimeEnvironmentId = useAppStore(selectOwner)
   const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))
   const keybindings = useAppStore((s) => s.keybindings)
   const session = useNativeChatRetainedSession({
@@ -381,10 +381,10 @@ export function NativeChatResolvedView({
           <NativeChatEmptyState kind="empty" agent={agent} />
         ) : (
           <NativeChatConversation
+            ref={messageListRef}
             session={sessionWithPending}
             isVisible={isVisible}
             isWorking={turnActive}
-            fontScale={fontScale.scale}
             {...turnTiming}
             awaitingInput={awaitingInput}
             onLinkClick={onLinkClick}
@@ -394,19 +394,28 @@ export function NativeChatResolvedView({
           />
         )}
       </div>
-      {/* Live interactive prompt (question / approval) is the bottom input region
-          (mobile parity). A question card supplies its own answer input, so it
-          fully replaces the composer while active — no stray "Send a message". */}
-      <NativeChatInteractiveCard
-        card={promptCard}
-        send={interactiveSend}
-        canSend={canSend}
-        onShowingQuestionChange={setQuestionActive}
-        answerInputRef={questionAnswerInputRef}
-      />
+      {/* A collapsed card stays mounted but hidden, so a partly answered question survives. */}
+      {mountedPromptCard ? (
+        <div hidden={collapsedCard !== null} inert={collapsedCard !== null} className="contents">
+          <NativeChatInteractiveCard
+            key={promptCardPresentation.occurrenceKey ?? 'prompt'}
+            card={mountedPromptCard}
+            send={interactiveSend}
+            onDismiss={promptCardPresentation.dismiss}
+            onCollapse={promptCardPresentation.collapse}
+            shouldFocus={shownPromptCard !== null && isVisible && isFocusedGroup}
+            answerInputRef={questionAnswerInputRef}
+          />
+        </div>
+      ) : null}
+      {collapsedCard ? (
+        <NativeChatPromptStrip card={collapsedCard} onExpand={promptCardPresentation.expand} />
+      ) : null}
       {/* canSend reflects both the tab's fresh-shell quarantine and the mobile
-          presence-lock, so native chat cannot race either input owner. */}
-      {questionActive ? null : (
+          presence-lock, so native chat cannot race either input owner. Under a card it stays
+          mounted but hidden, so its state survives; detaching the ref keeps root typing, paste
+          and reveal focus off it. */}
+      <div hidden={shownPromptCard !== null} className="contents">
         <NativeChatComposer
           ref={shownPromptCard ? undefined : composerRef}
           inputOwnedByCard={shownPromptCard !== null}

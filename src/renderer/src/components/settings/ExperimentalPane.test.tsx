@@ -254,7 +254,7 @@ describe('ExperimentalPane', () => {
     root.unmount()
   })
 
-  it('shows the structured-native-chat child setting only when Chat UI is the default view', async () => {
+  it('offers one Chat UI switch and no default-view selector', async () => {
     const updateSettings = vi.fn()
     const { root, container } = await renderExperimentalPane({
       updateSettings,

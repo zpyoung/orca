@@ -211,6 +211,6 @@ export function applyMentionSuggestion(
     return { draft, caret }
   }
   const tokenStart = before.length - match[2].length - 1
-  const nextBefore = `${before.slice(0, tokenStart)}@${path} `
-  return { draft: nextBefore + after, caret: nextBefore.length }
+  const nextBefore = `${before.slice(0, tokenStart)}${formatNativeChatFileReference(path)} `
+  return { draft: nextBefore + after.replace(/^ /, ''), caret: nextBefore.length }
 }

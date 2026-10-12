@@ -23,13 +23,10 @@ import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner
 import { retireProvider } from '@/lib/retire-unowned-background-terminal'
 import { createRuntimeAgentBackgroundSession } from '@/lib/fork-automation-launch-settings/runtime-agent-background-session-create'
 import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-stream'
-import {
-  createSshBackgroundStartupDelivery,
-  sshBackgroundLaunchWaitsForShellReady
-} from '@/lib/ssh-background-startup-delivery'
 import { isMainTerminalSideEffectAuthorityForPty } from '@/components/terminal-pane/terminal-side-effect-facts-handler'
+import { hasExtraAgentArgs } from '../../../shared/automation-extra-agent-args'
 import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
-import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
+import { resolveTuiAgentLaunchArgs } from '../../../shared/tui-agent-launch-defaults'
 import { runBestEffortAgentBackgroundCleanups } from '@/lib/agent-background-session-cleanup'
 import type { bindAutomationTerminal } from '@/lib/automation-terminal-ownership'
 import {
@@ -55,13 +52,12 @@ export async function launchAgentBackgroundSession(
     onAgentStatus
   } = args
   const store = useAppStore.getState()
+  // Folder workspaces exist only in getKnownWorktreeById (#2989).
   const worktree = store.getKnownWorktreeById(worktreeId)
   const repo = worktree ? store.repos.find((entry) => entry.id === worktree.repoId) : null
   if (!worktree) {
     throw new Error('The target workspace is no longer available.')
   }
-  const cmdOverrides = store.settings?.agentCmdOverrides ?? {}
-  const agentEnv = resolveTuiAgentLaunchEnv(agent, store.settings?.agentDefaultEnv)
   // Folder launch ownership cannot be derived from a repo row (#2989).
   const launchHost = resolveAgentBackgroundLaunchHost({
     store,
@@ -70,19 +66,30 @@ export async function launchAgentBackgroundSession(
     repo
   })
   const { platform: launchPlatform, isRemote } = launchHost
-  const startupShell = resolveStartupShell(
-    launchPlatform,
-    resolveLocalWindowsAgentStartupShell({
-      platform: launchPlatform,
-      isRemote,
-      terminalWindowsShell: store.settings?.terminalWindowsShell
-    })
+  // Route by the worktree's owner host, not the focused runtime.
+  const runtimeTarget = getActiveRuntimeTarget(
+    getSettingsForWorktreeRuntimeOwner(store, worktreeId)
   )
+  if (hasExtraAgentArgs(args.extraAgentArgs) && runtimeTarget.kind === 'environment') {
+    // Why: that server rebuilds the command from its own settings and would drop the extras.
+    throw new Error("Extra arguments can't be applied to a paired server's workspace from here.")
+  }
   const inheritedAgentArgs = resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs)
   const { agentArgs, sessionOptions } = resolveAgentBackgroundLaunchSettings({
     inheritedAgentArgs,
     overrides: launchOverrides
   })
+  // Why before any tab or PTY: an invalid launch must fail the run without creating a terminal.
+  const planInputs = resolveAgentStartupPlanInputs({
+    agent,
+    settings: store.settings ?? {},
+    platform: launchPlatform,
+    isRemote,
+    agentArgs,
+    extraAgentArgs: args.extraAgentArgs,
+    sessionOptions
+  })
+  const startupShell = resolveStartupShell(launchPlatform, planInputs.shell)
   const trimmedPrompt = prompt?.trim() ?? ''
   const hasPrompt = trimmedPrompt.length > 0
   const isFollowupPath = requireTuiAgentConfig(agent).promptInjectionMode === 'stdin-after-start'
@@ -91,14 +98,7 @@ export async function launchAgentBackgroundSession(
   const startupPlan = buildAgentStartupPlan({
     ...planInputs,
     prompt: hasPrompt && !isFollowupPath ? trimmedPrompt : '',
-    cmdOverrides,
-    agentArgs,
-    agentEnv,
-    sessionOptions,
     includeSessionOptionCatalogDefaults: launchOverrides == null ? undefined : false,
-    platform: launchPlatform,
-    shell: startupShell,
-    isRemote,
     allowEmptyPromptLaunch: !hasPrompt || isFollowupPath
   })
   if (!startupPlan) {

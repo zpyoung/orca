@@ -154,6 +154,7 @@ const WorktreeList = React.memo(function WorktreeList({
     prCache,
     workspaceStatuses,
     settings,
+    projectGroups,
     visibleProjectGroupsForRows: visibleScope.visibleProjectGroupsForRows,
     projectGrouping,
     folderWorkspaces,

@@ -1,4 +1,5 @@
 import { readOpenCodeNativeChatTranscriptTail } from './transcript-opencode'
+import { isENOENT } from '../ipc/filesystem-path-containment'
 import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
 import {
   retainNativeChatTranscriptCompanion,
@@ -59,7 +60,8 @@ export async function readNativeChatTranscriptTailFile(
   includeTrailingLine = false,
   endOffset?: number,
   decodeCompanion?: NativeChatTranscriptCompanionDecoder | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onConsumedBoundary?: (boundary: Buffer) => void
 ): Promise<{
   messages: NativeChatMessage[]
   companion?: NativeChatTranscriptCompanion

@@ -17,7 +17,7 @@ describe('SourceControlActionRecipeRow', () => {
         draftValue: value,
         baseValue: value,
         defaultTuiAgent: 'codex',
-        isSavingRecipe: false,
+        isSavingTemplate: false,
         onAgentChange: () => {},
         onTemplateChange: () => {},
         onAgentArgsChange: () => {},

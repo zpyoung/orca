@@ -9,6 +9,7 @@ import type {
   NativeChatTurnLifecycle
 } from '../../shared/native-chat-types'
 import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
+import type { NativeChatTranscriptSubscription } from './transcript-watch-contract'
 import {
   getActiveNativeChatWatcherCount,
   readNativeChatTranscriptTail,

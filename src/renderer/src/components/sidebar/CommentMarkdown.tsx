@@ -289,56 +289,83 @@ const CommentMarkdown = React.memo(
     },
     ref
   ) {
-    const components = React.useMemo(() => {
-      if (!onLinkClick) {
-        return variant === 'document'
-          ? highlightCode || renderCodeBlock
-            ? createDocumentCommentMarkdownComponents(undefined, highlightCode, renderCodeBlock)
-            : documentCommentMarkdownComponents
-          : expandImages
-            ? createCompactCommentMarkdownComponents(undefined, true)
-            : compactCommentMarkdownComponents
-      }
-      return variant === 'document'
-        ? createDocumentCommentMarkdownComponents(onLinkClick, highlightCode, renderCodeBlock)
-        : createCompactCommentMarkdownComponents(onLinkClick, expandImages)
-    }, [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode])
+    const baseComponents = React.useMemo(
+      () =>
+        selectCommentMarkdownComponents({
+          variant,
+          onLinkClick,
+          renderCodeBlock,
+          expandImages,
+          highlightCode
+        }),
+      [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode]
+    )
+    const components = React.useMemo(
+      () => (extension ? { ...baseComponents, ...extension.components } : baseComponents),
+      [baseComponents, extension]
+    )
+    const fadingComponents = React.useMemo(
+      () => ({ ...components, span: CommentMarkdownWords }),
+      [components]
+    )
+    const activeRehypePlugins = React.useMemo(() => {
+      const plugins = extension ? extensionRehypePlugins(extension) : rehypePlugins
+      return highlightCode ? [...plugins, rehypeHighlight] : plugins
+    }, [extension, highlightCode])
     const activeRemarkPlugins = React.useMemo(() => {
       const plugins = fileLinkExists
         ? [...remarkPlugins, remarkNativeChatFileLinks(fileLinkExists)]
         : remarkPlugins
-      return githubRepo ? [...plugins, remarkGitHubReferences(githubRepo)] : plugins
-    }, [githubRepo, linkifyFilePaths])
-    const activeRehypePlugins = React.useMemo(
-      () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),
-      [highlightCode]
+      const withExtension = extension ? [...plugins, ...extension.remarkPlugins] : plugins
+      return githubRepo ? [...withExtension, remarkGitHubReferences(githubRepo)] : withExtension
+    }, [extension, fileLinkExists, githubRepo])
+    const blocks = useMarkdownBlocks(content, growing)
+    const [hadWordFade, setHadWordFade] = React.useState(fadeWords)
+    if (fadeWords && !hadWordFade) {
+      setHadWordFade(true)
+    }
+    const wrapsWords = fadeWords || hadWordFade
+    const fadingRehypePlugins = React.useMemo(
+      () => [...activeRehypePlugins, rehypeWordFade],
+      [activeRehypePlugins]
     )
 
     return (
-      <div
-        ref={ref}
-        className={cn(
-          // Reset inline-code pill styles when <code> is inside a <pre> block.
-          // The descendant selector (pre code) has higher specificity than the
-          // direct utility classes on <code>, so these overrides win reliably.
-          '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none',
-          'min-w-0 max-w-full [overflow-wrap:anywhere]',
-          highlightCode && 'native-chat-code [&_pre_code]:text-inherit',
-          className
-        )}
-        {...rest}
-      >
-        <Markdown
-          remarkPlugins={activeRemarkPlugins}
-          rehypePlugins={activeRehypePlugins}
-          components={components}
-          urlTransform={
-            allowFileUriLinks ? commentMarkdownFileUriUrlTransform : commentMarkdownUrlTransform
-          }
-        >
-          {content}
-        </Markdown>
-      </div>
+      <CommentMarkdownMermaidContext.Provider value={renderMermaid}>
+        <CommentMarkdownMermaidSourceContext.Provider value={keepMermaidSourceWhilePending}>
+          <div
+            ref={ref}
+            className={cn(
+              // Reset inline-code pill styles when <code> is inside a <pre> block.
+              // The descendant selector (pre code) has higher specificity than the
+              // direct utility classes on <code>, so these overrides win reliably.
+              '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none',
+              'min-w-0 max-w-full [overflow-wrap:anywhere]',
+              highlightCode && 'native-chat-code [&_pre_code]:text-inherit',
+              className
+            )}
+            {...rest}
+          >
+            {blocks.map((block, index) => (
+              <MemoizedMarkdown
+                key={block.start}
+                remarkPlugins={activeRemarkPlugins}
+                rehypePlugins={wrapsWords ? fadingRehypePlugins : activeRehypePlugins}
+                components={wrapsWords ? fadingComponents : components}
+                urlTransform={
+                  allowFileUriLinks
+                    ? commentMarkdownFileUriUrlTransform
+                    : commentMarkdownUrlTransform
+                }
+              >
+                {growing && index === blocks.length - 1
+                  ? remend(block.text, { linkMode: 'text-only' })
+                  : block.text}
+              </MemoizedMarkdown>
+            ))}
+          </div>
+        </CommentMarkdownMermaidSourceContext.Provider>
+      </CommentMarkdownMermaidContext.Provider>
     )
   })
 )

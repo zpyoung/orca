@@ -22,7 +22,7 @@ export function registerProjectGroupHandlers(
   store: Store,
   runtime?: RepoRemovalRuntime
 ): void {
-  ipcMain.handle('projectGroups:list', () => store.getProjectGroups())
+  ipcMain.handle('projectGroups:list', () => visibleProjectGroups(store))
 
   ipcMain.handle('projectGroups:create', (_event, rawArgs: unknown): ProjectGroup => {
     const args = parseProjectGroupIpcArgs(

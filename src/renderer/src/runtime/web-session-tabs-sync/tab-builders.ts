@@ -9,7 +9,8 @@ import type { OpenFile } from '../../store/slices/editor'
 import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
 import type { ReadyEditorSurface, MirroredEditorTab } from './state'
 import type { WebSessionExistingTabIndex } from '../web-session-existing-tab-index'
-import { isReadyEditorTab, localEditorFileId, editorSourceFileId } from './terminal-surfaces'
+import { isReadyEditorTab } from './terminal-surfaces'
+import { createMirroredEditorFileResolver } from './mirrored-editor-file-identity'
 import type { TerminalDockPaneState } from '../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 export function buildTerminalUnifiedTab(

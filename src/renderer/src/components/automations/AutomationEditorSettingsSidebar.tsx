@@ -103,6 +103,7 @@ export function AutomationEditorSettingsSidebar({
                 launchOverridesGate={launchOverridesGate}
                 onDraftChange={onDraftChange}
               />
+              <AutomationExtraAgentArgsField draft={draft} onDraftChange={onDraftChange} />
             </div>
           </div>
         </div>

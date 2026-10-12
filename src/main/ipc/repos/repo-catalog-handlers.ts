@@ -13,6 +13,7 @@ import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cac
 import { notifyReposChanged } from './repos-changed-notification'
 import { ProjectUpdateIpcArgs, parseProjectGroupIpcArgs } from './repo-ipc-arg-schemas'
 import { listReposForExecutionHost } from './host-repo-catalog-snapshot'
+import { visibleRepos } from '../../ssh/orcad-retained-source'
 import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
 
 export function registerRepoCatalogHandlers(
@@ -90,12 +91,21 @@ export function registerRepoCatalogHandlers(
     }
   )
 
+  // Why: forget a project on one execution host without disturbing the same repo id on other hosts (SSH-workspace forget flow).
   ipcMain.handle(
-    'repos:remove',
+    'repos:removeForHost',
     async (
       _event,
-      args: { repoId: string; expectedLedgers?: { ledgerId: string; revision: number }[] }
+      args: {
+        repoId: string
+        hostId: string
+        expectedLedgers?: { ledgerId: string; revision: number }[]
+      }
     ) => {
+      const hostId = normalizeExecutionHostId(args.hostId)
+      if (!hostId) {
+        throw new Error(`Invalid host ID: ${args.hostId}`)
+      }
       // Why: the runtime resolves a bare id and rejects one registered on two hosts, so only route
       // through it when the caller actually asked for the ledger retention guard.
       if (runtime && args.expectedLedgers) {
@@ -103,23 +113,9 @@ export function registerRepoCatalogHandlers(
           runtime.removeProject(args.repoId, { expectedLedgers: args.expectedLedgers })
         )
       } else {
-        store.removeProject(args.repoId)
+        store.removeProjectForHost(args.repoId, hostId)
         invalidateAuthorizedRootsCache()
       }
-      notifyReposChanged(mainWindow)
-    }
-  )
-
-  // Why: forget a project on one execution host without disturbing the same repo id on other hosts (SSH-workspace forget flow).
-  ipcMain.handle(
-    'repos:removeForHost',
-    async (_event, args: { repoId: string; hostId: string }) => {
-      const hostId = normalizeExecutionHostId(args.hostId)
-      if (!hostId) {
-        throw new Error(`Invalid host ID: ${args.hostId}`)
-      }
-      store.removeProjectForHost(args.repoId, hostId)
-      invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)
     }
   )

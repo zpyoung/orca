@@ -82,8 +82,13 @@ export const ptySessionControlApi = {
   write: (id: string, data: string, inputKind: TerminalInputKind): void => {
     ipcRenderer.send('pty:write', { id, data, inputKind })
   },
-  writeAccepted: (id: string, data: string, inputKind: TerminalInputKind): Promise<boolean> =>
-    ipcRenderer.invoke('pty:writeAccepted', { id, data, inputKind }),
+  writeAccepted: (
+    id: string,
+    data: string,
+    inputKind: TerminalInputKind,
+    options?: { requireWriteSettlement?: true }
+  ): Promise<boolean> =>
+    ipcRenderer.invoke('pty:writeAccepted', { id, data, inputKind, ...options }),
   writeInputAccepted: (id: string, data: string, inputKind: TerminalInputKind): Promise<boolean> =>
     ipcRenderer.invoke('pty:writeInputAccepted', { id, data, inputKind }),
   onWriteUnavailable: (callback: (payload: { id: string }) => void): (() => void) => {

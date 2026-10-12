@@ -1,5 +1,6 @@
 import type { DraftPasteReadySignal, TuiAgentConfig } from './tui-agent-config'
 import { createOpenCodeAgentRowScanner } from './opencode-agent-row-scanner'
+import { createCodexComposerReadyScanner } from './codex-composer-ready-scanner'
 
 // Why: agents enable bracketed paste (DECSET 2004) before their composer is
 // actually mounted/focused. These markers let the scanner detect the real
@@ -41,23 +42,18 @@ type DraftPasteReadySignalSpec = {
 }
 
 // Signals that read the screen's structure, not one marker; a Record so none lacks its scanner.
-type StructuralSignal = 'opencode-agent-row'
+type StructuralSignal = 'opencode-agent-row' | 'codex-composer-prompt'
 const STRUCTURAL_SCANNERS: Record<
   StructuralSignal,
-  () => { observe: (data: string) => { ready: boolean; readyAfterMs: number | null } }
+  () => { observe: (data: string) => { ready: boolean; readyAfterMs?: number | null } }
 > = {
-  'opencode-agent-row': createOpenCodeAgentRowScanner
+  'opencode-agent-row': createOpenCodeAgentRowScanner,
+  'codex-composer-prompt': createCodexComposerReadyScanner
 }
 
 type SingleSignal = Exclude<DraftPasteReadySignal, StructuralSignal>
 
 const DRAFT_PASTE_READY_SIGNALS: Record<SingleSignal, DraftPasteReadySignalSpec> = {
-  'codex-composer-prompt': {
-    markerAnchor: DECSET_BRACKETED_PASTE,
-    markerAnchorEnd: null,
-    marker: CODEX_COMPOSER_PROMPT,
-    quietAnchor: null
-  },
   'render-cursor-after-bracketed-paste': {
     markerAnchor: DECSET_BRACKETED_PASTE,
     // Why: the launching shell's prompt turns bracketed paste on and back off before exec

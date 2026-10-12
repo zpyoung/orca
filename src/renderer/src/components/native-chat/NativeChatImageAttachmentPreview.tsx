@@ -4,8 +4,13 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { translate } from '@/i18n/i18n'
 import { basename } from '@/lib/path'
 import { useLocalImageSrc } from '@/components/editor/useLocalImageSrc'
-import { isNativeChatPastedImagePath } from './native-chat-image-paste'
+import { copyableNativeChatImageSrc, keepPreviewOpenForChatMenu } from './native-chat-image-copy'
+import {
+  isNativeChatImageAttachmentPath,
+  isNativeChatPastedImagePath
+} from './native-chat-image-paste'
 import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
+import { isAgentSessionAttachmentStorePath } from '../../../../shared/agent-session-attachments'
 import { chatImageAccess } from '@/lib/local-file-access'
 
 type Props = {

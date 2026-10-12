@@ -36,7 +36,17 @@ import type {
   NativeChatSubagentRosterState
 } from './native-chat-subagent-sections'
 import { NativeChatToolRunIcon } from './NativeChatToolIcon'
+import { NativeChatToolRunCallCounts } from './NativeChatToolRunCallCounts'
+import { NativeChatToolRunMembers, revealNativeChatToolRunMember } from './NativeChatToolRunMembers'
+import { NativeChatToolRunMemberList } from './NativeChatToolRunMemberList'
 import { NativeChatToolCategoryDots } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
+
+/** Rows drawn among an open run's lines, each keyed: before the block they are keyed by, or
+ *  after the last. */
+export type NativeChatToolRunAsides = {
+  before: ReadonlyMap<NativeChatBlock, readonly React.JSX.Element[]>
+  after: readonly React.JSX.Element[]
+}
 
 /** Stable empty default: a fresh array literal per render breaks memoization. */
 const NO_SUBAGENT_GROUPS: NativeChatSubagentGroupBlock[] = []
@@ -232,10 +242,7 @@ export function NativeChatToolRun({
             </span>
           ) : null}
           <NativeChatToolCategoryDots blocks={blocks} />
-          {/* The run in words, in the transcript's own type. Present tense while
-              live, past once settled; the text changes in place and nothing
-              around it moves. While live it keeps its width and the preview
-              beside it is what gives way. */}
+          {/* Keep the collapsed header bounded; the tool detail carries the full command. */}
           <span
             className={cn(
               'min-w-0 line-clamp-2 whitespace-normal break-words text-sm native-chat-message-text leading-relaxed transition-colors',

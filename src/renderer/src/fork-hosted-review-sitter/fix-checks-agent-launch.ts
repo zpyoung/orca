@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
-// FORK-COPY-SHA: 4bb6f2072b07c1f0664b809551f77754700570e4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 // Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
 import { toast } from 'sonner'
@@ -147,7 +147,12 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
   const attachedWorkspace =
     args.worktreeId || !args.item
       ? null
-      : findGithubPrWorkspaceAttachment(store.allWorktrees(), args.repoId, args.item.number)
+      : findGithubPrWorkspaceAttachment(
+          store.allWorktrees(),
+          args.repoId,
+          args.item.number,
+          args.item.url
+        )
   const targetWorktreeId = args.worktreeId ?? attachedWorkspace?.id ?? null
   if (targetWorktreeId) {
     const targetWorktree = store.allWorktrees().find((worktree) => worktree.id === targetWorktreeId)

@@ -30,7 +30,10 @@ import { startHeimdall } from '../fork-heimdall/registration'
 import { wireHeimdallFleetWindows } from '../fork-heimdall/fleet-ipc-forward'
 import { startClaudeSuppressionVerdictPublisher } from '../fork-ask-question-tool/claude-suppression-verdict-publisher'
 import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'
-import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
+import {
+  codexStructuredLaunchHomeResolvers,
+  prepareCodexRuntimeHomeForLaunch
+} from './codex-launch-preparation'
 import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
 import { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
 import { SkillCloudService } from '../skills/skill-cloud-service'

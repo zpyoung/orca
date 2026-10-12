@@ -86,6 +86,7 @@ export function createAutomation(
   }
   const schedulerOwner = getAutomationSchedulerOwner(repo)
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
+  const extraAgentArgs = storedExtraAgentArgs(input.extraAgentArgs)
   const launchOverrides = normalizeAgentLaunchOverrides(input.launchOverrides)
   const automation: Automation = {
     id: randomUUID(),
@@ -94,6 +95,7 @@ export function createAutomation(
     prompt: input.prompt,
     precheck: normalizeAutomationPrecheck(input.precheck),
     agentId: input.agentId,
+    ...(extraAgentArgs !== undefined ? { extraAgentArgs } : {}),
     ...(launchOverrides ? { launchOverrides } : {}),
     // Why own contexts win: a wire context speaks the client's perspective —
     // 'runtime:<id>' is a client-assigned name this store cannot interpret, and
@@ -169,6 +171,10 @@ export function updateAutomation(
   const dtstart = updates.dtstart ?? current.dtstart
   const scheduleChanged = updates.rrule !== undefined || updates.dtstart !== undefined
   const workspaceMode = updates.workspaceMode ?? current.workspaceMode
+  // Omitted preserves; empty or whitespace clears.
+  const extraAgentArgs = Object.hasOwn(definedUpdates, 'extraAgentArgs')
+    ? storedExtraAgentArgs(definedUpdates.extraAgentArgs)
+    : storedExtraAgentArgs(current.extraAgentArgs)
   const normalizedLaunchOverrides = Object.hasOwn(definedUpdates, 'launchOverrides')
     ? definedUpdates.launchOverrides === null
       ? null
@@ -232,6 +238,12 @@ export function updateAutomation(
       : current.nextRunAt,
     updatedAt: Date.now()
   }
+  if (extraAgentArgs === undefined) {
+    delete merged.extraAgentArgs
+  } else {
+    merged.extraAgentArgs = extraAgentArgs
+  }
+  assertAutomationExtraAgentArgs(merged)
   if (Object.hasOwn(definedUpdates, 'launchOverrides') && !normalizedLaunchOverrides) {
     delete merged.launchOverrides
   }

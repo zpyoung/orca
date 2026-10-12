@@ -39,7 +39,7 @@ export type PendingSidebarRevealArgs = {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   settings: AppState['settings']
   projectGroups: readonly ProjectGroup[]
-  visibleProjectGroupsForRows: readonly ProjectGroup[]
+  visibleProjectGroupsForRows?: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
   flashRevealedRow: (rowKey: string) => void
   markRevealScroll: (targetTop: number) => void
@@ -83,58 +83,14 @@ export function expandGroupsForWorktreeReveal(
   if (!targetWorktree) {
     return
   }
-  const targetRepo = args.repoMap.get(targetWorktree.repoId)
-  const hostGroupKey = `host:${getWorktreeExecutionHostId(targetWorktree, targetRepo, args.defaultHostId)}`
-  if (args.collapsedGroups.has(hostGroupKey)) {
-    args.toggleGroup(hostGroupKey)
-  }
-
-  const hostLineage = getHostScopedWorktreeLineageInputs(
-    args.worktrees,
-    args.worktreeLineageById,
-    executionHostId
-  )
-  for (const parent of getWorktreeLineageAncestors(
-    targetWorktree,
-    hostLineage.lineageById,
-    hostLineage.worktreeMap
-  )) {
-    const lineageGroupKey = getWorktreeLineageGroupKey(parent)
-    if (args.collapsedGroups.has(lineageGroupKey)) {
-      args.toggleGroup(lineageGroupKey)
-    }
-  }
-
-  const groupKeys =
-    args.pinnedDisplayPolicy === 'single-location' &&
-    isPinnedSectionWorktree(
-      targetWorktree,
-      args.worktrees,
-      args.worktreeLineageById,
-      args.worktreeMap
-    )
-      ? getPinnedWorktreeRevealCollapsedGroupKeys({
-          worktree: targetWorktree,
-          collapsedGroups: args.collapsedGroups,
-          inPinnedSection: true
-        })
-      : getGroupKeysForWorktree(
-          args.groupBy,
-          targetWorktree,
-          args.repoMap,
-          args.prCache,
-          args.workspaceStatuses,
-          args.settings,
-          // Why: must be the same host-filtered set buildRows used, or
-          // reveal expands a group that was filtered out of the rendered
-          // tree and the worktree stays collapsed under its repo group.
-          args.visibleProjectGroupsForRows,
-          args.projectGrouping
-        )
-  for (const groupKey of groupKeys) {
-    if (args.collapsedGroups.has(groupKey)) {
-      args.toggleGroup(groupKey)
-    }
+  for (const groupKey of getWorktreeRevealCollapsedGroupKeys({
+    ...args,
+    // Why: must be the host-filtered set buildRows used, or reveal expands a filtered-out group.
+    projectGroups: args.visibleProjectGroupsForRows ?? args.projectGroups,
+    worktree: targetWorktree,
+    hostScopedGroups
+  })) {
+    args.toggleGroup(groupKey)
   }
 }
 

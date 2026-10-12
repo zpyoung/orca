@@ -7,7 +7,7 @@ import type { AgentSessionLaunchPlan } from '@/lib/agent-session-launch-plan'
 import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-platform'
 import { beginStructuredAgentSessionProvisionalLaunch } from '@/lib/structured-agent-session-provisional-tab'
 import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import type { DeclinedStructuredLaunchTerminalOptions } from '@/lib/structured-agent-session-paired-admission'
+import type { DeclinedStructuredLaunchTerminalOptions } from '@/lib/structured-agent-session-launch-admission'
 
 export function buildDirectWorkItemStartup(args: {
   agent: TuiAgent | null

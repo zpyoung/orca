@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { appendReturnedDraftText } from '../../../../../shared/returned-draft-text'
 import {
-  appendNativeChatDraftText,
   readNativeChatDraftCache,
   subscribeToNativeChatDraftAppend
 } from '../native-chat-draft-cache'
+import { subscribeToNativeChatComposerDraft } from '../native-chat-composer-draft-store'
 import {
   adoptNativeChatDraftAppends,
+  adoptNativeChatDraftStoreText,
   readAgentComposerDraftCache,
   subscribeAgentComposerDraftCache,
   writeAgentComposerDraftCache
@@ -62,8 +64,18 @@ export function useAgentComposerDraft(
         const pending = pendingAppendRef.current
         pendingAppendRef.current = {
           scopeKey,
-          text:
-            pending?.scopeKey === scopeKey ? appendNativeChatDraftText(pending.text, text) : text
+          text: pending?.scopeKey === scopeKey ? appendReturnedDraftText(pending.text, text) : text
+        }
+      }),
+    [isComposing, scopeKey]
+  )
+
+  // Why: upstream's send, goal and queue paths clear or restore the draft in its store only.
+  useEffect(
+    () =>
+      subscribeToNativeChatComposerDraft(scopeKey, () => {
+        if (!isComposing()) {
+          adoptNativeChatDraftStoreText(scopeKey)
         }
       }),
     [isComposing, scopeKey]
@@ -85,7 +97,7 @@ export function useAgentComposerDraft(
     const pending = pendingAppendRef.current
     pendingAppendRef.current = null
     if (pending?.scopeKey === scopeKey) {
-      setDraft((previous) => appendNativeChatDraftText(previous, pending.text))
+      setDraft((previous) => appendReturnedDraftText(previous, pending.text))
     }
   }, [scopeKey, setDraft])
 
@@ -97,7 +109,7 @@ export function useAgentComposerDraft(
         pendingAppendRef.current = null
         writeAgentComposerDraftCache(
           scopeKey,
-          appendNativeChatDraftText(readAgentComposerDraftCache(scopeKey), pending.text)
+          appendReturnedDraftText(readAgentComposerDraftCache(scopeKey), pending.text)
         )
       }
     },

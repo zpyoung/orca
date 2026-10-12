@@ -53,6 +53,7 @@ const COMMAND = {
 function setup(overrides: Partial<Parameters<typeof useNativeChatPickerCommandDispatch>[0]> = {}) {
   const callbacks = {
     onSendOutcome: vi.fn(),
+    onSubmitted: vi.fn(),
     restoreImageAttachments: vi.fn(),
     setDraft: vi.fn(),
     setCaret: vi.fn(),
@@ -96,7 +97,8 @@ describe('useNativeChatPickerCommandDispatch', () => {
   })
 
   it('types Codex autocomplete commands', () => {
-    const { hook } = setup({ agent: 'codex' })
+    const { hook, callbacks } = setup({ agent: 'codex' })
+    const { onSubmitted } = callbacks
 
     act(() => hook.result.current(COMMAND))
 

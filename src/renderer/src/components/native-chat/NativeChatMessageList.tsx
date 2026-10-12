@@ -1,7 +1,4 @@
-import {
-  NATIVE_CHAT_TRANSCRIPT_OUTER_CLASS,
-  NATIVE_CHAT_TRANSCRIPT_COLUMN_CLASS
-} from './native-chat-appearance-style'
+import { NATIVE_CHAT_TRANSCRIPT_OUTER_CLASS } from './native-chat-appearance-style'
 import { NativeChatJumpToLatest } from './NativeChatJumpToLatest'
 import { useNativeChatRowTypography } from './use-native-chat-row-typography'
 import { useCallback, useMemo, useRef, useState } from 'react'
@@ -58,12 +55,10 @@ import type {
 import type { AgentSessionLatestTurn } from '../../../../shared/agent-session-wire'
 import { isStructuredAgentSessionThinking } from '../../../../shared/structured-agent-session-live-turn'
 import type { NativeChatSettledTurns } from '../../../../shared/native-chat-turn-status'
-import {
-  nativeChatTurnDiffs,
-  type NativeChatDiffReveal,
-  type NativeChatDiffTarget,
-  type NativeChatTurnDiff
-} from './native-chat-turn-diffs'
+import type { NativeChatDiffReveal, NativeChatDiffTarget } from './native-chat-turn-diffs'
+import { useNativeChatTurnDiffs } from './use-native-chat-turn-diffs'
+import { transcriptTailRow } from './native-chat-transcript-tail-row'
+import { structuredAgentLabel } from '@/lib/structured-agent-session-launch-label'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 import { cn } from '@/lib/utils'
 

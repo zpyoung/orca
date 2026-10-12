@@ -18,10 +18,8 @@ import type {
   NativeChatSubagentRosterState
 } from './native-chat-subagent-sections'
 import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client'
-import {
-  nativeChatReasoningClassName,
-  nativeChatUserMessageClassName
-} from './fork-native-chat-coloring/native-chat-message-coloring'
+import { useNativeChatWorkRun } from './use-native-chat-work-run'
+import { useNativeChatRowNavigation } from './use-native-chat-row-navigation'
 
 /** What a user message says about its delivery: that nothing has confirmed it yet, quietly in
  *  place of its time, or that it did not go through, with its own Retry when the surface can send
@@ -145,42 +143,27 @@ export const MessageRow = memo(function MessageRow(
 
   if (isUser) {
     return (
-      <div ref={rowRef} className="group relative flex flex-col items-end gap-0.5">
-        {/* User turns get a distinct muted fill (not the card/canvas color) so
-            the prompt reads apart from the assistant's body copy. */}
-        <div className={nativeChatUserMessageClassName()}>
-          {markdown ? (
-            <>
-              <NativeChatImageAttachments
-                blocks={prose}
-                runtimeContext={runtimeContext}
-                enablePreview={runtimeContext !== undefined}
-              />
-              <CommentMarkdown
-                content={markdown}
-                variant="document"
-                className="text-sm"
-                renderCodeBlock={NativeChatCodeBlock}
-                onLinkClick={onLinkClick}
-                allowFileUriLinks={allowFileUriLinks}
-                highlightCode
-              />
-            </>
-          ) : (
-            <NativeChatImageAttachments
-              blocks={prose}
-              runtimeContext={runtimeContext}
-              enablePreview={runtimeContext !== undefined}
-            />
-          )}
-        </div>
-        {message.sentAs === 'goal' ? (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Goal className="size-3" aria-hidden />
-            <span>{translate('components.native-chat.goal.sentAsGoal', 'Sent as goal')}</span>
-          </div>
-        ) : null}
-        <UserMessageMeta
+      <NativeChatUserMessageRow
+        message={message}
+        markdown={markdown}
+        prose={prose}
+        rowRef={rowRef}
+        onRefolded={returnToView}
+        onLinkClick={onLinkClick}
+        allowFileUriLinks={allowFileUriLinks}
+        runtimeContext={runtimeContext}
+        rewind={rewind}
+        deliveryNotice={deliveryNotice}
+      />
+    )
+  }
+
+  if (isReasoning && run === undefined) {
+    return (
+      <div ref={rowRef}>
+        <NativeChatReasoningRow
+          message={message}
+          turnIsWorking={activeTurnIsWorking}
           markdown={markdown}
           onLinkClick={onLinkClick}
           allowFileUriLinks={allowFileUriLinks}
@@ -190,63 +173,13 @@ export const MessageRow = memo(function MessageRow(
   }
 
   return (
-    <div
-      ref={rowRef}
-      className={cn(
-        'group relative max-w-full select-text text-sm leading-relaxed text-foreground',
-        // Reasoning is the agent thinking aloud — quieter, italic, like an aside.
-        isReasoning && nativeChatReasoningClassName(),
-        isSystem && 'text-xs text-muted-foreground'
-      )}
-    >
-      <NativeChatImageAttachments
-        blocks={prose}
-        runtimeContext={runtimeContext}
-        enablePreview={runtimeContext !== undefined}
-      />
-      {markdown ? (
-        <CommentMarkdown
-          content={markdown}
-          variant="document"
-          className="text-sm"
-          renderCodeBlock={NativeChatCodeBlock}
-          onLinkClick={onLinkClick}
-          allowFileUriLinks={allowFileUriLinks}
-          linkifyFilePaths={onLinkClick !== undefined}
-          highlightCode
-        />
-      ) : null}
-      {tools.length > 0 || subagentGroups.length > 0 || backgroundTasks.length > 0 ? (
-        <NativeChatToolRun
-          blocks={tools}
-          previousTodoWrite={previousTodoWrite}
-          previousUpdatePlan={previousUpdatePlan}
-          revealedDiff={revealedDiff}
-          onRevealDiff={onScrollMessageToTop}
-          onLinkClick={onLinkClick}
-          subagentGroups={subagentGroups}
-          subagentRoster={subagentRoster}
-          subagentDisclosure={subagentDisclosure}
-          backgroundTasks={backgroundTasks}
-          expandSignal={expandSignal}
-          activeTurnIsWorking={activeTurnIsWorking}
-          trailing={trailingRun}
-          disclosureId={message.id}
-        />
-      ) : null}
-      {showControls ? (
-        <NativeChatAgentControls
-          markdown={markdown}
-          timestamp={message.timestamp}
-          onScrollToTop={scrollToTop}
-          className={cn(
-            'mt-1 w-fit select-none transition-opacity can-hover:pointer-events-none can-hover:opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 [.group:has(:focus-visible)_&]:pointer-events-auto [.group:has(:focus-visible)_&]:opacity-100',
-            // They hang into the gap below; a section keeps them inside its border instead.
-            !inSubagentSection && '-mb-5'
-          )}
-        />
-      ) : null}
-    </div>
+    <NativeChatAssistantMessageRow
+      props={props}
+      content={content}
+      run={run}
+      rowRef={rowRef}
+      scrollToTop={scrollToTop}
+    />
   )
 }, sameMessageRowProps)
 

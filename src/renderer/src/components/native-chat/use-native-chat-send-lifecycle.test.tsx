@@ -100,7 +100,13 @@ describe('useNativeChatSendLifecycle', () => {
     const onPendingSendCanceled = vi.fn()
     const { result, rerender } = renderHook(
       ({ transportSafe }) =>
-        useNativeChatSendLifecycle('tab-1', 'pty-1', onPendingSendCanceled, transportSafe),
+        useNativeChatSendLifecycle(
+          'tab-1',
+          'pty-1',
+          onPendingSendCanceled,
+          undefined,
+          transportSafe
+        ),
       { initialProps: { transportSafe: true } }
     )
 

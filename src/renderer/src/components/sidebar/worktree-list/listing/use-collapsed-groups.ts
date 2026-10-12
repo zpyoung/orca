@@ -26,9 +26,10 @@ export function useEffectiveCollapsedGroups(args: {
   prCache: AppState['prCache'] | null
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   settings: AppState['settings']
+  projectGroups: readonly ProjectGroup[]
   // Why: must be the host-filtered set buildRows uses, or the agent send picker
   // force-opens a group key the rendered tree never built.
-  visibleProjectGroupsForRows: readonly ProjectGroup[]
+  visibleProjectGroupsForRows?: readonly ProjectGroup[]
   projectGrouping: ProjectGroupingModel
   folderWorkspaces: readonly FolderWorkspace[]
   defaultHostId: ExecutionHostId
@@ -47,7 +48,8 @@ export function useEffectiveCollapsedGroups(args: {
     prCache,
     workspaceStatuses,
     settings,
-    visibleProjectGroupsForRows,
+    projectGroups,
+    visibleProjectGroupsForRows = projectGroups,
     projectGrouping,
     folderWorkspaces,
     defaultHostId
@@ -64,7 +66,7 @@ export function useEffectiveCollapsedGroups(args: {
         agentSendTargetWorktreeId,
         folderWorkspaces,
         visibleProjectGroupsForRows,
-        { groupBy, workspaceStatuses, defaultHostId }
+        { groupBy, workspaceStatuses, defaultHostId, hostScopedGroups }
       )
       if (folderKeys.length === 0) {
         return collapsedGroups
@@ -76,28 +78,10 @@ export function useEffectiveCollapsedGroups(args: {
       return nextForFolder
     }
     const next = new Set(collapsedGroups)
-    if (
-      pinnedDisplayPolicy === 'single-location' &&
-      isPinnedSectionWorktree(targetWorktree, visibleWorktrees, worktreeLineageById, worktreeMap)
-    ) {
-      next.delete(PINNED_GROUP_KEY)
-    } else {
-      for (const groupKey of getGroupKeysForWorktree(
-        groupBy,
-        targetWorktree,
-        repoMap,
-        prCache,
-        workspaceStatuses,
-        settings,
-        visibleProjectGroupsForRows,
-        projectGrouping
-      )) {
-        next.delete(groupKey)
-      }
-    }
-
-    for (const parent of getWorktreeLineageAncestors(
-      targetWorktree,
+    for (const groupKey of getWorktreeRevealCollapsedGroupKeys({
+      worktree: targetWorktree,
+      worktrees,
+      visibleWorktrees,
       worktreeLineageById,
       repoMap,
       defaultHostId,
@@ -108,7 +92,7 @@ export function useEffectiveCollapsedGroups(args: {
       prCache,
       workspaceStatuses,
       settings,
-      projectGroups,
+      projectGroups: visibleProjectGroupsForRows,
       projectGrouping
     })) {
       next.delete(groupKey)

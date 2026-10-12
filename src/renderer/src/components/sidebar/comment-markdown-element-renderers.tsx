@@ -1,6 +1,7 @@
 import React from 'react'
 import type { Components } from 'react-markdown'
 import { NATIVE_CHAT_FILE_HREF_PREFIX } from '../../../../shared/native-chat-href-routing'
+import { isMermaidFence } from './comment-mermaid-fence'
 import {
   CommentMarkdownDocumentCode,
   CommentMarkdownDocumentPre
@@ -267,32 +268,23 @@ export function createDocumentCommentMarkdownComponents(
           {children}
         </a>
       ),
-    code: ({ className, children }) =>
-      isMermaidFence(className) ? (
-        renderMermaidFence(
-          children,
-          'my-3 min-w-0 max-w-full overflow-x-auto rounded-md border border-border/60 p-3 [&_.mermaid-block]:min-w-0 [&_.mermaid-block_pre]:my-0 [&_.mermaid-block_pre]:max-h-80 [&_.mermaid-block_pre]:max-w-full [&_.mermaid-block_pre]:overflow-x-auto [&_.mermaid-block_pre]:rounded-md [&_.mermaid-block_pre]:bg-accent [&_.mermaid-block_pre]:p-3 [&_.mermaid-block_pre]:font-mono [&_.mermaid-block_pre]:text-[12px]'
-        )
-      ) : highlightCode ? (
-        <code className="rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]">
-          {children}
-        </code>
-      ) : (
-        <code className="rounded bg-accent px-1.5 py-0.5 font-mono text-[0.92em] [overflow-wrap:anywhere]">
-          {children}
-        </code>
-      ),
-    // Mermaid fences render a <div>, which is invalid inside <pre>, so unwrap them.
-    pre: ({ children }) =>
-      isMermaidPre(children) ? (
-        <>{children}</>
-      ) : renderCodeBlock ? (
-        renderCodeBlock({ children, language: extractCodeFenceLanguage(children) })
-      ) : (
-        <pre className="my-3 max-h-80 max-w-full overflow-x-auto rounded-md bg-accent p-3 font-mono text-[12px]">
-          {children}
-        </pre>
-      ),
+    code: highlightCode
+      ? ({ className, children }) =>
+          isMermaidFence(className) ? (
+            <CommentMarkdownDocumentCode className={className}>
+              {children}
+            </CommentMarkdownDocumentCode>
+          ) : (
+            <code className="rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]">
+              {children}
+            </code>
+          )
+      : CommentMarkdownDocumentCode,
+    pre: ({ children }) => (
+      <CommentMarkdownDocumentPre renderCodeBlock={renderCodeBlock}>
+        {children}
+      </CommentMarkdownDocumentPre>
+    ),
     ul: ({ children }) => <ul className="my-2 ml-5 list-disc space-y-1">{children}</ul>,
     ol: ({ children, start }) => (
       <ol start={start} className="my-2 ml-5 list-decimal space-y-1">
@@ -382,16 +374,18 @@ export function selectCommentMarkdownComponents({
   variant,
   onLinkClick,
   renderCodeBlock,
-  expandImages
+  expandImages,
+  highlightCode
 }: {
   variant: 'compact' | 'document'
   onLinkClick?: CommentMarkdownLinkClickHandler
   renderCodeBlock?: DocumentCodeBlockRenderer
+  highlightCode?: boolean
   expandImages: boolean
 }): Components {
   if (variant === 'document') {
-    return onLinkClick || renderCodeBlock
-      ? createDocumentCommentMarkdownComponents(onLinkClick, renderCodeBlock)
+    return onLinkClick || highlightCode || renderCodeBlock
+      ? createDocumentCommentMarkdownComponents(onLinkClick, highlightCode, renderCodeBlock)
       : documentCommentMarkdownComponents
   }
   return onLinkClick || expandImages

@@ -16,7 +16,7 @@ import {
   NativeChatToolName
 } from './NativeChatToolAnnotations'
 import { NativeChatToolIcon } from './NativeChatToolIcon'
-import { NativeChatToolName as ForkNativeChatToolName } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
+import { NativeChatToolFileTarget } from './NativeChatToolFileTarget'
 import { NativeChatDiffView } from './NativeChatDiffView'
 import { nativeChatToolLineLabel } from './native-chat-tool-line-label'
 import { diffFromText, diffFromToolCall } from './native-chat-diff'
@@ -144,10 +144,11 @@ export function NativeChatToolLine({
              category to read from it. The empty slot keeps rows aligned. */
           <span aria-hidden className="size-4 shrink-0" />
         )}
-        <ForkNativeChatToolName name={name}>
-          {isCall ? <NativeChatToolName name={name} mcpIdentity={block.mcpIdentity} /> : name}
-        </ForkNativeChatToolName>
-        {preview ? (
+        {label?.verb && label.verb !== name ? <span className="sr-only">{name} </span> : null}
+        {commandAlone ? (
+          // The run's header already says these ran; the row is the command itself.
+          <span className="sr-only">{label?.verb} </span>
+        ) : (
           <span
             className={cn(
               'text-chat-foreground-faint transition-colors group-hover/tool-line:text-chat-foreground',

@@ -221,8 +221,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   terminalUrlMiddleClickBehavior?: 'open' | 'actions' | 'none'
   /** New supported agent launches use structured Chat UI; off defaults to terminal UI. */
   experimentalNativeChat?: boolean
-  /** Opt-in updated structured runtime; off keeps the existing PTY-backed native chat path. */
-  experimentalStructuredNativeChat?: boolean
   /** Experimental per-pane docked composer for agent terminals; off by default. */
   experimentalTerminalDock?: boolean
   /** Open the terminal composer automatically for new agent sessions; mounted panes are unchanged. */

@@ -31,8 +31,8 @@ import {
   renderJournalState
 } from '../../../src/main/native-chat/agent-session-journal/journal-reducer'
 
-// A release that knows neither the Stop event nor the Resume marker: an unknown row kind would
-// make it delete the journal from that row on, so both ride a tombstone it already reads.
+// A release that knows none of the Stop event, the Resume marker and the reopen mark: an unknown
+// row kind would make it delete the journal from that row on, so each rides a tombstone it reads.
 const BASELINE_REF = 'v1.4.219-rc.0.zy01'
 const JOURNAL = 'src/main/native-chat/agent-session-journal'
 // A main build that shares this one's host database and schema version, so a downgrade to it opens

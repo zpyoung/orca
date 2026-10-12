@@ -32,10 +32,8 @@ import type {
 import type { AppState } from '@/store/types'
 import { reportTerminalDropUploadSkipsAndFailures } from '../terminal-pane/terminal-drop-upload-report'
 import { rememberUploadedAttachmentPreviewSources } from './fork-agent-composer/agent-composer-attachment-preview'
-import {
-  findTerminalTabWorktreeId,
-  resolveNativeChatFileLinkContext
-} from './native-chat-file-link'
+import { NATIVE_FILE_DROP_MAX_PATHS } from '../../../../shared/native-file-drop'
+import { findTerminalTabWorktreeId } from './native-chat-file-link'
 import {
   captureDirectSshMutationExpectation,
   type DirectSshMutationExpectation

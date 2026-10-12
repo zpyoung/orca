@@ -7,6 +7,7 @@ import {
   type SubscribeNativeChatTranscriptArgs
 } from '../../../native-chat/transcript-watch'
 import { nativeChatCompanionFrameFields } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
+import { nativeChatTranscriptPathOnExecutionHost } from '../../../native-chat/ssh-transcript-path'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../core'
 import { sanitizeNativeChatRpcBlock } from './native-chat-rpc-block-sanitize'
 import {

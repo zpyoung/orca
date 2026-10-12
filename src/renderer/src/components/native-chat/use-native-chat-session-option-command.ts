@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { emitNativeChatMessageSent } from '@/lib/native-chat-telemetry'
 import {
@@ -21,8 +21,9 @@ export function useNativeChatSessionOptionCommand(args: {
   onSlashCommand?: (command: string) => void
   onSubmitted?: () => void
   resolveTarget: () => NativeChatResolvedTarget | null
+  setHistory?: Dispatch<SetStateAction<HistoryState>>
 }): { dispatch: NativeChatSessionOptionDispatchCommand; isDispatching: boolean } {
-  const { agent, disabled, onSlashCommand, onSubmitted, resolveTarget } = args
+  const { agent, disabled, onSlashCommand, onSubmitted, resolveTarget, setHistory } = args
   const mountedRef = useRef(true)
   const activeObserversRef = useRef(new Set<ClaudeModelSwitchConfirmationObserver>())
   const activeSendsRef = useRef(new Set<AbortController>())
@@ -116,6 +117,7 @@ export function useNativeChatSessionOptionCommand(args: {
           agent,
           runtime: nativeChatComposerTargetIsRemote(target.ptyId) ? 'remote' : 'local'
         })
+        setHistory?.((previous) => pushHistory(previous, command))
         const outcome = observer ? await observer.result : undefined
         return { outcome }
       } finally {
@@ -128,7 +130,7 @@ export function useNativeChatSessionOptionCommand(args: {
         }
       }
     },
-    [agent, disabled, onSlashCommand, onSubmitted, resolveTarget]
+    [agent, disabled, onSlashCommand, onSubmitted, resolveTarget, setHistory]
   )
 
   return { dispatch, isDispatching }

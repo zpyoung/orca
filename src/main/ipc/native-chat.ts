@@ -14,6 +14,8 @@ import {
   type SubscribeNativeChatTranscriptArgs
 } from '../native-chat/transcript-watch'
 import { abortWhenRendererGone } from './renderer-lifetime-abort'
+import { agentHookServer } from '../agent-hooks/server'
+import { nativeChatTranscriptPathOnExecutionHost } from '../native-chat/ssh-transcript-path'
 import {
   readSshNativeChatTranscript,
   subscribeSshNativeChatForSender
@@ -56,7 +58,11 @@ async function readSession(args: NativeChatReadSessionArgs): Promise<ReadTranscr
   return readNativeChatTranscriptTail({
     agent,
     sessionId,
-    transcriptPath: args.transcriptPath,
+    transcriptPath: nativeChatTranscriptPathOnExecutionHost(
+      agentHookServer.getStatusSnapshot(),
+      sessionId,
+      args.transcriptPath
+    ),
     limit,
     ...(typeof args.beforeOffset === 'number' ? { beforeOffset: args.beforeOffset } : {})
   })

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx
-// FORK-COPY-SHA: 4bb6f2072b07c1f0664b809551f77754700570e4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 
 /** The composer grows with the draft up to 8 lines, then scrolls internally.
  *  Sizing is layout-driven (field-sizing + an lh-relative cap) rather than a JS
@@ -20,7 +20,7 @@ vi.mock('./AgentComposerActions', () => ({
 }))
 
 vi.mock('../NativeChatAutocompleteMenus', () => ({
-  NativeChatMentionHint: () => null,
+  NativeChatMentionMenu: () => null,
   NativeChatPickerMenu: () => null
 }))
 
@@ -34,7 +34,7 @@ function TestField({ draft }: { draft: string }): React.JSX.Element {
   return (
     <AgentComposerField
       terminalTabId="tab-1"
-      paneKey="pane-1"
+      draftScopeKey="pane-test"
       textareaRef={createRef<HTMLTextAreaElement>()}
       draft={draft}
       disabled={false}
@@ -42,7 +42,7 @@ function TestField({ draft }: { draft: string }): React.JSX.Element {
       canSend
       autocomplete={{ mode: 'none' }}
       activeSuggestion={0}
-      notice={null}
+      notices={[]}
       imageAttachments={[]}
       sendButtonDisabled={false}
       isWorking={false}

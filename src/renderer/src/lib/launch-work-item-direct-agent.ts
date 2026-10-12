@@ -55,15 +55,6 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
   const recipeSessionOptions = args.launchOptions?.model
     ? agentLaunchOverridesToSessionOptionValues(args.launchOptions)
     : undefined
-  const sessionOptions =
-    recipeSessionOptions ??
-    resolveInitialNativeChatSessionOptions(args.settings, {
-      agent: args.agent,
-      ...(args.promptDelivery === 'draft'
-        ? { promptDelivery: 'draft' as const, launchDraftText: args.draftContent }
-        : {}),
-      nativeChatTranscriptIsLocalReadable: args.nativeChatTranscriptIsLocalReadable
-    })
   const draftLaunchPlan =
     args.promptDelivery === 'submit-after-ready'
       ? null
@@ -75,7 +66,7 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
           isRemote: args.isRemote,
           agentArgs: effectiveAgentArgs,
           agentEnv: effectiveAgentEnv,
-          sessionOptions,
+          sessionOptions: recipeSessionOptions,
           includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined
         })
 
@@ -105,7 +96,7 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     isRemote: args.isRemote,
     agentArgs: effectiveAgentArgs,
     agentEnv: effectiveAgentEnv,
-    sessionOptions,
+    sessionOptions: recipeSessionOptions,
     includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
     allowEmptyPromptLaunch: true
   })

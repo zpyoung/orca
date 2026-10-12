@@ -94,18 +94,17 @@ export async function installTranscriptWatcher(
   }
 
   async function readSnapshot(limit: number) {
-    return readNativeChatTranscriptTailFile(
+    return tailReader({
       filePath,
       limit,
       decode,
-      false,
-      undefined,
-      decodeLifecycle,
-      gateAbort.signal,
-      (boundary) => {
+      decodeCompanion,
+      maxBytes: initialMaxBytes,
+      signal: gateAbort.signal,
+      onConsumedBoundary: (boundary) => {
         state.boundary = boundary
       }
-    )
+    })
   }
 
   async function finishSuccessfulDrain(startVersion: TranscriptFileVersion): Promise<void> {
@@ -161,14 +160,7 @@ export async function installTranscriptWatcher(
       // Why: 0 is a valid window — an explicit undefined check keeps an empty
       // snapshot empty instead of falling back to an unbounded incremental read.
       contentReplaced && !initialDrain && onReplace && initialLimit !== undefined
-        ? await tailReader({
-            filePath,
-            limit: initialLimit,
-            decode,
-            decodeCompanion,
-            maxBytes: initialMaxBytes,
-            signal: gateAbort.signal
-          })
+        ? await readSnapshot(initialLimit)
         : null
     if (closed) {
       return
@@ -188,14 +180,7 @@ export async function installTranscriptWatcher(
 
     const initialSnapshot =
       initialDrain && onInitialSnapshot && initialLimit !== undefined
-        ? await tailReader({
-            filePath,
-            limit: initialLimit,
-            decode,
-            decodeCompanion,
-            maxBytes: initialMaxBytes,
-            signal: gateAbort.signal
-          })
+        ? await readSnapshot(initialLimit)
         : null
     if (closed) {
       return

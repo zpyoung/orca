@@ -48,18 +48,20 @@ import { createFeedbackDraftSlice } from './feedback-draft'
 import { createTaskCreationDraftsSlice } from './task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-hosts'
+import { createStructuredSessionLaunchDirectorySlice } from './structured-session-launch-directories'
 import { createAsksSlice } from './fork-ask-question-tool/asks'
 import { createLedgerSlice } from './ledger'
 import { createHeimdallFleetSlice } from './fork-heimdall/fleet'
-import { translate } from '@/i18n/i18n'
-
-export const TEST_REPO = {
-  id: 'repo1',
-  path: '/repo1',
-  displayName: 'Repo 1',
-  badgeColor: '#000',
-  addedAt: 0
-}
+import '@/i18n/i18n'
+import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
+export { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
+export {
+  makeTab,
+  makeLayout,
+  makeOpenFile,
+  makeUnifiedTab,
+  makeTabGroup
+} from './store-session-test-harness'
 
 export function createTestStore() {
   return create<AppState>()((...a) => ({
@@ -108,6 +110,7 @@ export function createTestStore() {
     ...createTaskCreationDraftsSlice(...a),
     ...createRemoteServerUpdatesSlice(...a),
     ...createTerminalQuickCommandHostsSlice(...a),
+    ...createStructuredSessionLaunchDirectorySlice(...a),
     ...createLedgerSlice(...a),
     ...createAsksSlice(...a),
     ...createHeimdallFleetSlice(...a)

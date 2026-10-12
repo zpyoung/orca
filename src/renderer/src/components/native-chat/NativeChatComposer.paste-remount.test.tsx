@@ -9,11 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRef, type RefObject } from 'react'
 import type { NativeChatComposerHandle } from './native-chat-composer-types'
 import type { NativeChatAttachmentOwner } from './native-chat-attachment-upload'
+import type { NativeChatComposerImageAttachment } from './NativeChatComposerField'
 import type {
-  NativeChatComposerField as NativeChatComposerFieldComponent,
-  NativeChatComposerFieldProps,
-  NativeChatComposerImageAttachment
-} from './NativeChatComposerField'
+  AgentComposerField as AgentComposerFieldComponent,
+  AgentComposerFieldProps
+} from './fork-agent-composer/AgentComposerField'
+import { promptValue } from './fork-agent-composer/composer-textarea.test-support'
 
 type FieldProps = {
   imageAttachments?: readonly NativeChatComposerImageAttachment[]
@@ -61,18 +62,18 @@ vi.mock('@/lib/native-chat-telemetry', () => ({
   emitNativeChatPickerOpened: vi.fn(),
   emitNativeChatSendClassified: vi.fn()
 }))
-vi.mock('./NativeChatComposerField', async (importOriginal) => {
+vi.mock('./fork-agent-composer/AgentComposerField', async (importOriginal) => {
   const original = await importOriginal<{
-    NativeChatComposerField: typeof NativeChatComposerFieldComponent
+    AgentComposerField: typeof AgentComposerFieldComponent
   }>()
   return {
-    NativeChatComposerField: (props: NativeChatComposerFieldProps) => {
+    AgentComposerField: (props: AgentComposerFieldProps) => {
       mocks.state.fieldProps = props
-      return <original.NativeChatComposerField {...props} />
+      return <original.AgentComposerField {...props} />
     }
   }
 })
-vi.mock('./NativeChatComposerActions', () => ({ NativeChatComposerActions: () => null }))
+vi.mock('./fork-agent-composer/AgentComposerActions', () => ({ AgentComposerActions: () => null }))
 vi.mock('./use-native-chat-skills', () => ({
   useNativeChatSkills: () => ({ status: 'ready', skills: [], error: null, retry: () => {} })
 }))
@@ -334,7 +335,7 @@ it.each([
     render(composer(acceptsImages))
     await act(async () => vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000))
     expect(mocks.state.fieldProps?.sendButtonDisabled).toBe(true)
-    expect(screen.getByRole('button', { name: 'Saving pasted image…' })).toBeTruthy()
+    expect(screen.getByTitle('Saving pasted image…')).toBeTruthy()
     await act(async () =>
       fireEvent.click(screen.getByRole('button', { name: 'Remove attachment' }))
     )
@@ -369,8 +370,8 @@ it.each([true, false])(
     writeNativeChatDraftCache(PANE, 'look at this')
     render(composer(acceptsImages, handle))
     await act(async () => handle.current?.pasteFromClipboard())
-    expect(screen.getByRole('textbox').textContent).toContain('ordinary text')
-    expect(screen.queryByRole('button', { name: 'Saving pasted image…' })).toBeNull()
+    expect(promptValue(screen.getByRole('textbox'))).toContain('ordinary text')
+    expect(screen.queryByTitle('Saving pasted image…')).toBeNull()
     expect(mocks.state.fieldProps?.sendButtonDisabled).toBe(false)
     expect(mocks.save).not.toHaveBeenCalled()
   }

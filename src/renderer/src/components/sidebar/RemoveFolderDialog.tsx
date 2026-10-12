@@ -15,8 +15,8 @@ import { requestLedger } from '@/runtime/runtime-ledger-client'
 import {
   getRepoExecutionHostId,
   isRuntimeOwnedSshTargetId,
-  parseExecutionHostId,
-  type ExecutionHostId
+  normalizeExecutionHostId,
+  parseExecutionHostId
 } from '../../../../shared/execution-host'
 import {
   retentionChecking,
@@ -42,7 +42,8 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
   const isOpen = activeModal === 'confirm-remove-folder'
   const repoId = typeof modalData.repoId === 'string' ? modalData.repoId : ''
   const displayName = typeof modalData.displayName === 'string' ? modalData.displayName : ''
-  const hostId = typeof modalData.hostId === 'string' ? (modalData.hostId as ExecutionHostId) : null
+  const hostId =
+    typeof modalData.hostId === 'string' ? normalizeExecutionHostId(modalData.hostId) : null
   const repo = useAppStore((s) =>
     s.repos.find(
       (candidate) =>
@@ -125,10 +126,11 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
   }, [isOpen, repoId, repo, ledgerPreviewGeneration])
 
   const handleConfirm = useCallback(async () => {
-    if (repoId) {
+    // Why: without the opener's host a bare id could remove another host's row (#13071).
+    if (repoId && hostId) {
       try {
         await removeProject(repoId, {
-          ...(hostId ? { hostId } : {}),
+          hostId,
           errorFeedback: 'toast',
           expectedLedgers: ledgerPreview.map(({ ledgerId, revision }) => ({ ledgerId, revision }))
         })
@@ -143,8 +145,8 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
         }
         throw error
       }
-      closeModal()
     }
+    closeModal()
   }, [closeModal, hostId, ledgerPreview, removeProject, repoId])
 
   const handleOpenChange = useCallback(

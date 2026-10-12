@@ -229,7 +229,10 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
           )
         )
       },
-      onBinary: (socket, bytes) => this.handleWebSocketBinaryMessage(bytes, socket.ws),
+      onBinary: (socket, bytes) => {
+        this.lastClientRequestAt = Date.now()
+        this.handleWebSocketBinaryMessage(bytes, socket.ws)
+      },
       onReady: (socket) => {
         // Why: first authenticated mobile/remote client (direct WS and
         // cloud relay both attach here) starts path-candidate tracking.
@@ -238,6 +241,9 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         // legitimately lack this method (its own server activates it).
         this.runtime.activateRecentPtyPathCandidateTracking?.()
         this.mobileRelayPairingProvider?.onDemandStateChanged?.()
+        if (socket.clientCapabilities.includes(AGENT_LAUNCH_RUNTIME_CAPABILITY)) {
+          this.runtime.noteAgentLaunchClientReady?.()
+        }
         askRosterFor(this.runtime)?.recordConnectionCapabilities(
           socket.connectionId,
           socket.clientCapabilities

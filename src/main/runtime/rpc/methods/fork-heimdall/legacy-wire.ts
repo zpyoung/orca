@@ -78,6 +78,7 @@ function refuseUnfencedLegacyMutation(): never {
 export const LEGACY_HEIMDALL_METHODS = [
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.list,
+    permission: 'workspace',
     params: z.object({}).strict(),
     handler: async (_params, context) =>
       (await requireHeimdallKernel(context.runtime).list()).map((entry) =>
@@ -86,21 +87,25 @@ export const LEGACY_HEIMDALL_METHODS = [
   }),
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.disarm,
+    permission: 'workspace',
     params: LegacyWatcherIdRequestSchema,
     handler: refuseUnfencedLegacyMutation
   }),
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.disarmAll,
+    permission: 'workspace',
     params: z.object({}).strict(),
     handler: refuseUnfencedLegacyMutation
   }),
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.approve,
+    permission: 'workspace',
     params: LegacyApproveRequestSchema,
     handler: refuseUnfencedLegacyMutation
   }),
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.ledger,
+    permission: 'workspace',
     params: LegacyWatcherIdRequestSchema,
     handler: ({ watcherId }, context) =>
       projectHeimdallLedgerForClient(

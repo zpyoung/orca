@@ -19,12 +19,19 @@ import { buildComposerSendOptions } from './fork-agent-composer/composer-send-op
 import { createComposerPayloadRestore } from './fork-agent-composer/use-agent-composer-send'
 import type { ComposerSendTier } from './fork-agent-composer/composer-send-tier'
 import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
+import {
+  answerNativeChatCommandInComposer,
+  type NativeChatLocalCommandAnswer
+} from './use-native-chat-local-command-answer'
+
+const NO_ATTACHMENTS: readonly AgentComposerImageAttachment[] = []
 
 export function useNativeChatPickerCommandDispatch(args: {
   agent: AgentType
   disabled: boolean
   isDispatchingSessionOption: boolean
-  paneKey: string
+  /** Restores an unsent command into this pane's draft; absent, nothing is restored. */
+  paneKey?: string
   sendTier?: ComposerSendTier
   onSendOutcome?: (outcome: SendOutcome) => void
   readTerminalScreen?: () => string | null
@@ -34,14 +41,15 @@ export function useNativeChatPickerCommandDispatch(args: {
   onSubmitted?: () => void
   sessionOptionsSurface: NativeChatPtySessionOptionsSurface | null
   trackPendingSend: NativeChatSendLifecycle['trackPendingSend']
+  setHistory?: Dispatch<SetStateAction<HistoryState>>
   setDraft: (value: string) => void
   setCaret: Dispatch<SetStateAction<number>>
   setActiveSuggestion: Dispatch<SetStateAction<number>>
-  imageAttachments: readonly AgentComposerImageAttachment[]
+  imageAttachments?: readonly AgentComposerImageAttachment[]
   clearSkillOrigin: () => void
   clearImageAttachments: () => void
-  restoreImageAttachments: (attachments: readonly AgentComposerImageAttachment[]) => void
-  setNotice: Dispatch<SetStateAction<string | null>>
+  restoreImageAttachments?: (attachments: readonly AgentComposerImageAttachment[]) => void
+  setNotice: (notice: string | null) => void
 }): (command: Extract<NativeChatPickerItem, { kind: 'command' }>) => void {
   const {
     agent,
@@ -57,10 +65,11 @@ export function useNativeChatPickerCommandDispatch(args: {
     onSubmitted,
     sessionOptionsSurface,
     trackPendingSend,
+    setHistory,
     setDraft,
     setCaret,
     setActiveSuggestion,
-    imageAttachments,
+    imageAttachments = NO_ATTACHMENTS,
     clearSkillOrigin,
     clearImageAttachments,
     restoreImageAttachments,
@@ -73,15 +82,36 @@ export function useNativeChatPickerCommandDispatch(args: {
       if (!target || disabled || isDispatchingSessionOption) {
         return
       }
-      const restorePayload = createComposerPayloadRestore({
-        paneKey,
-        text,
-        imageAttachments,
-        setDraft,
-        setCaret,
-        setNotice,
-        restoreImageAttachments
-      })
+      if (
+        answerNativeChatCommandInComposer({
+          draft: text,
+          answerCommandLocally,
+          sessionOptionsSurface,
+          onSlashCommand,
+          onSubmitted,
+          setDraft,
+          setCaret,
+          clearSkillOrigin,
+          setNotice
+        })
+      ) {
+        emitNativeChatPickerItemAccepted({ agent, itemKind: 'command' })
+        emitNativeChatSendClassified({ agent, outcome: 'command' })
+        setActiveSuggestion(0)
+        return
+      }
+      const restorePayload =
+        paneKey === undefined
+          ? undefined
+          : createComposerPayloadRestore({
+              paneKey,
+              text,
+              imageAttachments,
+              setDraft,
+              setCaret,
+              setNotice,
+              restoreImageAttachments
+            })
       // Same tiered send-options pipeline as a normal chat send, so a picker
       // command reports exactly once and restores on `may-not-have-sent`.
       const sendOptions = buildComposerSendOptions({
@@ -90,7 +120,7 @@ export function useNativeChatPickerCommandDispatch(args: {
         readTerminalScreen,
         onOutcome: (outcome) => {
           if (outcome === 'may-not-have-sent') {
-            restorePayload()
+            restorePayload?.()
           }
           onSendOutcome?.(outcome)
         }
@@ -112,6 +142,7 @@ export function useNativeChatPickerCommandDispatch(args: {
         runtime: nativeChatComposerTargetIsRemote(target.ptyId) ? 'remote' : 'local'
       })
       onSubmitted?.()
+      setHistory?.((previous) => pushHistory(previous, text))
       setDraft('')
       setCaret(0)
       setActiveSuggestion(0)
@@ -129,6 +160,7 @@ export function useNativeChatPickerCommandDispatch(args: {
       isDispatchingSessionOption,
       onSendOutcome,
       onSlashCommand,
+      onSubmitted,
       paneKey,
       readTerminalScreen,
       resolveTarget,
@@ -138,6 +170,7 @@ export function useNativeChatPickerCommandDispatch(args: {
       setActiveSuggestion,
       setCaret,
       setDraft,
+      setHistory,
       setNotice,
       trackPendingSend
     ]

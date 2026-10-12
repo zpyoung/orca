@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-runtime-owner.ts
-// FORK-COPY-SHA: 4bb6f2072b07c1f0664b809551f77754700570e4
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
 import {
   getRuntimeEnvironmentIdForWorktree,
   type WorktreeRuntimeOwnerState
@@ -10,7 +10,10 @@ import {
 } from '@/lib/connection-owner-resolution'
 import { isRuntimeOwnedSshTargetId } from '../../../../../shared/execution-host'
 import type { AppState } from '@/store/types'
-import { findTerminalTabWorktreeId } from '../native-chat-file-link'
+import {
+  createNativeChatTabOwnerSelector,
+  findTerminalTabWorktreeId
+} from '../native-chat-file-link'
 
 export type NativeChatRuntimeOwnerState = Pick<AppState, 'tabsByWorktree'> &
   WorktreeRuntimeOwnerState
@@ -34,6 +37,14 @@ export function selectNativeChatRuntimeEnvironmentId(
 ): string | null {
   const worktreeId = findTerminalTabWorktreeId(state.tabsByWorktree, terminalTabId)
   return worktreeId ? getRuntimeEnvironmentIdForWorktree(state, worktreeId) : null
+}
+
+export function createNativeChatRuntimeSelector(terminalTabId: string) {
+  const selectOwner = createNativeChatTabOwnerSelector(terminalTabId)
+  return (state: NativeChatRuntimeOwnerState): string | null => {
+    const worktreeId = selectOwner({ tabsByWorktree: state.tabsByWorktree })
+    return worktreeId ? getRuntimeEnvironmentIdForWorktree(state, worktreeId) : null
+  }
 }
 
 export type NativeChatSshOwnerState = NativeChatRuntimeOwnerState & ConnectionOwnerState

@@ -22,7 +22,6 @@ import {
   sendNativeChatMessage,
   type NativeChatSendHandle
 } from './native-chat-runtime-send'
-import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
 import { inferQuestionAnsweredFromCurrentStatus } from '../terminal-pane/agent-question-answered-inference'
 import {
   isTerminalInputQuarantined,
@@ -113,7 +112,7 @@ export function useNativeChatInteractiveSend(
 
   const sendRawVerified = useCallback(
     (raw: string): Promise<boolean> =>
-      targetPtyId
+      targetPtyId && !isTerminalInputQuarantined(terminalTabId)
         ? sendRuntimePtyInputVerified(
             getSettingsForAgentTabRuntimeOwner(terminalTabId),
             targetPtyId,
@@ -130,7 +129,7 @@ export function useNativeChatInteractiveSend(
       prompt: AskPrompt,
       selections: AskAnswerSelection[],
       onDeliverySettled?: (delivered: boolean) => void
-    ): { settleAfterMs: number; waitsForVerifiedDelivery: boolean } => {
+    ): { settleAfterMs: number } => {
       if (
         !targetPtyId ||
         !hasAskAnswer(prompt, selections) ||
@@ -139,7 +138,7 @@ export function useNativeChatInteractiveSend(
         if (isTerminalInputQuarantined(terminalTabId)) {
           onDeliverySettled?.(false)
         }
-        return { settleAfterMs: 0, waitsForVerifiedDelivery: false }
+        return { settleAfterMs: 0 }
       }
       // Cancel any prior in-flight answer before starting a new one.
       cancelInFlight()
@@ -173,18 +172,9 @@ export function useNativeChatInteractiveSend(
                 console.warn('[agent-question] native-chat inference failed:', err)
                 return false
               })
-            }
-            onDeliverySettled?.(delivered)
-          }
-        : undefined
-      // Why: Grok/OMP answers have no selector state machine to infer from —
-      // forward the send's own outcome so a cancelled/failed answer is still
-      // observable instead of dismissing the card on a nominal timer (r5-1).
-      const onOutcome = (outcome: SendOutcome): void => {
-        if (settledHandle && inFlightRef.current === settledHandle) {
-          inFlightRef.current = null
+          })
         }
-        onDeliverySettled?.(outcome !== 'may-not-have-sent')
+        onDeliverySettled?.(delivered)
       }
       const handle: NativeChatSendHandle = stepsAnswer
         ? sendNativeChatAskAnswer(
@@ -195,18 +185,15 @@ export function useNativeChatInteractiveSend(
             onSettled
           )
         : sendNativeChatMessage(target, formatAskAnswer(prompt, selections), {
-            onOutcome
+            onDeliverySettled: onSettled
           })
       // Why: native-chat answer writes bypass xterm.onData. Infer only after
       // every paced selector write has fired, so an early digit in a multi-step
       // answer cannot dismiss the wait or cancel the remaining writes.
       settledHandle = handle
       inFlightRef.current = handle
-      // Why: both branches now settle from the send's real lifecycle (r5-1),
-      // so the card must always wait for it rather than a nominal timer.
       return {
-        settleAfterMs: handle.settleAfterMs,
-        waitsForVerifiedDelivery: handle.settleAfterMs > 0
+        settleAfterMs: handle.settleAfterMs
       }
     },
     [terminalTabId, paneKey, targetPtyId, agent, cancelInFlight]

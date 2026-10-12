@@ -6,8 +6,6 @@ import {
   appendNativeChatAttachmentCache,
   clearNativeChatAttachmentCacheForTests,
   readNativeChatAttachmentCache,
-  restoreNativeChatAttachmentCache,
-  subscribeNativeChatAttachmentCache,
   useNativeChatComposerAttachments
 } from './use-native-chat-composer-attachments'
 import * as draftCache from './native-chat-draft-cache'
@@ -635,85 +633,6 @@ describe('useNativeChatComposerAttachments', () => {
       probe.latest().clearImageAttachments()
     })
     expect(revoke).not.toHaveBeenCalled()
-    act(() => probe.root.unmount())
-  })
-
-  it('restores failed-send chips by path without duplicating chips attached since send', async () => {
-    const probe = await renderProbe('pty-restore')
-    await act(async () => {
-      probe.latest().appendImageAttachments(['/tmp/sent.png'])
-    })
-    const sent = [...probe.latest().imageAttachments]
-    await act(async () => {
-      probe.latest().clearImageAttachments()
-    })
-    await act(async () => {
-      probe.latest().appendImageAttachments(['/tmp/new.png', '/tmp/sent.png'])
-    })
-    await act(async () => {
-      probe.latest().restoreImageAttachments(sent)
-    })
-
-    expect(probe.latest().imageAttachments.map((attachment) => attachment.path)).toEqual([
-      '/tmp/new.png',
-      '/tmp/sent.png'
-    ])
-    expect(readNativeChatAttachmentCache('pty-restore')).toEqual(probe.latest().imageAttachments)
-    act(() => probe.root.unmount())
-  })
-
-  it('rescopes attachments when the scope key changes (composer reused for another pane)', async () => {
-    const probe = await renderProbe('pty-1')
-    await act(async () => {
-      probe.latest().attachResolvedPaths(['/tmp/orca-native-chat-pane-1.png'])
-    })
-    expect(probe.latest().imageAttachments).toMatchObject([
-      { path: '/tmp/orca-native-chat-pane-1.png' }
-    ])
-
-    // Reused for a different pane: pane-1's chip must not stay live (it would
-    // otherwise be submitted to pane-2's target now that images defer to submit).
-    await probe.rerender('pty-2')
-    expect(probe.latest().imageAttachments).toMatchObject([])
-
-    // Switching back restores pane-1's still-cached chip.
-    await probe.rerender('pty-1')
-    expect(probe.latest().imageAttachments).toMatchObject([
-      { path: '/tmp/orca-native-chat-pane-1.png' }
-    ])
-    act(() => probe.root.unmount())
-  })
-
-  it('observes a restore performed after a replacement host mounted (dock/native-chat handoff)', async () => {
-    // The old host already unmounted (its send-lifecycle cleanup restores the
-    // payload after the new host has taken over) — the new host must still see it.
-    const replacement = await renderProbe('pty-handoff')
-    expect(replacement.latest().imageAttachments).toMatchObject([])
-
-    await act(async () => {
-      restoreNativeChatAttachmentCache('pty-handoff', [{ id: 'restored-1', path: '/tmp/lost.png' }])
-    })
-
-    expect(replacement.latest().imageAttachments).toMatchObject([{ path: '/tmp/lost.png' }])
-    expect(readNativeChatAttachmentCache('pty-handoff')).toMatchObject([{ path: '/tmp/lost.png' }])
-    act(() => replacement.root.unmount())
-  })
-
-  it('does not let a throwing subscriber abort fanout to other subscribers', async () => {
-    const throwing = vi.fn(() => {
-      throw new Error('boom')
-    })
-    const unsubscribeThrowing = subscribeNativeChatAttachmentCache('pty-throw', throwing)
-    const probe = await renderProbe('pty-throw')
-
-    expect(() => {
-      act(() => {
-        restoreNativeChatAttachmentCache('pty-throw', [{ id: 'r1', path: '/tmp/ok.png' }])
-      })
-    }).not.toThrow()
-
-    expect(probe.latest().imageAttachments).toMatchObject([{ path: '/tmp/ok.png' }])
-    unsubscribeThrowing()
     act(() => probe.root.unmount())
   })
 })

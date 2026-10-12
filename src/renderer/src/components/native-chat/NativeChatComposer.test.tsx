@@ -123,7 +123,13 @@ vi.mock('./use-native-chat-composer-attachments', () => ({
     imageAttachments: mocks.imageAttachments,
     attachResolvedPaths: vi.fn(),
     clearImageAttachments: vi.fn(),
-    removeImageAttachment: vi.fn()
+    flushPendingAttachments: vi.fn(),
+    restoreImageAttachments: vi.fn(),
+    removeImageAttachment: vi.fn(),
+    beginPendingImageAttachment: vi.fn(),
+    revealPendingImageAttachment: vi.fn(),
+    dropPendingImageAttachment: vi.fn(),
+    pendingChips: { begin: vi.fn(), resolve: vi.fn(), drop: vi.fn(), attachReferences: vi.fn() }
   })
 }))
 vi.mock('./use-native-chat-composer-paste', () => ({

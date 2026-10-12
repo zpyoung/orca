@@ -270,8 +270,8 @@ export type RepoSlice = {
   // options.errorFeedback defaults to 'silent' so bulk/background callers keep their own aggregate reporting.
   removeProject: (
     projectId: string,
-    options?: {
-      hostId?: ExecutionHostId
+    options: {
+      hostId: ExecutionHostId
       errorFeedback?: 'toast' | 'silent'
       expectedLedgers?: ExpectedLedgerRevision[]
     }

@@ -26,6 +26,8 @@ import {
   TerminalPaneSshReconnectPortals
 } from './TerminalPaneRuntimePortals'
 import type { TerminalPaneController } from './use-terminal-pane-controller'
+import { useAppStore } from '@/store'
+import { isTerminalPaneOnClient } from './terminal-pane-client-host'
 import { useTerminalPaneDockSurface } from './fork-terminal-dock/use-terminal-pane-dock-surface'
 
 export function TerminalPaneSurface({
@@ -117,6 +119,7 @@ export function TerminalPaneSurface({
     visibleTerminalError,
     worktreeId
   } = controller
+  const paneOnClient = useAppStore((state) => isTerminalPaneOnClient(state, worktreeId))
   const { dockMounts, contextMenuProps: terminalDockMenuProps } =
     useTerminalPaneDockSurface(controller)
 

@@ -1,4 +1,4 @@
-import { changePrompt, promptValue } from './native-chat-prompt-editor.test-support'
+import { changePrompt, promptValue } from './fork-agent-composer/composer-textarea.test-support'
 // @vitest-environment happy-dom
 
 // A message sent while the queue is held asks first, from Enter and from the button alike:
@@ -18,8 +18,8 @@ vi.mock('@/i18n/i18n', () => ({
     fallback.replace('{{count}}', String(options?.count ?? ''))
 }))
 // The button's own wiring: the primary action calls the same `send` Enter does.
-vi.mock('./NativeChatComposerActions', () => ({
-  NativeChatComposerActions: ({ onSend }: { onSend: () => void }) => (
+vi.mock('./fork-agent-composer/AgentComposerActions', () => ({
+  AgentComposerActions: ({ onSend }: { onSend: () => void }) => (
     <button type="button" data-testid="composer-send" onClick={onSend}>
       Send
     </button>

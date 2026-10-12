@@ -152,6 +152,7 @@ export class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRuntimeWithC
       agent: TuiAgent
       prompt: string
       title?: string
+      extraAgentArgs?: string
       launchOverrides?: AgentLaunchOverrides
     }
   ): Promise<RuntimeTerminalCreate> {
@@ -171,9 +172,14 @@ export class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRuntimeWithC
       opts.agent,
       opts.prompt,
       undefined,
-      opts.launchOverrides ? { launchOverrides: opts.launchOverrides } : undefined
+      opts.extraAgentArgs || opts.launchOverrides
+        ? {
+            ...(opts.extraAgentArgs ? { extraAgentArgs: opts.extraAgentArgs } : {}),
+            ...(opts.launchOverrides ? { launchOverrides: opts.launchOverrides } : {})
+          }
+        : undefined
     )
-    return await this.createTerminal(`id:${worktree.id}`, {
+    const terminal = await this.createTerminal(`id:${worktree.id}`, {
       command: startup.startup.command,
       env: startup.startup.env,
       ...(startup.startup.launchConfig ? { launchConfig: startup.startup.launchConfig } : {}),

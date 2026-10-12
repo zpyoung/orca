@@ -11,6 +11,12 @@ export function useNativeChatSendLifecycle(
   terminalTabId: string,
   targetPtyId: string | null,
   onPendingSendCanceled?: (pendingId: string) => void,
+  cardOwnership?: {
+    /** A prompt card owns the agent's input while the composer stays mounted. */
+    inputOwnedByCard: boolean
+    /** Settles the echo of a send the card retired; it keeps the user's text visible. */
+    onPendingSendRetired?: (pendingId: string) => void
+  },
   // Why: false only for a genuine transport-unsafe transition (recovery,
   // quarantine, ssh-disconnect, mobile lease) on the same pty — never for an
   // agent-status flap, which never touches this flag.
@@ -29,22 +35,23 @@ export function useNativeChatSendLifecycle(
         if (cleanupTimer !== null) {
           clearTimeout(cleanupTimer)
         }
-        handle.cancel(keepInput)
+        try {
+          handle.cancel(keepInput)
+        } catch {
+          // Isolate one handle's throw so later queued sends still get cancelled.
+        }
         if (pendingId) {
           onSettled?.(pendingId)
         }
       }
-      try {
-        handle.cancel()
-      } catch {
-        // Isolate one handle's throw so later queued sends still get cancelled.
-      }
-      if (pendingId) {
-        onPendingSendCanceled?.(pendingId)
-      }
-    }
-    pendingSendHandlesRef.current.clear()
-  }, [onPendingSendCanceled])
+      pendingSendHandlesRef.current.clear()
+    },
+    []
+  )
+  const cancelPendingSends = useCallback(
+    () => settlePendingSends(onPendingSendCanceled),
+    [settlePendingSends, onPendingSendCanceled]
+  )
   const trackPendingSend = useCallback((handle: NativeChatSendHandle, pendingId?: string) => {
     const entry = {
       cleanupTimer: null as ReturnType<typeof setTimeout> | null,
@@ -92,6 +99,16 @@ export function useNativeChatSendLifecycle(
     }
     wasTransportSafeRef.current = transportSafe
   }, [transportSafe, cancelPendingSends])
+
+  const inputOwnedByCard = cardOwnership?.inputOwnedByCard === true
+  const onPendingSendRetired = cardOwnership?.onPendingSendRetired ?? onPendingSendCanceled
+  // Why: once a card owns the agent's input, an unsubmitted Enter would answer it. No line clear
+  // either: it would type under the dialog, and the next send clears the line first.
+  useLayoutEffect(() => {
+    if (inputOwnedByCard) {
+      settlePendingSends(onPendingSendRetired, true)
+    }
+  }, [inputOwnedByCard, onPendingSendRetired, settlePendingSends])
 
   return { cancelPendingSends, trackPendingSend }
 }

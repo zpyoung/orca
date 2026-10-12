@@ -120,23 +120,20 @@ export class RuntimeRepositorySettingsController {
     }
     const repo = await this.deps.resolveRepo(repoSelector)
     const hostId = getRepoExecutionHostId(repo)
-    const idExistsOnOtherHost = store
-      .getRepos()
-      .some((entry) => entry.id === repo.id && getRepoExecutionHostId(entry) !== hostId)
-    const operation = (): true => {
-      if (idExistsOnOtherHost) {
-        if (!store.removeProjectForHost) {
-          throw new Error('runtime_unavailable')
-        }
-        store.removeProjectForHost(repo.id, hostId)
-      } else {
-        store.removeProject!(repo.id)
+    const removeFromCatalog = (): true => {
+      if (!store.removeProjectForHost) {
+        throw new Error('runtime_unavailable')
       }
+      store.removeProjectForHost(repo.id, hostId)
       return true
     }
     const removed = this.deps.withCatalogRemoval
-      ? await this.deps.withCatalogRemoval({ repoId: repo.id }, options?.expectedLedgers, operation)
-      : { result: operation(), ledgers: [] }
+      ? await this.deps.withCatalogRemoval(
+          { repoId: repo.id },
+          options?.expectedLedgers,
+          removeFromCatalog
+        )
+      : { result: removeFromCatalog(), ledgers: [] }
     this.deps.forgetTerminalTopology(repo.id)
     this.deps.invalidateResolvedWorktrees()
     this.deps.invalidateWorktreeScan(repo.id)

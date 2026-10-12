@@ -40,6 +40,8 @@ export type AutomationDraft = {
   name: string
   prompt: string
   agentId: TuiAgent
+  /** Saved as-is; empty means none. */
+  extraAgentArgs: string
   launchOverrides: AgentLaunchOverrides
   projectId: string
   workspaceMode: AutomationWorkspaceMode

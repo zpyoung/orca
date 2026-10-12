@@ -57,7 +57,11 @@ function Probe({ worktreeId }: { worktreeId?: string }): React.JSX.Element {
     caret,
     disabled: false,
     isComposing: () => composing,
-    resolveTarget: () => ({ ptyId: 'pty-1', settings: { activeRuntimeEnvironmentId: null } }),
+    resolveTarget: () => ({
+      terminalTabId: 'tab-1',
+      ptyId: 'pty-1',
+      settings: { activeRuntimeEnvironmentId: null }
+    }),
     textareaRef,
     setCaret,
     setDraft,

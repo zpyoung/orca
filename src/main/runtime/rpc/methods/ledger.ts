@@ -99,12 +99,14 @@ const ledgerRequestSchema: z.ZodType<LedgerRequest> = ledgerRequestBaseSchema.su
 export const LEDGER_METHODS = [
   defineMethod({
     name: 'ledger.request',
+    permission: 'workspace',
     params: z.object({ request: ledgerRequestSchema }).strict(),
     handler: (params, { runtime, orchestrationCompatibilityEvidence }) =>
       runtime.executeLedgerRequest(params.request, orchestrationCompatibilityEvidence)
   }),
   defineMethod({
     name: 'ledger.ui',
+    permission: 'workspace',
     params: z
       .object({
         request: ledgerRequestBaseSchema,

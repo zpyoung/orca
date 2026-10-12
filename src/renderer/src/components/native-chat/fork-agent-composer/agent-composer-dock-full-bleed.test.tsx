@@ -15,7 +15,7 @@ vi.mock('./AgentComposerActions', () => ({
 }))
 
 vi.mock('../NativeChatAutocompleteMenus', () => ({
-  NativeChatMentionHint: () => null,
+  NativeChatMentionMenu: () => null,
   NativeChatPickerMenu: () => null
 }))
 
@@ -30,6 +30,7 @@ const stubImeEnterGesture = {
   isComposing: () => false,
   ownsKeyDown: () => false,
   onKeyUp: () => {},
+  onCompositionEnd: () => {},
   reset: () => {},
   setComposing: () => {}
 }
@@ -44,7 +45,7 @@ function renderField(layout?: 'dock'): {
   render(
     <AgentComposerField
       terminalTabId="tab-1"
-      paneKey="pane-1"
+      draftScopeKey="pane-1"
       textareaRef={createRef<HTMLTextAreaElement>()}
       draft=""
       disabled={false}
@@ -53,7 +54,7 @@ function renderField(layout?: 'dock'): {
       layout={layout}
       autocomplete={{ mode: 'none' }}
       activeSuggestion={0}
-      notice={null}
+      notices={[]}
       imageAttachments={[]}
       sendButtonDisabled={false}
       isWorking={false}
@@ -70,7 +71,8 @@ function renderField(layout?: 'dock'): {
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}
       onRetrySkills={vi.fn()}
-      onAcceptMention={vi.fn()}
+      onChooseMentionFile={vi.fn()}
+      mentionFiles={{ files: [], loading: false, failed: false }}
       onRemoveImageAttachment={vi.fn()}
       onAttach={vi.fn()}
       onDictationToggle={vi.fn()}

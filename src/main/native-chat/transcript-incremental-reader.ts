@@ -2,7 +2,8 @@ import type { NativeChatMessage } from '../../shared/native-chat-types'
 import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
 import { transcriptFallbackId } from './transcript-fallback-id'
-import { openTranscriptReadStream, wslGatedStat } from './wsl-transcript-fs-access'
+import { extendTranscriptBoundary } from './transcript-file-version'
+import { openTranscriptReadStream, transcriptFileStat } from './wsl-transcript-fs-access'
 
 const APPEND_BATCH_MESSAGE_LIMIT = 40
 const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024

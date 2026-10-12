@@ -98,6 +98,8 @@ export type Automation = {
   prompt: string
   precheck: AutomationPrecheck | null
   agentId: TuiAgent
+  /** Saved text appended to the host's default agent Arguments on each fresh run; absent means none. */
+  extraAgentArgs?: string
   launchOverrides?: AgentLaunchOverrides | null
   /** Why: runContext carries the logical project + host setup identity for
    *  multi-host projects; projectId remains only as the legacy repo-id storage
@@ -187,6 +189,8 @@ export type AutomationCreateInput = {
   prompt: string
   precheck?: AutomationPrecheck | null
   agentId: TuiAgent
+  /** Empty or whitespace means no extras. */
+  extraAgentArgs?: string
   launchOverrides?: AgentLaunchOverrides | null
   runContext?: WorkspaceRunContext | null
   sourceContext?: TaskSourceContext | null
@@ -212,6 +216,7 @@ export type AutomationUpdateInput = Partial<
     | 'prompt'
     | 'precheck'
     | 'agentId'
+    | 'extraAgentArgs'
     | 'launchOverrides'
     | 'runContext'
     | 'sourceContext'

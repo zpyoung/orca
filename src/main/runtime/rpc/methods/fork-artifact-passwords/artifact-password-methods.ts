@@ -29,6 +29,7 @@ function assertLocalPasswordRequest(caller: ArtifactPasswordCaller): void {
 export const ARTIFACT_PASSWORD_METHODS = [
   defineMethod({
     name: 'artifacts.shareProtected',
+    permission: 'workspace',
     params: ProtectedWriteRequest,
     handler: (params, { runtime, clientKind, clientId }) => {
       assertLocalPasswordRequest({ clientKind, clientId })
@@ -37,6 +38,7 @@ export const ARTIFACT_PASSWORD_METHODS = [
   }),
   defineMethod({
     name: 'artifacts.publishProtected',
+    permission: 'workspace',
     params: ProtectedWriteRequest,
     handler: (params, { runtime, clientKind, clientId }) => {
       assertLocalPasswordRequest({ clientKind, clientId })
@@ -45,6 +47,7 @@ export const ARTIFACT_PASSWORD_METHODS = [
   }),
   defineMethod({
     name: 'artifacts.rotateProtection',
+    permission: 'workspace',
     params: ProtectedWriteRequest,
     handler: (params, { runtime, clientKind, clientId }) => {
       assertLocalPasswordRequest({ clientKind, clientId })
@@ -53,6 +56,7 @@ export const ARTIFACT_PASSWORD_METHODS = [
   }),
   defineMethod({
     name: 'artifacts.removeProtection',
+    permission: 'workspace',
     params: ProtectedWriteRequest,
     handler: (params, { runtime, clientKind, clientId }) => {
       assertLocalPasswordRequest({ clientKind, clientId })
@@ -61,6 +65,7 @@ export const ARTIFACT_PASSWORD_METHODS = [
   }),
   defineMethod({
     name: 'artifacts.revealPassphrase',
+    permission: 'accounts-admin',
     params: SourceRequest,
     handler: (params, { runtime, clientKind, clientId }) => {
       assertLocalPasswordRequest({ clientKind, clientId })

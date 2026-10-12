@@ -126,25 +126,6 @@ structured sessions as well as Heimdall owners; a fork-only launch workaround wo
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Wire compat Rule 1 strict schemas
-
-**What:** corrects Rule 1 of the remote wire-compatibility contract. It claimed every JSON payload
-is parsed with a decoder that ignores unknown keys, citing zod `.strip()` on RPC params. That holds
-only for a default schema. A `.strict()` schema rejects the entire payload on an unknown key, so
-adding an optional field to one is a breaking change, not a safe one.
-
-**Why upstream, not isolated:** the rule is upstream's contract and the defect is upstream's. Two
-independent changes added an optional field to a strict schema on the same day, each believing they
-were complying with Rule 1 as written. A fork-local correction would leave upstream readers acting
-on the false premise.
-
-**Paths:** `docs/reference/remote-wire-compatibility.md`.
-
-**Excluded when preparing the upstream PR:** the worked example cites `EnrollInputSchema`, which is
-fork-only. Replace it with an upstream strict request schema, or state the shape generically.
-
-**Status:** pending-upstream. Not yet submitted.
-
 ## Warning status tokens
 
 **What:** adds the warning foreground role to the canonical light/dark theme and Tailwind bindings.
@@ -581,7 +562,6 @@ namespace remains accepted, and only exact roots or dot-delimited children quali
 - `src/main/macos-press-and-hold-default.ts`
 - `src/main/macos-press-and-hold-default.test.ts`
 - `tests/e2e/macos-press-and-hold-startup.spec.ts`
-- `docs/reference/macos-press-and-hold.md`
 
 **Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
 continue to use `com.stablyai.orca` or a dot-suffixed child.

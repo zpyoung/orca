@@ -32,6 +32,8 @@ function composerHandle(): NativeChatComposerHandle {
   return {
     focus: vi.fn(() => true),
     insertTypedText: vi.fn(() => true),
+    acceptsText: vi.fn(() => true),
+    appendText: vi.fn(),
     handlePasteEvent: vi.fn(),
     pasteFromClipboard: vi.fn()
   }

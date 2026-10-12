@@ -3,11 +3,11 @@ import { useAppStore } from '@/store'
 import { getWorktreeMapFromState } from '@/store/selectors'
 import { translate } from '@/i18n/i18n'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
-import { isTerminalAskStatus, type AskStatus } from '../../../../shared/fork-ask-question-tool/ask-answer-envelope'
 import {
-  isOrcaWindowForegroundFocused,
-  isVisibleForegroundPaneKey
-} from '../terminal-pane/terminal-notification-pane-visibility'
+  isTerminalAskStatus,
+  type AskStatus
+} from '../../../../shared/fork-ask-question-tool/ask-answer-envelope'
+import { createTerminalAttentionSurface } from '../terminal-pane/terminal-attention-surface'
 
 /** How long a pending ask waits on an unfocused pane before escalating to an OS notification. */
 export const ASK_NOTIFICATION_ESCALATION_DELAY_MS = 3 * 60_000
@@ -20,13 +20,17 @@ export type UseAskNotificationEscalationParams = {
 }
 
 function isAskPaneFocused(worktreeId: string, paneKey: string): boolean {
-  return (
-    isOrcaWindowForegroundFocused() &&
-    isVisibleForegroundPaneKey(useAppStore.getState(), worktreeId, paneKey)
-  )
+  return createTerminalAttentionSurface(useAppStore.getState()).isSurfaceViewed({
+    workspaceId: worktreeId,
+    surfaceKey: paneKey
+  })
 }
 
-function dispatchAskEscalationNotification(worktreeId: string, paneKey: string, askId: string): void {
+function dispatchAskEscalationNotification(
+  worktreeId: string,
+  paneKey: string,
+  askId: string
+): void {
   const state = useAppStore.getState()
   const worktree = getWorktreeMapFromState(state).get(worktreeId)
   const worktreeLabel = worktree?.displayName ?? worktreeId

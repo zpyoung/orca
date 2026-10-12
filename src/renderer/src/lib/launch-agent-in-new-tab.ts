@@ -17,7 +17,6 @@ import {
   resolveTuiAgentLaunchEnv
 } from '../../../shared/tui-agent-launch-defaults'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
-import { seedCommandCodeSubmittedPromptStatus } from '@/lib/command-code-prompt-status-seed'
 import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { LaunchSource } from '../../../shared/telemetry-events'
@@ -52,7 +51,7 @@ export type LaunchAgentInNewTabArgs = LaunchAgentInNewTabRequest & {
   prompt?: string
   /** Optional CLI arguments appended to the selected agent command. */
   agentArgs?: string | null
-  /** Explicit entity session options; omission keeps native-chat launch defaults. */
+  /** Explicit session options folded into the launch command. */
   sessionOptions?: Record<string, SessionOptionValue>
   includeSessionOptionCatalogDefaults?: boolean
   initialCwd?: string | null
@@ -165,9 +164,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
     isRemote,
     agentArgs: effectiveAgentArgs,
     agentEnv,
-    sessionOptions:
-      sessionOptions ??
-      resolveInitialNativeChatSessionOptions(store.settings, initialViewModeOptions),
+    sessionOptions,
     includeSessionOptionCatalogDefaults
   }
   const { startupPlan, pasteDraftAfterLaunch, submitPastedPrompt } = planLaunchAgentStartupPrompt({

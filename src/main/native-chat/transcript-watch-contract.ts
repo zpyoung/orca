@@ -15,6 +15,7 @@ export type NativeChatTranscriptTailReader = (args: {
   decodeCompanion?: NativeChatTranscriptCompanionDecoder | null
   maxBytes?: number
   signal?: AbortSignal
+  onConsumedBoundary?: (boundary: Buffer) => void
 }) => Promise<{
   messages: NativeChatMessage[]
   companion?: NativeChatTranscriptCompanion

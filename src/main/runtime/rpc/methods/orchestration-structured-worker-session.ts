@@ -234,7 +234,7 @@ export async function sendStructuredWorkerPreamble(args: {
   dispatchId: string
   preamble: string
   /** Who the task is from (`dispatchTaskSource`), shown on the worker's turn. */
-  from: AgentMessageSource
+  from?: AgentMessageSource
 }): Promise<'accepted' | 'pending'> {
   const body: AgentJournalMessageItem = {
     kind: 'message',

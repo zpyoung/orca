@@ -6,10 +6,11 @@ export async function dispatchNativeChatStructuredComposerText(
   transport: NativeChatStructuredComposerTransport,
   text: string,
   attachments: readonly AgentComposerImageAttachment[] = []
-): Promise<{ accepted: boolean; error: string | null }> {
-  const command = await transport.dispatchCommand(text)
-  if (command.handled) {
-    return { accepted: command.accepted, error: command.error }
+): Promise<Omit<StructuredAgentSessionCommandOutcome, 'handled'> & { revealsTranscript: boolean }> {
+  const { handled, ...command } = await transport.dispatchCommand(text)
+  // A command's reveal, if any, came at the press; a message reveals unless it waits as a queued card.
+  if (handled) {
+    return { ...command, revealsTranscript: false }
   }
   const admission = transport.send(text, attachments)
   return { accepted: admission !== false, error: null, revealsTranscript: admission === true }

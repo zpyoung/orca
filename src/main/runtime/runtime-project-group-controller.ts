@@ -136,17 +136,7 @@ export class RuntimeProjectGroupController {
     const operation = (): boolean => {
       if (options?.removeContainedProjects) {
         for (const repo of reposBefore) {
-          const remaining = store
-            .getRepos()
-            .some(
-              (candidate) =>
-                candidate.id === repo.id && getRepoExecutionHostId(candidate) !== repo.hostId
-            )
-          if (remaining) {
-            store.removeProjectForHost?.(repo.id, repo.hostId)
-          } else {
-            store.removeProject?.(repo.id)
-          }
+          store.removeProjectForHost?.(repo.id, repo.hostId)
         }
       }
       return store.deleteProjectGroup!(groupId)

@@ -17,19 +17,19 @@ import type { NativeChatInteractiveSend } from './use-native-chat-interactive-se
 export function NativeChatInteractiveCard({
   card,
   send,
-  canSend,
-  onShowingQuestionChange,
-  onShowingCardChange,
+  onDismiss,
+  onCollapse,
+  shouldFocus = false,
   answerInputRef
 }: {
   card: NonNullable<InteractivePromptCard>
   send: NativeChatInteractiveSend
-  canSend: boolean
-  /** Reports whether a question card is on screen so the view can replace the
-   *  composer with it (the card's free-text row is the answer input). */
-  onShowingQuestionChange?: (showing: boolean) => void
-  /** Reports any visible card without changing native chat's question-only exclusion. */
-  onShowingCardChange?: (showing: boolean) => void
+  /** Hide this occurrence after its answer write was acknowledged. */
+  onDismiss: () => void
+  /** Fold this occurrence to a strip above the composer, writing nothing. */
+  onCollapse?: () => void
+  /** Take focus when the card takes the input region from the composer. */
+  shouldFocus?: boolean
   /** Forwarded to the question card's free-text row so pane-level Paste keeps
    *  a target while the composer is unmounted. */
   answerInputRef?: React.RefObject<HTMLInputElement | null>
@@ -40,47 +40,26 @@ export function NativeChatInteractiveCard({
   // vanish mid-send. `submitting` also gates a second submit racing the first.
   const submittingRef = useRef(false)
   const [submitting, setSubmitting] = useState(false)
-  const resetSubmitting = useCallback((): void => {
+  const activeRef = useRef(true)
+  const attemptRef = useRef(0)
+  const cancellingRef = useRef(false)
+  const [cancelling, setCancelling] = useState(false)
+  const settle = useCallback((): void => {
     submittingRef.current = false
     setSubmitting(false)
     cancellingRef.current = false
     setCancelling(false)
   }, [])
-  // A replacement prompt, ownership loss, or unmount must stop both timers and
-  // PTY writes during commit, before an old answer can type into the new prompt.
-  useLayoutEffect(
-    () => () => {
-      resetSubmitting()
-      cancelPending()
-    },
-    [canSend, cardKey, cancelPending, resetSubmitting]
-  )
-
-  // Forget the dismissal once the prompt clears so a fresh prompt can show.
-  const present = card != null
-  useEffect(() => {
-    if (!present) {
-      setDismissedKey(null)
-      resetSubmitting()
-    }
-  }, [present, resetSubmitting])
-
-  // Tell the view when a question card is up so it can hide the composer (this
-  // card supplies its own input). Reset on unmount so the composer comes back.
-  const showingCard = card != null && canSend && cardKey !== dismissedKey
-  const showingQuestion = showingCard && card.kind === 'question'
-  useEffect(() => {
-    onShowingQuestionChange?.(showingQuestion)
-    return () => onShowingQuestionChange?.(false)
-  }, [showingQuestion, onShowingQuestionChange])
+  // Retire callbacks during commit; an already-issued write may still settle later.
   useLayoutEffect(() => {
-    onShowingCardChange?.(showingCard)
-    return () => onShowingCardChange?.(false)
-  }, [showingCard, onShowingCardChange])
+    activeRef.current = true
+    return () => {
+      activeRef.current = false
+      attemptRef.current += 1
+      cancelPending()
+    }
+  }, [cancelPending])
 
-  if (!showingCard) {
-    return null
-  }
   if (card.kind === 'question') {
     return (
       <NativeChatQuestionCard
@@ -93,13 +72,7 @@ export function NativeChatInteractiveCard({
             return
           }
           submittingRef.current = true
-          const dismissAnsweredCard = (): void => {
-            setDismissedKey(cardKey)
-            resetSubmitting()
-          }
-          const keepRejectedAnswerVisible = (): void => {
-            resetSubmitting()
-          }
+          const attempt = ++attemptRef.current
           const result = sendAnswer(card.prompt, selections, (delivered) => {
             if (!activeRef.current || attempt !== attemptRef.current) {
               return
@@ -115,14 +88,31 @@ export function NativeChatInteractiveCard({
             settle()
             return
           }
-          // Why: the send now settles from its own real lifecycle (r5-1), not a
-          // nominal timer — dismiss only once `onDeliverySettled` actually fires.
           setSubmitting(true)
         }}
+        onCollapse={onCollapse}
+        shouldFocus={shouldFocus}
         onCancel={() => {
-          resetSubmitting()
-          setDismissedKey(cardKey)
-          cancelAsk()
+          if (cancellingRef.current) {
+            return
+          }
+          settle()
+          const attempt = ++attemptRef.current
+          cancellingRef.current = true
+          setCancelling(true)
+          submittingRef.current = true
+          setSubmitting(true)
+          void cancelAsk()
+            .catch(() => false)
+            .then((delivered) => {
+              if (!activeRef.current || attempt !== attemptRef.current) {
+                return
+              }
+              settle()
+              if (delivered) {
+                onDismiss()
+              }
+            })
         }}
       />
     )

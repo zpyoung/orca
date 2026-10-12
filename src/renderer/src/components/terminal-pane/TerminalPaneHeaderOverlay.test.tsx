@@ -29,12 +29,25 @@ vi.mock('@/i18n/i18n', () => ({
       fallback
     )
 }))
+// The header is prop-driven, but the width menu it renders reads the store via a selector.
+vi.mock('@/store', () => {
+  const state = {
+    settings: { activeRuntimeEnvironmentId: null },
+    updateSettings: vi.fn(),
+    repos: [{ id: 'repo1', connectionId: null, executionHostId: 'local' }],
+    worktreesByRepo: { repo1: [{ id: 'wt-1', repoId: 'repo1', hostId: 'local', path: '/repo' }] },
+    detectedWorktreesByRepo: {},
+    folderWorkspaces: [],
+    sshConnectionStates: new Map()
+  }
+  return {
+    useAppStore: Object.assign((selector: (value: typeof state) => unknown) => selector(state), {
+      getState: () => state
+    })
+  }
+})
+vi.mock('./terminal-input-activity', () => ({ recordTerminalUserInputForLeaf: vi.fn() }))
 
-// The header is prop-driven, but the width menu it renders reads the store itself.
-vi.mock('../../store', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) =>
-    selector({ settings: {}, updateSettings: vi.fn() })
-}))
 const mounted: { container: HTMLDivElement; root: Root }[] = []
 
 function makePane(id: number): ManagedPane {

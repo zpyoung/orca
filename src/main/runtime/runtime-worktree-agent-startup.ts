@@ -170,6 +170,7 @@ export function buildWorktreeStartupForAgent(
       platform: environment.getLaunchPlatform(),
       isRemote: repoIsRemote(repo),
       ...(agentArgs !== undefined ? { agentArgs } : {}),
+      ...(environment.extraAgentArgs ? { extraAgentArgs: environment.extraAgentArgs } : {}),
       sessionOptions: launchOverrides
         ? agentLaunchOverridesToSessionOptionValues(launchOverrides)
         : environment.toSessionOptions(environment.launchPreferences)

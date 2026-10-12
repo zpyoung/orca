@@ -300,6 +300,18 @@ export function createPtyWriteInput(deps: {
     }
   }
 
+  const writePtyInputSettled = (args: PtyWritePayload): boolean | Promise<boolean> => {
+    if (!ptyOwnership.has(args.id)) {
+      return false
+    }
+    const provider = tryGetProviderForPty(args.id)
+    if (!provider?.hasPty?.(args.id)) {
+      return false
+    }
+    noteRendererPtyInput(args)
+    return writeAndObserveInput(provider, args, true)
+  }
+
   // Why: a disposed or backpressured SSH mux can silently drop provider.write's
   // fire-and-forget notify, so this path settles over the transport instead of
   // trusting write()'s void return — kept separate from writePtyInput so the

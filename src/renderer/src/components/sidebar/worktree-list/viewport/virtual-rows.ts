@@ -5,8 +5,7 @@ import { getRenderRowKey } from '../listing/render-row'
 import type { RenderRow } from '../listing/render-row'
 
 export const GROUP_HEADER_ROW_HEIGHT = 24
-// Why: header rows return this estimate verbatim (measureElement no-ops them), so it must
-// equal the rendered DOM height. HostSectionHeader is h-8 (32px) inside a pt-1 (4px) wrapper.
+// Why: HostSectionHeader wraps its h-8 (32px) card in pt-1 (4px), so the row is 36px.
 export const HOST_HEADER_ROW_HEIGHT = 36
 // Why: must match the virtualizer's `gap` in WorktreeList so drop-preview math
 // agrees with rendered row spacing (the fork's density keeps it at 2, not 6).

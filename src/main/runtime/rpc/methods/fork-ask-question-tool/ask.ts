@@ -62,6 +62,7 @@ let askSubscriptionSeq = 0
 export const ASK_METHODS = [
   defineMethod({
     name: 'ask.register',
+    permission: 'workspace',
     params: AskRegisterParams,
     // C3/C4 own attribution and capability gating: register never blocks, and an ask is never
     // durably inserted for a surface no attached client can render.
@@ -108,6 +109,7 @@ export const ASK_METHODS = [
 
   defineMethod({
     name: 'ask.wait',
+    permission: 'workspace',
     params: AskWaitParams,
     handler: async (params, { runtime, signal }) => {
       const { db, registry, waitGate } = runtime.getAskServices()
@@ -124,6 +126,7 @@ export const ASK_METHODS = [
 
   defineMethod({
     name: 'ask.answer',
+    permission: 'workspace',
     params: AskAnswerParams,
     handler: async (params, { runtime }) => {
       const { db, registry } = runtime.getAskServices()
@@ -153,6 +156,7 @@ export const ASK_METHODS = [
 
   defineMethod({
     name: 'ask.updatePartial',
+    permission: 'workspace',
     params: AskUpdatePartialParams,
     handler: async (params, { runtime }) => {
       const { db, registry } = runtime.getAskServices()
@@ -168,6 +172,7 @@ export const ASK_METHODS = [
 
   defineMethod({
     name: 'ask.cancel',
+    permission: 'workspace',
     params: AskCancelParams,
     handler: async (params, { runtime }) => {
       const { db, registry } = runtime.getAskServices()
@@ -184,6 +189,7 @@ export const ASK_METHODS = [
 
   defineMethod({
     name: 'ask.snapshot',
+    permission: 'workspace',
     params: AskSnapshotParams,
     handler: async (params, { runtime }) => {
       const { db, registry } = runtime.getAskServices()
@@ -195,6 +201,7 @@ export const ASK_METHODS = [
 
   defineStreamingMethod({
     name: 'ask.subscribe',
+    permission: 'workspace',
     params: AskSubscribeParams,
     handler: async (params, { runtime, connectionId }, emit) => {
       const { db, registry } = runtime.getAskServices()

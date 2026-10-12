@@ -95,11 +95,13 @@ export function createNotificationDeliveryService(
       const notificationOptions =
         request.source === 'pending-ask' && request.title && request.body
           ? { title: request.title, body: request.body }
-          : buildNotificationOptions(request)
+          : buildNotificationOptions(request, translateMain)
 
       // Why: desktop focus only means this computer sees the worktree; the paired phone may still need the alert.
+      // The execution host pushed its own phones and retires them itself on acknowledgement.
       // no mobile push for pending asks in v1
       if (
+        !request.mobileDeliveredByHost &&
         deps.dispatchMobileNotification &&
         request.source !== 'test' &&
         request.source !== 'pending-ask'

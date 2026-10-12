@@ -1,4 +1,9 @@
-// Forked Tier2 copy of src/renderer/src/components/sidebar/use-worktree-card-review-details.ts (source HEAD 80b59e6301bc6c4a3618385b8c70b842b135b67c).
+// FORK-COPY-OF: src/renderer/src/components/sidebar/use-worktree-card-review-details.ts
+// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+import { useMemo } from 'react'
+import { getLinearReadScope, scopedLinearCacheKey } from '@/store/slices/linear/linear-slice-scope'
+import { getWorkspaceAttachmentSourceContext } from '../workspace-attachment-source-result'
+import { getWorkspaceReferenceLinearWorkspaceId } from '../workspace-reference-details'
 import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
 import { useAppStore } from '@/store'
 import { getGitHubPRCacheKey } from '@/store/slices/github-cache-key'
@@ -75,8 +80,21 @@ export function useWorktreeCardReviewDetails({
           true
         )
       : ''
-  // Why: use 'all' — the issue may belong to a different Linear workspace than the selected one.
-  const linearIssueCacheKey = worktree.linkedLinearIssue ? `all::${worktree.linkedLinearIssue}` : ''
+  // Saved workspace bindings keep equal Linear identifiers separate.
+  const linearSourceContext = useMemo(
+    () => getWorkspaceAttachmentSourceContext('linear', repo, worktree),
+    [repo, worktree]
+  )
+  const linearWorkspaceId = getWorkspaceReferenceLinearWorkspaceId(
+    worktree.linkedLinearIssueWorkspaceId,
+    linearSourceContext
+  )
+  const linearIssueCacheKey = worktree.linkedLinearIssue
+    ? scopedLinearCacheKey(
+        getLinearReadScope(settings, linearSourceContext),
+        `${linearWorkspaceId}::${worktree.linkedLinearIssue}`
+      )
+    : ''
 
   // Subscribe to ONLY the specific cache entry, not entire review/issue caches.
   const hostedReviewEntry = useAppStore((s) =>
@@ -88,7 +106,9 @@ export function useWorktreeCardReviewDetails({
     linearIssueCacheKey ? s.linearIssueCache[linearIssueCacheKey] : undefined
   )
   const linearIssueFallbackEntry = useAppStore((s) =>
-    worktree.linkedLinearIssue ? s.linearIssueCache[worktree.linkedLinearIssue] : undefined
+    !linearSourceContext && worktree.linkedLinearIssue
+      ? s.linearIssueCache[worktree.linkedLinearIssue]
+      : undefined
   )
   const review = resolveWorkspaceReview(worktree, hostedReviewEntry, prCacheEntry)
   return {
@@ -106,6 +126,8 @@ export function useWorktreeCardReviewDetails({
     issueEntry,
     linearIssueEntry,
     linearIssueFallbackEntry,
+    linearSourceContext,
+    linearWorkspaceId,
     ...review
   }
 }

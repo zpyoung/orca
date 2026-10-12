@@ -5,6 +5,12 @@ import { Check, Pencil, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AskAnswerSelection, AskPrompt } from './native-chat-interactive-prompt'
+import { NativeChatPromptCollapseToggle } from './NativeChatPromptCollapse'
+import { useNativeChatPromptCardFocus } from './use-native-chat-prompt-card-focus'
+import { useNativeChatQuestionAutoAdvance } from './use-native-chat-question-auto-advance'
+import { useNativeChatQuestionNumberKeys } from './use-native-chat-question-number-keys'
+import { isEditableTarget } from '@/lib/editable-target'
+import type { AgentJournalFreeTextInput } from '../../../../shared/agent-session-journal-types'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 
 export type NativeChatQuestionCardProps = {
@@ -52,6 +58,8 @@ export function NativeChatQuestionCard({
   shouldFocus = false,
   answerInputRef
 }: NativeChatQuestionCardProps): React.JSX.Element {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const autoAdvance = useNativeChatQuestionAutoAdvance()
   const widthClassName = useNativeChatWidthClassName()
   const [index, setIndex] = useState(0)
   useNativeChatPromptCardFocus(cardRef, shouldFocus, index)
@@ -206,7 +214,29 @@ export function NativeChatQuestionCard({
     // Part of the composer: docked in the bottom input region, matching the
     // composer's width and padding, rendered as the "ask" dialog card directly
     // above the text input. Its free-text row is the answer input.
-    <div className="shrink-0 bg-background" aria-busy={isSubmitting}>
+    <div
+      ref={cardRef}
+      data-native-chat-prompt-card-focus={shouldFocus || undefined}
+      role="group"
+      aria-label={q.question}
+      tabIndex={-1}
+      className="shrink-0 bg-chat-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      aria-busy={isSubmitting}
+      onKeyDown={(event) => {
+        // Why not from a text field: Escape there is editing, and collapsing would hide the draft.
+        if (
+          event.key === 'Escape' &&
+          !event.nativeEvent.isComposing &&
+          collapse &&
+          !isSubmitting &&
+          !isEditableTarget(event.target)
+        ) {
+          event.preventDefault()
+          event.stopPropagation()
+          collapse()
+        }
+      }}
+    >
       <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>
         {total > 1 ? (
           <div className="mb-2 flex gap-1 overflow-x-auto pb-1 scrollbar-sleek">

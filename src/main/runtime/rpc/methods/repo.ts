@@ -82,6 +82,7 @@ export const REPO_METHODS = [
   }),
   defineMethod({
     name: 'projectGroup.delete',
+    permission: 'workspace',
     params: ProjectGroupSelector.merge(
       ExpectedLedgers.extend({ removeContainedProjects: z.boolean().optional() })
     ),
@@ -197,6 +198,7 @@ export const REPO_METHODS = [
   }),
   defineMethod({
     name: 'repo.rm',
+    permission: 'workspace',
     params: RepoSelector.merge(ExpectedLedgers),
     handler: async (params, { runtime }) =>
       runtime.removeProject(params.repo, { expectedLedgers: params.expectedLedgers })

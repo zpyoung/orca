@@ -8,8 +8,13 @@ import type { NativeChatStructuredComposerTransport } from './native-chat-compos
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
+const actions = vi.hoisted((): { sendDisabled: boolean | null } => ({ sendDisabled: null }))
+
 vi.mock('./fork-agent-composer/AgentComposerActions', () => ({
-  AgentComposerActions: () => <div data-testid="composer-actions" />
+  AgentComposerActions: (props: { sendDisabled: boolean }) => {
+    actions.sendDisabled = props.sendDisabled
+    return <div data-testid="composer-actions" />
+  }
 }))
 vi.mock('./NativeChatAutocompleteMenus', () => ({
   NativeChatMentionMenu: () => null,
