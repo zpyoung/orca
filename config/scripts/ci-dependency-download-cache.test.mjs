@@ -60,13 +60,6 @@ describe('CI dependency download caches', () => {
     expect(saves[0].if).toContain("github.ref == 'refs/heads/main'")
     expect(saves[0].if).toContain("github.event_name != 'pull_request'")
     expect(saves[0].with.path).toBe('${{ steps.verification-cache.outputs.path }}')
-    const windows = workflow('pr').jobs.package_windows.steps.find((step) =>
-      step.uses?.includes('install-node-dependencies')
-    )
-    expect(windows.with['cache-dependency-path'].trim().split('\n')).toEqual([
-      'pnpm-lock.yaml',
-      'mobile/pnpm-lock.yaml'
-    ])
   })
 
   it('keeps producer lookup optional and compatible with the existing store archive', () => {

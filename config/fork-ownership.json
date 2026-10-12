@@ -187,13 +187,32 @@
   ],
   "seams": [
     {
+      "path": "config/scripts/vitest-node-runtime-files.mjs",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": [
+        "import { FORK_NODE_RUNTIME_INCLUDE } from './fork-vitest-node-runtime-files.mjs'",
+        "  ...FORK_NODE_RUNTIME_INCLUDE,"
+      ]
+    },
+    {
+      "path": "src/main/runtime/agent-state-rules/agent-state-rules-live-update.ts",
+      "feature": "release-routing",
+      "kind": "import-swap",
+      "lines": [
+        "import { getVersionChannel, AGENT_STATE_RULES_RELEASE_REPO } from '../../../shared/release-channel'",
+        "  return `https://github.com/${AGENT_STATE_RULES_RELEASE_REPO}/releases/download/${tag}/agent-state-rules.json`"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-composer.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": [
         "  sendRuntimePtyInputDelivery: async (settings: unknown, id: string, data: string) =>",
         "            terminalTabId: props.terminalTabId,",
-        "          const handle = sendNativeChatMessage(target, MESSAGE, {"
+        "          const handle = sendNativeChatMessage(target, MESSAGE, {",
+        "  sendRuntimePtyInputAcceptance: async (settings: unknown, id: string, data: string) =>"
       ]
     },
     {
@@ -4427,7 +4446,10 @@
       "path": "src/shared/release-channel.ts",
       "feature": "release-routing",
       "kind": "registration",
-      "lines": ["export const MAIN_RELEASE_REPO = 'zpyoung/orca'"]
+      "lines": [
+        "export const MAIN_RELEASE_REPO = 'zpyoung/orca'",
+        "export const AGENT_STATE_RULES_RELEASE_REPO = 'stablyai/orca'"
+      ]
     },
     {
       "path": "src/renderer/src/components/UpdateCard.error-card.test.tsx",
@@ -6348,6 +6370,11 @@
       "reason": "v1.4.224's release cut copied cloud-operate-relay-production-cell-flags.yml from main without main's matching test update, so the tag fails its own relay workflow inventory; this aligns the test with the workflows the release ships.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#relay-workflow-inventory-v1-4-224"
+    },
+    {
+      "path": "config/scripts/fork-vitest-node-runtime-files.mjs",
+      "reason": "Lists the fork's real-SQLite tests for the Node runtime project that v1.4.224's vitest-sqlite-runtime-boundary ratchet requires.",
+      "status": "permanent"
     }
   ],
   "residuals": {
@@ -8132,7 +8159,7 @@
       "removed": 1
     },
     "src/shared/release-channel.ts": {
-      "added": 1,
+      "added": 3,
       "removed": 1
     },
     "src/shared/release-channel.test.ts": {
@@ -8612,8 +8639,16 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-composer.test.tsx": {
-      "added": 9,
+      "added": 11,
       "removed": 2
+    },
+    "src/main/runtime/agent-state-rules/agent-state-rules-live-update.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "config/scripts/vitest-node-runtime-files.mjs": {
+      "added": 2,
+      "removed": 0
     }
   }
 }

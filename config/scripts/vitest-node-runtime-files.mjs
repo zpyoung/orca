@@ -1,4 +1,5 @@
 import { SQLITE_RUNTIME_INCLUDE } from './vitest-sqlite-runtime-files.mjs'
+import { FORK_NODE_RUNTIME_INCLUDE } from './fork-vitest-node-runtime-files.mjs'
 
 // SQLite publication, native bindings, worker IPC, socket liveness, and V8 retention use Node.
 export const NODE_RUNTIME_INCLUDE = [
@@ -15,6 +16,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/renderer/src/lib/react-commit-cascade-observer.test.ts',
   'src/renderer/src/lib/react-commit-cascade-telemetry.test.ts',
   ...SQLITE_RUNTIME_INCLUDE,
+  ...FORK_NODE_RUNTIME_INCLUDE,
   'src/cli/**/*.test.ts',
   'src/main/persistence/**/*.test.ts',
   'src/main/persistence*.test.ts',

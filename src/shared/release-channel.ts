@@ -25,6 +25,8 @@ export const HOURLY_RELEASE_REPO = 'stablyai/orca-hourly'
 export const DAILY_RELEASE_REPO = 'stablyai/orca-daily'
 export const ADHOC_RELEASE_REPO = 'stablyai/orca-adhoc'
 export const MAIN_RELEASE_REPO = 'zpyoung/orca'
+// Why upstream: the fork runs upstream's rules engine and never publishes agent-state-rules releases.
+export const AGENT_STATE_RULES_RELEASE_REPO = 'stablyai/orca'
 
 /** The dev channels, each published to its own repo rather than the main one. */
 const DEDICATED_REPO_CHANNELS = ['hourly', 'daily', 'adhoc'] as const

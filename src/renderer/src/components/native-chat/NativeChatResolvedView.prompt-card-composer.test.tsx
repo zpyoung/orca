@@ -28,6 +28,8 @@ vi.mock('./use-native-chat-retained-session', () => ({
 vi.mock('@/runtime/runtime-terminal-inspection', async (importOriginal) => ({
   ...(await importOriginal<RuntimeTerminalInspection>()),
   sendRuntimePtyInput: pty.raw,
+  sendRuntimePtyInputAcceptance: async (settings: unknown, id: string, data: string) =>
+    pty.raw(settings, id, data),
   sendRuntimePtyInputDelivery: async (settings: unknown, id: string, data: string) =>
     (await pty.verified(settings, id, data)) ? 'accepted' : 'refused'
 }))

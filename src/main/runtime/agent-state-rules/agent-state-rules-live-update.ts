@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { getAppEnvironment } from '../../../shared/app-environment'
 import { readFetchResponseTextWithinLimit } from '../../../shared/fetch-response-body'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
-import { getVersionChannel, MAIN_RELEASE_REPO } from '../../../shared/release-channel'
+import { getVersionChannel, AGENT_STATE_RULES_RELEASE_REPO } from '../../../shared/release-channel'
 import { getMainHttpClient } from '../../network/http-client'
 import { writePluginFileAtomically } from '../../plugins/plugin-atomic-file-write'
 import {
@@ -41,7 +41,7 @@ export function agentStateRulesChannelForAppVersion(
 // Why a fixed release-download URL: no API call or rate limit, and no "latest" lookup to steer.
 export function agentStateRulesDownloadUrl(channel: AgentStateRulesChannel): string {
   const tag = `agent-state-rules-engine-${AGENT_STATE_RULES_ENGINE_VERSION}-${channel}`
-  return `https://github.com/${MAIN_RELEASE_REPO}/releases/download/${tag}/agent-state-rules.json`
+  return `https://github.com/${AGENT_STATE_RULES_RELEASE_REPO}/releases/download/${tag}/agent-state-rules.json`
 }
 
 // Why per channel: stable and RC builds share userData, and a stable app must not run, or be
