@@ -10,6 +10,7 @@ import {
   testState,
   writeDataFile
 } from '../persistence-test-harness'
+import { legacyLaunchOverrides } from '../../shared/fork-automation-launch-settings/legacy-launch-overrides.test-support'
 
 const { trackMock, getCohortAtEmitMock } = vi.hoisted(() => ({
   trackMock: vi.fn(),
@@ -100,7 +101,7 @@ describe('automation launch settings persistence', () => {
       prompt: 'Run checks',
       agentId: 'claude',
       extraAgentArgs: '--effort high',
-      launchOverrides: { model: 'sonnet', ...{ agentArgs: '--add-dir docs' } },
+      launchOverrides: legacyLaunchOverrides({ model: 'sonnet', agentArgs: '--add-dir docs' }),
       projectId: 'r1',
       workspaceMode: 'existing',
       workspaceId: 'wt1',
@@ -129,7 +130,7 @@ describe('automation launch settings persistence', () => {
     })
 
     const updated = store.updateAutomation(automation.id, {
-      launchOverrides: { model: 'opus', ...{ agentArgs: '--add-dir docs' } }
+      launchOverrides: legacyLaunchOverrides({ model: 'opus', agentArgs: '--add-dir docs' })
     })
 
     expect(updated.extraAgentArgs).toBe('--add-dir docs')

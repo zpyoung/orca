@@ -3,10 +3,11 @@ import {
   buildAutomationLaunchOverridesCreateFields,
   buildAutomationLaunchOverridesUpdateFields
 } from './automation-launch-overrides-save'
+import { legacyLaunchOverrides } from '../../../../../shared/fork-automation-launch-settings/legacy-launch-overrides.test-support'
 
 describe('automation launch override save fields', () => {
   it('normalizes configured values and drops retired raw arguments for creates and updates', () => {
-    const value = { model: ' opus ', ...{ agentArgs: ' --verbose ' } }
+    const value = legacyLaunchOverrides({ model: ' opus ', agentArgs: ' --verbose ' })
     expect(buildAutomationLaunchOverridesCreateFields(value, 'supported')).toEqual({
       launchOverrides: { model: 'opus' }
     })

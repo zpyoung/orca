@@ -6,6 +6,7 @@ import {
   migrateLegacyAutomationLaunchArgs,
   normalizeAutomationLaunchOverrides
 } from './automation-launch-overrides-migration'
+import { legacyLaunchOverrides } from './legacy-launch-overrides.test-support'
 
 function automationWith(fields: Partial<Automation>): Automation {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the migration reads only the launch fields these cases set.
@@ -43,7 +44,9 @@ describe('automation launch overrides migration', () => {
   it('moves a stored raw argument string into extraAgentArgs', () => {
     expect(
       migrateLegacyAutomationLaunchArgs(
-        automationWith({ launchOverrides: { model: 'sonnet', ...{ agentArgs: '--add-dir docs' } } })
+        automationWith({
+          launchOverrides: legacyLaunchOverrides({ model: 'sonnet', agentArgs: '--add-dir docs' })
+        })
       )
     ).toMatchObject({
       extraAgentArgs: '--add-dir docs',
@@ -55,8 +58,7 @@ describe('automation launch overrides migration', () => {
     const migrated = migrateLegacyAutomationLaunchArgs(
       automationWith({
         extraAgentArgs: '--effort high',
-        // An absent model keeps the stored shape assignable; only the raw arguments are set.
-        launchOverrides: { model: undefined, ...{ agentArgs: '--add-dir docs' } }
+        launchOverrides: legacyLaunchOverrides({ agentArgs: '--add-dir docs' })
       })
     )
     expect(migrated.extraAgentArgs).toBe('--effort high --add-dir docs')
