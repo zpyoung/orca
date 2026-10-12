@@ -15,7 +15,6 @@ import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import type { PtyTransport } from './pty-transport'
 import { TerminalPaneHeaderDropSurface } from './TerminalPaneHeaderDropSurface'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
-import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'
 
 export type PaneTitleOverlayRect = {
   left: number
@@ -227,10 +226,6 @@ export default function TerminalPaneHeaderOverlay({
                   </button>
                 ) : null}
                 <div className="pane-title-actions ml-auto flex shrink-0 items-center gap-0">
-                  {/* Gated on chat mode alone, not canToggleNativeChat: a pane
-                      already in chat mode may have lost live hook identity, and
-                      width stays adjustable regardless. */}
-                  {isChatViewMode && isActivePane ? <NativeChatWidthMenu /> : null}
                   {canContinueAgentSessionInNewSession && isActivePane ? (
                     <Tooltip>
                       <TooltipTrigger asChild>

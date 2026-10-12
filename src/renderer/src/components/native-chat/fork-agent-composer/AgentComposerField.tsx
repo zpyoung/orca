@@ -18,7 +18,6 @@ import type { NativeChatComposerNotice } from '../native-chat-composer-notice'
 import { AgentComposerAttachmentThumbnail } from './AgentComposerAttachmentThumbnail'
 import { ComposerMarkdownOverlay } from './ComposerMarkdownOverlay'
 import { COMPOSER_TEXT_CLASS } from './composer-markdown-style'
-import { useNativeChatWidthClassName } from '../fork-native-chat-width/use-native-chat-width'
 import {
   nativeChatComposerPlaceholder,
   type NativeChatAfterStopSend
@@ -193,7 +192,6 @@ export function AgentComposerField({
   sessionOptionsPickerRequest,
   goalMode
 }: AgentComposerFieldProps): React.JSX.Element {
-  const widthClassName = useNativeChatWidthClassName()
   const draftNotSaved = useNativeChatComposerDraftUnsaved(draftScopeKey)
   const optionCount =
     autocomplete.mode === 'slash'
@@ -258,7 +256,7 @@ export function AgentComposerField({
         <div
           className={cn(
             'relative w-full',
-            layout === 'dock' ? 'flex h-full min-h-0 flex-col' : cn('mx-auto', widthClassName)
+            layout === 'dock' ? 'flex h-full min-h-0 flex-col' : 'mx-auto max-w-(--chat-content-max-width)'
           )}
         >
           {autocomplete.mode === 'slash' ? (

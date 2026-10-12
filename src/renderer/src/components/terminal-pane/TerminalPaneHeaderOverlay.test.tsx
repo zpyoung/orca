@@ -29,23 +29,18 @@ vi.mock('@/i18n/i18n', () => ({
       fallback
     )
 }))
-// The header is prop-driven, but the width menu it renders reads the store via a selector.
-vi.mock('@/store', () => {
-  const state = {
-    settings: { activeRuntimeEnvironmentId: null },
-    updateSettings: vi.fn(),
-    repos: [{ id: 'repo1', connectionId: null, executionHostId: 'local' }],
-    worktreesByRepo: { repo1: [{ id: 'wt-1', repoId: 'repo1', hostId: 'local', path: '/repo' }] },
-    detectedWorktreesByRepo: {},
-    folderWorkspaces: [],
-    sshConnectionStates: new Map()
-  }
-  return {
-    useAppStore: Object.assign((selector: (value: typeof state) => unknown) => selector(state), {
-      getState: () => state
+vi.mock('@/store', () => ({
+  useAppStore: {
+    getState: () => ({
+      settings: { activeRuntimeEnvironmentId: null },
+      repos: [{ id: 'repo1', connectionId: null, executionHostId: 'local' }],
+      worktreesByRepo: { repo1: [{ id: 'wt-1', repoId: 'repo1', hostId: 'local', path: '/repo' }] },
+      detectedWorktreesByRepo: {},
+      folderWorkspaces: [],
+      sshConnectionStates: new Map()
     })
   }
-})
+}))
 vi.mock('./terminal-input-activity', () => ({ recordTerminalUserInputForLeaf: vi.fn() }))
 
 const mounted: { container: HTMLDivElement; root: Root }[] = []
@@ -80,7 +75,6 @@ function renderOverlay({
   onRenameSubmit = vi.fn(),
   canContinueAgentSessionInNewSession = false,
   onContinueAgentSessionInNewSession = vi.fn(),
-  isChatViewMode,
   renameValue = '',
   renamingPaneId = null,
   dropSetup
@@ -95,7 +89,6 @@ function renderOverlay({
   onRenameSubmit?: ReturnType<typeof vi.fn>
   canContinueAgentSessionInNewSession?: boolean
   onContinueAgentSessionInNewSession?: ReturnType<typeof vi.fn>
-  isChatViewMode?: boolean
   renameValue?: string
   renamingPaneId?: number | null
   dropSetup?: {
@@ -141,7 +134,6 @@ function renderOverlay({
         managerRef={{ current: dropSetup?.manager ?? null }}
         paneTransportsRef={{ current: dropSetup?.transports ?? new Map<number, PtyTransport>() }}
         canContinueAgentSessionInNewSession={canContinueAgentSessionInNewSession}
-        isChatViewMode={isChatViewMode}
         onContinueAgentSessionInNewSession={
           onContinueAgentSessionInNewSession as (pane: ManagedPane) => void
         }
@@ -311,30 +303,6 @@ describe('TerminalPaneHeaderOverlay', () => {
     expect(onContinueAgentSessionInNewSession).toHaveBeenCalledWith(
       expect.objectContaining({ id: 1 })
     )
-  })
-
-  it('offers the chat width menu on a pane showing the chat view', () => {
-    const { container } = renderOverlay({
-      paneTitles: { 1: '', 2: '' },
-      isChatViewMode: true
-    })
-
-    expect(container.querySelector('button[aria-label="Chat width"]')).not.toBeNull()
-  })
-
-  it('hides the chat width menu on a terminal-view pane', () => {
-    const { container } = renderOverlay({
-      paneTitles: { 1: '', 2: '' },
-      isChatViewMode: false
-    })
-
-    expect(container.querySelector('button[aria-label="Chat width"]')).toBeNull()
-  })
-
-  it('hides the chat width menu when the chat-view flag is absent', () => {
-    const { container } = renderOverlay({ paneTitles: { 1: '', 2: '' } })
-
-    expect(container.querySelector('button[aria-label="Chat width"]')).toBeNull()
   })
 })
 

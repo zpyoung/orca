@@ -1,6 +1,5 @@
 import type { NativeChatGlobalSettings } from './native-chat-appearance-settings'
 import type { ExecutionHostId } from './execution-host'
-import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'
 import type { OrcaWorkspaceLayout } from './orca-workspace-layout'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
@@ -225,8 +224,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   experimentalTerminalDock?: boolean
   /** Open the terminal composer automatically for new agent sessions; mounted panes are unchanged. */
   dockTerminalComposerByDefault?: boolean
-  /** Reading-column width for every native chat pane; optional for legacy settings. */
-  nativeChatWidth?: NativeChatWidthTier
   /** Opt-in: resume working structured chats automatically on the next launch. Off still offers
    *  the list, so the user sees exactly what would run before anything spends tokens. */
   nativeChatResumeWorkOnRestart?: boolean

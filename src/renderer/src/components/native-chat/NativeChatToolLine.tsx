@@ -16,6 +16,7 @@ import {
   NativeChatToolName
 } from './NativeChatToolAnnotations'
 import { NativeChatToolIcon } from './NativeChatToolIcon'
+import { nativeChatToolCategoryTextClass } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
 import { NativeChatToolFileTarget } from './NativeChatToolFileTarget'
 import { NativeChatDiffView } from './NativeChatDiffView'
 import { nativeChatToolLineLabel } from './native-chat-tool-line-label'
@@ -116,6 +117,7 @@ export function NativeChatToolLine({
   const failed = lifecycle === 'failed' || (lifecycle !== 'interrupted' && result?.isError === true)
   const commandAlone = label?.command === true && label.verb !== null && label.target.length > 0
   const results = (isCall ? block.webSearchResults : undefined) ?? NO_SEARCH_RESULTS
+  const categoryTextClass = nativeChatToolCategoryTextClass(name)
   // An edit that has not landed has no output yet, but the change it proposes is worth opening.
   const proposesChange = () => isCall && diffFromToolCall(block.name, block.input) !== null
   const hasDetail =
@@ -137,7 +139,9 @@ export function NativeChatToolLine({
           <NativeChatToolIcon
             mcpIdentity={block.mcpIdentity}
             rowWord={name}
-            className={failed ? 'text-destructive/70' : 'text-chat-foreground-faint'}
+            className={
+              failed ? 'text-destructive/70' : (categoryTextClass ?? 'text-chat-foreground-faint')
+            }
           />
         ) : (
           /* A result's word is translated copy, not a tool name, so there is no
@@ -151,7 +155,8 @@ export function NativeChatToolLine({
         ) : (
           <span
             className={cn(
-              'text-chat-foreground-faint transition-colors group-hover/tool-line:text-chat-foreground',
+              categoryTextClass ??
+                'text-chat-foreground-faint transition-colors group-hover/tool-line:text-chat-foreground',
               label?.verb ? 'shrink-0' : 'min-w-0 truncate'
             )}
           >

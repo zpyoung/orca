@@ -40,11 +40,6 @@
       ]
     },
     {
-      "name": "native-chat-width",
-      "purpose": "Lets the user pick the reading-column width for every native-chat pane instead of a fixed max-width.",
-      "globs": ["**/fork-native-chat-width/**"]
-    },
-    {
       "name": "terminal-dock",
       "purpose": "Docks a rich agent composer beneath a terminal pane running a supported coding-agent CLI, so a prompt can be composed and sent without typing into the TUI, with the terminal still visible as a fallback.",
       "globs": ["**/fork-terminal-dock/**"]
@@ -1365,16 +1360,6 @@
       "lines": [".pane-dock-slot {", "  bottom: var(--terminal-dock-height, 0px);"]
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
-        "  const widthClassName = useNativeChatWidthClassName()",
-        "          widthClassName"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
@@ -1391,16 +1376,6 @@
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": ["    vi.useRealTimers()", "    vi.useFakeTimers()"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
-        "  const widthClassName = useNativeChatWidthClassName()",
-        "      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>"
-      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatView.test.tsx",
@@ -1550,17 +1525,6 @@
       "lines": [
         "import { TerminalDockExperimentalSetting } from './fork-terminal-dock/TerminalDockExperimentalSetting'",
         "      {showTerminalDock ? ("
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx",
-      "feature": "native-chat-width",
-      "kind": "registration",
-      "lines": [
-        "import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'",
-        "          <NativeChatWidthSetting",
-        "            value={settings.nativeChatWidth}",
-        "            onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}"
       ]
     },
     {
@@ -1821,22 +1785,6 @@
       "lines": ["  onToggleTerminalDock,", "  isTerminalDockDocked,"]
     },
     {
-      "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": ["    updateSettings: vi.fn(),"]
-    },
-    {
-      "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx",
-      "feature": "native-chat-width",
-      "kind": "registration",
-      "lines": [
-        "import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'",
-        "  isChatViewMode?: boolean",
-        "                  {isChatViewMode && isActivePane ? <NativeChatWidthMenu /> : null}"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
@@ -1961,7 +1909,7 @@
     },
     {
       "path": "src/renderer/src/i18n/i18n.ts",
-      "feature": "native-chat-width",
+      "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
         "import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'",
@@ -2288,24 +2236,18 @@
     },
     {
       "path": "src/shared/default-global-settings.ts",
-      "feature": "native-chat-width",
+      "feature": "sidebar-section-separator",
       "kind": "passthrough",
-      "lines": [
-        "import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from './fork-native-chat-width/native-chat-width-default'",
-        "    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,",
-        "    sidebarSectionSeparators: true,"
-      ]
+      "lines": ["    sidebarSectionSeparators: true,"]
     },
     {
       "path": "src/shared/global-settings-types.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'",
         "import type { ForkSessionHandoffSettings } from './fork-session-handoff/handoff-settings-types'",
         "  experimentalTerminalDock?: boolean",
         "  dockTerminalComposerByDefault?: boolean",
-        "  nativeChatWidth?: NativeChatWidthTier",
         "  forkSessionHandoff?: ForkSessionHandoffSettings",
         "  sidebarSectionSeparators?: boolean"
       ]
@@ -3433,15 +3375,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
-      "feature": "native-chat-width",
-      "kind": "registration",
-      "lines": [
-        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
-        "  const widthClassName = useNativeChatWidthClassName()"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/NativeChatToolRun.tsx",
       "feature": "native-chat-coloring",
       "kind": "registration",
@@ -4117,7 +4050,12 @@
       "path": "src/renderer/src/components/native-chat/NativeChatToolLine.tsx",
       "feature": "native-chat-coloring",
       "kind": "registration",
-      "lines": ["        <ForkNativeChatToolName name={name}>"]
+      "lines": [
+        "import { nativeChatToolCategoryTextClass } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'",
+        "  const categoryTextClass = nativeChatToolCategoryTextClass(name)",
+        "              failed ? 'text-destructive/70' : (categoryTextClass ?? 'text-chat-foreground-faint')",
+        "              categoryTextClass ??"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.test.tsx",
@@ -4537,7 +4475,7 @@
       "path": "src/cli/specs/automations.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": ["const AUTOMATION_LAUNCH_FLAGS = ['model', 'effort', 'agent-args']"]
+      "lines": ["const AUTOMATION_LAUNCH_FLAGS = ['model', 'effort']"]
     },
     {
       "path": "src/main/automations/headless-dispatch.ts",
@@ -4558,7 +4496,7 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "import { normalizeAgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+        "      normalizeAutomationSessionReuse(migrateLegacyAutomationLaunchArgs(automation))"
       ]
     },
     {
@@ -4582,7 +4520,7 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
       ]
     },
     {
@@ -4924,7 +4862,7 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "import type { AgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+        "import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
       ]
     },
     {
@@ -4940,7 +4878,7 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "import { resolveAgentBackgroundLaunchSettings } from '@/lib/fork-automation-launch-settings/agent-background-launch-settings'"
+        "import { agentLaunchOverridesToSessionOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
       ]
     },
     {
@@ -5002,7 +4940,7 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "import type { AgentLaunchOverrides } from './fork-automation-launch-settings/agent-launch-overrides'"
+        "import type { AgentLaunchOptionSelection } from './fork-automation-launch-settings/agent-launch-overrides'"
       ]
     },
     {
@@ -5096,7 +5034,7 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "import { normalizeAgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+        "    extraAgentArgs: migrateLegacyAutomationLaunchArgs(automation).extraAgentArgs ?? '',"
       ]
     },
     {
@@ -7001,10 +6939,6 @@
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx": {
-      "added": 9,
-      "removed": 1
-    },
     "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx": {
       "added": 67,
       "removed": 0
@@ -7026,11 +6960,7 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
-      "added": 6,
-      "removed": 6
-    },
-    "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx": {
-      "added": 3,
+      "added": 1,
       "removed": 1
     },
     "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
@@ -7143,10 +7073,6 @@
     },
     "src/renderer/src/components/settings/ExperimentalPane.tsx": {
       "added": 8,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
-      "added": 6,
       "removed": 0
     },
     "src/renderer/src/components/settings/appearance-search.ts": {
@@ -7340,14 +7266,6 @@
     "src/renderer/src/components/terminal-pane/TerminalContextMenu.tsx": {
       "added": 27,
       "removed": 1
-    },
-    "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx": {
-      "added": 42,
-      "removed": 10
-    },
-    "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
-      "added": 5,
-      "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
       "added": 6,
@@ -7686,11 +7604,11 @@
       "removed": 0
     },
     "src/shared/default-global-settings.ts": {
-      "added": 5,
+      "added": 3,
       "removed": 0
     },
     "src/shared/global-settings-types.ts": {
-      "added": 10,
+      "added": 7,
       "removed": 0
     },
     "src/shared/keybindings/definitions-core-4.ts": {
@@ -8026,7 +7944,7 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/NativeChatToolLine.tsx": {
-      "added": 3,
+      "added": 7,
       "removed": 2
     },
     "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.test.tsx": {
@@ -8246,8 +8164,8 @@
       "removed": 0
     },
     "src/main/persistence/scheduling-automations/automation-definition-operations.ts": {
-      "added": 12,
-      "removed": 0
+      "added": 35,
+      "removed": 6
     },
     "src/main/persistence/scheduling-automations/automation-run-operations.ts": {
       "added": 5,
@@ -8278,8 +8196,8 @@
       "removed": 0
     },
     "src/renderer/src/components/automations/automation-edit-draft.ts": {
-      "added": 3,
-      "removed": 0
+      "added": 7,
+      "removed": 1
     },
     "src/renderer/src/components/editor/CheckRunDetailsPanel.tsx": {
       "added": 2,
@@ -8458,7 +8376,7 @@
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-background-session.ts": {
-      "added": 44,
+      "added": 38,
       "removed": 22
     },
     "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
@@ -8586,7 +8504,7 @@
       "removed": 1
     },
     "src/main/runtime/runtime-worktree-agent-startup.ts": {
-      "added": 26,
+      "added": 22,
       "removed": 10
     },
     "src/renderer/src/components/automations/AutomationRunDetailsPage.tsx": {
@@ -8634,7 +8552,7 @@
       "removed": 1
     },
     "src/shared/rpc-contract/automation-params.ts": {
-      "added": 15,
+      "added": 16,
       "removed": 0
     },
     "src/shared/rpc-contract/git-params.ts": {

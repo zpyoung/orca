@@ -1,7 +1,6 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { useLocalStructuredAgentSessionsHeld } from '@/runtime/local-structured-chats'
 import { translate } from '@/i18n/i18n'
-import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'
 import { Label } from '../ui/label'
 import { NativeChatQueueFollowUpsSetting } from './NativeChatQueueFollowUpsSetting'
 import { NativeChatShellEnvironmentSetting } from './NativeChatShellEnvironmentSetting'
@@ -63,11 +62,6 @@ export function NativeChatExperimentalSetting({
       </div>
       {structuredChatActive ? (
         <div className="ml-4 space-y-4 border-l border-border pl-4">
-          <NativeChatWidthSetting
-            value={settings.nativeChatWidth}
-            onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}
-          />
-
           {/* Only structured sessions have a resume cursor to continue from. */}
           {structuredChatActive ? (
             <div className="flex items-start justify-between gap-4">

@@ -11,7 +11,6 @@ import { useNativeChatQuestionAutoAdvance } from './use-native-chat-question-aut
 import { useNativeChatQuestionNumberKeys } from './use-native-chat-question-number-keys'
 import { isEditableTarget } from '@/lib/editable-target'
 import type { AgentJournalFreeTextInput } from '../../../../shared/agent-session-journal-types'
-import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 
 export type NativeChatQuestionCardProps = {
   prompt: AskPrompt
@@ -60,7 +59,6 @@ export function NativeChatQuestionCard({
 }: NativeChatQuestionCardProps): React.JSX.Element {
   const cardRef = useRef<HTMLDivElement>(null)
   const autoAdvance = useNativeChatQuestionAutoAdvance()
-  const widthClassName = useNativeChatWidthClassName()
   const [index, setIndex] = useState(0)
   useNativeChatPromptCardFocus(cardRef, shouldFocus, index)
   // Keep option identity by index: labels are display text and are not guaranteed
@@ -237,7 +235,7 @@ export function NativeChatQuestionCard({
         }
       }}
     >
-      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>
+      <div className="mx-auto w-full max-w-(--chat-content-max-width) px-3 pt-2 pb-4 sm:px-4">
         {total > 1 ? (
           <div className="mb-2 flex gap-1 overflow-x-auto pb-1 scrollbar-sleek">
             {prompt.questions.map((qq, i) => (

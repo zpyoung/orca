@@ -19,10 +19,6 @@ vi.mock('../NativeChatAutocompleteMenus', () => ({
   NativeChatPickerMenu: () => null
 }))
 
-vi.mock('../fork-native-chat-width/use-native-chat-width', () => ({
-  useNativeChatWidthClassName: () => 'max-w-4xl'
-}))
-
 import { AgentComposerField } from './AgentComposerField'
 
 // A field-only render needs no live IME gesture; every hook is inert here.
@@ -97,7 +93,7 @@ describe('agent composer dock layout', () => {
     for (const className of ['px-3', 'pt-2', 'pb-2', 'pb-4', 'sm:px-4']) {
       expect(paddingWrapper).not.toHaveClass(className)
     }
-    for (const className of ['mx-auto', 'max-w-4xl']) {
+    for (const className of ['mx-auto', 'max-w-(--chat-content-max-width)']) {
       expect(widthWrapper).not.toHaveClass(className)
     }
     expect(widthWrapper).toHaveClass('w-full')
@@ -109,7 +105,7 @@ describe('agent composer dock layout', () => {
     const { widthWrapper, paddingWrapper, card } = renderField()
 
     expect(paddingWrapper).toHaveClass('px-3', 'pt-2', 'pb-4', 'sm:px-4')
-    expect(widthWrapper).toHaveClass('mx-auto', 'max-w-4xl')
+    expect(widthWrapper).toHaveClass('mx-auto', 'max-w-(--chat-content-max-width)')
     expect(card).toHaveClass('rounded-lg')
     expect(card).not.toHaveClass('rounded-none')
   })

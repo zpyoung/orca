@@ -13,7 +13,6 @@ import { NativeChatCodeBlock } from './NativeChatCodeBlock'
 import type { ChatApproval } from './native-chat-interactive-prompt'
 import { NativeChatPromptCollapseToggle } from './NativeChatPromptCollapse'
 import { useNativeChatPromptCardFocus } from './use-native-chat-prompt-card-focus'
-import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 
 export type NativeChatApprovalCardProps = {
   approval: ChatApproval
@@ -46,8 +45,6 @@ export function NativeChatApprovalCard({
   onLinkClick,
   allowFileUriLinks = false
 }: NativeChatApprovalCardProps): React.JSX.Element {
-  const widthClassName = useNativeChatWidthClassName()
-
   const cardRef = useRef<HTMLDivElement>(null)
   const neededPath = approvalBlockedPathToShow(approval)
   // A newer Orca's subject: its detail is shown, and only the card's cancel answers.
@@ -64,12 +61,7 @@ export function NativeChatApprovalCard({
 
   return (
     <div className="min-h-0 shrink overflow-hidden bg-chat-canvas">
-      <div
-        className={cn(
-          'mx-auto flex h-full min-h-0 max-h-full w-full px-3 pt-2 pb-1 sm:px-4',
-          widthClassName
-        )}
-      >
+      <div className="mx-auto flex h-full min-h-0 max-h-full w-full max-w-(--chat-content-max-width) px-3 pt-2 pb-1 sm:px-4">
         <div
           ref={cardRef}
           data-native-chat-prompt-card-focus={shouldFocus || undefined}

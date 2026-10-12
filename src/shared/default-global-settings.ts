@@ -16,7 +16,6 @@ import {
 } from './left-sidebar-appearance'
 import { DEFAULT_SOURCE_CONTROL_GROUP_ORDER } from './source-control-group-order'
 import { DESKTOP_TERMINAL_SCROLLBACK_ROWS_DEFAULT } from './terminal-scrollback-policy'
-import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from './fork-native-chat-width/native-chat-width-default'
 
 export function buildDefaultSettings(args: {
   workspaceDir: string
@@ -137,7 +136,6 @@ export function buildDefaultSettings(args: {
     experimentalNativeChat: false,
     experimentalTerminalDock: false,
     dockTerminalComposerByDefault: true,
-    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,
     nativeChatResumeWorkOnRestart: false,
     nativeChatQueueFollowUps: true,
     nativeChatInlineVisuals: true,
