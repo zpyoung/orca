@@ -64,10 +64,22 @@ export function useNativeChatPasteBridge({
         return
       }
       if (isEditableTarget(event.target)) {
-        // Other text fields (search, answer) keep their native paste.
-        if (event.target instanceof Node && composerRef.current?.contains?.(event.target)) {
-          composerRef.current.handlePasteEvent(event)
+        const composer = composerRef.current
+        if (event.target instanceof Node && composer?.contains?.(event.target)) {
+          composer.handlePasteEvent(event)
+          return
         }
+        // The answer input takes no images, so a paste with no text attaches to the composer.
+        const answerInput = questionAnswerInputRef?.current
+        if (
+          composer &&
+          answerInput &&
+          event.target === answerInput &&
+          !event.clipboardData?.getData('text/plain')
+        ) {
+          composer.handlePasteEvent(event)
+        }
+        // Other text fields (search, answer) keep their native paste.
         return
       }
       const composer = composerRef.current

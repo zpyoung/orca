@@ -34,6 +34,10 @@ function composerHandle(): NativeChatComposerHandle {
     insertTypedText: vi.fn(() => true),
     acceptsText: vi.fn(() => true),
     appendText: vi.fn(),
+    // The harness's textarea stands in for the composer's own field.
+    contains: vi.fn(
+      (node: Node | null) => node instanceof HTMLElement && node.dataset.testid === 'composer-field'
+    ),
     handlePasteEvent: vi.fn(),
     pasteFromClipboard: vi.fn()
   }
