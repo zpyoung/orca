@@ -44,6 +44,8 @@ export type NativeChatPtySessionOptionsSurface = SessionOptionsSurface & {
    *  with no timestamp of its own; a session log stamps every record. */
   reportSessionOptions(values: Record<string, SessionOptionValue>, observedAt?: number | null): void
   replaceModels(models: CatalogModel[]): void
+  /** The context window the host's model listing states for `modelId`, or null. */
+  contextWindowTokens(modelId: string): number | null
 }
 
 export type CreateNativeChatPtySessionOptionsArgs = {
@@ -238,6 +240,8 @@ export function createNativeChatPtySessionOptions(
       modelsAreDiscovered = true
       untrackRetiredModel()
       publish()
-    }
+    },
+    contextWindowTokens: (modelId) =>
+      models.find((model) => model.id === modelId)?.contextWindowTokens ?? null
   }
 }

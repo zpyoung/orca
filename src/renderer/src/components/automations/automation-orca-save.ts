@@ -15,6 +15,7 @@ import {
   type AutomationDispatchResult
 } from './automation-row-action-dispatch'
 import { buildDraftPrecheck } from './automation-draft-model'
+import { hasExtraAgentArgs } from '../../../../shared/automation-extra-agent-args'
 import { buildAutomationRunContextForRepo } from './automation-run-context'
 import {
   buildAutomationLaunchOverridesCreateFields,

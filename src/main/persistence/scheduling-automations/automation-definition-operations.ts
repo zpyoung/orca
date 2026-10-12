@@ -9,6 +9,10 @@ import type {
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import { normalizeAgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
+import {
+  assertAutomationExtraAgentArgs,
+  storedExtraAgentArgs
+} from '../../../shared/automation-extra-agent-args-record'
 import { nextAutomationOccurrenceAfter } from '../../../shared/automation-schedule-occurrences'
 import {
   applyAutomationExecutionTarget,
@@ -117,6 +121,7 @@ export function createAutomation(
     createdAt: now,
     updatedAt: now
   }
+  assertAutomationExtraAgentArgs(automation)
   operations.state.automations = [...(operations.state.automations ?? []), automation]
   operations.recordCreated()
   operations.flush()

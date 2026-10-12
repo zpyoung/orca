@@ -1,7 +1,11 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
 import { OrcaRuntimeWithListManagedWorktrees } from './orca-runtime-list-managed-worktrees'
 import type { RuntimeNavigationTarget } from '../../shared/runtime-navigation'
-import { navigationTargetsClients, navigationTargetsHost } from '../../shared/runtime-navigation'
+import {
+  navigationTargetsClients,
+  navigationTargetsHost,
+  resolveRuntimeNavigationTarget
+} from '../../shared/runtime-navigation'
 import { getRepoExecutionHostId } from '../../shared/execution-host'
 import { repoIsRemote } from '../../shared/agent-launch-remote'
 import type { Repo } from '../../shared/repo-types'
@@ -14,7 +18,8 @@ import type {
 } from './runtime-worktree-agent-startup'
 import {
   buildWorktreeStartupForAgent,
-  buildWorktreeStartupForDraft
+  buildWorktreeStartupForDraft,
+  resolveWorktreeStartupDraftAgent
 } from './runtime-worktree-agent-startup'
 import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
 import type { AgentLaunchOverrides } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
@@ -66,7 +71,7 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
     if (!repo) {
       throw new Error('repo_not_found')
     }
-    const navigation = opts.navigation ?? (opts.notifyClients === false ? 'caller' : 'all')
+    const navigation = resolveRuntimeNavigationTarget({ ...opts, defaultTarget: 'host' })
     const targetsHost = navigationTargetsHost(navigation)
     const targetsClients = navigationTargetsClients(navigation)
 
@@ -86,7 +91,14 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
         this.notifyHostActivateWorktree(repo.id, worktree.id)
       }
       if (targetsClients) {
-        this.notifyClientsActivateWorktree(repo.id, worktree.id)
+        this.notifyClientsActivateWorktree(
+          repo.id,
+          worktree.id,
+          undefined,
+          undefined,
+          undefined,
+          navigation
+        )
       }
     }
     if (!targetsHost) {
@@ -125,6 +137,19 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
     return { repoId: repo.id, worktreeId: worktree.id, activated: true, sleepingAgentWake }
   }
 
+  /** The agent a create's linked draft starts, chosen as `buildStartupForDraft` chooses it, so a
+   *  launch can name the agent before the create runs. */
+  async resolveStartupDraftAgent(repo: Repo, requestedAgent?: TuiAgent): Promise<TuiAgent | null> {
+    if (!this.store) {
+      return null
+    }
+    return resolveWorktreeStartupDraftAgent({
+      repo,
+      settings: this.store.getSettings(),
+      ...(requestedAgent ? { requestedAgent } : {})
+    })
+  }
+
   protected async buildStartupForDraft(
     repo: Repo,
     draft: string,
@@ -155,6 +180,7 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
     launchPreferences?: AgentLaunchPreferences,
     launchInputs?: {
       agentArgs?: string | null
+      extraAgentArgs?: string
       launchSource?: string
       launchOverrides?: AgentLaunchOverrides
       onPromptCarry?: (carried: boolean) => void
@@ -173,6 +199,7 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
       ...(prompt !== undefined ? { prompt } : {}),
       ...(launchPreferences ? { launchPreferences } : {}),
       ...(launchInputs?.agentArgs !== undefined ? { agentArgs: launchInputs.agentArgs } : {}),
+      ...(launchInputs?.extraAgentArgs ? { extraAgentArgs: launchInputs.extraAgentArgs } : {}),
       ...(launchInputs?.launchSource ? { launchSource: launchInputs.launchSource } : {}),
       ...(launchOverrides ? { launchOverrides } : {}),
       ...(launchInputs?.onPromptCarry ? { onPromptCarry: launchInputs.onPromptCarry } : {}),

@@ -229,7 +229,11 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
   const subscribeArgs: SubscribeNativeChatTranscriptArgs = {
     agent,
     sessionId,
-    transcriptPath,
+    transcriptPath: nativeChatTranscriptPathOnExecutionHost(
+      agentHookServer.getStatusSnapshot(),
+      sessionId,
+      transcriptPath
+    ),
     initialLimit: limit,
     onTranscriptPending: () => {
       if (!canPublish()) {

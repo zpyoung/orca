@@ -1,23 +1,18 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { InteractivePromptCard } from './native-chat-interactive-prompt'
-import { nativeChatCardDismissKey } from './native-chat-dismiss-key'
 import { NativeChatQuestionCard } from './NativeChatQuestionCard'
 import { NativeChatApprovalCard } from './NativeChatApprovalCard'
 import type { NativeChatInteractiveSend } from './use-native-chat-interactive-send'
 
 /**
- * Render the pane's interactive card (see useNativeChatInteractivePromptCard): a
- * question wizard or a tool approval. Cleared by the host once the agent moves
- * on, so it disappears automatically. Sends through the composer's verified
- * runtime path (R8/R6): answers via agent-specific paste or selector
- * keystrokes; cancel/deny as ESC.
- * Guarded by `canSend` so a mobile presence-lock blocks desktop sends too.
+ * Render one prompt occurrence the view chose (see useNativeChatPromptCardPresentation): a
+ * question wizard or a tool approval, in the composer's place. Sends through the composer's
+ * verified runtime path (R8/R6): answers via agent-specific paste or selector keystrokes;
+ * cancel/deny as ESC. Unmount cancels scheduled writes and ignores late results; writes already
+ * issued to the transport cannot be recalled.
  *
- * Dismiss-on-answer (mobile parity): the live status lingers after answering —
- * the agent emits a post-tool event carrying the same prompt — so we track the
- * answered prompt by content key and hide the card until a genuinely different
- * prompt arrives. The dismissal resets once the prompt clears, so a later
- * (even identical) prompt shows again instead of staying hidden.
+ * The card hides (`onDismiss`) only once its answer was delivered: a refused or unconfirmed
+ * answer keeps the choices up, so the user can answer again here or in the terminal.
  */
 export function NativeChatInteractiveCard({
   card,
@@ -27,7 +22,7 @@ export function NativeChatInteractiveCard({
   onShowingCardChange,
   answerInputRef
 }: {
-  card: InteractivePromptCard
+  card: NonNullable<InteractivePromptCard>
   send: NativeChatInteractiveSend
   canSend: boolean
   /** Reports whether a question card is on screen so the view can replace the
@@ -38,10 +33,8 @@ export function NativeChatInteractiveCard({
   /** Forwarded to the question card's free-text row so pane-level Paste keeps
    *  a target while the composer is unmounted. */
   answerInputRef?: React.RefObject<HTMLInputElement | null>
-}): React.JSX.Element | null {
-  const { sendAnswer, sendRaw, cancelPending, cancelAsk } = send
-  const cardKey = useMemo(() => nativeChatCardDismissKey(card), [card])
-  const [dismissedKey, setDismissedKey] = useState<string | null>(null)
+}): React.JSX.Element {
+  const { sendAnswer, sendRawVerified, cancelPending, cancelAsk } = send
   // A question answer is a paced multi-step write (body→Enter per question); keep
   // the card up until it settles instead of dismissing on the click, so it doesn't
   // vanish mid-send. `submitting` also gates a second submit racing the first.
@@ -50,6 +43,8 @@ export function NativeChatInteractiveCard({
   const resetSubmitting = useCallback((): void => {
     submittingRef.current = false
     setSubmitting(false)
+    cancellingRef.current = false
+    setCancelling(false)
   }, [])
   // A replacement prompt, ownership loss, or unmount must stop both timers and
   // PTY writes during commit, before an old answer can type into the new prompt.
@@ -89,9 +84,9 @@ export function NativeChatInteractiveCard({
   if (card.kind === 'question') {
     return (
       <NativeChatQuestionCard
-        key={cardKey ?? 'question'}
         prompt={card.prompt}
         isSubmitting={submitting}
+        isCancelling={cancelling}
         answerInputRef={answerInputRef}
         onAnswer={(selections) => {
           if (submittingRef.current) {
@@ -106,16 +101,18 @@ export function NativeChatInteractiveCard({
             resetSubmitting()
           }
           const result = sendAnswer(card.prompt, selections, (delivered) => {
+            if (!activeRef.current || attempt !== attemptRef.current) {
+              return
+            }
+            settle()
             if (delivered) {
-              dismissAnsweredCard()
-            } else {
-              keepRejectedAnswerVisible()
+              onDismiss()
             }
           })
           if (result.settleAfterMs <= 0) {
             // Keep the actionable card visible when its PTY disappeared between
             // render and submit; the next live target update can make it retryable.
-            keepRejectedAnswerVisible()
+            settle()
             return
           }
           // Why: the send now settles from its own real lifecycle (r5-1), not a
@@ -130,13 +127,32 @@ export function NativeChatInteractiveCard({
       />
     )
   }
+  const choose = (raw: string): void => {
+    if (submittingRef.current) {
+      return
+    }
+    submittingRef.current = true
+    const attempt = ++attemptRef.current
+    setSubmitting(true)
+    void sendRawVerified(raw)
+      .catch(() => false)
+      .then((delivered) => {
+        if (!activeRef.current || attempt !== attemptRef.current) {
+          return
+        }
+        settle()
+        if (delivered) {
+          onDismiss()
+        }
+      })
+  }
   return (
     <NativeChatApprovalCard
       approval={card.approval}
-      onChoose={(raw) => {
-        setDismissedKey(cardKey)
-        sendRaw(raw)
-      }}
+      shouldFocus={shouldFocus}
+      isSubmitting={submitting}
+      onChoose={choose}
+      onCollapse={onCollapse}
     />
   )
 }

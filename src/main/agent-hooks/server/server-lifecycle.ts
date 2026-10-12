@@ -238,6 +238,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     }
     this.assistantMessageRetryTimers.clear()
     this.clearAllTranscriptPolls()
+    this.claudeOwedNotificationExpiry.clearAll()
     this.endpointDir = null
     this.endpointFilePathCache = null
     this.endpointFileWritten = false

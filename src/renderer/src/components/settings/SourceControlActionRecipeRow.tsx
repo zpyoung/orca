@@ -9,7 +9,7 @@ import type { CustomAgentId } from '../../../../shared/commit-message-agent-spec
 import { CUSTOM_AGENT_ID, isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
 import {
   SOURCE_CONTROL_ACTION_LABELS,
-  type SourceControlActionId
+  type AiActionId
 } from '../../../../shared/source-control-ai-actions'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
@@ -24,7 +24,7 @@ import {
 } from './source-control-ai-action-recipe-draft'
 import {
   getActionDescriptions,
-  SOURCE_CONTROL_TEXT_ACTION_ID_SET,
+  AI_TEXT_ACTION_ID_SET,
   getAgentCatalogForAction,
   getSourceControlActionAgentSupportText,
   getSourceControlActionAgentWarningText,
@@ -34,8 +34,8 @@ import { translate } from '@/i18n/i18n'
 
 const DEFAULT_AGENT_VALUE = '__default_agent__'
 
-type SourceControlActionRecipeRowProps = {
-  actionId: SourceControlActionId
+type SourceControlActionRecipeRowProps<ActionId extends AiActionId> = {
+  actionId: ActionId
   selectedAgent: TuiAgent | CustomAgentId | null
   draftValue: ActionRecipeDraftValue
   baseValue: ActionRecipeDraftValue
@@ -64,7 +64,13 @@ function resolveAgentArgsPlaceholderAgent(
   return defaultTuiAgent && defaultTuiAgent !== 'blank' ? defaultTuiAgent : null
 }
 
-export function SourceControlActionRecipeRow({
+function getActionLabel(actionId: AiActionId): string {
+  return actionId === 'conversationName'
+    ? translate('settings.chat.names.recipe', 'Chat name')
+    : SOURCE_CONTROL_ACTION_LABELS[actionId]
+}
+
+export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
   actionId,
   selectedAgent,
   draftValue,
@@ -105,9 +111,7 @@ export function SourceControlActionRecipeRow({
     <div className="rounded-md border border-border px-3 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-0.5">
-          <p className="text-xs font-medium text-foreground">
-            {SOURCE_CONTROL_ACTION_LABELS[actionId]}
-          </p>
+          <p className="text-xs font-medium text-foreground">{getActionLabel(actionId)}</p>
           <p className="text-[11px] text-muted-foreground">{getActionDescriptions()[actionId]}</p>
         </div>
         <div className="w-full shrink-0 space-y-1 sm:w-[220px]">
@@ -128,7 +132,7 @@ export function SourceControlActionRecipeRow({
                   )}
                 </span>
               </SelectItem>
-              {SOURCE_CONTROL_TEXT_ACTION_ID_SET.has(actionId) ? (
+              {AI_TEXT_ACTION_ID_SET.has(actionId) ? (
                 <SelectItem value={CUSTOM_AGENT_ID}>
                   <span className="flex items-center gap-2">
                     <Terminal className="size-3.5 text-muted-foreground" />

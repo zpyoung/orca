@@ -15,6 +15,7 @@ import {
 } from './repo-ipc-arg-schemas'
 import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
 import { activeNestedRepoScans, runNestedRepoScanForIpc } from './nested-repo-scan-ipc'
+import { visibleProjectGroups } from '../../ssh/orcad-retained-source'
 
 export function registerProjectGroupHandlers(
   mainWindow: BrowserWindow,

@@ -144,17 +144,20 @@ describe('per-job path classification', () => {
     expectClassification(['src/main/codex/codex-index-heal-binary-contract.test.ts'], {
       codex_index_heal_contract: true
     })
-    for (const file of ['src/main/agent-trust-presets.ts', 'src/main/codex/config-toml-trust.ts']) {
-      expectClassification([file], {
-        codex_index_heal_contract: true,
-        package: true,
-        package_windows: true
-      })
-    }
-    // Keep the real-binary gate live when a transport or launch dependency changes.
+    // Keep the real-binary gate live when a trust, transport, launch or hook-approval dependency changes.
     for (const file of [
+      'src/main/agent-trust-presets.ts',
+      'src/main/codex/config-toml-trust.ts',
+      'src/main/codex/codex-hook-trust-derivation.ts',
+      'src/main/codex/codex-hook-local-install.ts',
+      'src/main/codex/codex-hook-orca-approvals.ts',
+      'src/main/codex/codex-hook-reconcile.ts',
+      'src/main/codex/config-toml-hook-trust-edit.ts',
+      'src/main/codex-cli/codex-read-only-app-server-args.ts',
       'src/main/codex/codex-app-server-capability-signal.ts',
-      'src/main/codex/codex-process-exit-deadline.ts',
+      'src/main/provider-process/provider-process-exit-deadline.ts',
+      'src/main/provider-process/provider-process-launch.ts',
+      'src/main/provider-process/provider-record-reader.ts',
       'src/main/codex/codex-session-backfill.ts',
       'src/main/codex/codex-session-index-heal-state.ts',
       'src/main/codex-cli/command.ts',
@@ -318,6 +321,7 @@ describe('per-job path classification', () => {
       'mobile/app/h/[hostId]/index.tsx',
       'mobile/src/transport/client-context.web.tsx',
       'mobile/modules/orca-mobile-web-shell/ios/MobileWebShellCsp.swift',
+      'src/shared/native-chat-visual-shell.ts',
       // The vendored Expo module the page resolves a .web.ts out of.
       'mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.web.ts'
     ]) {
@@ -327,8 +331,7 @@ describe('per-job path classification', () => {
 
   it('runs it on a mobile-only diff, which should_run alone would skip', () => {
     const classified = classifyPrJobs(['mobile/app/h/[hostId]/tasks.tsx'])
-    expect(classified.should_run).toBe(false)
-    expect(classified.mobile_web_app).toBe(true)
+    expect([classified.should_run, classified.mobile_web_app]).toEqual([false, true])
   })
 
   it('needs no package.json prefix, because package.json already forces every job', () => {
@@ -348,6 +351,7 @@ describe('per-job path classification', () => {
       'src/shared/protocol-version.ts',
       'src/shared/terminal-stream-protocol.ts',
       'src/shared/agent-session-wire.ts',
+      'src/shared/agent-session-provider-handle.ts',
       'src/shared/agent-session-mutation-envelope.ts',
       'src/shared/agent-session-journal-item-key.ts',
       'src/shared/agent-session-journal-types.ts',

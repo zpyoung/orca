@@ -105,6 +105,7 @@ describe('useNativeChatPickerCommandDispatch', () => {
       '/clear'
     )
     expect(sendNativeChatMessage).not.toHaveBeenCalled()
+    expect(onSubmitted).toHaveBeenCalledOnce()
   })
 
   it.each(['claude', 'openclaude'] as const)('keeps %s autocomplete commands pasted', (agent) => {

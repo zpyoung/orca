@@ -3,15 +3,12 @@ import { useLocalStructuredAgentSessionsHeld } from '@/runtime/local-structured-
 import { translate } from '@/i18n/i18n'
 import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'
 import { Label } from '../ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { NativeChatQueueFollowUpsSetting } from './NativeChatQueueFollowUpsSetting'
 import { NativeChatShellEnvironmentSetting } from './NativeChatShellEnvironmentSetting'
 import { NativeChatSupportedAgents } from './NativeChatSupportedAgents'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsSwitch } from './SettingsFormControls'
 import { getExperimentalSearchEntry } from './experimental-search'
-
-type NativeChatDefaultView = 'terminal-chat' | 'native-chat'
 
 type NativeChatExperimentalSettingProps = {
   settings: GlobalSettings
@@ -23,22 +20,16 @@ export function NativeChatExperimentalSetting({
   updateSettings
 }: NativeChatExperimentalSettingProps): React.JSX.Element {
   const nativeChatEnabled = settings.experimentalNativeChat === true
-  const structuredNativeChatEnabled = settings.experimentalStructuredNativeChat === true
   const resumeOnRestartEnabled = settings.nativeChatResumeWorkOnRestart === true
-  const defaultView: NativeChatDefaultView =
-    settings.openAgentTabsInChatByDefault === true ? 'native-chat' : 'terminal-chat'
-  // Structured-only settings; terminal-backed chat never reads them. They govern the chats this
-  // machine holds too, which keep running whatever the setting says.
   const holdsStructuredChats = useLocalStructuredAgentSessionsHeld()
-  const structuredChatActive =
-    (defaultView === 'native-chat' && structuredNativeChatEnabled) || holdsStructuredChats
+  const structuredChatActive = nativeChatEnabled || holdsStructuredChats
 
   return (
     <SearchableSetting
       title={translate('auto.components.settings.ExperimentalPane.nativeChat.title', 'Chat UI')}
       description={translate(
         'auto.components.settings.ExperimentalPane.nativeChat.description',
-        'Preview the desktop chat surface for supported agent terminal sessions.'
+        'Open supported new agents in Chat UI.'
       )}
       keywords={getExperimentalSearchEntry().nativeChat.keywords}
       className="space-y-3 py-2"
@@ -52,7 +43,7 @@ export function NativeChatExperimentalSetting({
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.settings.ExperimentalPane.nativeChat.copy',
-              'Enables the experimental Chat UI for newly created supported local sessions. Existing terminal sessions keep the terminal chat path while we tune transcript fidelity, streaming, and parity.'
+              'Supported new agents open in structured chat. Other agents open in the terminal; existing chats stay available.'
             )}
           </p>
           <NativeChatSupportedAgents />
@@ -70,7 +61,7 @@ export function NativeChatExperimentalSetting({
           }
         />
       </div>
-      {nativeChatEnabled ? (
+      {structuredChatActive ? (
         <div className="ml-4 space-y-4 border-l border-border pl-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 shrink space-y-0.5">

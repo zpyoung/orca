@@ -4,7 +4,6 @@ import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { isTuiAgentEnabled, pickTuiAgent } from '../../../shared/tui-agent-selection'
 import { buildDirectWorkItemAgentStartupPlan } from '@/lib/launch-work-item-direct-agent'
 import type { AgentSessionLaunchPlan } from '@/lib/agent-session-launch-plan'
-import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-platform'
 import { beginStructuredAgentSessionProvisionalLaunch } from '@/lib/structured-agent-session-provisional-tab'
 import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
@@ -37,9 +36,6 @@ export function buildDirectWorkItemStartup(args: {
     promptDelivery: args.promptDelivery,
     settings: args.settings,
     launchPlatform,
-    nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
-      args.launchConnectionId
-    ),
     // Why: SSH hosts run the plain `orca` shim, so the Linux-only `orca-ide` rename is not applied.
     isRemote: typeof args.launchConnectionId === 'string'
   })
@@ -86,7 +82,7 @@ export function beginDirectWorkItemStructuredLaunch(args: {
   plan: AgentSessionLaunchPlan | null
   primaryTabId: string | null
   beforeOpen: (sessionId?: string) => boolean | void
-  /** The terminal launch a paired server's "no" falls back to, carrying the caller's own CLI args. */
+  /** The terminal launch the host's "no" falls back to, carrying the caller's own CLI args. */
   declinedTerminal?: DeclinedStructuredLaunchTerminalOptions
 }): {
   completed: boolean

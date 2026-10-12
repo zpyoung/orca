@@ -5,6 +5,7 @@ import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
 import type { TerminalLayoutSnapshot } from './terminal-tab-types'
 import type { TuiAgent } from './tui-agent'
+import type { StructuredAgentId } from './agent-session-provider-handle'
 
 export type RuntimeMobileSessionTerminalTab = {
   type: 'terminal'
@@ -101,7 +102,9 @@ export type RuntimeMobileSessionAgentTab = {
   title: string
   sessionId: string
   replacesSessionId?: string
-  agent: 'claude' | 'codex'
+  /** An agent the host registered. Beyond Claude and Codex, published only to clients advertising
+   *  the registered-agents capability. */
+  agent: StructuredAgentId
   color?: string | null
   isPinned?: boolean
   isActive: boolean

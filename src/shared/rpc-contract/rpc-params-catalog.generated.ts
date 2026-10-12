@@ -29,6 +29,8 @@ import {
   PairingProvisionRelayParamsSchema
 } from '../mobile-relay-credential-contract'
 import { MobileWebBundleChunkParamsSchema } from '../mobile-web-bundle/bundle-rpc-contract'
+import { OrcadMigrationSnapshotChunkRequestSchema } from '../orcad-migration-scrollback'
+import { OrcadTerminalCensusParamsSchema } from '../orcad-terminal-census'
 import { pluginConsentRequestSchema } from '../plugins/plugin-consent-request'
 import {
   AccountsUnsubscribeParams,
@@ -45,7 +47,14 @@ import {
 } from './accounts-params'
 import { PrepareCodexForWslPaneParams } from './agent-hooks-params'
 import { AgentLaunch, AgentLaunchReplay } from './agent-launch-params'
+import {
+  AttachmentReadParams,
+  AttachmentUploadAppendParams,
+  AttachmentUploadIdParams,
+  AttachmentUploadStartParams
+} from './agent-session-attachment-params'
 import { CreateAgentSessionParams, EnsureAgentSessionParams } from './agent-session-params'
+import { ReadVisualParams } from './agent-session-visual-params'
 import {
   AiVaultListSessionsParams,
   AiVaultPrepareSessionResumeParams,
@@ -206,6 +215,7 @@ import {
   GitBranchCompare,
   GitBranchDiff,
   GitBulkPaths,
+  GitBulkStage,
   GitCheckIgnored,
   GitCheckout,
   GitCommit,
@@ -358,6 +368,11 @@ import {
   WorkspaceSelection
 } from './linear-params'
 import { CreateProject } from './linear-project-create-params'
+import {
+  ManagedServerRecover,
+  ManagedServerSelector,
+  ManagedServerUpdate
+} from './managed-server-params'
 import { NativeChatSession, NativeChatUnsubscribe } from './native-chat-params'
 import {
   NotificationGetMissedSinceParams,
@@ -365,6 +380,7 @@ import {
   NotificationUnsubscribeParams,
   NotificationsSubscribeParams
 } from './notifications-params'
+import { OrcadMigrationCatalogParams } from './orcad-migration-params'
 import {
   FederationDispatchParams,
   FederationFleetSnapshotParams,
@@ -390,6 +406,7 @@ import {
   DispatchParams,
   DispatchShowParams,
   InboxParams,
+  PartyLocationParams,
   ReplyParams,
   ResetParams,
   SessionAddressParams,
@@ -476,7 +493,10 @@ import {
   SpeechModelAction
 } from './speech-params'
 import { SshTarget } from './ssh-params'
+import { ContinueInterruptedParams } from './structured-agent-session-continue-params'
 import {
+  AcknowledgeAttentionParams,
+  AgentsParams,
   AttachParams,
   CancelParams,
   ConversationCommandParams,
@@ -497,6 +517,7 @@ import {
   SendParams,
   SetOptionParams,
   SubscribeParams,
+  SubscribeTurnCompletionsParams,
   ThreadGoalParams,
   UnsubscribeParams
 } from './structured-agent-session-params'
@@ -590,9 +611,12 @@ export const RPC_PARAMS_BY_METHOD = {
   'agent.launch': AgentLaunch,
   'agent.launchReplay': AgentLaunchReplay,
   'agentHooks.prepareCodexForWslPane': PrepareCodexForWslPaneParams,
+  'agentSession.acknowledgeAttention': AcknowledgeAttentionParams,
+  'agentSession.agents': AgentsParams,
   'agentSession.cancel': CancelParams,
   'agentSession.close': OptionsParams,
   'agentSession.commands': OptionsParams,
+  'agentSession.continueInterrupted': ContinueInterruptedParams,
   'agentSession.conversationCommand': ConversationCommandParams,
   'agentSession.conversationOutline': OptionsParams,
   'agentSession.create': CreateParams,
@@ -606,6 +630,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'agentSession.queuedMessageDelete': QueuedMessageActionParams,
   'agentSession.queuedMessageSend': QueuedMessageActionParams,
   'agentSession.queuedMessagesResume': QueuedMessagesResumeParams,
+  'agentSession.readVisual': ReadVisualParams,
   'agentSession.release': HoldParams,
   'agentSession.respondToApproval': RespondParams,
   'agentSession.respondToQuestion': RespondToQuestionParams,
@@ -619,9 +644,14 @@ export const RPC_PARAMS_BY_METHOD = {
   'agentSession.setOption': SetOptionParams,
   'agentSession.subscribe': SubscribeParams,
   'agentSession.subscribeStatus': null,
-  'agentSession.subscribeTurnCompletions': null,
+  'agentSession.subscribeTurnCompletions': SubscribeTurnCompletionsParams,
   'agentSession.threadGoal': ThreadGoalParams,
   'agentSession.unsubscribe': UnsubscribeParams,
+  'agentSessionAttachment.read': AttachmentReadParams,
+  'agentSessionAttachment.uploadAbort': AttachmentUploadIdParams,
+  'agentSessionAttachment.uploadAppend': AttachmentUploadAppendParams,
+  'agentSessionAttachment.uploadCommit': AttachmentUploadIdParams,
+  'agentSessionAttachment.uploadStart': AttachmentUploadStartParams,
   'agentTeams.prepareLaunch': AgentTeamsPrepareLaunch,
   'agentTeams.tmuxCompat': AgentTeamsTmuxCompat,
   'aiVault.listSessions': AiVaultListSessionsParams,
@@ -816,7 +846,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'git.branchCompare': GitBranchCompare,
   'git.branchDiff': GitBranchDiff,
   'git.bulkDiscard': GitBulkPaths,
-  'git.bulkStage': GitBulkPaths,
+  'git.bulkStage': GitBulkStage,
   'git.bulkUnstage': GitBulkPaths,
   'git.cancelGenerateCommitMessage': WorktreeSelectorOfGitParams,
   'git.cancelGeneratePullRequestFields': WorktreeSelectorOfGitParams,
@@ -999,6 +1029,13 @@ export const RPC_PARAMS_BY_METHOD = {
   'linear.teamStates': TeamId,
   'linear.testConnection': WorkspaceSelection,
   'linear.updateIssue': IssueUpdateOfLinearParams,
+  'managedServer.cancelStop': ManagedServerSelector,
+  'managedServer.forget': ManagedServerSelector,
+  'managedServer.recover': ManagedServerRecover,
+  'managedServer.rollback': ManagedServerSelector,
+  'managedServer.status': ManagedServerSelector,
+  'managedServer.stop': ManagedServerSelector,
+  'managedServer.update': ManagedServerUpdate,
   'markdown.readTab': ActivateTab,
   'markdown.saveTab': SaveMarkdownTab,
   'mobileWeb.bundle.chunk': MobileWebBundleChunkParamsSchema,
@@ -1014,6 +1051,12 @@ export const RPC_PARAMS_BY_METHOD = {
   'notifications.testPush': null,
   'notifications.unregisterPush': null,
   'notifications.unsubscribe': NotificationUnsubscribeParams,
+  'orcad.migration.abortCatalog': OrcadMigrationCatalogParams,
+  'orcad.migration.catalogState': OrcadMigrationCatalogParams,
+  'orcad.migration.commitCatalog': OrcadMigrationCatalogParams,
+  'orcad.migration.stageCatalog': OrcadMigrationCatalogParams,
+  'orcad.migration.stageSnapshotChunk': OrcadMigrationSnapshotChunkRequestSchema,
+  'orcad.terminalCensus': OrcadTerminalCensusParamsSchema,
   'orchestration.ask': AskParams,
   'orchestration.callerShow': null,
   'orchestration.check': CheckParams,
@@ -1033,6 +1076,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'orchestration.gateList': GateListParams,
   'orchestration.gateResolve': GateResolveParams,
   'orchestration.inbox': InboxParams,
+  'orchestration.partyLocation': PartyLocationParams,
   'orchestration.reply': ReplyParams,
   'orchestration.requestShow': RequestShowParams,
   'orchestration.reset': ResetParams,

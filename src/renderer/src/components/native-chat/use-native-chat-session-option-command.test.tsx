@@ -33,10 +33,11 @@ import {
   armTerminalInputQuarantine
 } from '../terminal-pane/terminal-input-quarantine'
 
-function renderDispatch(agent: 'codex' | 'claude' | 'openclaude') {
+function renderDispatch(agent: 'codex' | 'claude' | 'openclaude', onSubmitted = vi.fn()) {
   return renderHook(() =>
     useNativeChatSessionOptionCommand({
       agent,
+      onSubmitted,
       disabled: false,
       resolveTarget: () => ({ terminalTabId: 'tab-1', settings: {}, ptyId: 'pty-1' }),
       setHistory: vi.fn()
@@ -65,8 +66,10 @@ describe('useNativeChatSessionOptionCommand', () => {
   })
 
   it('types Codex option commands even without caller delivery metadata', async () => {
-    const hook = renderDispatch('codex')
+    const onSubmitted = vi.fn()
+    const hook = renderDispatch('codex', onSubmitted)
     await act(() => hook.result.current.dispatch('/model'))
+    expect(onSubmitted).toHaveBeenCalledOnce()
 
     expect(typeNativeChatCommand).toHaveBeenCalledWith(
       { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },

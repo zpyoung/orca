@@ -59,7 +59,8 @@ function TestField({ draft }: { draft: string }): React.JSX.Element {
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}
       onRetrySkills={vi.fn()}
-      onAcceptMention={vi.fn()}
+      onChooseMentionFile={vi.fn()}
+      mentionFiles={{ files: [], loading: false, failed: false }}
       onRemoveImageAttachment={vi.fn()}
       onAttach={vi.fn()}
       onDictationToggle={vi.fn()}

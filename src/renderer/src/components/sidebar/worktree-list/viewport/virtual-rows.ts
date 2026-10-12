@@ -166,7 +166,7 @@ export function getStickyHeaderIndexes(rows: readonly RenderRow[]): number[] {
 // Why: the pinned host card is h-8 (32px) inside a pt-1 (4px) wrapper; the
 // group tier pins one pixel up to sit flush beneath it. Keep in sync with
 // HostSectionHeader's layout.
-export const HOST_STICKY_PINNED_HEIGHT = 36
+export const HOST_STICKY_PINNED_HEIGHT = HOST_HEADER_ROW_HEIGHT
 
 export type ActiveStickyIndexes = {
   /** Pinned host card (tier 1), or null outside host sections. */
@@ -190,17 +190,25 @@ export function getActiveStickyIndexesForScroll(args: {
   virtualItems: readonly VirtualItem[]
 }): ActiveStickyIndexes {
   const hostIndexes = getHostStickyIndexes(args.rows, args.stickyHeaderIndexes)
+  const virtualItemsByIndex = new Map(args.virtualItems.map((item) => [item.index, item]))
 
   const resolveWithHandoff = (
     candidates: readonly number[],
     pinnedOffset: number,
     fallbackToCandidate: boolean
   ): number | null => {
-    const candidateIndex = getActiveStickyHeaderIndex(candidates, args.rangeStartIndex)
+    // The group slot can reach a header before the viewport's range start does.
+    const candidateIndex =
+      candidates.findLast(
+        (index) =>
+          index <= args.rangeStartIndex ||
+          (virtualItemsByIndex.get(index)?.start ?? Number.POSITIVE_INFINITY) <=
+            args.scrollOffset + pinnedOffset
+      ) ?? null
     if (candidateIndex === null) {
       return null
     }
-    const candidate = args.virtualItems.find((item) => item.index === candidateIndex)
+    const candidate = virtualItemsByIndex.get(candidateIndex)
     if (!candidate) {
       // Why: scrollToIndex/reveal can advance rangeStartIndex before TanStack
       // mounts the candidate row. Pinning without geometry lets a Project
@@ -208,7 +216,7 @@ export function getActiveStickyIndexesForScroll(args: {
       // sticky; group tier waits for geometry, host tier may keep the id.
       const previous = getPreviousStickyHeaderIndex(candidates, candidateIndex)
       if (previous !== null) {
-        const previousItem = args.virtualItems.find((item) => item.index === previous)
+        const previousItem = virtualItemsByIndex.get(previous)
         if (previousItem) {
           return previous
         }

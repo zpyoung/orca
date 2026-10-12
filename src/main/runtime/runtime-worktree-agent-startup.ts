@@ -39,8 +39,39 @@ type StartupEnvironment = {
   getLaunchPlatform: () => NodeJS.Platform
   /** Replaces the configured arguments for this launch; `null` means none. */
   agentArgs?: string | null
+  /** An automation's saved extras, merged over the launch's arguments. */
+  extraAgentArgs?: string
   /** Caller-supplied telemetry attribution, validated leniently at the host boundary. */
   launchSource?: string
+}
+
+/** The agent a linked draft starts: the requested one, else the default, else one detected on the
+ *  host that runs it. `null` means the draft starts no agent. */
+export async function resolveWorktreeStartupDraftAgent(
+  environment: Pick<StartupEnvironment, 'repo' | 'settings'> & { requestedAgent?: TuiAgent }
+): Promise<TuiAgent | null> {
+  const { repo, settings } = environment
+  const preferredAgent = environment.requestedAgent ?? settings.defaultTuiAgent
+  // Why: `blank` is an explicit shell-only preference, so linked drafts must not auto-pick an agent.
+  if (preferredAgent === 'blank') {
+    return null
+  }
+  if (isTuiAgent(preferredAgent) && isTuiAgentEnabled(preferredAgent, settings.disabledTuiAgents)) {
+    return preferredAgent
+  }
+  let detected: string[] = []
+  // Why: detection has to run on the machine that will run the agent, and SSH ownership has two
+  // spellings — the raw field probes this client for an `executionHostId: 'ssh:*'`-only repo.
+  const sshConnectionId = getRepoSshConnectionId(repo)
+  try {
+    // Why: startup-draft fallback can run from sparse runtime launch envs too.
+    detected = sshConnectionId
+      ? await detectRemoteAgents({ connectionId: sshConnectionId })
+      : await detectInstalledAgentsWithShellPathHydration()
+  } catch {
+    detected = []
+  }
+  return pickTuiAgent(null, detected.filter(isTuiAgent), settings.disabledTuiAgents)
 }
 
 export async function buildWorktreeStartupForDraft(
@@ -55,30 +86,7 @@ export async function buildWorktreeStartupForDraft(
     return null
   }
   const { repo, settings } = environment
-  const preferredAgent = environment.requestedAgent ?? settings.defaultTuiAgent
-  // Why: `blank` is an explicit shell-only preference, so linked drafts must not auto-pick an agent.
-  if (preferredAgent === 'blank') {
-    return null
-  }
-  let agent =
-    isTuiAgent(preferredAgent) && isTuiAgentEnabled(preferredAgent, settings.disabledTuiAgents)
-      ? preferredAgent
-      : null
-  if (!agent) {
-    let detected: string[] = []
-    // Why: detection has to run on the machine that will run the agent, and SSH ownership has two
-    // spellings — the raw field probes this client for an `executionHostId: 'ssh:*'`-only repo.
-    const sshConnectionId = getRepoSshConnectionId(repo)
-    try {
-      // Why: startup-draft fallback can run from sparse runtime launch envs too.
-      detected = sshConnectionId
-        ? await detectRemoteAgents({ connectionId: sshConnectionId })
-        : await detectInstalledAgentsWithShellPathHydration()
-    } catch {
-      detected = []
-    }
-    agent = pickTuiAgent(null, detected.filter(isTuiAgent), settings.disabledTuiAgents)
-  }
+  const agent = await resolveWorktreeStartupDraftAgent(environment)
   if (!agent) {
     return null
   }
@@ -223,6 +231,7 @@ export function resolveWorktreeCreateAgentStartup(
     preferences: AgentLaunchPreferences | undefined,
     inputs: {
       agentArgs?: string | null
+      extraAgentArgs?: string
       launchSource?: string
       launchOverrides?: AgentLaunchOverrides
       onPromptCarry?: (carried: boolean) => void
@@ -234,6 +243,7 @@ export function resolveWorktreeCreateAgentStartup(
   }
   return build(args.startupAgent, args.startupPrompt, args.startupLaunchPreferences, {
     ...(args.startupAgentArgs !== undefined ? { agentArgs: args.startupAgentArgs } : {}),
+    ...(args.startupExtraAgentArgs ? { extraAgentArgs: args.startupExtraAgentArgs } : {}),
     ...(args.startupLaunchSource ? { launchSource: args.startupLaunchSource } : {}),
     ...(args.startupLaunchOverrides ? { launchOverrides: args.startupLaunchOverrides } : {}),
     ...(args.onStartupPromptCarry ? { onPromptCarry: args.onStartupPromptCarry } : {})

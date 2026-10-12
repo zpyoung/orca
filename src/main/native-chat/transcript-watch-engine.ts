@@ -49,7 +49,6 @@ export async function installTranscriptWatcher(
 
   const state = createIncrementalTranscriptState()
   let watchedVersion: TranscriptFileVersion | null = null
-  let watchedBoundary = ''
   let initialDrain = true,
     initialErrorEmitted = false
   let closed = false
@@ -94,8 +93,22 @@ export async function installTranscriptWatcher(
     }
   }
 
+  async function readSnapshot(limit: number) {
+    return readNativeChatTranscriptTailFile(
+      filePath,
+      limit,
+      decode,
+      false,
+      undefined,
+      decodeLifecycle,
+      gateAbort.signal,
+      (boundary) => {
+        state.boundary = boundary
+      }
+    )
+  }
+
   async function finishSuccessfulDrain(startVersion: TranscriptFileVersion): Promise<void> {
-    watchedBoundary = await boundaryFingerprint(filePath, state.offset, gateAbort.signal)
     const completedVersion = await readTranscriptFileVersion(filePath, gateAbort.signal)
     if (transcriptFileVersionChanged(completedVersion, startVersion)) {
       // Why: a write racing this drain needs another pass even when the reader
@@ -105,6 +118,7 @@ export async function installTranscriptWatcher(
     } else {
       watchedVersion = completedVersion
     }
+    pendingReadRequested ||= completedVersion.size !== state.offset
     if (closed) {
       return
     }
@@ -133,7 +147,7 @@ export async function installTranscriptWatcher(
       identityChanged ||
       sameSizeVersionChanged ||
       current.size < state.offset ||
-      (state.offset > 0 && watchedBoundary !== currentBoundary)
+      (state.offset > 0 && state.boundary.toString('base64') !== currentBoundary)
     if (identityChanged) {
       nativeWatcher.invalidate()
     }
@@ -168,7 +182,6 @@ export async function installTranscriptWatcher(
         replacementSnapshot.beforeOffset,
         replacementSnapshot.companion
       )
-      await readAndEmitAppends()
       await finishSuccessfulDrain(current)
       return
     }
@@ -199,7 +212,6 @@ export async function installTranscriptWatcher(
           undefined,
           initialSnapshot.companion
         )
-        await readAndEmitAppends()
       } else {
         let companion: NativeChatTranscriptCompanion | undefined
         const messages = await readIncrementalTranscriptMessages(

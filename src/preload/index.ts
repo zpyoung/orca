@@ -5,10 +5,7 @@ import { buildForkAskApi } from './fork-ask-question-tool/ask-preload-api'
 import { buildForkHeimdallApi } from './fork-heimdall/heimdall-preload-api'
 import { buildHostedReviewAgentApi } from './fork-hosted-review-sitter/hosted-review-agent-preload-api'
 import type { PreloadApi } from './api-types'
-import {
-  installBrowserFindListener,
-  installNativeFileDropHandlers
-} from './preload-runtime-support'
+import { installBrowserFindListener } from './preload-runtime-support'
 import { appApi } from './api/app-bridge'
 import { ledgerApi } from './api/ledger-bridge'
 import { orcaProfilesApi } from './api/orca-profiles-bridge'
@@ -93,7 +90,6 @@ import { mobileApi } from './api/mobile-bridge'
 import { agentStatusApi } from './api/agent-status-bridge'
 import { speechApi } from './api/speech-bridge'
 
-installNativeFileDropHandlers()
 installBrowserFindListener()
 
 // Custom APIs for renderer. Each domain bridge owns its IPC contract.

@@ -29,10 +29,11 @@ export function useNativeChatPickerCommandDispatch(args: {
   onSendOutcome?: (outcome: SendOutcome) => void
   readTerminalScreen?: () => string | null
   resolveTarget: () => NativeChatResolvedTarget | null
-  onSlashCommand?: (command: string) => void
+  onSlashCommand?: (command: string, output?: string) => void
+  answerCommandLocally?: NativeChatLocalCommandAnswer
+  onSubmitted?: () => void
   sessionOptionsSurface: NativeChatPtySessionOptionsSurface | null
   trackPendingSend: NativeChatSendLifecycle['trackPendingSend']
-  setHistory: Dispatch<SetStateAction<HistoryState>>
   setDraft: (value: string) => void
   setCaret: Dispatch<SetStateAction<number>>
   setActiveSuggestion: Dispatch<SetStateAction<number>>
@@ -52,9 +53,10 @@ export function useNativeChatPickerCommandDispatch(args: {
     readTerminalScreen,
     resolveTarget,
     onSlashCommand,
+    answerCommandLocally,
+    onSubmitted,
     sessionOptionsSurface,
     trackPendingSend,
-    setHistory,
     setDraft,
     setCaret,
     setActiveSuggestion,
@@ -109,7 +111,7 @@ export function useNativeChatPickerCommandDispatch(args: {
         agent,
         runtime: nativeChatComposerTargetIsRemote(target.ptyId) ? 'remote' : 'local'
       })
-      setHistory((previous) => pushHistory(previous, text))
+      onSubmitted?.()
       setDraft('')
       setCaret(0)
       setActiveSuggestion(0)
@@ -119,6 +121,7 @@ export function useNativeChatPickerCommandDispatch(args: {
     },
     [
       agent,
+      answerCommandLocally,
       clearImageAttachments,
       clearSkillOrigin,
       disabled,
@@ -135,7 +138,6 @@ export function useNativeChatPickerCommandDispatch(args: {
       setActiveSuggestion,
       setCaret,
       setDraft,
-      setHistory,
       setNotice,
       trackPendingSend
     ]

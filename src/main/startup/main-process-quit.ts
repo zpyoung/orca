@@ -216,7 +216,7 @@ function installWillQuitHandler(): void {
         return
       }
       try {
-        await finalStore.flushFinalOrThrowAsync({ exportJsonCompatibility: true })
+        await finalStore.flushFinalOrThrowAsync()
         await finalStore.freezeWritesAsync()
         state.profileStateAdmission?.release()
         state.profileStateAdmission = undefined

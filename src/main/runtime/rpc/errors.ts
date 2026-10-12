@@ -68,6 +68,8 @@ const RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   WORKTREE_CREATE_COLLISION_CODE,
   AGENT_LAUNCH_PANE_ALREADY_LIVE_CODE,
   AGENT_LAUNCH_SESSION_ALREADY_EXISTS_CODE,
+  AGENT_LAUNCH_TAB_CLOSED_CODE,
+  AGENT_LAUNCH_TARGET_FORBIDDEN_CODE,
   'agent_launch_replay_unsupported',
   'runtime_unavailable',
   'selector_not_found',

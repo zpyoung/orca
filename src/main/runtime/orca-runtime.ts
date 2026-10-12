@@ -3,6 +3,9 @@ import { OrcaRuntimeWithLedger } from './orca-runtime-ledger'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import { askServicesFor, type AskServices } from '../fork-ask-question-tool/ask-services'
 import { registerWorktreeChangeInvalidator } from '../ipc/worktree-change-invalidators'
+import type { AgentSessionRecordStore } from './agent-session-record-store'
+import { peekOpenedAgentSessionRecordStore } from './agent-session-record-store-slot'
+import { createAgentLaunchRecordWarmupGate } from './agent-launch-record-warmup-gate'
 import { registerDetectedWorktreeScanInvalidation } from '../ipc/worktrees/listing/register-detected-worktree-scan-invalidation'
 
 class OrcaRuntimeService extends OrcaRuntimeWithLedger {

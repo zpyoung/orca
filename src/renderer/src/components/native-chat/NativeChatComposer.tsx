@@ -17,8 +17,7 @@ import { useNativeChatComposerAttachments } from './use-native-chat-composer-att
 import { useNativeChatComposerPaste } from './use-native-chat-composer-paste'
 import { useNativeChatExternalAttachments } from './use-native-chat-external-attachments'
 import { useNativeChatSessionOptions } from './use-native-chat-session-options'
-import { useNativeChatFileAttachmentActions } from './use-native-chat-file-attachment-actions'
-import { useNativeChatDictationActions } from './use-native-chat-dictation-actions'
+import { useNativeChatDictation } from './use-native-chat-dictation'
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
 import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
@@ -55,6 +54,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     {
       terminalTabId,
       paneKey,
+      draftScopeKey = paneKey,
       targetPtyId,
       agent,
       canSend = true,
@@ -68,6 +68,8 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       onOptimisticSend,
       onOptimisticSendCanceled,
       onSlashCommand,
+      onSubmitted,
+      answerCommandLocally,
       onSwitchToTerminal,
       readTerminalScreen,
       launchSeed,
@@ -122,6 +124,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       draft: core.draft,
       caret: core.caret,
       agentCommands,
+      recalledFromHistory: recall.active,
       sessionSkillNames,
       textareaRef: core.textareaRef,
       setDraft: core.setDraft,
@@ -160,7 +163,11 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setNotice: core.setNotice
     })
 
-    const { attachExternalPaths, resolveAttachmentOwner } = useNativeChatExternalAttachments({
+    const { pickAttachments, resolveAttachmentOwner } = useNativeChatFileDrops({
+      paneKey,
+      draftScopeKey,
+      targetPtyId,
+      structuredTransport,
       terminalTabId,
       structuredWorktreeId: structuredTransport?.worktreeId,
       disabled: core.disabled,
@@ -225,7 +232,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     const sessionOptionsSurface = structuredTransport?.optionsSurface ?? ptySessionOptionsSurface
     const sessionOptionsSnapshot = structuredTransport?.optionSnapshot ?? ptySessionOptionsSnapshot
 
-    const sendStructured = useNativeChatStructuredComposerSend({
+    const { send: sendStructured, fieldProps: queue } = useNativeChatHeldQueueComposerSend({
       agent,
       draft: core.draft,
       imageAttachments,

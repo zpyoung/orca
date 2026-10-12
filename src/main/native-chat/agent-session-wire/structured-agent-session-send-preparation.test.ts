@@ -25,6 +25,8 @@ import {
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
 import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 
@@ -51,7 +53,7 @@ beforeEach(async () => {
     acquisitionGeneration: `generation-${++generation}`,
     link: {
       linkId: `link-${fence}`,
-      handle: { provider: 'codex' as const, threadId: THREAD },
+      handle: codexProviderHandle(THREAD),
       origin: store.getRecord(SESSION)?.providerHandleChain.length
         ? ('resumed' as const)
         : ('created' as const),
@@ -71,6 +73,7 @@ beforeEach(async () => {
   }))
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     logger: {
       warn: (_message, fields) => hostErrors.push(fields.error),
       error: (_message, fields) => hostErrors.push(fields.error)
@@ -196,7 +199,7 @@ describe('a send with no live owner', () => {
     expect(acquire).not.toHaveBeenCalled()
   })
 
-  it('does not restart an owner for a send the session refuses anyway', async () => {
+  it('restarts an independently retained old-build clear source', async () => {
     await loseOwner()
     await store.transitionHandoff(SESSION, (current) => ({
       ...current,
@@ -210,12 +213,10 @@ describe('a send with no live owner', () => {
       }
     }))
 
-    await expect(host.send(CALLER, sendParams('into a cleared chat'))).resolves.toMatchObject({
-      ok: false,
-      refusal: { code: 'agent_session_operation_invalid' }
+    await expect(host.send(CALLER, sendParams('into the retained chat'))).resolves.toMatchObject({
+      ok: true
     })
-
-    expect(acquire).not.toHaveBeenCalled()
+    await eventually(() => expect(acquire).toHaveBeenCalledOnce())
   })
 
   it('restarts an owner that exited while the session stayed readable', async () => {

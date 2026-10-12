@@ -12,7 +12,7 @@ vi.mock('./fork-agent-composer/AgentComposerActions', () => ({
   AgentComposerActions: () => <div data-testid="composer-actions" />
 }))
 vi.mock('./NativeChatAutocompleteMenus', () => ({
-  NativeChatMentionHint: () => null,
+  NativeChatMentionMenu: () => null,
   NativeChatPickerMenu: () => null
 }))
 vi.mock('../../store', () => {
@@ -121,9 +121,9 @@ function promptValue(input: HTMLTextAreaElement): string {
 
 let paneCounter = 0
 
-function renderComposer(structuredTransport: NativeChatStructuredComposerTransport): void {
+function renderComposer(structuredTransport: NativeChatStructuredComposerTransport) {
   paneCounter += 1
-  render(
+  return render(
     <NativeChatComposer
       terminalTabId={`tab-${paneCounter}`}
       paneKey={`tab-${paneCounter}:structured`}
@@ -139,8 +139,7 @@ beforeEach(() => {
     configurable: true,
     value: {
       git: { discoverCommitMessageModels: vi.fn().mockResolvedValue({ success: false }) },
-      pty: { getMainBufferSnapshot: vi.fn().mockResolvedValue(null) },
-      ui: { onFileDrop: () => vi.fn() }
+      pty: { getMainBufferSnapshot: vi.fn().mockResolvedValue(null) }
     }
   })
 })
@@ -245,7 +244,7 @@ describe('structured send racing the next IME composition', () => {
     changePrompt(input, '/model')
     await act(async () => pressEnter(input))
 
-    expect(structured.onError).toHaveBeenCalledWith('nope')
+    expect(structured.onError).toHaveBeenCalledWith('nope', undefined)
     expect(structured.send).not.toHaveBeenCalled()
     expect(promptValue(input)).toBe('/model')
   })
@@ -311,5 +310,31 @@ describe('a withdrawn message put back during an IME composition', () => {
 
     expect(promptValue(input)).toBe('하\n\nwithdrawn')
     expect(readNativeChatDraftCache(pane)).toBe('하\n\nwithdrawn')
+  })
+})
+
+// One send per chat, as the common pattern: while it is out, Send is off and Enter keeps the text.
+describe('a structured send while the chat has one out', () => {
+  it('keeps the text in the box and Send disabled until the send settles', async () => {
+    const structured = transport({ send: vi.fn(() => false), sendOut: true })
+    const view = renderComposer(structured)
+    const input = textarea()
+    changePrompt(input, 'next one')
+    expect(actions.sendDisabled).toBe(true)
+
+    await act(async () => pressEnter(input))
+    expect(structured.send).toHaveBeenCalledWith('next one', [])
+    expect(promptValue(input)).toBe('next one')
+
+    view.rerender(
+      <NativeChatComposer
+        terminalTabId={`tab-${paneCounter}`}
+        paneKey={`tab-${paneCounter}:structured`}
+        targetPtyId={null}
+        agent="codex"
+        structuredTransport={{ ...structured, sendOut: false }}
+      />
+    )
+    expect(actions.sendDisabled).toBe(false)
   })
 })

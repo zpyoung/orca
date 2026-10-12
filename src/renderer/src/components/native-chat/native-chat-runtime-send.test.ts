@@ -872,12 +872,14 @@ describe('empty prompt submit', () => {
 describe('sendNativeChatAskAnswer', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    resetNativeChatPtySendQueuesForTests()
     sendRuntimePtyInput.mockClear()
     sendRuntimePtyInput.mockReturnValue(true)
     sendRuntimePtyInputVerified.mockReset().mockResolvedValue(true)
     resetNativeChatPtySendQueuesForTests()
   })
   afterEach(() => {
+    resetNativeChatPtySendQueuesForTests()
     vi.useRealTimers()
     resetNativeChatPtySendQueuesForTests()
   })
@@ -899,18 +901,31 @@ describe('sendNativeChatAskAnswer', () => {
       2 * NATIVE_CHAT_QUESTION_STEP_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
     )
 
-    vi.advanceTimersByTime(0)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '1', 'driving')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(
+      SETTINGS,
+      PTY,
+      '1',
+      'driving',
+      undefined
+    )
 
-    vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving')
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_QUESTION_STEP_MS)
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(
+      SETTINGS,
+      PTY,
+      '2',
+      'driving',
+      undefined
+    )
 
-    vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
-    expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_QUESTION_STEP_MS)
+    expect(sendRuntimePtyInputVerified).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
       buildNativeChatPasteBytes('custom answer'),
-      'driving'
+      'driving',
+      undefined
     )
   })
 
@@ -919,8 +934,8 @@ describe('sendNativeChatAskAnswer', () => {
     vi.advanceTimersByTime(0)
     expect(sendRuntimePtyInput).toHaveBeenCalledTimes(1)
     handle.cancel()
-    vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS * 2)
-    expect(sendRuntimePtyInput).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_QUESTION_STEP_MS * 2)
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
   })
 
   it('reports verified delivery only after settling and suppresses it after cancellation', async () => {
@@ -961,6 +976,7 @@ describe('sendNativeChatAskAnswer', () => {
     expect(onSettled).not.toHaveBeenCalled()
 
     resolveAccepted(true)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     await vi.waitFor(() => expect(onSettled).toHaveBeenCalledExactlyOnceWith(true))
   })
 })

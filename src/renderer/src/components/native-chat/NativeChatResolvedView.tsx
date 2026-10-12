@@ -1,3 +1,6 @@
+import { cn } from '@/lib/utils'
+import { NATIVE_CHAT_APPEARANCE_ROOT_CLASS } from './native-chat-appearance-style'
+import { useNativeChatStoreAppearanceStyle } from './use-native-chat-store-appearance-style'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNativeChatComposerRevealFocus } from './use-native-chat-composer-reveal-focus'
 import { useAppStore } from '../../store'
@@ -9,10 +12,14 @@ import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConve
 import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { useNativeChatLaunchPromptDeliveryNotice } from './use-native-chat-launch-prompt-delivery-notice'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
-import { useNativeChatFontScale } from './use-native-chat-font-scale'
+import { useNativeChatFontSize } from './use-native-chat-font-size'
+import { useNativeChatFind } from './use-native-chat-find'
+import { NativeChatFindBar } from './NativeChatFindBar'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
 import { NativeChatInteractiveCard } from './NativeChatInteractiveCard'
 import { useNativeChatInteractivePromptCard } from './use-native-chat-interactive-prompt-card'
+import { useNativeChatPromptCardPresentation } from './use-native-chat-prompt-card-presentation'
+import { NativeChatPromptStrip } from './NativeChatPromptCollapse'
 import { NativeChatEmptyState } from './NativeChatEmptyState'
 import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send'
 import { shouldClearNativeChatWorkingSuppression } from './native-chat-working-suppression'
@@ -49,6 +56,8 @@ import { LinkActionPopover } from '@/components/link-actions/LinkActionPopover'
 import { useNativeChatLinkActions } from './use-native-chat-link-actions'
 import type { NativeChatResolvedViewProps } from './native-chat-view-types'
 import { useNativeChatFileLinkContext } from './use-native-chat-file-link-context'
+import { useRecheckNativeChatFileLinksWhenTurnEnds } from './use-native-chat-file-link-existence'
+import { useNativeChatLocalCommandAnswer } from './use-native-chat-local-command-answer'
 import { matchNativeChatSplitShortcut } from './native-chat-split-shortcut'
 import { getShortcutPlatform } from '@/lib/shortcut-platform'
 import { formatShortcutLabel } from '@/hooks/useShortcutLabel'
@@ -114,38 +123,30 @@ export function NativeChatResolvedView({
   const canSend = useNativeChatCanSend(terminalTabId, targetPtyId)
   // Reuse the verified composer send path for interactive cards and composer
   // stop (Stop sends ESC, the agent-TUI interrupt key).
-  const interactiveSend = useNativeChatInteractiveSend(terminalTabId, paneKey, targetPtyId, agent)
+  const send = useNativeChatInteractiveSend(terminalTabId, paneKey, targetPtyId, agent)
+  // Every send this pane makes brings the latest into view, wherever the reader had scrolled.
+  const { messageListRef, revealLatest } = useNativeChatRevealLatest()
+  const interactiveSend = useNativeChatInteractiveSendReveal(send, targetPtyId, revealLatest)
   const [workingInterrupted, setWorkingInterrupted] = useState(false)
   const previousWorkingEpochRef = useRef<number | null>(null)
-  // True while a question card owns the input region, so the composer is hidden.
-  const [questionActive, setQuestionActive] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<NativeChatComposerHandle>(null)
   // The question card's free-text row; keeps Paste working while the card
   // replaces the composer.
   const questionAnswerInputRef = useRef<HTMLInputElement>(null)
   const fileLinkContext = useNativeChatFileLinkContext(terminalTabId)
-  const pasteClipboardIntoComposer = useNativeChatPasteBridge({
-    rootRef,
-    composerRef,
-    questionAnswerInputRef
-  })
-  useNativeChatComposerRevealFocus({
-    rootRef,
-    composerRef,
-    isVisible,
-    isFocusedGroup,
-    composerReady: !questionActive && targetPtyId !== null && canSend
-  })
+  const onPaste = useNativeChatPasteBridge({ rootRef, composerRef, questionAnswerInputRef })
   const contextMenu = useNativeChatContextMenu({
     rootRef,
+    composerRef,
+    enabled: isVisible,
     onSwitchToTerminal,
     splitShortcutLabels: {
       right: formatShortcutLabel('terminal.splitRight', keybindings),
       down: formatShortcutLabel('terminal.splitDown', keybindings)
     },
     actions: {
-      onPaste: pasteClipboardIntoComposer,
+      onPaste,
       ...(contextMenuActions ?? emptyNativeChatContextMenuActions)
     }
   })
@@ -184,8 +185,8 @@ export function NativeChatResolvedView({
     [record]
   )
   const onSlashCommand = useCallback(
-    (command: string) => {
-      setCommandMarkers(appendCommandMarkerCache(commandMarkerScope, command))
+    (command: string, output?: string) => {
+      setCommandMarkers(appendCommandMarkerCache(commandMarkerScope, command, Date.now(), output))
     },
     [commandMarkerScope]
   )
@@ -201,6 +202,8 @@ export function NativeChatResolvedView({
       ? sessionWithLaunchPrompt
       : { ...sessionWithLaunchPrompt, messages }
   }, [sessionWithLaunchPrompt, commandMarkers])
+  // Why: answer from the conversation the pane shows, so a `/clear` sent here reads as reset.
+  const answerLocally = useNativeChatLocalCommandAnswer(agent, sessionAfterCommandBoundaries)
   const launchPromptDeliveryNotices = useNativeChatLaunchPromptDeliveryNotice(
     paneLaunchPrompt?.failed ? launchPromptMessage?.id : null,
     sessionAfterCommandBoundaries.messages
@@ -217,6 +220,24 @@ export function NativeChatResolvedView({
     paneKey,
     messages: sessionAfterCommandBoundaries.messages,
     transcriptSettled: session.readPhase === 'ready'
+  })
+  // Why one derived value: an answerable card takes the input region from the composer, which
+  // would type into the agent's selector; both are never visible in one commit.
+  const promptCardPresentation = useNativeChatPromptCardPresentation({
+    paneKey,
+    targetPtyId,
+    card: promptCard,
+    canSend,
+    transcriptSettled: session.readPhase === 'ready'
+  })
+  const { card: shownPromptCard, collapsedCard } = promptCardPresentation
+  const mountedPromptCard = shownPromptCard ?? collapsedCard
+  useNativeChatComposerRevealFocus({
+    rootRef,
+    composerRef,
+    isVisible,
+    isFocusedGroup,
+    composerReady: shownPromptCard === null && targetPtyId !== null && canSend
   })
 
   // The streaming preview bubble (if any) sits after the transcript but before
@@ -288,6 +309,7 @@ export function NativeChatResolvedView({
     hasPromptCard: promptCard !== null
   })
   const turnTiming = useNativeChatTerminalTurnTiming(paneKey, session.messages, turnActive)
+  useRecheckNativeChatFileLinksWhenTurnEnds(turnActive)
 
   const stopAgent = useCallback(() => {
     setWorkingInterrupted(true)
@@ -303,9 +325,10 @@ export function NativeChatResolvedView({
     { sessionId, isVisible }
   )
 
-  // Chat-only font zoom via Cmd/Ctrl +/-/0, gated to the live conversation so
-  // the chord is inert on the loading/empty/error states and elsewhere.
-  const fontScale = useNativeChatFontScale(isConversation)
+  // Only the focused conversation accepts chat text-size shortcuts.
+  useNativeChatFontSize(isConversation && isVisible && isFocusedGroup, rootRef)
+  const find = useNativeChatFind(isVisible && isFocusedGroup, rootRef, composerRef, messageListRef)
+  const appearanceStyle = useNativeChatStoreAppearanceStyle()
 
   return (
     <div
@@ -314,9 +337,8 @@ export function NativeChatResolvedView({
       data-native-chat-working={isWorking ? 'true' : 'false'}
       tabIndex={-1}
       onPointerDownCapture={(event) => {
+        contextMenu.onPointerDownCapture(event)
         if (event.button === 2) {
-          contextMenu.onSelectionCapture()
-          event.preventDefault()
           event.stopPropagation()
           return
         }
@@ -325,6 +347,7 @@ export function NativeChatResolvedView({
         }
       }}
       onKeyDownCapture={(event) => {
+        find.onKeyDownCapture(event)
         const splitDirection = event.repeat
           ? null
           : matchNativeChatSplitShortcut(event, getShortcutPlatform(), keybindings)
@@ -340,12 +363,16 @@ export function NativeChatResolvedView({
         }
         routeNativeChatRootKeyToInput(event, composerRef.current, questionAnswerInputRef.current)
       }}
-      onMouseUpCapture={contextMenu.onSelectionCapture}
-      onKeyUpCapture={contextMenu.onSelectionCapture}
       onContextMenuCapture={contextMenu.onContextMenuCapture}
-      className="flex h-full min-h-0 w-full flex-col bg-background focus:outline-none"
+      className={cn(
+        NATIVE_CHAT_APPEARANCE_ROOT_CLASS,
+        'flex h-full min-h-0 w-full flex-col focus:outline-none'
+      )}
+      style={appearanceStyle}
+      data-native-chat-scheme={appearanceStyle.colorScheme}
     >
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {find.isOpen ? <NativeChatFindBar find={find} isVisible={isVisible} /> : null}
         {viewState.kind === 'loading' ? (
           <NativeChatEmptyState kind="loading" />
         ) : viewState.kind === 'error' ? (
@@ -381,7 +408,8 @@ export function NativeChatResolvedView({
           presence-lock, so native chat cannot race either input owner. */}
       {questionActive ? null : (
         <NativeChatComposer
-          ref={composerRef}
+          ref={shownPromptCard ? undefined : composerRef}
+          inputOwnedByCard={shownPromptCard !== null}
           terminalTabId={terminalTabId}
           paneKey={paneKey}
           targetPtyId={targetPtyId}
@@ -393,12 +421,15 @@ export function NativeChatResolvedView({
           onOptimisticSendCanceled={delivery.cancel}
           optimisticSendOutcome={delivery}
           onSlashCommand={onSlashCommand}
+          onSubmitted={revealLatest}
+          answerCommandLocally={answerLocally}
           onSwitchToTerminal={onSwitchToTerminal}
           readTerminalScreen={readTerminalScreen}
           reportedSessionOptions={session.sessionOptions}
           launchSeed={{ ...launchDraftSignal, ownsTabWideLaunchDraft }}
+          recallSource={{ messages: sessionWithPending.messages, commands: commandMarkers }}
         />
-      )}
+      </div>
       {contextMenu.menu}
       <LinkActionPopover request={linkActionRequest} onClose={closeLinkActions} />
     </div>

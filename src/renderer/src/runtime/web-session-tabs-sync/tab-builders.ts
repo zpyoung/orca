@@ -105,7 +105,7 @@ export function buildEditorUnifiedTab(
 export function buildMirroredEditorTabs(
   snapshot: RuntimeMobileSessionTabsResult,
   environmentId: string,
-  worktreeOpenFileById: ReadonlyMap<string, OpenFile>,
+  openFiles: readonly OpenFile[],
   existingTabIndex: WebSessionExistingTabIndex,
   hostGroupIdByTabId: ReadonlyMap<string, string>,
   fallbackGroupId: string,
@@ -113,11 +113,19 @@ export function buildMirroredEditorTabs(
   now: number,
   hasLocalDraft: (fileId: string) => boolean
 ): MirroredEditorTab[] {
-  return snapshot.tabs.filter(isReadyEditorTab).map((tab, index) => {
-    const fileId = localEditorFileId(tab)
-    const existingFile = worktreeOpenFileById.get(fileId)
+  const readyTabs = snapshot.tabs.filter(isReadyEditorTab)
+  if (readyTabs.length === 0) {
+    return []
+  }
+  const resolveFile = createMirroredEditorFileResolver(openFiles, snapshot.worktree, environmentId)
+  // New split tabs share the retained file even when the host lists them before its original tab.
+  for (const tab of readyTabs) {
+    resolveFile(tab, existingTabIndex.getEditorUnifiedTabByHostId(tab.id))
+  }
+  return readyTabs.map((tab, index) => {
+    const identity = resolveFile(tab, existingTabIndex.getEditorUnifiedTabByHostId(tab.id))
+    const { fileId, existingFile, sourceFileId } = identity
     const existingUnifiedTab = existingTabIndex.getEditorUnifiedTab(fileId, tab.id)
-    const sourceFileId = editorSourceFileId(tab)
     const groupId = hostGroupIdByTabId.get(tab.id) ?? fallbackGroupId
     // Why: the host publishes only its own store's flag and never learns of client edits, so
     // taking it verbatim would clear a client-dirty tab and the tab strip would then close it
@@ -125,20 +133,23 @@ export function buildMirroredEditorTabs(
     // the evidence the flag is the client's own; a dirty flag with no draft came from an
     // earlier snapshot and must keep following the host, e.g. after a host-side save.
     const keepsClientDirty = existingFile?.isDirty === true && hasLocalDraft(fileId)
-    const file: OpenFile = {
-      ...existingFile,
-      id: fileId,
-      filePath: tab.filePath,
-      relativePath: tab.relativePath,
-      worktreeId: snapshot.worktree,
-      language: tab.language,
-      isDirty: tab.isDirty || keepsClientDirty,
-      runtimeEnvironmentId: environmentId,
-      mode: tab.type === 'markdown' ? tab.mode : 'edit',
-      markdownPreviewSourceFileId: sourceFileId,
-      // Why: marks this tab host-owned so a later snapshot that omits it can cull it; locally opened tabs lack this flag and survive.
-      mirroredFromRuntimeSession: true
-    }
+    const file: OpenFile =
+      identity.preservesOwner && existingFile
+        ? existingFile
+        : {
+            ...existingFile,
+            id: fileId,
+            filePath: tab.filePath,
+            relativePath: tab.relativePath,
+            worktreeId: snapshot.worktree,
+            language: tab.language,
+            isDirty: tab.isDirty || keepsClientDirty,
+            runtimeEnvironmentId: environmentId,
+            mode: tab.type === 'markdown' ? tab.mode : 'edit',
+            markdownPreviewSourceFileId: sourceFileId,
+            // Why: marks this tab host-owned so a later snapshot that omits it can cull it; locally opened tabs lack this flag and survive.
+            mirroredFromRuntimeSession: true
+          }
     return {
       file,
       hostTabId: tab.id,

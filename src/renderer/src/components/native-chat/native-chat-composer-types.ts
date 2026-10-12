@@ -19,6 +19,14 @@ export type NativeChatOptionPickerRequest = {
   sequence: number
 }
 
+/** A queue the host holds, with cards waiting. */
+export type NativeChatQueueHold = {
+  /** Every card shown, held or not. */
+  count: number
+  /** Delete every card; false when one could not be (already reported). */
+  clear: () => Promise<boolean>
+}
+
 export type NativeChatStructuredComposerTransport = {
   conversationCommands?: readonly AgentSessionConversationCommand[]
   send: (text: string, attachments: readonly AgentComposerImageAttachment[]) => boolean
@@ -29,17 +37,26 @@ export type NativeChatStructuredComposerTransport = {
   /** The `/` surface the running session reports. Absent keeps the curated
    *  per-agent catalog, which is what an older host leaves the client with. */
   sessionCommands?: readonly AgentSessionSlashCommand[]
+  /** False when the agent takes no image input, as its host registered it. */
+  acceptsImages?: boolean
   /** The session's context usage; null until the journal can state it. */
   contextUsage?: StructuredAgentContextUsage | null
   worktreeId?: string
   /** Present only where the host can set this session's goal. */
   threadGoal?: { setObjective: (objective: string) => Promise<boolean> }
-  onError: (message: string | null) => void
+  onError: (message: string | null, detail?: NativeChatComposerErrorDetail) => void
+  /** A local send: brings the latest into view at the press, not when the host answers. */
+  onSubmitted?: () => void
   runtime: 'local' | 'remote'
   /** The session behind this composer; a real user send relinquishes orchestration ownership. */
   sessionId: string
   /** Owning runtime for that report; null is the local runtime. */
   runtimeEnvironmentId: string | null
+  /** Present while the queue is held: a message sent now first asks whether to clear its cards. */
+  queueHold?: NativeChatQueueHold
+  /** Present while the host holds the queue and no turn runs: an empty composer's primary
+   *  action becomes Resume, which releases it. */
+  queueResume?: NativeChatQueueResume
 }
 
 export type NativeChatOptimisticSendOutcome = {
@@ -68,6 +85,10 @@ export type NativeChatComposerProps = AgentComposerCoreProps & {
   /** Cmd/Ctrl+Enter from an empty composer: send the newest queued draft now.
    *  False = nothing queued, and the chord falls through to a plain send. */
   steerQueued?: () => boolean
+  /** The chat's own notices, shown in the composer's notice card above its input. */
+  notices?: readonly NativeChatComposerNotice[]
+  /** The conversation Up/Down recalls prompts from. */
+  recallSource?: NativeChatRecallSource
 }
 
 /** Launch context prefilled into the TUI input as an unsent draft, plus the two

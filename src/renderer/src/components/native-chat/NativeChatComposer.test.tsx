@@ -152,6 +152,7 @@ vi.mock('./use-native-chat-send-lifecycle', () => ({
 }))
 
 import { NativeChatComposer } from './NativeChatComposer'
+import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 
 describe('NativeChatComposer', () => {
   beforeEach(() => {
@@ -209,8 +210,7 @@ describe('NativeChatComposer', () => {
       configurable: true,
       value: {
         git: { discoverCommitMessageModels: mocks.discoverCommitMessageModels },
-        pty: { getMainBufferSnapshot: mocks.getMainBufferSnapshot },
-        ui: { onFileDrop: () => vi.fn() }
+        pty: { getMainBufferSnapshot: mocks.getMainBufferSnapshot }
       }
     })
   })
@@ -237,6 +237,22 @@ describe('NativeChatComposer', () => {
     expect(mocks.cancelPendingSends.mock.invocationCallOrder[0]).toBeLessThan(
       onStop.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     )
+  })
+
+  it('writes nothing from a composer hidden under a prompt card that still holds focus', () => {
+    render(
+      <NativeChatComposer
+        terminalTabId="tab-1"
+        paneKey="tab-1:leaf-1"
+        targetPtyId="pty-1"
+        agent="claude"
+        inputOwnedByCard
+      />
+    )
+    act(() => mocks.fieldProps?.onSend?.())
+    act(() => mocks.fieldProps?.onStop?.())
+    expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
+    expect(sendRuntimePtyInput).not.toHaveBeenCalled()
   })
 
   it('associates a delayed submit with its optimistic cache entry', () => {

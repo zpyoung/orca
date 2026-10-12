@@ -140,10 +140,13 @@ const WorktreeList = React.memo(function WorktreeList({
     pairedDeviceIdsByEnvironment
   })
   const effectiveCollapsedGroups = useEffectiveCollapsedGroups({
+    hostScopedGroups:
+      filterState.workspaceHostScope !== 'all' || filterState.visibleWorkspaceHostIds !== null,
     collapsedGroups,
     agentSendTargetWorktreeId,
     groupBy,
     pinnedDisplayPolicy,
+    worktrees: allWorktrees,
     visibleWorktrees,
     repoMap,
     worktreeMap,

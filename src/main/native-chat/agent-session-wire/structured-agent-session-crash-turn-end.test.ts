@@ -39,6 +39,8 @@ import {
 import { resettleOpenStructuredAgentSessionConversation } from './structured-agent-session-conversation-open'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { withNativeChatCutTurnNotices } from '../../../shared/native-chat-cut-turn-notice'
+import { latestNativeChatOrcaStopCut } from '../../../shared/native-chat-orca-stop-cut'
+import { beginAgentSessionRuntimeRecord } from '../../runtime/agent-session-runtime-end-record'
 import { STRUCTURED_AGENT_SESSION_IDLE_MS } from './structured-agent-session-idle-sweep'
 import type { StructuredAgentSessionHostDeps } from './structured-agent-session-host-types'
 import {
@@ -48,6 +50,8 @@ import {
 } from './structured-agent-session-host-test-data'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { recordingStructuredAgentSessionLogger } from './structured-agent-session-logger-test-support'
+import { claudeProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const PROVIDER_SESSION = 'provider-session-alpha-1'
 /** The tool call's row: the last thing the provider wrote before the crash. */
@@ -71,7 +75,7 @@ function crashedClaudeRecord(): AgentSessionRecord {
     providerHandleChain: [
       {
         linkId,
-        handle: { provider: 'claude', sessionId: PROVIDER_SESSION, leafUuid: null },
+        handle: claudeProviderHandle(PROVIDER_SESSION, null),
         origin: 'created',
         mintedAtFence: 13,
         observedAt: TOOL_STARTED_AT - 60_000
@@ -120,7 +124,7 @@ async function seedClaudeToolTurn(): Promise<void> {
       workspaceId: LOCATION.workspaceId,
       hostId: LOCATION.executionHostId,
       agent: 'claude',
-      providerHandle: { kind: 'claude', sessionId: PROVIDER_SESSION, leafUuid: null }
+      providerHandle: claudeProviderHandle(PROVIDER_SESSION, null)
     },
     database: openTestJournalHostDatabase(root),
     now: () => now
@@ -158,6 +162,7 @@ async function seedClaudeToolTurn(): Promise<void> {
 
 function openHost(overrides: Partial<StructuredAgentSessionHostDeps>): void {
   host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
@@ -357,6 +362,41 @@ describe('a turn a read reached before the reconcile proved its owner dead', () 
     ).toEqual({ key: 'workedFor', duration: '27s' })
   })
 
+  it('explains the turn its proof revised, so the cut reads once and offers Continue', async () => {
+    // The Orca that crashed recorded that it started, and never that it ended.
+    const crashed = crashedClaudeRecord()
+    const ownerProcess = crashed.lease.ownerProcess
+    if (!ownerProcess) {
+      throw new Error('the crashed record has no owner')
+    }
+    await seedTestAgentSessionRecordStore(root, {
+      records: [
+        {
+          ...crashed,
+          lease: { ...crashed.lease, ownerProcess: { ...ownerProcess, runtime: 'runtime-crashed' } }
+        }
+      ]
+    })
+    beginAgentSessionRuntimeRecord(root, 'runtime-crashed', TOOL_STARTED_AT - 60_000)
+    store = await openTestAgentSessionRecordStore(root)
+    openHost({ probeOwner: async () => ({ outcome: 'pid-absent' }) })
+    expect(await settledTurn()).toEqual(UNVERIFIABLE_TURN)
+
+    await host.reconcileRestartLeases()
+    await drainSession()
+
+    const { items } = await host.journalSnapshot(SESSION)
+    const turnItemId = items.find((item) => item.body.kind === 'turn')?.itemId
+    expect(items.flatMap((item) => (item.body.kind === 'status' ? [item.turnScope] : []))).toEqual([
+      { kind: 'turn', turnItemId }
+    ])
+    expect(latestNativeChatOrcaStopCut(items, [])).toEqual({ turnItemId, cause: 'crash' })
+    const readerRows = withNativeChatCutTurnNotices(items, { agentName: 'Claude' }).filter(
+      (item) => item.body.kind === 'status'
+    )
+    expect(readerRows).toHaveLength(1)
+  })
+
   it('revises nothing twice, whoever re-runs the settle', async () => {
     openHost({ probeOwner: async () => ({ outcome: 'pid-absent' }) })
     await host.history({ sessionId: SESSION, direction: 'tail' })
@@ -435,7 +475,7 @@ describe('a turn a read reached before the reconcile proved its owner dead', () 
           process,
           link: {
             linkId: `claude-${fence}-link`,
-            handle: { provider: 'claude', sessionId: PROVIDER_SESSION, leafUuid: null },
+            handle: claudeProviderHandle(PROVIDER_SESSION, null),
             origin: 'resumed',
             mintedAtFence: fence,
             observedAt: RELAUNCHED_AT
@@ -513,7 +553,7 @@ async function hostWithFailingFirstStart(failure: Error) {
         process,
         link: {
           linkId: `claude-${fence}-link`,
-          handle: { provider: 'claude', sessionId: PROVIDER_SESSION, leafUuid: null },
+          handle: claudeProviderHandle(PROVIDER_SESSION, null),
           origin: 'resumed',
           mintedAtFence: fence,
           observedAt: now

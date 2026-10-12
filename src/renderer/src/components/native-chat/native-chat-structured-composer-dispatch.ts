@@ -1,3 +1,4 @@
+import type { StructuredAgentSessionCommandOutcome } from '../../../../shared/structured-agent-session-composer'
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
 import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
@@ -10,5 +11,6 @@ export async function dispatchNativeChatStructuredComposerText(
   if (command.handled) {
     return { accepted: command.accepted, error: command.error }
   }
-  return { accepted: transport.send(text, attachments), error: null }
+  const admission = transport.send(text, attachments)
+  return { accepted: admission !== false, error: null, revealsTranscript: admission === true }
 }

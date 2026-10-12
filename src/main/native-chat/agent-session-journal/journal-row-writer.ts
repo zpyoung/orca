@@ -27,7 +27,7 @@ export type JournalRowWriterDeps = {
   readOnly: () => boolean
   highestFence: () => number
   nextSequence: () => number
-  commit: (row: JournalRow) => void
+  commit: (rows: readonly JournalRow[]) => void
   /** Standing hook run for EVERY appended row — the queued-draft returned
    *  transition rides here so no rejection path can bypass it. Bookkeeping: it
    *  runs in its own savepoint, so its failure is reported and never vetoes the row. */
@@ -66,7 +66,7 @@ export class JournalRowWriter {
       // fail. Rejecting here instead would leave the next append reusing a
       // sequence the table already holds. The ledger first: it cannot throw, the fold can.
       receipt?.committed()
-      this.deps.commit(row)
+      this.deps.commit([row])
       return row
     })
   }
@@ -74,35 +74,42 @@ export class JournalRowWriter {
   /** Several rows in ONE transaction, in order, planned once the lane is this append's: none is
    *  durable unless all are, so no reader ever meets some without the rest. */
   enqueueRows(
-    plan: () => readonly ((seq: number, ts: number) => JournalRow)[]
+    plan: () => readonly ((seq: number, ts: number) => JournalRow)[],
+    receipt?: JournalOperationReceipt
   ): Promise<JournalRow[]> {
-    return this.deps.serialize(() => {
-      assertJournalWritable(this.deps.readOnly(), this.deps.sessionId)
-      const first = this.deps.nextSequence()
-      const ts = this.deps.now()
-      const rows = plan().map((build, index) => build(first + index, ts))
-      if (rows.length === 0) {
-        return rows
-      }
-      for (const row of rows) {
-        assertJournalFence(row.fence, this.deps.highestFence())
-      }
-      try {
-        this.deps.database().transaction((db) => {
-          for (const row of rows) {
-            insertJournalRow(db, this.deps.sessionId, row)
-            this.runBookkeeping(db, row)
-          }
-        })
-      } catch (error) {
-        this.deps.rolledBack?.()
-        throw error
-      }
-      for (const row of rows) {
-        this.deps.commit(row)
-      }
+    return this.deps.serialize(() => this.writeRows(plan, receipt))
+  }
+
+  /** `enqueueRows`' write, for a caller already running at its own turn in the queue. */
+  writeRows(
+    plan: () => readonly ((seq: number, ts: number) => JournalRow)[],
+    receipt?: JournalOperationReceipt
+  ): JournalRow[] {
+    assertJournalWritable(this.deps.readOnly(), this.deps.sessionId)
+    const first = this.deps.nextSequence()
+    const ts = this.deps.now()
+    const rows = plan().map((build, index) => build(first + index, ts))
+    if (rows.length === 0) {
       return rows
-    })
+    }
+    for (const row of rows) {
+      assertJournalFence(row.fence, this.deps.highestFence())
+    }
+    try {
+      this.deps.database().transaction((db) => {
+        for (const row of rows) {
+          insertJournalRow(db, this.deps.sessionId, row)
+          this.runBookkeeping(db, row)
+        }
+        receipt?.write(db)
+      })
+    } catch (error) {
+      this.deps.rolledBack?.()
+      throw error
+    }
+    receipt?.committed()
+    this.deps.commit(rows)
+    return rows
   }
 
   /** Assign the next sequence, make the row durable, and fold it through the SAME reducer

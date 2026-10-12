@@ -77,14 +77,19 @@ function pageForClient(
 export const NATIVE_CHAT_METHODS = [
   defineMethod({
     name: 'nativeChat.readSession',
+    permission: 'workspace',
     params: NativeChatSession,
-    handler: async (params, { clientKind, signal }) => {
+    handler: async (params, { runtime, clientKind, signal }) => {
       const limit = params.limit ?? MOBILE_NATIVE_CHAT_DEFAULT_WINDOW
       const result = await readNativeChatTranscriptTail(
         {
           agent: params.agent,
           sessionId: params.sessionId,
-          transcriptPath: params.transcriptPath,
+          transcriptPath: nativeChatTranscriptPathOnExecutionHost(
+            runtime.getAgentProviderSessionRows(),
+            params.sessionId,
+            params.transcriptPath
+          ),
           limit,
           beforeOffset: params.beforeOffset
         },
@@ -107,6 +112,7 @@ export const NATIVE_CHAT_METHODS = [
   }),
   defineStreamingMethod({
     name: 'nativeChat.subscribe',
+    permission: 'workspace',
     params: NativeChatSession,
     handler: async (params, { runtime, connectionId, clientKind, signal }, emit) => {
       if (signal?.aborted) {
@@ -150,7 +156,11 @@ export const NATIVE_CHAT_METHODS = [
       const subscribeArgs: SubscribeNativeChatTranscriptArgs = {
         agent: params.agent,
         sessionId: params.sessionId,
-        transcriptPath: params.transcriptPath,
+        transcriptPath: nativeChatTranscriptPathOnExecutionHost(
+          runtime.getAgentProviderSessionRows(),
+          params.sessionId,
+          params.transcriptPath
+        ),
         initialLimit: limit,
         onInitialSnapshot: (messages, hasMore, beforeOffset, error, companion) => {
           if (closed) {
@@ -229,6 +239,7 @@ export const NATIVE_CHAT_METHODS = [
   }),
   defineMethod({
     name: 'nativeChat.unsubscribe',
+    permission: 'workspace',
     params: NativeChatUnsubscribe,
     handler: async (params, { runtime, connectionId }) => {
       const connection = connectionId ?? 'local'

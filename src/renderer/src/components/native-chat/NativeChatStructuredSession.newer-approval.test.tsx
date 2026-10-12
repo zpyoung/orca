@@ -12,7 +12,7 @@ vi.mock('@/runtime/structured-agent-session-client', () =>
   moduleFactories.structuredAgentSessionClient()
 )
 vi.mock('./use-structured-agent-session', () => moduleFactories.useStructuredAgentSession())
-vi.mock('./use-native-chat-font-scale', () => moduleFactories.useNativeChatFontScale())
+vi.mock('./use-native-chat-font-size', () => moduleFactories.useNativeChatFontSize())
 vi.mock('./use-native-chat-file-link-context', () => moduleFactories.useNativeChatFileLinkContext())
 vi.mock('./use-native-chat-file-link-click', () => moduleFactories.useNativeChatFileLinkClick())
 vi.mock('./NativeChatMessageList', () => moduleFactories.nativeChatMessageList())
@@ -86,6 +86,25 @@ it('sends nothing for the card when no turn is running', () => {
   )
   mocks.approvalCardProps?.onCancel?.()
   expect(mocks.cancel).not.toHaveBeenCalled()
+})
+
+it('cancels a Pi extension dialog outside a model turn', () => {
+  mocks.promptItems = [NEWER_APPROVAL]
+  render(
+    <NativeChatStructuredSession
+      isVisible
+      isFocusedGroup
+      tabId="pi-dialog-tab"
+      sessionId="pi-dialog-session"
+      target={{ kind: 'local' }}
+      agent="pi"
+    />
+  )
+  mocks.approvalCardProps?.onCancel?.()
+  expect(mocks.cancel).toHaveBeenCalledWith(undefined, {
+    itemId: 'approval-item',
+    expectedRevision: 3
+  })
 })
 
 function renderSession() {

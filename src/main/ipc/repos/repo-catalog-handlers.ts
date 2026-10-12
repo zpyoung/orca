@@ -28,7 +28,7 @@ export function registerRepoCatalogHandlers(
     enrichMissingRepoGitRemoteIdentities(store, { onChanged: broadcastReposChanged })
     // Why: username resolution spawns git/gh, so keep it off this sync handler (issue #7225); it re-lists when values land.
     enrichRepoGitUsernames(store, { onChanged: broadcastReposChanged })
-    return store.getRepos()
+    return visibleRepos(store)
   })
 
   ipcMain.handle(

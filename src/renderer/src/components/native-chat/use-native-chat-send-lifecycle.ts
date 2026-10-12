@@ -22,11 +22,17 @@ export function useNativeChatSendLifecycle(
       { cleanupTimer: ReturnType<typeof setTimeout> | null; pendingId?: string }
     >()
   )
-  const cancelPendingSends = useCallback(() => {
-    for (const [handle, entry] of pendingSendHandlesRef.current) {
-      const { cleanupTimer, pendingId } = entry
-      if (cleanupTimer !== null) {
-        clearTimeout(cleanupTimer)
+  const settlePendingSends = useCallback(
+    (onSettled?: (pendingId: string) => void, keepInput = false) => {
+      for (const [handle, entry] of pendingSendHandlesRef.current) {
+        const { cleanupTimer, pendingId } = entry
+        if (cleanupTimer !== null) {
+          clearTimeout(cleanupTimer)
+        }
+        handle.cancel(keepInput)
+        if (pendingId) {
+          onSettled?.(pendingId)
+        }
       }
       try {
         handle.cancel()

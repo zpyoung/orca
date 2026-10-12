@@ -115,7 +115,7 @@ export class RuntimeRepositorySettingsController {
     options?: { expectedLedgers?: ExpectedLedgerRevision[] }
   ): Promise<{ removed: true; ledgers?: DetachedLedgerRemoval[] }> {
     const store = this.deps.getStore()
-    if (!store?.removeProject) {
+    if (!store?.removeProjectForHost) {
       throw new Error('runtime_unavailable')
     }
     const repo = await this.deps.resolveRepo(repoSelector)

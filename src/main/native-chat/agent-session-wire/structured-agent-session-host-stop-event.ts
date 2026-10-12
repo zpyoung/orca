@@ -9,24 +9,22 @@ import type { StructuredAgentSessionHostSession } from './structured-agent-sessi
 import { structuredAgentSessionConversationFence } from './structured-agent-session-provider-child'
 import type { JournalStopSettle } from '../agent-session-journal/queued-message-pause'
 import { sentSinceStop } from './structured-agent-session-queued-stop'
+import type { AgentSessionResumeTrigger } from '../../../shared/agent-session-resume-marker'
 
 /** How a stop ends the child, and why (`lastEndedChild`). A person's Stop wrote its event in its
  *  own step (`recorded` names its reason); any other stop names the reason its event records, with
- *  the host's text for it. Quit writes none: its resume marker's trigger records why. */
-export type StructuredAgentSessionStopEnding = (
+ *  the host's text for it. Quit writes none: its row about a turn it cut says why. */
+export type StructuredAgentSessionStopEnding =
   | { recorded: 'user-stop' }
   | {
       cause: Exclude<StructuredAgentSessionStopCause, 'user-stop'>
       reason?: string
-      quit?: true
+      /** The app is quitting, and why: a turn this stop cuts gets a row naming it. */
+      quit?: AgentSessionResumeTrigger
       /** The idle sweep judged the agent resting (`owesWork`): a send it retires unanswered is
        *  no work its event records. */
       resting?: true
     }
-) & {
-  /** The retry of a stop already owed, set only by that retry: its event, if any, is written. */
-  retry?: true
-}
 
 /** How long a host stop waits for the session's sink before it judges whether the stop ends work. */
 const STOP_EVENT_DRAIN_TIMEOUT_MS = 1_000
@@ -34,8 +32,8 @@ const STOP_EVENT_DRAIN_TIMEOUT_MS = 1_000
 /**
  * Whether this stop ends work its event must record: a running turn or an unanswered send, a start's
  * own included, read once the sink drained what the provider already said. A start that carries
- * no send ends nothing. A person's Stop wrote its own event, and quit, the idle sweep's rest and a
- * retry of a stop already owed write none.
+ * no send ends nothing. A person's Stop wrote its own event, and quit and the idle sweep's rest
+ * write none; a stop that joins a close already begun writes none either.
  */
 export async function stopEndsWork(
   context: StructuredAgentSessionLifetimeContext,
@@ -44,7 +42,13 @@ export async function stopEndsWork(
   ending: StructuredAgentSessionStopEnding
 ): Promise<boolean> {
   const { child, journal } = session
-  if ('recorded' in ending || ending.quit || ending.resting || ending.retry || !child) {
+  if (
+    'recorded' in ending ||
+    ending.quit ||
+    ending.resting ||
+    ending.cause === 'context-clear' ||
+    !child
+  ) {
     return false
   }
   // A failed drain has nothing more to deliver, so the journal's read as it stands holds. One
