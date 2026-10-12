@@ -129,10 +129,45 @@ export function resolveBaselineReleaseRef(): string {
   return latest
 }
 
+const UPSTREAM_RELEASE_URL = 'https://github.com/stablyai/orca.git'
+const UPSTREAM_STABLE_TAG = /^v\d+\.\d+\.\d+$/
+
+/**
+ * Upstream's suites pin upstream stable tags, which this fork never pushes. Fetches just that tag
+ * into refs/remotes, outside refs/tags, so the fork's own tag-based baseline selection never sees it.
+ */
+function resolveUpstreamStableTag(ref: string): string | null {
+  if (!UPSTREAM_STABLE_TAG.test(ref)) {
+    return null
+  }
+  const local = `refs/remotes/upstream-releases/${ref}`
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return git(['rev-parse', '--verify', '--quiet', `${local}^{commit}`])
+    } catch {
+      // Not fetched yet, or a concurrent worker still holds the ref lock.
+    }
+    try {
+      git(['fetch', '--no-tags', '--quiet', UPSTREAM_RELEASE_URL, `+refs/tags/${ref}:${local}`])
+    } catch {
+      // Retried: parallel test files can race on the same ref update.
+    }
+  }
+  try {
+    return git(['rev-parse', '--verify', '--quiet', `${local}^{commit}`])
+  } catch {
+    return null
+  }
+}
+
 function resolveCommit(ref: string): string {
   try {
     return git(['rev-parse', `${ref}^{commit}`])
   } catch (error) {
+    const upstream = resolveUpstreamStableTag(ref)
+    if (upstream) {
+      return upstream
+    }
     throw new Error(
       `Cross-version harness could not resolve ref "${ref}" to a commit: ${String(error)}. ` +
         'The ref must exist locally; a shallow CI clone needs `fetch-depth: 0`.'
