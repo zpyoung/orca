@@ -29,55 +29,54 @@ export function sendNativeChatAskAnswer(
     return { cancel: () => {}, settleAfterMs: 0 }
   }
   const timers: ReturnType<typeof setTimeout>[] = []
-  const verifiedWrites: Promise<boolean>[] = []
   let cancelled = false
-  let undelivered = false
-  groups.forEach((group, index) => {
-    timers.push(
-      setTimeout(() => {
-        // Why: a refused or unacknowledged keystroke group leaves the selector in an unknown
-        // state, so later groups would answer a question the user never saw.
-        if (undelivered) {
-          return
-        }
-        const bytes = 'raw' in group ? group.raw : buildNativeChatPasteBytes(group.text)
-        if (onSettled) {
-          // Why: inference must use the remote host's acceptance result, not
-          // the fire-and-forget renderer dispatch result; an answer that dismisses
-          // its card needs the provider's acknowledgment.
-          verifiedWrites.push(
-            sendRuntimePtyInputVerified(target.settings, target.ptyId, bytes, 'driving', {
-              isCancelled: () => cancelled,
-              requireWriteSettlement: true
-            })
-              .catch(() => false)
-              .then((delivered) => {
-                if (!delivered) {
-                  undelivered = true
-                }
-                return delivered
-              })
-          )
-        } else {
-          sendRuntimePtyInput(target.settings, target.ptyId, bytes, 'driving')
-        }
-      }, index * NATIVE_CHAT_QUESTION_STEP_MS)
-    )
-  })
   const settleAfterMs =
     (groups.length - 1) * NATIVE_CHAT_QUESTION_STEP_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
-  if (onSettled) {
-    // Why: status inference must wait for every paced write and must not run
-    // after cancellation or a rejected runtime write.
-    timers.push(
-      setTimeout(() => {
-        void Promise.all(verifiedWrites).then((results) => {
-          if (!cancelled) {
-            onSettled(results.every(Boolean))
+  const bytesAt = (index: number): string => {
+    const group = groups[index]
+    return 'raw' in group ? group.raw : buildNativeChatPasteBytes(group.text)
+  }
+  if (!onSettled) {
+    groups.forEach((_group, index) => {
+      timers.push(
+        setTimeout(() => {
+          sendRuntimePtyInput(target.settings, target.ptyId, bytesAt(index), 'driving')
+        }, index * NATIVE_CHAT_QUESTION_STEP_MS)
+      )
+    })
+  } else {
+    // Why: each group waits for the provider's acknowledgment of the one before, so a slow body
+    // cannot be overtaken by the selector's Enter, and an unacknowledged group stops the answer
+    // instead of answering a question the user never saw.
+    const writeAt = (index: number): void => {
+      if (cancelled) {
+        return
+      }
+      if (index >= groups.length) {
+        timers.push(setTimeout(() => !cancelled && onSettled(true), NATIVE_CHAT_SUBMIT_DELAY_MS))
+        return
+      }
+      void sendRuntimePtyInputVerified(target.settings, target.ptyId, bytesAt(index), 'driving', {
+        isCancelled: () => cancelled,
+        requireWriteSettlement: true
+      })
+        .catch(() => false)
+        .then((delivered) => {
+          if (cancelled) {
+            return
+          }
+          if (!delivered) {
+            onSettled(false)
+            return
+          }
+          if (index + 1 < groups.length) {
+            timers.push(setTimeout(() => writeAt(index + 1), NATIVE_CHAT_QUESTION_STEP_MS))
+          } else {
+            writeAt(index + 1)
           }
         })
-      }, settleAfterMs)
-    )
+    }
+    writeAt(0)
   }
   return {
     cancel: () => {

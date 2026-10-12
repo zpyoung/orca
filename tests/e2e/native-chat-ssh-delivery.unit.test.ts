@@ -19,6 +19,8 @@ import { TERMINAL_METHODS } from '../../src/main/runtime/rpc/methods/terminal'
 import { sendAgentDraftPasteContentNow } from '../../src/renderer/src/lib/agent-draft-paste-content'
 import type { RpcClient } from '../../mobile/src/transport/rpc-client'
 
+// The fork's send path is keyed by a quarantine-scoped target rather than (settings, ptyId).
+const chatTarget = (ptyId: string) => ({ terminalTabId: 'tab-ssh', ptyId, settings: null })
 let close: (() => void) | undefined
 afterEach(() => {
   resetNativeChatPtySendQueuesForTests()
@@ -40,7 +42,7 @@ describe('prompt delivery through production IPC, provider and paired host', () 
       [{ indices: [], other: text }]
     )
     const onSettled = vi.fn()
-    sendNativeChatAskAnswer(null, ssh.id, groups, onSettled)
+    sendNativeChatAskAnswer(chatTarget(ssh.id), groups, onSettled)
     await vi.advanceTimersByTimeAsync(2000)
     expect(ssh.bytes).not.toContain('\r')
     expect(onSettled).not.toHaveBeenCalled()
@@ -60,8 +62,7 @@ describe('prompt delivery through production IPC, provider and paired host', () 
     close = ssh.close
     const onSettled = vi.fn()
     const handle = sendNativeChatAskAnswer(
-      null,
-      ssh.id,
+      chatTarget(ssh.id),
       [{ text: `${'X'.repeat(32768)}TAIL` }, { raw: '\r' }],
       onSettled
     )
@@ -78,7 +79,7 @@ describe('prompt delivery through production IPC, provider and paired host', () 
     const ssh = createSshDelivery()
     close = ssh.close
     const onDeliverySettled = vi.fn()
-    sendNativeChatMessage(null, ssh.id, 'body', { onDeliverySettled })
+    sendNativeChatMessage(chatTarget(ssh.id), 'body', { onDeliverySettled })
     await vi.advanceTimersByTimeAsync(600)
     expect(ssh.bytes.join('')).toBe('\x15body\r')
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(true)
@@ -150,7 +151,7 @@ describe('prompt delivery through production IPC, provider and paired host', () 
       })
     ).resolves.toBe(true)
     await expect(
-      sendNativeChatMessageVerified(null, 'remote:owner@@terminal', 'body')
+      sendNativeChatMessageVerified(chatTarget('remote:owner@@terminal'), 'body')
     ).resolves.toBe(true)
     await expect(
       sendAgentDraftPasteContentNow(null, 'remote:owner@@terminal', 'launch', 'launch')
@@ -164,12 +165,12 @@ describe('prompt delivery through production IPC, provider and paired host', () 
     io.rpc.mockResolvedValue({ send: { handle: 'terminal', accepted: true, bytesWritten: 1 } })
     const onWriteUnconfirmed = vi.fn()
     const onWriteRejected = vi.fn()
-    sendNativeChatMessage(null, 'remote:owner@@terminal', 'hello', {
+    sendNativeChatMessage(chatTarget('remote:owner@@terminal'), 'hello', {
       onWriteRejected,
       onWriteUnconfirmed
     })
     const onDeliverySettled = vi.fn()
-    sendNativeChatMessage(null, 'remote:owner@@terminal', 'answer', { onDeliverySettled })
+    sendNativeChatMessage(chatTarget('remote:owner@@terminal'), 'answer', { onDeliverySettled })
     await vi.advanceTimersByTimeAsync(2000)
     expect(onWriteUnconfirmed).not.toHaveBeenCalled()
     expect(onWriteRejected).not.toHaveBeenCalled()
@@ -253,7 +254,7 @@ describe('prompt delivery through production IPC, provider and paired host', () 
       [{ indices: [], other: 'custom answer' }]
     )
     const onSettled = vi.fn()
-    sendNativeChatAskAnswer(null, 'remote:owner@@terminal', groups, onSettled)
+    sendNativeChatAskAnswer(chatTarget('remote:owner@@terminal'), groups, onSettled)
     await vi.advanceTimersByTimeAsync(4000)
     expect(ssh.bytes).toEqual(groups.map((group) => ('raw' in group ? group.raw : group.text)))
     expect(ssh.settlement).not.toHaveBeenCalled()

@@ -37,6 +37,8 @@ export type NativeChatDeliveryObserver = {
   settled: () => void
   /** The send was invalidated mid-flight: it settles unacknowledged without claiming a refusal. */
   abandoned: () => void
+  /** Whether the caller waits on settlement, so each write asks the host for the provider's ack. */
+  settlesWrites: boolean
 }
 
 export function createDeliveryObserver(
@@ -68,7 +70,8 @@ export function createDeliveryObserver(
       }
     },
     settled: () => settle(acknowledged),
-    abandoned: () => settle(false)
+    abandoned: () => settle(false),
+    settlesWrites: options.onDeliverySettled !== undefined
   }
 }
 
@@ -85,7 +88,14 @@ export async function sendObservedWrite(
   if (!delivery) {
     return sendRuntimePtyInputAcceptance(settings, ptyId, data, 'driving', ...cancelArgs)
   }
-  const result = await sendRuntimePtyInputDelivery(settings, ptyId, data, 'driving', ...cancelArgs)
+  const result = await sendRuntimePtyInputDelivery(
+    settings,
+    ptyId,
+    data,
+    'driving',
+    isCancelled,
+    delivery.settlesWrites ? { requireWriteSettlement: true } : undefined
+  )
   if (isCancelled?.()) {
     return false
   }

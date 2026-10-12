@@ -993,6 +993,7 @@ describe('sendNativeChatAskAnswer', () => {
     expect(onSettled).not.toHaveBeenCalled()
 
     resolveAccepted(true)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     await vi.waitFor(() => expect(onSettled).toHaveBeenCalledExactlyOnceWith(true))
   })
 })

@@ -187,6 +187,16 @@
   ],
   "seams": [
     {
+      "path": "tests/e2e/native-chat-ssh-delivery.unit.test.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "const chatTarget = (ptyId: string) => ({ terminalTabId: 'tab-ssh', ptyId, settings: null })",
+        "    sendNativeChatAskAnswer(chatTarget(ssh.id), groups, onSettled)",
+        "    sendNativeChatMessage(chatTarget(ssh.id), 'body', { onDeliverySettled })"
+      ]
+    },
+    {
       "path": "tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -6394,6 +6404,21 @@
       "path": "config/scripts/fork-vitest-node-runtime-files.mjs",
       "reason": "Lists the fork's real-SQLite tests for the Node runtime project that v1.4.224's vitest-sqlite-runtime-boundary ratchet requires.",
       "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-agent-state-rules-release.test.ts",
+      "reason": "Runs upstream's rules-release regression against the fork's own app release feed (MAIN_RELEASE_REPO), which is where this fork's updater reads.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/ci-native-cache.test.mjs",
+      "reason": "Contracts for the fork-owned PR job graph: this fork removed the Windows PR packaging lane, so the case asserts its removal instead of the lane's Node-ABI save ordering.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/pr-preflight-gates.test.mjs",
+      "reason": "Contracts for the fork-owned PR job graph: this fork removed the Windows PR packaging lane, so its preflight gating is asserted absent.",
+      "status": "permanent"
     }
   ],
   "residuals": {
@@ -8676,6 +8701,10 @@
     "tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts": {
       "added": 5,
       "removed": 1
+    },
+    "tests/e2e/native-chat-ssh-delivery.unit.test.ts": {
+      "added": 9,
+      "removed": 8
     }
   }
 }

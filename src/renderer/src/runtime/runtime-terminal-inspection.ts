@@ -244,7 +244,8 @@ export async function sendRuntimePtyInputDelivery(
   ptyId: string,
   data: string,
   inputKind: TerminalInputKind,
-  isCancelled?: () => boolean
+  isCancelled?: () => boolean,
+  writeOptions?: { requireWriteSettlement?: true }
 ): Promise<RuntimePtyInputDelivery> {
   const tooLarge = isRuntimePtyInputTooLarge(data)
   if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
@@ -256,9 +257,11 @@ export async function sendRuntimePtyInputDelivery(
   const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
   if (target.kind !== 'environment' || !terminal) {
     // Why: fire-and-forget `write` can't observe a PTY-gone or mobile-lease
-    // rejection; the observed path needs main's real answer.
+    // rejection; settlement makes main answer over the provider, SSH included.
     try {
-      const accepted = await window.api.pty.writeInputAccepted(ptyId, data, inputKind)
+      const accepted = await window.api.pty.writeAccepted(ptyId, data, inputKind, {
+        requireWriteSettlement: true
+      })
       if (accepted) {
         recordRuntimeTerminalInputForPtyId(ptyId)
       }
@@ -271,7 +274,12 @@ export async function sendRuntimePtyInputDelivery(
     const result = await callRuntimeRpc<{ send: RuntimeTerminalSend }>(
       target,
       'terminal.send',
-      { terminal, text: data, client: DESKTOP_RUNTIME_CLIENT },
+      {
+        terminal,
+        text: data,
+        client: DESKTOP_RUNTIME_CLIENT,
+        ...(writeOptions?.requireWriteSettlement ? { requireWriteSettlement: true } : {})
+      },
       { timeoutMs: 15_000 }
     )
     if (result.send.accepted === true) {
