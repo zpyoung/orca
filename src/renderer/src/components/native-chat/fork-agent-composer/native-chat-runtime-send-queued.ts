@@ -42,7 +42,7 @@ export function sendNativeChatMessageVerifiedQueued(
           target.ptyId,
           buildNativeChatPasteBytes(text),
           'driving',
-          () => isCancelled() || signal?.aborted === true
+          { isCancelled: () => isCancelled() || signal?.aborted === true }
         )
           .then((bodyAccepted) => {
             if (!bodyAccepted || isCancelled() || signal?.aborted) {
@@ -59,7 +59,7 @@ export function sendNativeChatMessageVerifiedQueued(
                 target.ptyId,
                 NATIVE_CHAT_SUBMIT,
                 'driving',
-                () => isCancelled() || signal?.aborted === true
+                { isCancelled: () => isCancelled() || signal?.aborted === true }
               )
                 .then((sent) => {
                   accepted = sent

@@ -6690,7 +6690,7 @@
       "removed": 23
     },
     "src/main/native-chat/transcript-watch-contract.ts": {
-      "added": 28,
+      "added": 29,
       "removed": 8
     },
     "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts": {
@@ -6698,15 +6698,15 @@
       "removed": 0
     },
     "src/main/native-chat/transcript-watch-engine.ts": {
-      "added": 36,
-      "removed": 33
+      "added": 30,
+      "removed": 26
     },
     "src/main/native-chat/transcript-watch.test.ts": {
       "added": 117,
       "removed": 17
     },
     "src/main/native-chat/transcript-watch.ts": {
-      "added": 30,
+      "added": 31,
       "removed": 267
     },
     "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": {
@@ -6758,8 +6758,8 @@
       "removed": 2
     },
     "src/main/runtime/orca-runtime-persist-headless-session-tab-props.ts": {
-      "added": 79,
-      "removed": 4
+      "added": 74,
+      "removed": 3
     },
     "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts": {
       "added": 11,
@@ -6826,8 +6826,8 @@
       "removed": 0
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts": {
-      "added": 7,
-      "removed": 1
+      "added": 6,
+      "removed": 0
     },
     "src/main/skills/claude-plugin-skill-sources.test.ts": {
       "added": 1,
@@ -7002,7 +7002,7 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx": {
-      "added": 4,
+      "added": 9,
       "removed": 1
     },
     "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx": {
@@ -7026,8 +7026,8 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
-      "added": 5,
-      "removed": 2
+      "added": 6,
+      "removed": 6
     },
     "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx": {
       "added": 3,
@@ -7051,15 +7051,15 @@
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
       "added": 144,
-      "removed": 49
+      "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
       "added": 12,
-      "removed": 32
+      "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
-      "added": 18,
-      "removed": 37
+      "added": 17,
+      "removed": 39
     },
     "src/renderer/src/components/native-chat/native-chat-pending.ts": {
       "added": 1,
@@ -7090,7 +7090,7 @@
       "removed": 5
     },
     "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx": {
-      "added": 59,
+      "added": 65,
       "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
@@ -7098,8 +7098,8 @@
       "removed": 11
     },
     "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
-      "added": 2,
-      "removed": 2
+      "added": 1,
+      "removed": 1
     },
     "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
       "added": 3,
@@ -7146,7 +7146,7 @@
       "removed": 0
     },
     "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
-      "added": 5,
+      "added": 6,
       "removed": 0
     },
     "src/renderer/src/components/settings/appearance-search.ts": {
@@ -7162,8 +7162,8 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/CommentMarkdown.tsx": {
-      "added": 13,
-      "removed": 5
+      "added": 11,
+      "removed": 6
     },
     "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
       "added": 11,
@@ -7191,11 +7191,11 @@
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
       "added": 56,
-      "removed": 14
+      "removed": 13
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
-      "added": 5,
-      "removed": 0
+      "added": 19,
+      "removed": 4
     },
     "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts": {
       "added": 8,
@@ -7283,7 +7283,7 @@
     },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts": {
       "added": 7,
-      "removed": 5
+      "removed": 3
     },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
       "added": 13,
@@ -7302,8 +7302,8 @@
       "removed": 5
     },
     "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts": {
-      "added": 5,
-      "removed": 1
+      "added": 3,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts": {
       "added": 1,
@@ -7342,8 +7342,8 @@
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx": {
-      "added": 33,
-      "removed": 0
+      "added": 42,
+      "removed": 10
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
       "added": 5,
@@ -7922,7 +7922,7 @@
       "removed": 0
     },
     "src/main/notifications/notification-delivery-service.ts": {
-      "added": 11,
+      "added": 8,
       "removed": 2
     },
     "src/main/ipc/repos.ts": {
@@ -7934,8 +7934,8 @@
       "removed": 5
     },
     "src/main/ipc/repos/repo-catalog-handlers.ts": {
-      "added": 25,
-      "removed": 6
+      "added": 24,
+      "removed": 4
     },
     "src/main/ipc/repos/repo-ipc-arg-schemas.ts": {
       "added": 6,
@@ -7994,12 +7994,12 @@
       "removed": 0
     },
     "src/main/runtime/runtime-project-group-controller.ts": {
-      "added": 74,
+      "added": 64,
       "removed": 3
     },
     "src/main/runtime/runtime-repository-settings-controller.ts": {
-      "added": 27,
-      "removed": 8
+      "added": 30,
+      "removed": 3
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-websocket-dispatch.ts": {
       "added": 1,
@@ -8018,7 +8018,7 @@
       "removed": 0
     },
     "src/preload/api/repository-api.ts": {
-      "added": 9,
+      "added": 10,
       "removed": 2
     },
     "src/renderer/src/app-shell/app-command-handlers.ts": {
@@ -8063,7 +8063,7 @@
     },
     "src/renderer/src/components/sidebar/RemoveFolderDialog.tsx": {
       "added": 95,
-      "removed": 9
+      "removed": 6
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/ProjectGroupDialogs.tsx": {
       "added": 3,
@@ -8098,8 +8098,8 @@
       "removed": 3
     },
     "src/renderer/src/store/repos/repo-removal.ts": {
-      "added": 21,
-      "removed": 3
+      "added": 25,
+      "removed": 2
     },
     "src/renderer/src/store/repos/repo-state.ts": {
       "added": 15,
@@ -8398,7 +8398,7 @@
       "removed": 5
     },
     "src/renderer/src/components/right-sidebar/useSourceControlAgentActionStart.ts": {
-      "added": 8,
+      "added": 6,
       "removed": 0
     },
     "src/renderer/src/components/settings/CommitMessageAiPane.test.tsx": {
@@ -8418,8 +8418,8 @@
       "removed": 2
     },
     "src/renderer/src/components/settings/SourceControlActionRecipeRow.tsx": {
-      "added": 46,
-      "removed": 28
+      "added": 52,
+      "removed": 18
     },
     "src/renderer/src/components/settings/SourceControlAiActionRecipeDefaults.tsx": {
       "added": 14,
@@ -8458,15 +8458,15 @@
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-background-session.ts": {
-      "added": 47,
-      "removed": 27
+      "added": 44,
+      "removed": 22
     },
     "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
       "added": 28,
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-in-new-tab.ts": {
-      "added": 11,
+      "added": 10,
       "removed": 1
     },
     "src/renderer/src/lib/launch-agent-web-host-tab.ts": {
@@ -8474,8 +8474,8 @@
       "removed": 4
     },
     "src/renderer/src/lib/launch-work-item-direct-agent.ts": {
-      "added": 20,
-      "removed": 8
+      "added": 13,
+      "removed": 1
     },
     "src/renderer/src/lib/launch-work-item-direct-types.ts": {
       "added": 2,
@@ -8586,8 +8586,8 @@
       "removed": 1
     },
     "src/main/runtime/runtime-worktree-agent-startup.ts": {
-      "added": 25,
-      "removed": 9
+      "added": 26,
+      "removed": 10
     },
     "src/renderer/src/components/automations/AutomationRunDetailsPage.tsx": {
       "added": 21,
@@ -8650,40 +8650,40 @@
       "removed": 1
     },
     "src/main/automations/runtime-automation-service.ts": {
-      "added": 0,
-      "removed": 0
+      "added": 5,
+      "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatUserMessageRow.tsx": {
-      "added": 0,
+      "added": 1,
       "removed": 0
     },
     "src/renderer/src/components/native-chat/NativeChatAssistantMessageRow.tsx": {
-      "added": 0,
+      "added": 1,
       "removed": 0
     },
     "src/renderer/src/web/web-preload-api-ui-pairing-local-fields.test.ts": {
-      "added": 0,
-      "removed": 0
+      "added": 10,
+      "removed": 2
     },
     "src/renderer/src/components/native-chat/native-chat-composer-ime-file-drop.test.tsx": {
-      "added": 0,
-      "removed": 0
+      "added": 7,
+      "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-external-attachments-destination.test.tsx": {
-      "added": 0,
-      "removed": 0
+      "added": 5,
+      "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-queue-send-confirm.test.tsx": {
-      "added": 0,
-      "removed": 0
+      "added": 3,
+      "removed": 3
     },
     "src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts": {
-      "added": 0,
-      "removed": 0
+      "added": 1,
+      "removed": 1
     },
     "src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-composer.test.tsx": {
-      "added": 0,
-      "removed": 0
+      "added": 9,
+      "removed": 2
     }
   }
 }

@@ -243,7 +243,7 @@ function localAnswerArgs() {
     agent: 'omp' as const,
     disabled: false,
     isDispatchingSessionOption: false,
-    resolveTarget: () => ({ ptyId: 'pty-a', settings: null }),
+    resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId: 'pty-a', settings: null }),
     onSlashCommand: vi.fn(),
     onSubmitted: vi.fn(),
     answerCommandLocally: () => 'Context: 20k / 272k tokens',
@@ -302,7 +302,7 @@ it('reveals only the pane whose option send it was, at the press', async () => {
       return useNativeChatSessionOptionCommand({
         agent: 'codex',
         disabled: false,
-        resolveTarget: () => ({ ptyId, settings: null }),
+        resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId, settings: null }),
         onSubmitted: reveal.revealLatest
       })
     },
@@ -331,7 +331,7 @@ it('reveals a PTY option send at the press, before the terminal confirms it', as
     const command = useNativeChatSessionOptionCommand({
       agent: 'codex',
       disabled: false,
-      resolveTarget: () => ({ ptyId: 'pty-a', settings: null }),
+      resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId: 'pty-a', settings: null }),
       onSubmitted: transcript.revealLatest
     })
     return { ...transcript, command }

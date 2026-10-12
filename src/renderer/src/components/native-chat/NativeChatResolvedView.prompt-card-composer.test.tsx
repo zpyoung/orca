@@ -27,7 +27,9 @@ vi.mock('./use-native-chat-retained-session', () => ({
 }))
 vi.mock('@/runtime/runtime-terminal-inspection', async (importOriginal) => ({
   ...(await importOriginal<RuntimeTerminalInspection>()),
-  sendRuntimePtyInput: pty.raw
+  sendRuntimePtyInput: pty.raw,
+  sendRuntimePtyInputDelivery: async (settings: unknown, id: string, data: string) =>
+    (await pty.verified(settings, id, data)) ? 'accepted' : 'refused'
 }))
 vi.mock('@/runtime/runtime-terminal-verified-input', () => ({
   sendRuntimePtyInputVerified: pty.verified
@@ -68,7 +70,12 @@ vi.mock('./NativeChatComposer', async () => {
         )
         const send = (): void => {
           let pendingId: string | undefined
-          const handle = sendNativeChatMessage(null, props.targetPtyId ?? '', MESSAGE, {
+          const target = {
+            terminalTabId: props.terminalTabId,
+            ptyId: props.targetPtyId ?? '',
+            settings: null
+          }
+          const handle = sendNativeChatMessage(target, MESSAGE, {
             onWriteRejected: () => {
               if (pendingId) {
                 props.optimisticSendOutcome?.reject(pendingId)

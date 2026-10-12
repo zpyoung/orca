@@ -1,36 +1,48 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const io = vi.hoisted(() => ({ write: vi.fn(), verified: vi.fn() }))
+const io = vi.hoisted(() => ({ write: vi.fn(), acceptance: vi.fn(), delivery: vi.fn() }))
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
   sendRuntimePtyInput: io.write,
-  sendRuntimePtyInputVerified: io.verified
+  sendRuntimePtyInputAcceptance: io.acceptance,
+  sendRuntimePtyInputDelivery: io.delivery
 }))
 import {
   sendNativeChatMessage,
   resetNativeChatPtySendQueuesForTests
 } from './native-chat-runtime-send'
 import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from './native-chat-send'
+import type { NativeChatResolvedTarget } from './native-chat-composer-target'
+import {
+  _resetTerminalInputQuarantineForTests,
+  armTerminalInputQuarantine
+} from '../terminal-pane/terminal-input-quarantine'
+
+// The fork's send path is scoped to a terminal tab so reattach quarantine can invalidate it.
+const TARGET: NativeChatResolvedTarget = { terminalTabId: 'tab', ptyId: 'pane', settings: null }
+
 beforeEach(() => {
   vi.useFakeTimers()
   resetNativeChatPtySendQueuesForTests()
   io.write.mockReset().mockReturnValue(true)
-  io.verified.mockReset().mockResolvedValue(true)
+  io.acceptance.mockReset().mockResolvedValue(true)
+  io.delivery.mockReset().mockResolvedValue('accepted')
 })
 afterEach(() => {
   resetNativeChatPtySendQueuesForTests()
+  _resetTerminalInputQuarantineForTests()
   vi.useRealTimers()
 })
 it('observes a refused write, skips Enter, and releases the queue for the next user action', async () => {
   const rejected = vi.fn()
-  io.verified.mockResolvedValueOnce(false)
-  sendNativeChatMessage(null, 'pane', 'refused', { onWriteRejected: rejected })
+  io.delivery.mockResolvedValueOnce('refused')
+  sendNativeChatMessage(TARGET, 'refused', { onWriteRejected: rejected })
   await vi.advanceTimersByTimeAsync(1000)
   expect(rejected).toHaveBeenCalledOnce()
-  expect(io.verified.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
     buildNativeChatPasteBytes('refused')
   ])
-  sendNativeChatMessage(null, 'pane', 'next', { onWriteRejected: rejected })
+  sendNativeChatMessage(TARGET, 'next', { onWriteRejected: rejected })
   await vi.advanceTimersByTimeAsync(1000)
-  expect(io.verified.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
     buildNativeChatPasteBytes('refused'),
     buildNativeChatPasteBytes('next'),
     NATIVE_CHAT_SUBMIT
@@ -39,28 +51,28 @@ it('observes a refused write, skips Enter, and releases the queue for the next u
 it('reports a lost acknowledgment once as unconfirmed, never as rejection, and still submits', async () => {
   const rejected = vi.fn()
   const unconfirmed = vi.fn()
-  io.verified.mockRejectedValueOnce(new Error('lost acknowledgment'))
-  io.verified.mockRejectedValueOnce(new Error('lost acknowledgment'))
-  sendNativeChatMessage(null, 'pane', 'uncertain', {
+  io.delivery.mockResolvedValueOnce('unverifiable')
+  io.delivery.mockResolvedValueOnce('unverifiable')
+  sendNativeChatMessage(TARGET, 'uncertain', {
     onWriteRejected: rejected,
     onWriteUnconfirmed: unconfirmed
   })
   await vi.advanceTimersByTimeAsync(120000)
   expect(rejected).not.toHaveBeenCalled()
   expect(unconfirmed).toHaveBeenCalledOnce()
-  expect(io.verified.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
     buildNativeChatPasteBytes('uncertain'),
     NATIVE_CHAT_SUBMIT
   ])
 })
 it('serializes rapid sends through their acknowledged Enter and preserves the paste delay', async () => {
   const rejected = vi.fn()
-  sendNativeChatMessage(null, 'pane', 'one', { onWriteRejected: rejected })
-  sendNativeChatMessage(null, 'pane', 'two', { onWriteRejected: rejected })
+  sendNativeChatMessage(TARGET, 'one', { onWriteRejected: rejected })
+  sendNativeChatMessage(TARGET, 'two', { onWriteRejected: rejected })
   await vi.advanceTimersByTimeAsync(499)
-  expect(io.verified).toHaveBeenCalledOnce()
+  expect(io.delivery).toHaveBeenCalledOnce()
   await vi.advanceTimersByTimeAsync(501)
-  expect(io.verified.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
     buildNativeChatPasteBytes('one'),
     NATIVE_CHAT_SUBMIT,
     buildNativeChatPasteBytes('two'),
@@ -73,15 +85,15 @@ it.each(['accepted', 'refused', 'unknown'] as const)(
   async (outcome) => {
     const settled = vi.fn()
     if (outcome === 'refused') {
-      io.verified.mockResolvedValueOnce(false)
+      io.delivery.mockResolvedValueOnce('refused')
     } else if (outcome === 'unknown') {
-      io.verified.mockRejectedValueOnce(new Error('lost acknowledgment'))
+      io.delivery.mockResolvedValueOnce('unverifiable')
     }
-    sendNativeChatMessage(null, 'pane', 'answer', { onDeliverySettled: settled })
+    sendNativeChatMessage(TARGET, 'answer', { onDeliverySettled: settled })
     expect(settled).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(1000)
     expect(settled).toHaveBeenCalledExactlyOnceWith(outcome === 'accepted')
-    expect(io.verified.mock.calls.map((call) => call[2])).toEqual(
+    expect(io.delivery.mock.calls.map((call) => call[2])).toEqual(
       outcome === 'refused'
         ? [buildNativeChatPasteBytes('answer')]
         : [buildNativeChatPasteBytes('answer'), NATIVE_CHAT_SUBMIT]
@@ -90,17 +102,33 @@ it.each(['accepted', 'refused', 'unknown'] as const)(
 )
 
 it('ignores a pasted answer acknowledgment after cancellation', async () => {
-  let acknowledge: (accepted: boolean) => void = () => {}
-  io.verified.mockReturnValueOnce(
-    new Promise<boolean>((resolve) => {
+  let acknowledge: (delivery: 'accepted') => void = () => {}
+  io.delivery.mockReturnValueOnce(
+    new Promise<'accepted'>((resolve) => {
       acknowledge = resolve
     })
   )
   const settled = vi.fn()
-  const handle = sendNativeChatMessage(null, 'pane', 'answer', { onDeliverySettled: settled })
+  const handle = sendNativeChatMessage(TARGET, 'answer', { onDeliverySettled: settled })
+  // The fork dispatches the body from a microtask; cancel once the write is in flight.
+  await vi.advanceTimersByTimeAsync(0)
   handle.cancel()
-  acknowledge(true)
+  acknowledge('accepted')
   await vi.advanceTimersByTimeAsync(1000)
   expect(settled).not.toHaveBeenCalled()
-  expect(io.verified).toHaveBeenCalledOnce()
+  expect(io.delivery).toHaveBeenCalledOnce()
+})
+
+it('reports a send refused by reattach quarantine as rejected and unacknowledged', async () => {
+  const rejected = vi.fn()
+  const settled = vi.fn()
+  armTerminalInputQuarantine(TARGET.terminalTabId)
+  sendNativeChatMessage(TARGET, 'quarantined', {
+    onWriteRejected: rejected,
+    onDeliverySettled: settled
+  })
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(rejected).toHaveBeenCalledOnce()
+  expect(settled).toHaveBeenCalledExactlyOnceWith(false)
+  expect(io.delivery).not.toHaveBeenCalled()
 })

@@ -31,21 +31,32 @@ export function sendNativeChatAskAnswer(
   const timers: ReturnType<typeof setTimeout>[] = []
   const verifiedWrites: Promise<boolean>[] = []
   let cancelled = false
+  let undelivered = false
   groups.forEach((group, index) => {
     timers.push(
       setTimeout(() => {
+        // Why: a refused or unacknowledged keystroke group leaves the selector in an unknown
+        // state, so later groups would answer a question the user never saw.
+        if (undelivered) {
+          return
+        }
         const bytes = 'raw' in group ? group.raw : buildNativeChatPasteBytes(group.text)
         if (onSettled) {
           // Why: inference must use the remote host's acceptance result, not
-          // the fire-and-forget renderer dispatch result.
+          // the fire-and-forget renderer dispatch result; an answer that dismisses
+          // its card needs the provider's acknowledgment.
           verifiedWrites.push(
-            sendRuntimePtyInputVerified(
-              target.settings,
-              target.ptyId,
-              bytes,
-              'driving',
-              () => cancelled
-            ).catch(() => false)
+            sendRuntimePtyInputVerified(target.settings, target.ptyId, bytes, 'driving', {
+              isCancelled: () => cancelled,
+              requireWriteSettlement: true
+            })
+              .catch(() => false)
+              .then((delivered) => {
+                if (!delivered) {
+                  undelivered = true
+                }
+                return delivered
+              })
           )
         } else {
           sendRuntimePtyInput(target.settings, target.ptyId, bytes, 'driving')
