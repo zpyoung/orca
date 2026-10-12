@@ -7,7 +7,7 @@ describe('buildCommitMessageGenerationParams', () => {
       buildCommitMessageGenerationParams({
         agentId: 'claude',
         commandTemplate: '{basePrompt}',
-        agentArgs: '--model opus',
+        agentArgs: '--verbose',
         launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } },
         baseParams: null,
         settings: null
@@ -16,7 +16,24 @@ describe('buildCommitMessageGenerationParams', () => {
       agentId: 'claude',
       model: 'sonnet',
       thinkingLevel: 'high',
-      agentArgs: "'--model' 'sonnet' '--effort' 'high' '--model' 'opus'",
+      agentArgs: "'--model' 'sonnet' '--effort' 'high' '--verbose'",
+      recipeAgentArgs: '--verbose',
+      launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } }
+    })
+  })
+
+  it('lets a raw model argument replace the recipe model flag while preserving recipe state', () => {
+    expect(
+      buildCommitMessageGenerationParams({
+        agentId: 'claude',
+        commandTemplate: '{basePrompt}',
+        agentArgs: '--model opus',
+        launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } },
+        baseParams: null,
+        settings: null
+      })
+    ).toMatchObject({
+      agentArgs: "'--model' 'opus'",
       recipeAgentArgs: '--model opus',
       launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } }
     })

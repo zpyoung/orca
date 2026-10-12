@@ -16,6 +16,7 @@ const gitDiff = vi.fn()
 const gitCancelDiff = vi.fn()
 const runtimeEnvironmentCall = vi.fn()
 const runtimeEnvironmentSubscribe = vi.fn()
+const runtimeEnvironmentCancelSubscription = vi.fn()
 
 const status = {
   branch: 'feature/handoff',
@@ -46,6 +47,7 @@ beforeEach(() => {
   gitCancelDiff.mockResolvedValue(undefined)
   runtimeEnvironmentCall.mockReset()
   runtimeEnvironmentSubscribe.mockReset()
+  runtimeEnvironmentCancelSubscription.mockReset().mockResolvedValue(undefined)
   vi.stubGlobal('window', {
     api: {
       git: {
@@ -57,7 +59,8 @@ beforeEach(() => {
       runtime: { call: vi.fn() },
       runtimeEnvironments: {
         call: runtimeEnvironmentCall,
-        subscribe: runtimeEnvironmentSubscribe
+        subscribe: runtimeEnvironmentSubscribe,
+        cancelSubscription: runtimeEnvironmentCancelSubscription
       }
     }
   })

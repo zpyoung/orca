@@ -392,7 +392,7 @@ export function AgentComposerField({
                     settleImeValue(event.currentTarget)
                   }
                 }}
-                onPaste={onPaste}
+                onPasteCapture={onPaste}
                 onSelect={(e) => onTextareaSelect(e.currentTarget)}
                 aria-expanded={autocomplete.mode !== 'none'}
                 aria-controls={autocomplete.mode !== 'none' ? pickerListboxId : undefined}
