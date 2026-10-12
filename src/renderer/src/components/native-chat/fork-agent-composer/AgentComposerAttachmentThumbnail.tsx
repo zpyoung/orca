@@ -75,13 +75,13 @@ function useAttachmentThumbnailSource(path: string, terminalTabId: string): stri
         attachmentPreviewConnectionId(terminalTabId),
         path
       )
-      // Why chat-image: attachments from outside a worktree are otherwise denied.
-      const url = await loadLocalImageAbsolutePath(
-        previewPath,
-        undefined,
-        undefined,
-        chatImageAccess()
-      )
+      let url: string | null = null
+      try {
+        // Why chat-image: attachments from outside a worktree are otherwise denied.
+        url = await loadLocalImageAbsolutePath(previewPath, undefined, undefined, chatImageAccess())
+      } catch {
+        // An unreadable preview shows the chip without a thumbnail.
+      }
       if (!cancelled) {
         setSource(url ?? undefined)
       }
