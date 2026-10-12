@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createStore, makeRepo, readDataFile, testState } from '../persistence-test-harness'
+import {
+  closeTestStores,
+  createStore,
+  makeRepo,
+  readDataFile,
+  testState,
+  writeDataFile
+} from '../persistence-test-harness'
 
 const { trackMock, getCohortAtEmitMock } = vi.hoisted(() => ({
   trackMock: vi.fn(),
@@ -42,7 +49,8 @@ describe('automation launch settings persistence', () => {
     getCohortAtEmitMock.mockReturnValue({ nth_repo_added: 2 })
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await closeTestStores()
     rmSync(testState.dir, { recursive: true, force: true })
   })
 
@@ -55,8 +63,7 @@ describe('automation launch settings persistence', () => {
       agentId: 'claude',
       launchOverrides: {
         model: ' sonnet ',
-        optionValues: { effort: 'high', fastMode: false },
-        agentArgs: '--verbose'
+        optionValues: { effort: 'high', fastMode: false }
       },
       projectId: 'r1',
       workspaceMode: 'existing',
@@ -68,8 +75,7 @@ describe('automation launch settings persistence', () => {
 
     expect(automation.launchOverrides).toEqual({
       model: 'sonnet',
-      optionValues: { effort: 'high', fastMode: false },
-      agentArgs: '--verbose'
+      optionValues: { effort: 'high', fastMode: false }
     })
     expect(
       store.updateAutomation(automation.id, {
@@ -84,6 +90,85 @@ describe('automation launch settings persistence', () => {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the harness writes automations as an array of plain records.
     const persisted = readDataFile() as { automations: Record<string, unknown>[] }
     expect(Object.hasOwn(persisted.automations[0], 'launchOverrides')).toBe(false)
+  })
+
+  it('folds retired launchOverrides.agentArgs from a create into extraAgentArgs', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const automation = store.createAutomation({
+      name: 'Nightly',
+      prompt: 'Run checks',
+      agentId: 'claude',
+      extraAgentArgs: '--effort high',
+      launchOverrides: { model: 'sonnet', ...{ agentArgs: '--add-dir docs' } },
+      projectId: 'r1',
+      workspaceMode: 'existing',
+      workspaceId: 'wt1',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+
+    expect(automation.extraAgentArgs).toBe('--effort high --add-dir docs')
+    expect(automation.launchOverrides).toEqual({ model: 'sonnet' })
+  })
+
+  it('folds retired launchOverrides.agentArgs from an update into extraAgentArgs', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const automation = store.createAutomation({
+      name: 'Nightly',
+      prompt: 'Run checks',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'existing',
+      workspaceId: 'wt1',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+
+    const updated = store.updateAutomation(automation.id, {
+      launchOverrides: { model: 'opus', ...{ agentArgs: '--add-dir docs' } }
+    })
+
+    expect(updated.extraAgentArgs).toBe('--add-dir docs')
+    expect(updated.launchOverrides).toEqual({ model: 'opus' })
+  })
+
+  it('migrates a stored launchOverrides.agentArgs without losing it', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const automation = store.createAutomation({
+      name: 'Nightly',
+      prompt: 'Run checks',
+      agentId: 'claude',
+      extraAgentArgs: '--effort high',
+      launchOverrides: { model: 'sonnet' },
+      projectId: 'r1',
+      workspaceMode: 'existing',
+      workspaceId: 'wt1',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the harness writes automations as an array of plain records.
+    const persisted = readDataFile() as { automations: Record<string, unknown>[] }
+    persisted.automations[0].launchOverrides = { model: 'sonnet', agentArgs: '--add-dir docs' }
+    writeDataFile(persisted)
+    await closeTestStores()
+
+    const reloaded = await createStore()
+    const [migrated] = reloaded.listAutomations()
+    expect(migrated.extraAgentArgs).toBe('--effort high --add-dir docs')
+    expect(migrated.launchOverrides).toEqual({ model: 'sonnet' })
+
+    const renamed = reloaded.updateAutomation(automation.id, { name: 'Renamed' })
+    expect(renamed.extraAgentArgs).toBe('--effort high --add-dir docs')
+    expect(renamed.launchOverrides).toEqual({ model: 'sonnet' })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the harness writes automations as an array of plain records.
+    const stored = readDataFile() as { automations: Record<string, unknown>[] }
+    expect(stored.automations[0].launchOverrides).toEqual({ model: 'sonnet' })
   })
 
   it('persists automation run launch settings across later status updates', async () => {

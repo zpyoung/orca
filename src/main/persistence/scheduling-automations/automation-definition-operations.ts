@@ -7,7 +7,12 @@ import type {
   AutomationUpdateInput
 } from '../../../shared/automations-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
-import { normalizeAgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import {
+  foldLegacyLaunchAgentArgs,
+  legacyLaunchOverridesAgentArgs,
+  migrateLegacyAutomationLaunchArgs,
+  normalizeAutomationLaunchOverrides
+} from '../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
 import {
   assertAutomationExtraAgentArgs,
@@ -49,7 +54,9 @@ export type AutomationDefinitionOperations = {
 
 export function listAutomations(state: PersistedState): Automation[] {
   return (state.automations ?? [])
-    .map((automation) => normalizeAutomationSessionReuse(automation))
+    .map((automation) =>
+      normalizeAutomationSessionReuse(migrateLegacyAutomationLaunchArgs(automation))
+    )
     .sort((left, right) => left.name.localeCompare(right.name))
 }
 
@@ -86,8 +93,13 @@ export function createAutomation(
   }
   const schedulerOwner = getAutomationSchedulerOwner(repo)
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
-  const extraAgentArgs = storedExtraAgentArgs(input.extraAgentArgs)
-  const launchOverrides = normalizeAgentLaunchOverrides(input.launchOverrides)
+  const extraAgentArgs = storedExtraAgentArgs(
+    foldLegacyLaunchAgentArgs(
+      input.extraAgentArgs,
+      legacyLaunchOverridesAgentArgs(input.launchOverrides)
+    )
+  )
+  const launchOverrides = normalizeAutomationLaunchOverrides(input.launchOverrides)
   const automation: Automation = {
     id: randomUUID(),
     ...(input.creationKey ? { creationKey: input.creationKey } : {}),
@@ -140,7 +152,7 @@ export function updateAutomation(
   if (index === -1) {
     throw new Error('Automation not found.')
   }
-  const current = operations.state.automations[index]
+  const current = migrateLegacyAutomationLaunchArgs(operations.state.automations[index])
   const projectionContext = automationProjectionContext(
     operations.state,
     operations.storageAuthority,
@@ -172,13 +184,18 @@ export function updateAutomation(
   const scheduleChanged = updates.rrule !== undefined || updates.dtstart !== undefined
   const workspaceMode = updates.workspaceMode ?? current.workspaceMode
   // Omitted preserves; empty or whitespace clears.
-  const extraAgentArgs = Object.hasOwn(definedUpdates, 'extraAgentArgs')
-    ? storedExtraAgentArgs(definedUpdates.extraAgentArgs)
-    : storedExtraAgentArgs(current.extraAgentArgs)
+  const extraAgentArgs = storedExtraAgentArgs(
+    foldLegacyLaunchAgentArgs(
+      Object.hasOwn(definedUpdates, 'extraAgentArgs')
+        ? definedUpdates.extraAgentArgs
+        : current.extraAgentArgs,
+      legacyLaunchOverridesAgentArgs(definedUpdates.launchOverrides)
+    )
+  )
   const normalizedLaunchOverrides = Object.hasOwn(definedUpdates, 'launchOverrides')
     ? definedUpdates.launchOverrides === null
       ? null
-      : normalizeAgentLaunchOverrides(definedUpdates.launchOverrides)
+      : normalizeAutomationLaunchOverrides(definedUpdates.launchOverrides)
     : current.launchOverrides
   const merged: Automation = {
     ...current,

@@ -5,13 +5,13 @@ import {
 } from './automation-launch-overrides-save'
 
 describe('automation launch override save fields', () => {
-  it('normalizes configured values for creates and updates', () => {
-    const value = { model: ' opus ', agentArgs: ' --verbose ' }
+  it('normalizes configured values and drops retired raw arguments for creates and updates', () => {
+    const value = { model: ' opus ', ...{ agentArgs: ' --verbose ' } }
     expect(buildAutomationLaunchOverridesCreateFields(value, 'supported')).toEqual({
-      launchOverrides: { model: 'opus', agentArgs: ' --verbose ' }
+      launchOverrides: { model: 'opus' }
     })
     expect(buildAutomationLaunchOverridesUpdateFields(value, 'supported')).toEqual({
-      launchOverrides: { model: 'opus', agentArgs: ' --verbose ' }
+      launchOverrides: { model: 'opus' }
     })
   })
 

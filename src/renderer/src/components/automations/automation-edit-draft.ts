@@ -8,7 +8,10 @@
 
 import type { Automation, ExternalAutomationJob } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
-import { normalizeAgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import {
+  migrateLegacyAutomationLaunchArgs,
+  normalizeAutomationLaunchOverrides
+} from '../../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
 import {
   isRunnableAutomationCronSchedule,
   isRunnableAutomationSchedule,
@@ -25,8 +28,8 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
     name: automation.name,
     prompt: automation.prompt,
     agentId: automation.agentId,
-    extraAgentArgs: automation.extraAgentArgs ?? '',
-    launchOverrides: normalizeAgentLaunchOverrides(automation.launchOverrides) ?? {},
+    extraAgentArgs: migrateLegacyAutomationLaunchArgs(automation).extraAgentArgs ?? '',
+    launchOverrides: normalizeAutomationLaunchOverrides(automation.launchOverrides) ?? {},
     projectId: getAutomationRunRepoId(automation),
     workspaceMode: automation.workspaceMode,
     workspaceId: automation.workspaceId ?? '',

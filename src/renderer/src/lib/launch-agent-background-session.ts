@@ -1,6 +1,6 @@
 import { useAppStore } from '@/store'
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
-import { resolveAgentBackgroundLaunchSettings } from '@/lib/fork-automation-launch-settings/agent-background-launch-settings'
+import { agentLaunchOverridesToSessionOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type {
   LaunchAgentBackgroundSessionArgs,
   LaunchAgentBackgroundSessionResult
@@ -26,7 +26,6 @@ import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-strea
 import { isMainTerminalSideEffectAuthorityForPty } from '@/components/terminal-pane/terminal-side-effect-facts-handler'
 import { hasExtraAgentArgs } from '../../../shared/automation-extra-agent-args'
 import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
-import { resolveTuiAgentLaunchArgs } from '../../../shared/tui-agent-launch-defaults'
 import { runBestEffortAgentBackgroundCleanups } from '@/lib/agent-background-session-cleanup'
 import type { bindAutomationTerminal } from '@/lib/automation-terminal-ownership'
 import {
@@ -74,18 +73,13 @@ export async function launchAgentBackgroundSession(
     // Why: that server rebuilds the command from its own settings and would drop the extras.
     throw new Error("Extra arguments can't be applied to a paired server's workspace from here.")
   }
-  const inheritedAgentArgs = resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs)
-  const { agentArgs, sessionOptions } = resolveAgentBackgroundLaunchSettings({
-    inheritedAgentArgs,
-    overrides: launchOverrides
-  })
+  const sessionOptions = agentLaunchOverridesToSessionOptionValues(launchOverrides)
   // Why before any tab or PTY: an invalid launch must fail the run without creating a terminal.
   const planInputs = resolveAgentStartupPlanInputs({
     agent,
     settings: store.settings ?? {},
     platform: launchPlatform,
     isRemote,
-    agentArgs,
     extraAgentArgs: args.extraAgentArgs,
     sessionOptions
   })
@@ -172,7 +166,7 @@ export async function launchAgentBackgroundSession(
         ...(hasPrompt && !isFollowupPath ? { prompt: trimmedPrompt } : {}),
         startupPlan,
         launchOverrides,
-        effectiveAgentArgs: agentArgs,
+        effectiveAgentArgs: planInputs.agentArgs ?? '',
         paneEnv,
         launchToken,
         title
@@ -292,7 +286,7 @@ export async function launchAgentBackgroundSession(
       ptyId,
       startupPlan,
       startupShell,
-      effectiveAgentArgs: agentArgs,
+      effectiveAgentArgs: planInputs.agentArgs ?? '',
       terminalOwnership
     }
   } catch (error) {

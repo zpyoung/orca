@@ -1,4 +1,4 @@
-import { normalizeAgentLaunchOverrides } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { normalizeAutomationLaunchOverrides } from '../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
 import {
   findCatalogModel,
   findCatalogOption,
@@ -10,7 +10,7 @@ import type { Automation } from '../../shared/automations-types'
 export function formatAutomationLaunchOverrides(
   automation: Pick<Automation, 'agentId' | 'launchOverrides'>
 ): string | null {
-  const overrides = normalizeAgentLaunchOverrides(automation.launchOverrides)
+  const overrides = normalizeAutomationLaunchOverrides(automation.launchOverrides)
   if (!overrides) {
     return null
   }
@@ -26,9 +26,6 @@ export function formatAutomationLaunchOverrides(
       (!model ? catalog?.unknownModelOptions?.find((candidate) => candidate.id === id) : undefined)
     const label = option?.label ?? id
     parts.push(value === true ? label : `${label}: ${value === false ? 'Off' : value}`)
-  }
-  if (overrides.agentArgs) {
-    parts.push(overrides.agentArgs)
   }
   return parts.join(' · ')
 }

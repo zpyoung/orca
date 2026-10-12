@@ -139,6 +139,7 @@ export const LaunchOverrides = z
   .object({
     model: z.string().min(1).max(128).optional(),
     optionValues: LaunchOverrideOptionValues.optional(),
+    // Retired: older clients still send it; the store folds it into extraAgentArgs.
     agentArgs: z.string().max(4096).optional()
   })
   .optional()

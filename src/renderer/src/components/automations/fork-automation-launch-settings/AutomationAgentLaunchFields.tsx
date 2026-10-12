@@ -1,10 +1,6 @@
 import AgentCombobox from '@/components/agent/AgentCombobox'
 import { AgentLaunchOverridesFields } from '@/components/fork-automation-launch-settings/AgentLaunchOverridesFields'
 import { isEmptyAgentLaunchOverrides } from '../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import {
-  getTuiAgentDefaultArgs,
-  resolveTuiAgentLaunchArgs
-} from '../../../../../shared/tui-agent-launch-defaults'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../../shared/tui-agent'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
@@ -22,7 +18,7 @@ type AutomationAgentLaunchFieldsProps = {
   onDraftChange: (updater: (current: AutomationDraft) => AutomationDraft) => void
 }
 
-/** Render the Orca automation agent picker and its model/effort/args launch settings. */
+/** Render the Orca automation agent picker and its model/effort launch settings. */
 export function AutomationAgentLaunchFields({
   draft,
   settings,
@@ -44,15 +40,9 @@ export function AutomationAgentLaunchFields({
             "Launch settings can't be saved to this host and won't apply to runs."
           )
 
-  // Why: model/effort ids are agent-specific, so only raw args survive an agent switch.
+  // Why: model/effort ids are agent-specific, so an agent switch clears them.
   const changeAgent = (agentId: TuiAgent): void => {
-    onDraftChange((current) => ({
-      ...current,
-      agentId,
-      launchOverrides: current.launchOverrides.agentArgs
-        ? { agentArgs: current.launchOverrides.agentArgs }
-        : {}
-    }))
+    onDraftChange((current) => ({ ...current, agentId, launchOverrides: {} }))
   }
 
   return (
@@ -79,8 +69,7 @@ export function AutomationAgentLaunchFields({
             launchOverrides: updater(current.launchOverrides)
           }))
         }
-        agentArgsPlaceholder={getTuiAgentDefaultArgs(draft.agentId)}
-        inheritedAgentArgs={resolveTuiAgentLaunchArgs(draft.agentId, settings?.agentDefaultArgs)}
+        showAgentArgs={false}
         reuseSessionNote={draft.workspaceMode === 'existing' && draft.reuseSession}
         disabled={launchOverridesGate !== 'supported'}
         disabledReason={launchOverridesDisabledReason}
