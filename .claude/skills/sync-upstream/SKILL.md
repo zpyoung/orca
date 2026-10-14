@@ -953,13 +953,15 @@ anchor has moved since `upstream_synced`. Duplicating any of that here would dri
 
 "Nothing to release" is a normal, successful outcome, not a warning.
 
-Dispatch only — do NOT wait for the build. `release-cut.yml` tags, builds, and publishes; mac
-notarization alone runs over an hour. Record the dispatched run and stop.
+Let the skill run to its end. It watches the build until the GitHub release is published, which
+takes over an hour because of mac notarization, and it re-runs, fixes, or recuts within its own
+limits when the build fails. Waiting is part of this run, so don't cut it short. The skill also
+finishes a previous release that never published, so run it even when this sync changed nothing.
 
-If the release skill stops on one of its own preconditions or fails partway, that is a "needs
-attention" item, but it does NOT invalidate the sync: the PR is already merged and `main` already
-carries it, and that stands. Never try to undo the sync because a release failed, and never re-run the skill in the
-same run to force a different outcome.
+If the release skill stops on one of its own preconditions, or ends in "needs attention", that is a
+"needs attention" item, but it does NOT invalidate the sync: the PR is already merged and `main`
+already carries it, and that stands. Never try to undo the sync because a release failed, and never
+re-invoke the skill in the same run to force a different outcome.
 
 ## Step 15 — Record what this run learned
 
@@ -1035,7 +1037,9 @@ belongs to the `release` skill: report it, do not edit it from here.
   under PR CI below, not here
 - PR CI: every check that failed, whether it reproduced on re-run or was flake, and every fix commit
   made to turn it green — SHA, subject, and the cause it addressed
-- Release: `nothing to release` | `skipped (<reason>)` | the tag cut and the run dispatched
+- Release: `nothing to release` | `skipped (<reason>)` | `published <tag>` with the release URL |
+  `needs attention` with the release skill's classified cause, plus every run, re-run, recut, and
+  fix PR the skill reported
 - Learned: `nothing` | the lesson in one line and the URL of the skill PR left open for review
 - All "needs attention" items
 
@@ -1071,7 +1075,9 @@ belongs to the `release` skill: report it, do not edit it from here.
   algebra, and a hand-rolled version can regress the published series and break auto-update.
 - Never cut a release from work this run could not verify and land. No release after any hard fail,
   none while the PR is still open, none with a dirty tree.
-- One release per run, at most. If the skill reports "nothing to release", that is the end of it.
+- One invocation of the release skill per run, at most. The re-runs and the one recut it makes inside
+  its own limits are part of that invocation. If it reports "nothing to release", that is the end
+  of it.
 - This skill is revised by its own runs, but only through Step 15: a separate branch, a PR the run
   never merges, and no edit to `## Hard safety rules` or the fix policy's never-list. Never edit the
   skill on `$SYNC_BRANCH`, and never edit it as a way of getting a check green — a rule rewritten to
