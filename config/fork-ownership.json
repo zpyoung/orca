@@ -160,6 +160,11 @@
       "globs": ["**/fork-release-recovery/**"]
     },
     {
+      "name": "fork-sync-precheck",
+      "purpose": "Precheck that lets the daily sync automation skip days with no upstream stable release and nothing to release.",
+      "globs": ["**/fork-sync-precheck/**"]
+    },
+    {
       "name": "computer-peer-identity",
       "purpose": "Authorizes the packaged fork's macOS computer-use peer without broadening bundle-prefix trust.",
       "globs": ["**/fork-computer-peer-identity/**"]
