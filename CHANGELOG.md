@@ -1,5 +1,5 @@
 ---
-last_released_commit: ad2dc09421a8a4a6abf136d6667c81877d99dae3
+last_released_commit: fb72307395c0dd365524fe4cde41038f701a74c4
 upstream_synced: v1.4.224
 ---
 
@@ -11,6 +11,19 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.225-rc.0.zy03] - 2026-10-14
+
+Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4.224).
+
+### Changed
+- The daily upstream sync now runs a cheap precheck first and skips the full run when upstream
+  has shipped no new stable release, the newest fork release is published, and there are no
+  unreleased fork commits. If the check can't decide, the sync runs as before.
+- Fork releases are now watched until they're published, not just dispatched. A release whose
+  build failed is noticed on the next run and re-run or recut instead of sitting as an empty
+  draft, and problems that need the account owner, such as an expired Apple agreement, are
+  reported for attention.
 
 ## [1.4.225-rc.0.zy02] - 2026-10-14
 
