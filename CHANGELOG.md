@@ -1,5 +1,5 @@
 ---
-last_released_commit: 5ef269a8a72d75b9dc8cf33280d2428cf0e2e910
+last_released_commit: ad2dc09421a8a4a6abf136d6667c81877d99dae3
 upstream_synced: v1.4.224
 ---
 
@@ -12,7 +12,47 @@ line per release, and detailed in each GitHub release's generated notes.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
 
+## [1.4.225-rc.0.zy02] - 2026-10-14
+
+Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4.224).
+
+### Changed
+- Claude chat sends from the composer now report delivery the way upstream does. A message the
+  terminal refused shows "Message not sent", and one whose delivery couldn't be confirmed is held
+  as unconfirmed instead of being sent twice. Sends are still dropped safely when a terminal
+  reattaches.
+- Answers to an agent's multi-part question are typed group by group, each waiting for the
+  previous one to be acknowledged, so a slow answer is no longer overtaken by the final Enter.
+  Over SSH this uses the paired host's own acknowledgement.
+- Chat width now follows upstream's chat width setting on every surface, including the terminal
+  dock. The fork's separate width tiers are gone.
+- The tool line in chat tints upstream's icon and verb by tool category, replacing the fork's
+  glyph and monospace tool name.
+- Automation raw arguments now use upstream's extra agent arguments field. The fork's
+  `--agent-args` flag and editor field are removed. Saved arguments move over verbatim, and an
+  argument outside upstream's allowed list makes that automation's runs fail with an error until
+  it's fixed.
+
+### Fixed
+- Fork releases build and publish again. Since the v1.4.222 sync, every release stopped before
+  the macOS build because the release pipeline expected an analytics key this fork doesn't have.
+  Telemetry stays off.
+- An image pasted into a question card's answer box attaches to the composer again instead of
+  being dropped.
+- Pasting into the fork composer works with upstream's paste handling again.
+- A chat attachment whose preview can't be read shows the chip without a thumbnail instead of
+  raising an error.
+- Agent state rules update from upstream's releases again. They had been looking for updates in
+  this fork, which publishes none.
+- Fork launches, handoffs and Heimdall worker reports work with upstream's new launch API and its
+  removal of the orchestration capability token.
+- Stopping a structured agent session before it picks up a message puts that message back in the
+  composer again, including while an IME composition is in progress. Text put back while the
+  composer was closed appears when it reopens.
+
 ## [1.4.225-rc.0.zy01] - 2026-10-12
+
+Not published: the build failed. Superseded by 1.4.225-rc.0.zy02.
 
 Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4.224).
 
