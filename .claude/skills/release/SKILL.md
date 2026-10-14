@@ -1,6 +1,6 @@
 ---
 name: release
-description: Use when cutting a release of the zpyoung/orca fork, or when asked to update CHANGELOG.md with fork-owned changes. Records commits this fork owns (not upstream's), computes a fork version anchored to the upstream point main is built on, and dispatches release-cut.yml. Triggers on "cut a release", "release the fork", "update the changelog", "ship a build".
+description: Use when cutting a release of the zpyoung/orca fork, when a fork release failed or is stuck as a draft, or when asked to update CHANGELOG.md with fork-owned changes. Records commits this fork owns (not upstream's), computes a fork version anchored to the upstream point main is built on, dispatches release-cut.yml, and watches the build until the release is published, recovering the failures it can. Triggers on "cut a release", "release the fork", "release failed", "get the release out", "update the changelog", "ship a build".
 ---
 
 # Releasing the fork
@@ -8,10 +8,15 @@ description: Use when cutting a release of the zpyoung/orca fork, or when asked 
 `zpyoung/orca` is a consumption fork of `stablyai/orca`. A release answers two questions:
 **what did this fork change** (`CHANGELOG.md`) and **what upstream is it built on** (the version).
 
-This skill writes the changelog and dispatches the existing release pipeline. It does **not** sync
-upstream, and it does **not** run typecheck/lint/tests — CI owns verification.
+This skill writes the changelog, dispatches the existing release pipeline, and stays with the build
+until the GitHub release is published. A dispatched cut is not a release: the tag and changelog
+land minutes in, while signing, notarization, and publishing take over an hour and can fail on their
+own, leaving a draft no client ever sees. It does **not** sync upstream, and it does **not** run
+typecheck/lint/tests — CI owns verification.
 
-Arguments: `--yes` skips the confirmation prompt (for unattended automation runs).
+Arguments: `--yes` skips the confirmation prompt and every other question (for unattended
+automation runs). Where an unattended run would need a person, it stops and reports "needs
+attention" instead.
 
 ## 1. Check preconditions
 
@@ -86,12 +91,51 @@ replacement.
 
 ## 3. Decide whether there is anything to release
 
+### First, check that the previous release actually shipped
+
+The frontmatter advances when the changelog commit lands, before the build runs. So a cut whose
+build failed looks fully released to the range check below, and every later run would report
+"nothing to release" while the newest fork release sits as a draft with no assets. This happened to
+`v1.4.219-rc.0.zy01` and `v1.4.225-rc.0.zy01`. Check the newest changelog section's tag before
+anything else:
+
+```sh
+PREV_TAG=v$(grep -m1 -oE '^## \[[^]]+\]' CHANGELOG.md | sed -E 's/^## \[(.*)\]$/\1/')
+PREV_SHA=$(git log -1 --format=%H -F --grep="docs(changelog): release ${PREV_TAG}" HEAD)
+gh release view "$PREV_TAG" --repo zpyoung/orca --json isDraft,assets \
+  --jq '{isDraft, assets: [.assets[].name]}'
+gh run list --repo zpyoung/orca --workflow=release-cut.yml --commit "$PREV_SHA" \
+  --json databaseId,status,conclusion,createdAt,url --limit 1
+```
+
+A release-cut run's head SHA is the changelog commit it was dispatched on, which is why `--commit`
+finds it.
+
+- **Published** (`isDraft` false, assets present) → carry on below.
+- **Run still in progress** → do not cut. Go to Step 7 and watch that run instead.
+- **No run, and no tag** → "changelog pushed, dispatch never ran" (see *Recovering from a partial
+  failure*). Re-dispatch the same version, then go to Step 7.
+- **Run failed** → classify its failure with Step 7's table, then:
+  - If the range check below finds something new to release, cut normally. The new cut supersedes
+    the draft, and Step 5 carries the draft's entries forward.
+  - Otherwise, for a **transient** or **account-side** cause, re-run the failed jobs
+    (`gh run rerun "$RUN_ID" --repo zpyoung/orca --failed`) and go to Step 7. A re-run costs no
+    suffix and needs no changelog change. GitHub refuses re-runs of runs older than 30 days; recut
+    instead.
+  - Otherwise, for a **repo defect**, apply Step 7's fix flow if `origin/main` doesn't already
+    carry a fix, then recut with the suffix advanced. A re-run would replay the broken workflow,
+    because re-runs use the run's original commit.
+
+Only the newest section matters. Older drafts are already superseded; leave them alone.
+
+### Then, check for new content
+
 Release if **either** holds:
 
 - there is at least one non-bot fork commit in the range, or
 - `$ANCHOR` differs from `upstream_synced` (upstream shipped a new stable release since the last one)
 
-If neither holds, report "nothing to release" and stop.
+If neither holds, and the previous release is published, report "nothing to release" and stop.
 
 Always report the upstream gap — e.g. *"main is 100 commits behind upstream/main"* — but never let
 it block. It is informational; releases cut from main's actual content. Expect this number to stay
@@ -177,6 +221,10 @@ Synced to upstream [v1.4.156-rc.1](https://github.com/stablyai/orca/releases/tag
   `create-draft-release.mjs` matches on it to build the release body. A mismatch silently drops
   the section and the release ships with generated notes only.
 - With no fork commits, keep the section — the `Synced to upstream` line alone is the entry.
+- When this cut supersedes an unpublished draft (Step 3), copy the draft section's entries into the
+  new one, because no client ever received them. Then add one line under the draft's own heading:
+  `Not published: the build failed. Superseded by <new version>.` Leave the rest of
+  that section as it was.
 
 Then update the frontmatter:
 
@@ -227,20 +275,100 @@ Pass `version` and `version_suffix` separately — never the joined `$TAG`, and 
 leading `v`. `kind` is a required input; it is ignored when `version` is set, but must still be
 passed.
 
-Report the run URL:
+Capture the run by the changelog commit it was dispatched on. It can take a few seconds to appear:
 
 ```sh
-gh run list --repo zpyoung/orca --workflow=release-cut.yml --limit 1 --json url,status
+RELEASE_SHA=$(git rev-parse HEAD)
+gh run list --repo zpyoung/orca --workflow=release-cut.yml --commit "$RELEASE_SHA" \
+  --event workflow_dispatch --json databaseId,url,status --limit 1
 ```
+
+Do not take `--limit 1` without `--commit`. A scheduled cut or another dispatch can be newer.
 
 **`dry_run=true` cannot validate any of this.** Its `if:` condition also skips release-cut's
 "Compute next version" step, so a dry run never evaluates the version gate, the rc/suffix history,
 or the tag it would cut — it only echoes the schedule-window state, which a manual dispatch already
 bypasses. There is no way to rehearse a cut; verify by reading the gate, then dispatch for real.
 
-## 7. Report
+## 7. Watch the build until the release is published
 
-State the version cut, the commits included, the upstream anchor, the gap, and the run URL.
+Stay with the run. Mac signing and notarization alone take over an hour, so watch in the background
+and expect to wait up to 3 hours:
+
+```sh
+gh run watch "$RUN_ID" --repo zpyoung/orca --exit-status --compact --interval 300 \
+  > "${TMPDIR:-/tmp}/release-watch-$RUN_ID.log" 2>&1; echo "exit=$?"
+```
+
+Write the output to a file and read its tail, because `gh run watch` redraws on every interval.
+In Claude Code, run the command with `run_in_background` and wait for the completion notification.
+Don't poll it yourself.
+
+**On success, confirm the release is really out:**
+
+```sh
+gh release view "$TAG" --repo zpyoung/orca --json isDraft,isPrerelease,assets \
+  --jq '{isDraft, isPrerelease, assets: [.assets[].name]}'
+```
+
+It must be `isDraft: false` and `isPrerelease: true`, with `latest-mac.yml`, an `-arm64-mac.zip`,
+and `orca-macos-arm64.dmg` among the assets. Auto-update reads `latest-mac.yml`, so a release without
+it has not shipped, even when every job is green.
+
+**On failure, find what broke:**
+
+```sh
+gh run view "$RUN_ID" --repo zpyoung/orca --json jobs --jq '.jobs[] | select(.conclusion=="failure")
+  | "\(.databaseId) \(.name) \([.steps[] | select(.conclusion=="failure") | .name] | join(","))"'
+gh api "repos/zpyoung/orca/actions/jobs/$JOB_ID/logs" | sed 's/\x1b\[[0-9;]*m//g' \
+  | grep -nE '##\[error\]|Error|⨯' | head -40
+```
+
+Read the first real error, not the last. A failed job skips everything after it, so the jobs that
+show as skipped never ran and say nothing about the cause. Then classify it:
+
+| Cause | Looks like | Action |
+|---|---|---|
+| **Transient** | runner lost or shut down, network timeouts, 5xx from GitHub or Apple, notarytool timing out | `gh run rerun "$RUN_ID" --repo zpyoung/orca --failed`, then watch again |
+| **Account-side** | notarytool `HTTP status code: 403. A required agreement is missing or has expired`, a 401 or rejected Apple ID, an expired signing certificate, a credential secret that is missing or empty | Stop with "needs attention". Name the error and what the owner must do, such as "sign the updated agreement at developer.apple.com/account". Leave the draft as it is. The next run's Step 3 re-runs it, so no recut is needed once the owner fixes the account. |
+| **Repo defect** | the same step fails the same way on a re-run: a workflow input the fork doesn't provide, an upstream workflow or script change that assumes upstream's setup, a fork-owned file that drifted | Fix it on `main` (below), then recut with the suffix advanced |
+
+A re-run replays the run's original commit and workflow file, so it can only clear transient or
+account-side causes. If the rerun fails the same way, treat the cause as a repo defect.
+
+**Fixing a repo defect.** The fix goes through a PR, never a direct push:
+
+1. Branch from `origin/main` as `release-fix/<tag>` and make the smallest change that makes the
+   failing step pass on the fork. Files a fork must own to fix this are almost always the release
+   workflows and `config/scripts/release-*`. Keep `config/fork-ownership.json` correct for anything
+   you touch.
+2. Never weaken a gate to get through: no skipped signing, notarization, or verification step, no
+   loosened version gate, no `continue-on-error`. A placeholder value is acceptable only for an
+   input the fork deliberately leaves unused, such as the telemetry key while
+   `TELEMETRY_ENABLED` is false. Never put a real credential in a file.
+3. Open the PR with `env -u GITHUB_TOKEN gh pr create --repo zpyoung/orca` and a body following
+   `.github/pull_request_template.md`. Wait for its checks in the background, then merge with
+   `env -u GITHUB_TOKEN gh pr merge <n> --repo zpyoung/orca --merge`. Never `--squash` or
+   `--rebase`. PR CI never runs the release workflows, so green checks prove only that nothing else
+   broke, and the recut is the real test.
+4. Detach onto the new `origin/main`, then go back to Step 2 and recut. Step 3 finds the failed
+   draft, and Step 5 carries its entries forward.
+
+If the fix needs a judgement call, such as taking or dropping a fork feature, or a change outside
+the release pipeline, or if its PR doesn't go green within 2 hours, leave the PR open and report
+"needs attention".
+
+**Limits per invocation:** at most one re-run per cut, one fix PR, and two cuts in total, the
+original and one recut. When a limit is hit, stop and report "needs attention" with the run URL
+and the classified cause. Never loop on recuts. Each recut spends a `zyNN` suffix, and there are
+only 99.
+
+## 8. Report
+
+State the outcome first: `published <TAG>` with the release URL, or `needs attention` with the
+cause, its classification, and what a person must do. Then list the version cut, the commits
+included, the upstream anchor, the gap, every run URL, any re-run or recut and its reason, and any
+fix PR.
 
 ## Recovering from a partial failure
 
@@ -252,9 +380,10 @@ The frontmatter already advanced, so a naive re-run sees nothing to release. Re-
 `VERSION_BASE`/`VERSION_SUFFIX` by hand — the changelog section is still correct and `$TAG` does not
 exist yet. Do not write a second changelog section.
 
-**Tag created, build failed with an incomplete draft.** Do not reuse the tag. Cut again with the
-suffix advanced (`rc.1.zy01` → `rc.1.zy02`), which the gate admits, and add a new changelog section
-for the new tag. Note `kind=rc` recovery cannot help here: `release-cut.yml` reconstructs a *bare*
+**Tag created, build failed with an incomplete draft.** Step 3 finds it and Step 7 decides between a
+re-run of the failed jobs and a recut. Never reuse the tag for a fresh dispatch. A recut advances
+the suffix (`rc.1.zy01` → `rc.1.zy02`), which the gate admits, and adds a new changelog section for
+the new tag. Note `kind=rc` recovery cannot help here: `release-cut.yml` reconstructs a *bare*
 `v<base>-rc.<n>` tag, which never matches a `.zy` tag.
 
 **Never delete a published tag or release to retry.** The suffix history is read from tags *and*
