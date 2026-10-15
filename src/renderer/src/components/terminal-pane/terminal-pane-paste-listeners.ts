@@ -16,7 +16,7 @@ import {
 } from '@/lib/app-menu-selection-actions'
 import { isEditableTarget } from '@/lib/editable-target'
 import { copyTerminalSelection } from './terminal-selection-copy'
-import { isInsideNativeChatCover } from './native-chat-covered-pane'
+import { isTerminalPasteOwnedByChat as isInsideNativeChatCover } from './fork-terminal-dock/terminal-dock-paste-yield'
 import type { TerminalPaneCloseController } from './use-terminal-pane-close-actions'
 import {
   formatClipboardImagePasteError,
