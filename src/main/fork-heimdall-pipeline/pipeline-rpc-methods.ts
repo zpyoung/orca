@@ -221,6 +221,7 @@ export async function ensurePipelineTrackedForWorkspace(input: {
 export const PIPELINE_RPC_METHODS = [
   defineMethod({
     name: HEIMDALL_CHANNELS.pipelineList,
+    permission: 'workspace',
     params: PipelineListRequestSchema,
     handler: async (request, context) => {
       const binding = requireHeimdallPipeline(context.runtime)
@@ -257,6 +258,7 @@ export const PIPELINE_RPC_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.pipelineResolve,
+    permission: 'workspace',
     params: PipelineResolveRequestSchema,
     handler: async (request, context) => {
       const { store } = requireHeimdallPipeline(context.runtime)
@@ -289,6 +291,7 @@ export const PIPELINE_RPC_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.pipelinePersonal,
+    permission: 'workspace',
     params: PipelinePersonalRequestSchema,
     handler: async (request, context) => {
       if (!isLocalArtifactPasswordCaller(context)) {
@@ -300,6 +303,7 @@ export const PIPELINE_RPC_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.pipelineEnsureTracked,
+    permission: 'workspace',
     params: PipelineEnsureTrackedRequestSchema,
     handler: async (request, context) => {
       const { store } = requireHeimdallPipeline(context.runtime)
@@ -330,6 +334,7 @@ export const PIPELINE_RPC_METHODS = [
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.pipelineRunView,
+    permission: 'workspace',
     params: PipelineRunViewRequestSchema,
     handler: async ({ target }, context) => {
       if (
