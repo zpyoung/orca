@@ -5308,6 +5308,14 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["const PRE_CHANGE_REF = 'v1.4.216-rc.0.zy01'"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-paste-listeners.ts",
+      "feature": "terminal-dock",
+      "kind": "import-swap",
+      "lines": [
+        "import { isTerminalPasteOwnedByChat as isInsideNativeChatCover } from './fork-terminal-dock/terminal-dock-paste-yield'"
+      ]
     }
   ],
   "exceptions": [
@@ -8710,6 +8718,10 @@
     "tests/e2e/native-chat-ssh-delivery.unit.test.ts": {
       "added": 9,
       "removed": 8
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-paste-listeners.ts": {
+      "added": 1,
+      "removed": 1
     }
   }
 }
