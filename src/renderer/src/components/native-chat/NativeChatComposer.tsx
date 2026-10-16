@@ -408,6 +408,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       <AgentComposerField
         {...fieldProps}
         sessionOptionsPickerRequest={structuredTransport?.optionPickerRequest ?? null}
+        agent={agent}
       />
     )
   }
