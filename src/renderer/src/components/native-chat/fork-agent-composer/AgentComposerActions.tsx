@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: f51e82c4c26745f6a15e215e4391f533327697e2
 import { ArrowUp, CircleAlert, Mic, Play, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -9,6 +9,7 @@ import type {
   SessionOptionsSurface
 } from '../../../../../shared/native-chat-session-options'
 import { NativeChatSessionOptionPickers } from '../NativeChatSessionOptionPickers'
+import { NativeChatComposerPermissionPicker } from '../NativeChatPermissionModePicker'
 import { NativeChatComposerGoalChip } from '../NativeChatComposerGoalChip'
 import { NativeChatContextUsageRing } from '../NativeChatContextUsageRing'
 import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
@@ -46,6 +47,8 @@ export type AgentComposerActionsProps = {
   onExitGoalMode?: () => void
   /** Absent until the session has reported or the transcript can estimate. */
   contextUsage?: NativeChatContextUsageSummary | null
+  /** The chat's agent, whose permission modes the picker describes. */
+  agent?: string
 }
 
 export function AgentComposerActions({
@@ -71,7 +74,8 @@ export function AgentComposerActions({
   sessionOptionsPickerRequest,
   onExitGoalMode,
   contextUsage,
-  focusComposer
+  focusComposer,
+  agent
 }: AgentComposerActionsProps): React.JSX.Element {
   const resumes = primaryAction === 'resume'
   const dictationLabel = isDictating
@@ -120,6 +124,11 @@ export function AgentComposerActions({
             {translate('components.native-chat.composer.attach', 'Attach file')}
           </TooltipContent>
         </Tooltip>
+        <NativeChatComposerPermissionPicker
+          surface={sessionOptionsSurface}
+          snapshot={sessionOptionsSnapshot}
+          {...(agent ? { agent } : {})}
+        />
         {onExitGoalMode ? <NativeChatComposerGoalChip onExit={onExitGoalMode} /> : null}
       </div>
       <div className="ml-auto flex items-center gap-1.5">

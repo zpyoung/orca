@@ -5428,18 +5428,6 @@
       "ledger": "docs/fork-upstreaming.md#federated-rejection-replay"
     },
     {
-      "path": "src/main/claude-accounts/runtime-auth/runtime-auth-sync.ts",
-      "reason": "Clear the host runtime account selection together with the legacy selection when managed credentials are missing, invalid, or unowned; otherwise structured launches strip valid system authentication after fallback.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#claude-host-auth-fallback-selection"
-    },
-    {
-      "path": "src/main/claude-accounts/runtime-auth-service-materialization.test.ts",
-      "reason": "Regression coverage for host managed-auth fallback clearing the effective account selection while preserving unrelated WSL selections and allowing system authentication.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#claude-host-auth-fallback-selection"
-    },
-    {
       "path": "docs/reference/remote-wire-compatibility.md",
       "reason": "Upstream deleted this contract in v1.4.224, but the fork's AGENTS.md still points at it; it keeps the fork's strict-schema correction to Rule 1 (a `.strict()` schema rejects an unknown key) and upstream's last viewer-activation section.",
       "status": "permanent"
@@ -5493,6 +5481,11 @@
     {
       "path": ".github/workflows/readme-downloads-badge.yml",
       "reason": "Generates the fork's own README download-count badge.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/relay-windows-process-tree.yml",
+      "reason": "The fork still ships the SSH relay, and release-cut's relay-windows-process-tree job calls this workflow to build the Windows relay addon; upstream deleted it when its main dropped the relay.",
       "status": "permanent"
     },
     {
