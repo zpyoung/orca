@@ -52,15 +52,6 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag }}
 
-      # Why: a relay-era ref (before #27215) needs the Windows relay addon this build no longer compiles.
-      - name: Refuse a ref that still ships the SSH relay
-        shell: bash
-        run: |
-          if [[ -e config/tsconfig.relay.json ]]; then
-            echo "::error::This ref predates #27215 and still ships the SSH relay; build a commit at or after 2b4b60a87e."
-            exit 1
-          fi
-
       - name: Restore draft-publish scripts from the workflow ref
         env:
           WORKFLOW_SHA: ${{ github.workflow_sha }}
@@ -82,18 +73,6 @@ jobs:
           cache-dependency-path: |
             pnpm-lock.yaml
             mobile/pnpm-lock.yaml
-
-      # Why: packaging bundles the pinned Node into the macOS terminal host. Keyed on the pin alone
-      # with no restore-keys, so a pin bump starts empty instead of carrying old archives forward.
-      - name: Locate the pinned Node runtime cache
-        shell: bash
-        run: echo "ORCA_NODE_RUNTIME_CACHE_DIR=$HOME/Library/Caches/orca-node-runtime" >>"$GITHUB_ENV"
-
-      - name: Cache the pinned Node runtime
-        uses: actions/cache@v5
-        with:
-          path: ~/Library/Caches/orca-node-runtime
-          key: orca-node-runtime-mac-${{ hashFiles('src/shared/node-runtime-pin.ts') }}
 
       # Cache the Electron binary + electron-builder tool downloads (notarytool,
       # winCodeSign, nsis, squirrel, AppImage). Saves ~30-90s per job, incl. mac.
@@ -163,6 +142,16 @@ jobs:
           echo "identity=$identity" >>"$GITHUB_OUTPUT"
           echo "Classified $TAG as $identity"
 
+      # Only a Windows runner compiles these; release-cut's relay-windows-process-tree
+      # job built them from this tag before dispatching this workflow.
+      - name: Collect the Windows process-table addons for the relay
+        uses: actions/download-artifact@v8
+        with:
+          name: relay-windows-process-tree
+          path: .build/windows-process-tree
+          run-id: ${{ inputs.release_run_id }}
+          github-token: ${{ github.token }}
+
       - name: Download release JavaScript from the release run
         if: inputs.javascript_source_sha != ''
         uses: actions/download-artifact@v8
@@ -211,6 +200,12 @@ jobs:
           node config/scripts/runtime-file-watcher-fault-harness.mjs
           ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs
 
+      - name: Gate SSH relay watcher process isolation
+        run: |
+          # Why: the remote native watcher shares a daemon with live PTYs.
+          # Kill only its child and require both PTY and watch recovery before packaging.
+          node config/scripts/relay-watcher-fault-harness.mjs
+
       - name: Abort if the parent release-cut run was cancelled
         # Why: this workflow is dispatched separately, so cancelling release-cut
         # does not stop mac `--publish always`. A cancelled parent left v1.4.206
@@ -237,7 +232,7 @@ jobs:
           timeout_minutes: 70
           max_attempts: 2
           retry_wait_seconds: 30
-          command: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON config/scripts/pinned-node-downloads.mjs darwin-arm64 darwin-x64 && node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish always -c.publish.releaseType=draft
+          command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish always -c.publish.releaseType=draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORCA_REQUIRE_ORCAD_TEMPLATE: '1'

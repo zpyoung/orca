@@ -109,23 +109,6 @@ and their import swaps. The database change is generic.
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Claude host auth fallback selection
-
-**What:** clears both the legacy host account selection and its runtime-map entry when a managed
-account's auth path is unowned or its credentials are missing or invalid. Previously the runtime map
-still selected the unusable account, so structured Claude launches stripped ambient authentication
-even after the auth service had fallen back to the system default. Other WSL selections are preserved.
-
-**Why upstream, not isolated:** this is a shared account-selection consistency bug affecting ordinary
-structured sessions as well as Heimdall owners; a fork-only launch workaround would leave it intact.
-
-**Paths:**
-
-- `src/main/claude-accounts/runtime-auth/runtime-auth-sync.ts`
-- `src/main/claude-accounts/runtime-auth-service-materialization.test.ts`
-
-**Status:** pending-upstream. Not yet submitted.
-
 ## Relay workflow inventory v1.4.224
 
 **What:** v1.4.224's release cut (`6ad7ac240e`) copied `cloud-operate-relay-production-cell-flags.yml`

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: f51e82c4c26745f6a15e215e4391f533327697e2
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
@@ -89,6 +89,7 @@ export type AgentComposerFieldProps = {
   contextUsage?: NativeChatContextUsageSummary | null
   sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
   goalMode?: NativeChatComposerGoalMode
+  agent?: string
 }
 
 export type AgentComposerImageAttachment = {
@@ -190,7 +191,8 @@ export function AgentComposerField({
   sessionOptionsSnapshot,
   contextUsage,
   sessionOptionsPickerRequest,
-  goalMode
+  goalMode,
+  agent
 }: AgentComposerFieldProps): React.JSX.Element {
   const draftNotSaved = useNativeChatComposerDraftUnsaved(draftScopeKey)
   const optionCount =
@@ -450,6 +452,7 @@ export function AgentComposerField({
                 sessionOptionsPickerRequest={sessionOptionsPickerRequest}
                 focusComposer={focusComposer}
                 onExitGoalMode={goalMode?.active ? goalMode.exit : undefined}
+                {...(agent ? { agent } : {})}
               />
             </div>
           </div>
