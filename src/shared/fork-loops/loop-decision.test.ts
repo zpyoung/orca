@@ -229,9 +229,44 @@ describe('decideNext caps', () => {
 
   it('pauses at the cost cap and not below it', () => {
     const loop = { caps: { maxCostUsd: 5 } }
-    expect(decide({ loop, state: { costUsd: 4.99 } })).toEqual(START_REPEAT)
-    expect(decide({ loop, state: { costUsd: 5 } })).toEqual({ kind: 'pause', reason: 'cap-cost' })
-    expect(decide({ loop, state: { costUsd: null } })).toEqual(START_REPEAT)
+    const measured = evidence({ costUsd: 1 })
+    expect(decide({ loop, state: { costUsd: 4.99 }, latest: measured })).toEqual(START_REPEAT)
+    expect(decide({ loop, state: { costUsd: 5 }, latest: measured })).toEqual({
+      kind: 'pause',
+      reason: 'cap-cost'
+    })
+  })
+
+  it('starts the first iteration under a cost cap before any cost exists', () => {
+    const loop = { caps: { maxCostUsd: 5 } }
+    expect(
+      decide({ loop, latest: null, state: { costUsd: null, iterationsCompleted: 0 } })
+    ).toEqual(START_REPEAT)
+  })
+
+  it('fails closed on a cost cap when the settled iteration cost was unmeasurable', () => {
+    const loop = { caps: { maxCostUsd: 5 } }
+    const expected = { kind: 'pause', reason: 'cap-cost', detail: 'usage-unavailable' }
+    expect(decide({ loop, state: { costUsd: null, iterationsCompleted: 5 } })).toEqual(expected)
+    expect(
+      decide({ loop, state: { costUsd: 1, iterationsCompleted: 5 }, latest: evidence() })
+    ).toEqual(expected)
+  })
+
+  it('fails closed on resume when the last settled record in history had no cost', () => {
+    const loop = { caps: { maxCostUsd: 5 } }
+    expect(
+      decide({
+        loop,
+        latest: null,
+        history: [evidence()],
+        state: { costUsd: null, iterationsCompleted: 1 }
+      })
+    ).toEqual({ kind: 'pause', reason: 'cap-cost', detail: 'usage-unavailable' })
+  })
+
+  it('does not require cost when no cost cap is configured', () => {
+    expect(decide({ state: { costUsd: null, iterationsCompleted: 5 } })).toEqual(START_REPEAT)
   })
 
   it('completion beats a cap that fires on the same iteration', () => {
@@ -557,6 +592,31 @@ describe('decideNext queue', () => {
       freshSession: true,
       promptSource: { queueItemId: 'a' }
     })
+  })
+
+  it('reruns a persisted in-flight item instead of treating the queue as exhausted', () => {
+    const action = decide({
+      loop: queueLoop(false),
+      latest: null,
+      queue: [{ id: 'q1', position: 0, state: 'in-flight' }]
+    })
+    expect(action).toEqual({
+      kind: 'start-iteration',
+      freshSession: true,
+      promptSource: { queueItemId: 'q1' }
+    })
+  })
+
+  it('prefers an in-flight item over earlier pending ones', () => {
+    const action = decide({
+      loop: queueLoop(false),
+      latest: null,
+      queue: [
+        { id: 'a', position: 0, state: 'pending' },
+        { id: 'b', position: 1, state: 'in-flight' }
+      ]
+    })
+    expect(action).toMatchObject({ promptSource: { queueItemId: 'b' } })
   })
 
   it('treats a missing or empty queue as exhausted even with repeatQueue', () => {

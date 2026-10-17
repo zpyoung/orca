@@ -82,7 +82,22 @@ function doneSignalsPassed(done: LoopConfig['done'], latest: IterationEvidence):
   return true
 }
 
-function capPause(loop: LoopConfig, state: LoopRuntimeState): LoopAction | null {
+function costUnmeasurable(
+  state: LoopRuntimeState,
+  history: IterationRecord[],
+  latest: IterationEvidence | null
+): boolean {
+  const lastSettled =
+    latest?.endReason === 'settled'
+      ? latest
+      : history.filter((record) => record.endReason === 'settled').at(-1)
+  return lastSettled
+    ? lastSettled.costUsd === null
+    : state.iterationsCompleted > 0 && state.costUsd === null
+}
+
+function capPause(input: DecideNextInput, latest: IterationEvidence | null): LoopAction | null {
+  const { loop, state, history } = input
   const maxIterations = state.maxIterationsGranted ?? loop.caps.maxIterations
   if (maxIterations !== undefined && state.iterationsCompleted >= maxIterations) {
     return pause('cap-iterations')
@@ -94,11 +109,14 @@ function capPause(loop: LoopConfig, state: LoopRuntimeState): LoopAction | null 
   if (maxCostUsd !== undefined && state.costUsd !== null && state.costUsd >= maxCostUsd) {
     return pause('cap-cost')
   }
+  if (maxCostUsd !== undefined && costUnmeasurable(state, history, latest)) {
+    return pause('cap-cost', 'usage-unavailable')
+  }
   return null
 }
 
 function evidencePause(input: DecideNextInput, latest: IterationEvidence): LoopAction | null {
-  const { loop, state, history, now } = input
+  const { loop, history, now } = input
   if (latest.protectedPathHits.length > 0) {
     return pause('protected-path', latest.protectedPathHits.join(', '))
   }
@@ -110,7 +128,7 @@ function evidencePause(input: DecideNextInput, latest: IterationEvidence): LoopA
   if (decide) {
     return pause('agent-decide', decide.text)
   }
-  const capped = capPause(loop, state)
+  const capped = capPause(input, latest)
   if (capped) {
     return capped
   }
@@ -141,7 +159,9 @@ function resolveNextPrompt(
     return { promptSource: 'repeat' }
   }
   const items = [...(input.queue ?? [])].sort((a, b) => a.position - b.position)
-  const next = items.find((item) => item.state === 'pending')
+  const next =
+    items.find((item) => item.state === 'in-flight') ??
+    items.find((item) => item.state === 'pending')
   if (next) {
     return { promptSource: { queueItemId: next.id } }
   }
@@ -203,7 +223,7 @@ function settlementOutcome(latest: IterationEvidence, input: DecideNextInput): L
  * holds before the next iteration starts.
  */
 export function decideNext(input: DecideNextInput): LoopAction {
-  const { loop, state, latest, hold } = input
+  const { loop, latest, hold } = input
 
   if (hold.stopRequested !== null) {
     return pause('user', 'stop-requested')
@@ -228,7 +248,7 @@ export function decideNext(input: DecideNextInput): LoopAction {
       return paused
     }
   } else {
-    const capped = capPause(loop, state)
+    const capped = capPause(input, null)
     if (capped) {
       return capped
     }
