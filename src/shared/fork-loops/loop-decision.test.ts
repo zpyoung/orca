@@ -104,7 +104,9 @@ const START_REPEAT = { kind: 'start-iteration', freshSession: true, promptSource
 describe('decideNext completion', () => {
   it('completes when the only configured check passes', () => {
     const action = decide({
-      loop: { done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'every-iteration' } } },
+      loop: {
+        done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'every-iteration' } }
+      },
       latest: evidence({ check: check() })
     })
     expect(action).toEqual({ kind: 'complete' })
@@ -112,7 +114,9 @@ describe('decideNext completion', () => {
 
   it('does not complete when the check fails', () => {
     const action = decide({
-      loop: { done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'every-iteration' } } },
+      loop: {
+        done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'every-iteration' } }
+      },
       latest: evidence({ check: check({ pass: false, exitCode: 1 }) })
     })
     expect(action).toEqual(START_REPEAT)
@@ -128,9 +132,9 @@ describe('decideNext completion', () => {
 
   it('does not complete when the evaluator says not-met or did not run', () => {
     const loop = { done: { evaluator: { condition: 'tests green' } } }
-    expect(decide({ loop, latest: evidence({ evaluator: { verdict: 'not-met', reason: 'no' } }) })).toEqual(
-      START_REPEAT
-    )
+    expect(
+      decide({ loop, latest: evidence({ evaluator: { verdict: 'not-met', reason: 'no' } }) })
+    ).toEqual(START_REPEAT)
     expect(decide({ loop, latest: evidence() })).toEqual(START_REPEAT)
   })
 
@@ -150,12 +154,17 @@ describe('decideNext completion', () => {
       START_REPEAT
     )
     expect(
-      decide({ loop, latest: evidence({ check: check({ pass: false, exitCode: 1 }), evaluator: met }) })
+      decide({
+        loop,
+        latest: evidence({ check: check({ pass: false, exitCode: 1 }), evaluator: met })
+      })
     ).toEqual(START_REPEAT)
   })
 
   it('on-claim ignores a passing check until the agent emits LOOP_DONE', () => {
-    const loop = { done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'on-claim' as const } } }
+    const loop = {
+      done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'on-claim' as const } }
+    }
     expect(decide({ loop, latest: evidence({ check: check() }) })).toEqual(START_REPEAT)
     expect(
       decide({ loop, latest: evidence({ check: check(), markers: [{ kind: 'done' }] }) })
@@ -163,7 +172,9 @@ describe('decideNext completion', () => {
   })
 
   it('on-claim with a claim but a failing check keeps going', () => {
-    const loop = { done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'on-claim' as const } } }
+    const loop = {
+      done: { check: { command: 'true', timeoutSeconds: 10, runWhen: 'on-claim' as const } }
+    }
     const action = decide({
       loop,
       latest: evidence({ check: check({ pass: false, exitCode: 1 }), markers: [{ kind: 'done' }] })
@@ -174,7 +185,9 @@ describe('decideNext completion', () => {
   it('LOOP_DONE alone never completes', () => {
     expect(decide({ latest: evidence({ markers: [{ kind: 'done' }] }) })).toEqual(START_REPEAT)
     const loop = { done: { evaluator: { condition: 'x' } } }
-    expect(decide({ loop, latest: evidence({ markers: [{ kind: 'done' }] }) })).toEqual(START_REPEAT)
+    expect(decide({ loop, latest: evidence({ markers: [{ kind: 'done' }] }) })).toEqual(
+      START_REPEAT
+    )
   })
 })
 
@@ -205,7 +218,9 @@ describe('decideNext caps', () => {
   it('wall-clock cap counts activeMs, not elapsed time since the last iteration', () => {
     const loop = { caps: { maxActiveMinutes: 10 } }
     const longIdle = { lastIterationEndedAt: NOW - 120 * MINUTE }
-    expect(decide({ loop, state: { ...longIdle, activeMs: 10 * MINUTE - 1 } })).toEqual(START_REPEAT)
+    expect(decide({ loop, state: { ...longIdle, activeMs: 10 * MINUTE - 1 } })).toEqual(
+      START_REPEAT
+    )
     expect(decide({ loop, state: { ...longIdle, activeMs: 10 * MINUTE } })).toEqual({
       kind: 'pause',
       reason: 'cap-time'
@@ -382,33 +397,45 @@ describe('decideNext precedence', () => {
 })
 
 describe('decideNext usage limits and progress', () => {
-  it('pauses on usage-limit evidence', () => {
+  it('pauses on usage-limit evidence with the reset time as detail', () => {
     const action = decide({
       latest: evidence({ usageLimit: { provider: 'claude', resetsAt: NOW + MINUTE } })
     })
-    expect(action).toMatchObject({ kind: 'pause', reason: 'usage-limit' })
+    expect(action).toEqual({
+      kind: 'pause',
+      reason: 'usage-limit',
+      detail: new Date(NOW + MINUTE).toISOString()
+    })
   })
 
-  it('waits for the reset when resumeAtLimitReset is on and the reset is in the future', () => {
+  it('waits until sixty seconds after the reset when resumeAtLimitReset is on', () => {
     const action = decide({
       loop: { resumeAtLimitReset: true },
       latest: evidence({ usageLimit: { provider: 'claude', resetsAt: NOW + MINUTE } })
     })
-    expect(action).toEqual({ kind: 'wait', until: NOW + MINUTE, reason: 'limit-reset' })
+    expect(action).toEqual({ kind: 'wait', until: NOW + 2 * MINUTE, reason: 'limit-reset' })
   })
 
-  it('pauses when the reset time is unknown even with resumeAtLimitReset', () => {
+  it('pauses with the provider as detail when the reset time is unknown', () => {
     const action = decide({
       loop: { resumeAtLimitReset: true },
       latest: evidence({ usageLimit: { provider: 'claude', resetsAt: null } })
     })
-    expect(action).toMatchObject({ kind: 'pause', reason: 'usage-limit' })
+    expect(action).toEqual({ kind: 'pause', reason: 'usage-limit', detail: 'claude' })
   })
 
-  it('starts again once the reset time has passed', () => {
+  it('still waits during the sixty second grace after the reset has passed', () => {
     const action = decide({
       loop: { resumeAtLimitReset: true },
       latest: evidence({ usageLimit: { provider: 'claude', resetsAt: NOW - 1 } })
+    })
+    expect(action).toEqual({ kind: 'wait', until: NOW + MINUTE - 1, reason: 'limit-reset' })
+  })
+
+  it('starts again once the grace period has elapsed', () => {
+    const action = decide({
+      loop: { resumeAtLimitReset: true },
+      latest: evidence({ usageLimit: { provider: 'claude', resetsAt: NOW - MINUTE } })
     })
     expect(action).toEqual(START_REPEAT)
   })
@@ -425,7 +452,9 @@ describe('decideNext usage limits and progress', () => {
 
   it('ignores no-progress when the option is off', () => {
     const stuck = (n: number) => evidence({ n, treeAfter: 'tree-a' })
-    expect(decide({ history: [stuck(1), stuck(2), stuck(3)], latest: stuck(3) })).toEqual(START_REPEAT)
+    expect(decide({ history: [stuck(1), stuck(2), stuck(3)], latest: stuck(3) })).toEqual(
+      START_REPEAT
+    )
   })
 })
 
@@ -435,9 +464,9 @@ describe('decideNext pacing', () => {
   })
 
   it('starts the first iteration when there is no evidence', () => {
-    expect(decide({ latest: null, state: { iterationsCompleted: 0, lastIterationEndedAt: null } })).toEqual(
-      START_REPEAT
-    )
+    expect(
+      decide({ latest: null, state: { iterationsCompleted: 0, lastIterationEndedAt: null } })
+    ).toEqual(START_REPEAT)
   })
 
   it('interval from-end waits until lastIterationEndedAt plus the interval', () => {
@@ -452,11 +481,15 @@ describe('decideNext pacing', () => {
 
   it('interval from-end starts once the interval has elapsed', () => {
     const loop = { pacing: { kind: 'interval' as const, minutes: 5, anchor: 'from-end' as const } }
-    expect(decide({ loop, state: { lastIterationEndedAt: NOW - 5 * MINUTE } })).toEqual(START_REPEAT)
+    expect(decide({ loop, state: { lastIterationEndedAt: NOW - 5 * MINUTE } })).toEqual(
+      START_REPEAT
+    )
   })
 
   it('interval wall-clock waits for the next anchor tick', () => {
-    const loop = { pacing: { kind: 'interval' as const, minutes: 5, anchor: 'wall-clock' as const } }
+    const loop = {
+      pacing: { kind: 'interval' as const, minutes: 5, anchor: 'wall-clock' as const }
+    }
     expect(decide({ loop, state: { nextWallClockTickAt: NOW + 3 * MINUTE } })).toEqual({
       kind: 'wait',
       until: NOW + 3 * MINUTE,
