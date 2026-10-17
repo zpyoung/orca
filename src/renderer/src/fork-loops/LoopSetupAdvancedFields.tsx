@@ -1,0 +1,286 @@
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { translate } from '@/i18n/i18n'
+import type { LoopPreset, LoopSessionPolicy } from '../../../shared/fork-loops/loop-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
+
+export type LoopSetupDraft = {
+  name: string
+  agent: TuiAgent | null
+  preset: LoopPreset
+  prompt: string
+  repeatQueue: boolean
+  intervalMinutes: string
+  anchor: 'from-end' | 'wall-clock'
+  sessionPolicy: LoopSessionPolicy
+  maxIterations: string
+  maxActiveMinutes: string
+  maxCostUsd: string
+  checkCommand: string
+  checkTimeoutSeconds: string
+  checkRunWhen: 'every-iteration' | 'on-claim'
+  evaluatorCondition: string
+  protectedPaths: string
+  noProgress: boolean
+  checkpointCommits: boolean
+  askBeforeNext: boolean
+  resumeAtLimitReset: boolean
+}
+
+export type FieldError =
+  | 'prompt'
+  | 'interval'
+  | 'iterations'
+  | 'activeMinutes'
+  | 'cost'
+  | 'checkTimeout'
+
+export type FieldProps = { label: string; hint?: string; error?: string }
+
+export function Field({
+  label,
+  hint,
+  error,
+  htmlFor,
+  children
+}: FieldProps & { htmlFor?: string; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="space-y-2">
+      <div className="space-y-1">
+        <Label htmlFor={htmlFor}>{label}</Label>
+        {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      </div>
+      {children}
+      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+    </div>
+  )
+}
+
+export function TextField({
+  id,
+  value,
+  rows,
+  placeholder,
+  inputMode,
+  onChange,
+  ...field
+}: FieldProps & {
+  id: string
+  value: string
+  rows?: number
+  placeholder?: string
+  inputMode?: 'numeric' | 'decimal'
+  onChange: (value: string) => void
+}): React.JSX.Element {
+  const control = { id, value, placeholder, inputMode, 'aria-invalid': field.error !== undefined }
+  return (
+    <Field htmlFor={id} {...field}>
+      {rows ? (
+        <Textarea {...control} rows={rows} onChange={(event) => onChange(event.target.value)} />
+      ) : (
+        <Input {...control} onChange={(event) => onChange(event.target.value)} />
+      )}
+    </Field>
+  )
+}
+
+export function SelectField({
+  value,
+  options,
+  placeholder,
+  onChange,
+  ...field
+}: FieldProps & {
+  value: string
+  options: readonly { value: string; label: string }[]
+  placeholder?: string
+  onChange: (value: string) => void
+}): React.JSX.Element {
+  return (
+    <Field {...field}>
+      <Select value={value} disabled={options.length === 0} onValueChange={onChange}>
+        <SelectTrigger size="sm" className="w-full">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  )
+}
+
+export function CheckboxField({
+  id,
+  label,
+  checked,
+  onChange
+}: {
+  id: string
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox id={id} checked={checked} onCheckedChange={(next) => onChange(next === true)} />
+      <Label htmlFor={id} className="text-xs font-normal">
+        {label}
+      </Label>
+    </div>
+  )
+}
+
+export type SectionProps = {
+  draft: LoopSetupDraft
+  errors: ReadonlySet<FieldError>
+  update: (patch: Partial<LoopSetupDraft>) => void
+}
+
+export function wholeNumberError(): string {
+  return translate('fork.loops.setup.errorWholeNumber', 'Enter a whole number of at least 1.')
+}
+
+export function LoopSetupAdvancedFields({
+  draft,
+  errors,
+  update,
+  showCost
+}: SectionProps & { showCost: boolean }): React.JSX.Element {
+  const flags = [
+    {
+      field: 'noProgress',
+      label: translate('fork.loops.setup.noProgress', 'Pause after 3 iterations with no changes')
+    },
+    {
+      field: 'checkpointCommits',
+      label: translate(
+        'fork.loops.setup.checkpointCommits',
+        'Commit a checkpoint after each iteration'
+      )
+    },
+    {
+      field: 'askBeforeNext',
+      label: translate('fork.loops.setup.askBeforeNext', 'Ask before each new iteration')
+    },
+    {
+      field: 'resumeAtLimitReset',
+      label: translate('fork.loops.setup.resumeAtLimitReset', 'Resume when the usage limit resets')
+    }
+  ] as const
+  return (
+    <div className="space-y-4 pt-2">
+      <TextField
+        id="loop-setup-check-command"
+        label={translate('fork.loops.setup.checkCommand', 'Done check command')}
+        hint={translate(
+          'fork.loops.setup.checkHint',
+          'Runs in the workspace. Exit code 0 means the work is done.'
+        )}
+        value={draft.checkCommand}
+        onChange={(checkCommand) => update({ checkCommand })}
+      />
+      {draft.checkCommand.trim() !== '' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            inputMode="numeric"
+            id="loop-setup-check-timeout"
+            label={translate('fork.loops.setup.checkTimeout', 'Check timeout (seconds)')}
+            value={draft.checkTimeoutSeconds}
+            error={
+              errors.has('checkTimeout')
+                ? translate('fork.loops.setup.errorCheckTimeout', 'Enter 1 to 600 seconds.')
+                : undefined
+            }
+            onChange={(checkTimeoutSeconds) => update({ checkTimeoutSeconds })}
+          />
+          <SelectField
+            label={translate('fork.loops.setup.checkRunWhen', 'Run the check')}
+            value={draft.checkRunWhen}
+            options={[
+              {
+                value: 'every-iteration',
+                label: translate('fork.loops.setup.runEveryIteration', 'After every iteration')
+              },
+              {
+                value: 'on-claim',
+                label: translate('fork.loops.setup.runOnClaim', 'When the agent says it is done')
+              }
+            ]}
+            onChange={(value) =>
+              update({ checkRunWhen: value === 'on-claim' ? 'on-claim' : 'every-iteration' })
+            }
+          />
+        </div>
+      ) : null}
+      <TextField
+        id="loop-setup-evaluator"
+        rows={2}
+        label={translate('fork.loops.setup.evaluator', 'Done condition')}
+        hint={translate(
+          'fork.loops.setup.evaluatorHint',
+          'A second agent reads the changes and judges whether this is true.'
+        )}
+        value={draft.evaluatorCondition}
+        onChange={(evaluatorCondition) => update({ evaluatorCondition })}
+      />
+      <TextField
+        inputMode="numeric"
+        id="loop-setup-max-active"
+        label={translate('fork.loops.setup.maxActiveMinutes', 'Maximum active minutes')}
+        value={draft.maxActiveMinutes}
+        error={errors.has('activeMinutes') ? wholeNumberError() : undefined}
+        onChange={(maxActiveMinutes) => update({ maxActiveMinutes })}
+      />
+      {showCost ? (
+        <TextField
+          inputMode="decimal"
+          id="loop-setup-max-cost"
+          label={translate('fork.loops.setup.maxCost', 'Maximum cost (USD)')}
+          value={draft.maxCostUsd}
+          error={
+            errors.has('cost')
+              ? translate('fork.loops.setup.errorCost', 'Enter an amount above 0.')
+              : undefined
+          }
+          onChange={(maxCostUsd) => update({ maxCostUsd })}
+        />
+      ) : null}
+      <TextField
+        id="loop-setup-protected"
+        rows={2}
+        label={translate('fork.loops.setup.protectedPaths', 'Protected paths')}
+        hint={translate(
+          'fork.loops.setup.protectedPathsHint',
+          'One path or glob per line. The loop pauses if the agent changes one.'
+        )}
+        value={draft.protectedPaths}
+        onChange={(protectedPaths) => update({ protectedPaths })}
+      />
+      <div className="space-y-2">
+        {flags.map(({ field, label }) => (
+          <CheckboxField
+            key={field}
+            id={`loop-setup-${field}`}
+            label={label}
+            checked={draft[field]}
+            onChange={(checked) => update({ [field]: checked })}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}

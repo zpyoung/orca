@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { QuickLaunchAgentMenuItems } from './QuickLaunchButton'
+import { LoopMenuItem } from '@/fork-loops/LoopMenuItem'
 import TabBarCreateEntry from './TabBarCreateEntry'
 import { TabStripScrollIndicator } from './TabStripScrollIndicator'
 import { TabStripTooltipProvider } from './TabStripTooltipProvider'
@@ -282,6 +283,7 @@ export function renderTabBarSurface({
                 groupId={resolvedGroupId}
                 onFocusTerminal={queueTerminalTabFocusAfterNewTabMenuClose}
               />
+              <LoopMenuItem worktreeId={worktreeId} groupId={resolvedGroupId} />
             </>
           ) : null}
         </DropdownMenuContent>
