@@ -72,6 +72,7 @@ function installApi(): { [K in keyof LoopsApi]: ReturnType<typeof vi.fn> } {
     bindTab: vi.fn(),
     detach: vi.fn(),
     openTab: vi.fn(),
+    iterations: vi.fn(async () => []),
     onChanged: vi.fn(() => () => {})
   }
   Object.defineProperty(window, 'api', { configurable: true, value: { loops: api } })
