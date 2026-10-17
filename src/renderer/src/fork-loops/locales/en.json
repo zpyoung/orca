@@ -198,7 +198,8 @@
           "needsYou": "Needs you",
           "paused": "Paused",
           "running": "Running",
-          "stopped": "Stopped"
+          "stopped": "Stopped",
+          "unverifiable": "Unverifiable"
         },
         "steer": {
           "label": "Steering note",
@@ -214,7 +215,10 @@
           "label": "Loop status",
           "sessionFresh": "fresh session",
           "sessionContinued": "continued session"
-        }
+        },
+        "unverifiableHint": "The agent host is unreachable, so the loop is not advancing.",
+        "skippedTicks_one": "{{count}} tick skipped",
+        "skippedTicks_other": "{{count}} ticks skipped"
       },
       "status": {
         "glyph": {
@@ -225,7 +229,8 @@
             "running": "Running",
             "needsYou": "Needs you",
             "paused": "Paused",
-            "detached": "Detached"
+            "detached": "Detached",
+            "unverifiable": "Unverifiable"
           }
         },
         "close": {

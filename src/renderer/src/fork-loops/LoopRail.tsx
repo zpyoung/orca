@@ -13,12 +13,13 @@ import {
   IterationRow,
   LastCheck,
   LoopMeters,
+  loopPill,
   PILL_BASE,
-  PILL_TONE,
   phaseLabel,
   presetSummary,
   SECTION_HEADING,
-  stateLabel
+  skippedTicksLabel,
+  unverifiableHint
 } from './loop-rail-parts'
 import { selectLoopForPaneKey } from './loops-slice'
 
@@ -70,6 +71,9 @@ function LoopRailPanel({
   const ended = loop.state === 'completed' || loop.state === 'stopped'
   const canResume = loop.state === 'paused'
   const iterations = loop.recentIterations.toReversed()
+  const pill = loopPill(loop)
+  const skippedTicks = skippedTicksLabel(loop)
+  const hint = unverifiableHint(loop)
   const detailIteration =
     openIteration === null
       ? undefined
@@ -100,9 +104,11 @@ function LoopRailPanel({
           <h2 className="min-w-0 truncate text-sm font-semibold" title={loop.name}>
             {loop.name}
           </h2>
-          <span className={cn(PILL_BASE, PILL_TONE[loop.state])}>{stateLabel(loop.state)}</span>
+          <span className={cn(PILL_BASE, pill.tone)}>{pill.label}</span>
         </div>
         <p className="truncate text-xs text-muted-foreground">{presetSummary(loop)}</p>
+        {skippedTicks ? <p className="text-xs text-muted-foreground">{skippedTicks}</p> : null}
+        {hint ? <p className="text-xs text-status-warning-foreground">{hint}</p> : null}
         {loop.currentIteration ? (
           <p className="text-xs text-muted-foreground">{phaseLabel(loop.currentIteration.phase)}</p>
         ) : null}

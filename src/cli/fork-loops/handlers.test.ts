@@ -358,6 +358,36 @@ describe('orca loop read commands', () => {
     expect(log.mock.calls.join('\n')).toContain('paused: no-progress')
   })
 
+  it('shows an unverifiable loop as unverifiable, not running', async () => {
+    primeCapabilities()
+    callMock.mockResolvedValueOnce(response(snapshot({ unverifiableSince: 1_700_000_000_000 })))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await LOOP_HANDLERS['loop show'](context([['loop-id', 'loop-1']]))
+
+    const output = log.mock.calls.join('\n')
+    expect(output).toContain('Status: unverifiable')
+    expect(output).toContain('Host unreachable since 2023-11-14T22:13:20.000Z')
+  })
+
+  it('reports skipped ticks in show and list, and omits them when there are none', async () => {
+    primeCapabilities()
+    callMock.mockResolvedValueOnce(response(snapshot({ skippedTicks: 3 })))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await LOOP_HANDLERS['loop show'](context([['loop-id', 'loop-1']]))
+    expect(log.mock.calls.join('\n')).toContain('Ticks skipped: 3')
+
+    log.mockClear()
+    primeCapabilities()
+    callMock.mockResolvedValueOnce(
+      response([snapshot({ skippedTicks: 1 }), snapshot({ id: 'loop-2' })])
+    )
+    await LOOP_HANDLERS['loop list'](context([]))
+    const rows = log.mock.calls.join('\n').split('\n')
+    expect(rows[0]).toContain('1 tick skipped')
+    expect(rows[1]).not.toContain('skipped')
+  })
+
   it('prints the raw envelope for list with --json', async () => {
     primeCapabilities()
     const listed = response([snapshot()])

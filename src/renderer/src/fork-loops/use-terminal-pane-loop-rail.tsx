@@ -35,15 +35,17 @@ export function LoopStatusStrip({
 }): React.JSX.Element | null {
   const loop = useAppStore((state) => (paneKey ? selectLoopForPaneKey(state, paneKey) : undefined))
   const startedAt = loop?.currentIteration?.startedAt
+  const unverifiableSince = loop?.unverifiableSince
+  const frozen = unverifiableSince !== undefined
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (startedAt === undefined) {
+    if (startedAt === undefined || frozen) {
       return
     }
     setNow(Date.now())
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [startedAt])
+  }, [startedAt, frozen])
   if (!loop) {
     return null
   }
@@ -54,11 +56,12 @@ export function LoopStatusStrip({
       : translate('fork.loops.rail.iteration.done', '{{n}} iterations done', {
           n: loop.iterationsCompleted
         }),
+    ...(frozen ? [translate('fork.loops.rail.state.unverifiable', 'Unverifiable')] : []),
     getAgentLabel(loop.agent),
     loop.config.sessionPolicy === 'fresh'
       ? translate('fork.loops.rail.strip.sessionFresh', 'fresh session')
       : translate('fork.loops.rail.strip.sessionContinued', 'continued session'),
-    ...(current ? [formatLoopDuration(now - current.startedAt)] : [])
+    ...(current ? [formatLoopDuration((unverifiableSince ?? now) - current.startedAt)] : [])
   ]
   return (
     <div

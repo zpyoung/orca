@@ -198,7 +198,8 @@
           "needsYou": "需要您处理",
           "paused": "已暂停",
           "running": "运行中",
-          "stopped": "已停止"
+          "stopped": "已停止",
+          "unverifiable": "无法验证"
         },
         "steer": {
           "label": "引导备注",
@@ -214,7 +215,10 @@
           "label": "循环状态",
           "sessionFresh": "新会话",
           "sessionContinued": "延续会话"
-        }
+        },
+        "unverifiableHint": "无法连接代理主机，因此循环没有推进。",
+        "skippedTicks_one": "已跳过 {{count}} 个触发周期",
+        "skippedTicks_other": "已跳过 {{count}} 个触发周期"
       },
       "status": {
         "glyph": {
@@ -225,7 +229,8 @@
             "running": "运行中",
             "needsYou": "需要你处理",
             "paused": "已暂停",
-            "detached": "已分离"
+            "detached": "已分离",
+            "unverifiable": "无法验证"
           }
         },
         "close": {

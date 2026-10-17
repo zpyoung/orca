@@ -42,6 +42,39 @@ export function stateLabel(state: LoopState): string {
   }
 }
 
+/** Pill text and tone; an unreachable host outranks the stored state because nothing is advancing. */
+export function loopPill(loop: LoopSnapshot): { label: string; tone: string } {
+  if (loop.unverifiableSince !== undefined) {
+    return {
+      label: translate('fork.loops.rail.state.unverifiable', 'Unverifiable'),
+      tone: PILL_TONE.paused
+    }
+  }
+  return { label: stateLabel(loop.state), tone: PILL_TONE[loop.state] }
+}
+
+export function unverifiableHint(loop: LoopSnapshot): string | null {
+  return loop.unverifiableSince === undefined
+    ? null
+    : translate(
+        'fork.loops.rail.unverifiableHint',
+        'The agent host is unreachable, so the loop is not advancing.'
+      )
+}
+
+export function skippedTicksLabel(loop: LoopSnapshot): string | null {
+  if (loop.skippedTicks <= 0) {
+    return null
+  }
+  return loop.skippedTicks === 1
+    ? translate('fork.loops.rail.skippedTicks_one', '{{count}} tick skipped', {
+        count: loop.skippedTicks
+      })
+    : translate('fork.loops.rail.skippedTicks_other', '{{count}} ticks skipped', {
+        count: loop.skippedTicks
+      })
+}
+
 export function phaseLabel(phase: IterationPhase): string {
   switch (phase) {
     case 'relaunching':

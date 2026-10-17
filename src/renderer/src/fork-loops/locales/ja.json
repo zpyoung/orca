@@ -198,7 +198,8 @@
           "needsYou": "対応が必要",
           "paused": "一時停止中",
           "running": "実行中",
-          "stopped": "停止"
+          "stopped": "停止",
+          "unverifiable": "確認不可"
         },
         "steer": {
           "label": "指示メモ",
@@ -214,7 +215,10 @@
           "label": "ループの状態",
           "sessionFresh": "新規セッション",
           "sessionContinued": "継続セッション"
-        }
+        },
+        "unverifiableHint": "Agent のホストに接続できないため、ループは進行していません。",
+        "skippedTicks_one": "{{count}} 回のティックをスキップ",
+        "skippedTicks_other": "{{count}} 回のティックをスキップ"
       },
       "status": {
         "glyph": {
@@ -225,7 +229,8 @@
             "running": "実行中",
             "needsYou": "対応が必要",
             "paused": "一時停止中",
-            "detached": "切り離し済み"
+            "detached": "切り離し済み",
+            "unverifiable": "確認不可"
           }
         },
         "close": {

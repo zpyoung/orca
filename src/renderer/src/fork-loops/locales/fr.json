@@ -198,7 +198,8 @@
           "needsYou": "Votre action est requise",
           "paused": "En pause",
           "running": "En cours",
-          "stopped": "Arrêté"
+          "stopped": "Arrêté",
+          "unverifiable": "Non vérifiable"
         },
         "steer": {
           "label": "Note d’orientation",
@@ -214,7 +215,10 @@
           "label": "État de la boucle",
           "sessionFresh": "nouvelle session",
           "sessionContinued": "session poursuivie"
-        }
+        },
+        "unverifiableHint": "L'hôte de l'agent est injoignable, donc la boucle n'avance pas.",
+        "skippedTicks_one": "{{count}} tick ignoré",
+        "skippedTicks_other": "{{count}} ticks ignorés"
       },
       "status": {
         "glyph": {
@@ -225,7 +229,8 @@
             "running": "En cours",
             "needsYou": "Votre action requise",
             "paused": "En pause",
-            "detached": "Détachée"
+            "detached": "Détachée",
+            "unverifiable": "Non vérifiable"
           }
         },
         "close": {

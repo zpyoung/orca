@@ -9,6 +9,9 @@ function formatDuration(ms: number): string {
 }
 
 export function formatLoopStatus(loop: LoopSnapshot): string {
+  if (loop.unverifiableSince !== undefined) {
+    return 'unverifiable'
+  }
   return loop.state === 'paused' && loop.pauseReason !== undefined
     ? `paused: ${loop.pauseReason}`
     : loop.state
@@ -19,6 +22,10 @@ function formatIterations(loop: LoopSnapshot): string {
   return max === undefined ? `${loop.iterationsCompleted}` : `${loop.iterationsCompleted}/${max}`
 }
 
+function formatSkippedTicks(loop: LoopSnapshot): string {
+  return `${loop.skippedTicks} ${loop.skippedTicks === 1 ? 'tick' : 'ticks'} skipped`
+}
+
 export function formatLoopList(loops: LoopSnapshot[]): string {
   if (loops.length === 0) {
     return 'No loops.'
@@ -26,7 +33,7 @@ export function formatLoopList(loops: LoopSnapshot[]): string {
   return loops
     .map(
       (loop) =>
-        `${loop.id}  ${loop.name}  ${loop.preset}  ${loop.agent}  ${formatLoopStatus(loop)}  iterations ${formatIterations(loop)}`
+        `${loop.id}  ${loop.name}  ${loop.preset}  ${loop.agent}  ${formatLoopStatus(loop)}  iterations ${formatIterations(loop)}${loop.skippedTicks > 0 ? `  ${formatSkippedTicks(loop)}` : ''}`
     )
     .join('\n')
 }
@@ -39,6 +46,14 @@ export function formatLoopDetail(loop: LoopSnapshot): string {
     `Worktree: ${loop.worktreeId}`,
     `Iterations: ${formatIterations(loop)}  Active: ${formatDuration(loop.activeMs)}`
   ]
+  if (loop.unverifiableSince !== undefined) {
+    lines.push(
+      `Host unreachable since ${new Date(loop.unverifiableSince).toISOString()}; the loop is not advancing`
+    )
+  }
+  if (loop.skippedTicks > 0) {
+    lines.push(`Ticks skipped: ${loop.skippedTicks}`)
+  }
   if (loop.costUsd !== undefined) {
     lines.push(`Cost: $${loop.costUsd.toFixed(2)}`)
   }

@@ -96,7 +96,8 @@ describe('loop status glyph', () => {
     ['running', {}, 'Loop 3/10 · Running'],
     ['needs-you', { state: 'needs-you' as const }, 'Loop 3/10 · Needs you'],
     ['paused', { state: 'paused' as const }, 'Loop 3/10 · Paused'],
-    ['detached', { detached: true }, 'Loop 3/10 · Detached']
+    ['detached', { detached: true }, 'Loop 3/10 · Detached'],
+    ['unverifiable', { unverifiableSince: 5_000 }, 'Loop 3/10 · Unverifiable']
   ])('labels a %s loop', async (stateName, overrides, label) => {
     seed(makeLoop({ id: 'l1', ...overrides }))
     await renderProbe({ status: 'inactive' })
