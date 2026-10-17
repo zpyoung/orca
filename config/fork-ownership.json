@@ -188,6 +188,16 @@
       "name": "automation-launch-settings",
       "purpose": "Carries structured model, effort, and agent-argument overrides from automations and source-control recipes into agent launches.",
       "globs": ["**/fork-automation-launch-settings/**"]
+    },
+    {
+      "name": "fork-loops",
+      "purpose": "Runs an agent harness repeatedly in a worktree until a check command or evaluator says the work is done, with a rail, setup dialog, CLI, and mobile label.",
+      "globs": [
+        "**/fork-loops/**",
+        "skill-guides/orca-loop.md",
+        "skill-stubs/orca-loop.md",
+        "skills/orca-loop/**"
+      ]
     }
   ],
   "seams": [
@@ -513,8 +523,8 @@
       "lines": [
         "import { useHeimdallGlyph, withHeimdallGlyph } from '@/fork-heimdall/heimdall-status-lane-glyph'",
         "  const heimdallGlyph = useHeimdallGlyph(worktreeId, status, passiveStatusAnnouncement, className)",
-        "    return overlayNewCardUnreadStatus(heimdallGlyph ?? passiveStatus, showNewCardUnreadAlert)",
-        "                {withHeimdallGlyph(heimdallGlyph, status)}"
+        "      loopGlyph ?? heimdallGlyph ?? passiveStatus,",
+        "                {withLoopGlyph(loopGlyph, withHeimdallGlyph(heimdallGlyph, status))}"
       ]
     },
     {
@@ -5316,6 +5326,290 @@
       "lines": [
         "import { isTerminalPasteOwnedByChat as isInsideNativeChatCover } from './fork-terminal-dock/terminal-dock-paste-yield'"
       ]
+    },
+    {
+      "path": "config/scripts/generate-bundled-skill-guides.mjs",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": ["  'orca-loop',", "  'orca-loop': [],"]
+    },
+    {
+      "path": "mobile/src/components/WorktreeListRow.tsx",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import type { LoopWorktreeSummary } from '../../../src/shared/fork-loops/loop-types'",
+        "import { LoopWorktreeLabel } from '../worktree/fork-loops/loop-worktree-label'",
+        "  loop?: LoopWorktreeSummary",
+        "        <LoopWorktreeLabel loop={item.loop} />"
+      ]
+    },
+    {
+      "path": "mobile/src/worktree/worktree-list-snapshot.test.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import type { LoopWorktreeSummary } from '../../../src/shared/fork-loops/loop-types'",
+        "  describe('loop summaries', () => {"
+      ]
+    },
+    {
+      "path": "mobile/src/worktree/worktree-list-snapshot.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import type { LoopWorktreeSummary } from '../../../src/shared/fork-loops/loop-types'",
+        "type WorktreeWithLoop = Worktree & { loop?: LoopWorktreeSummary }",
+        "function areWorktreesEqual(left: WorktreeWithLoop, right: WorktreeWithLoop): boolean {",
+        "    areLoopSummariesEqual(left.loop, right.loop)",
+        "function areLoopSummariesEqual("
+      ]
+    },
+    {
+      "path": "src/cli/args.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": ["      'loop',"]
+    },
+    {
+      "path": "src/cli/bundled-skill-guides.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "    name: \"orca-loop\",",
+        "    markdown: ORCA_LOOP_MARKDOWN,",
+        "    fullMarkdown: ORCA_LOOP_MARKDOWN,"
+      ]
+    },
+    {
+      "path": "src/cli/handler-group-manifest.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "    name: 'loop',",
+        "      'loop create',",
+        "      'loop list',",
+        "      'loop show',",
+        "      'loop pause',",
+        "      'loop resume',",
+        "      'loop stop',",
+        "      'loop steer',",
+        "      'loop edit'",
+        "    load: async () => (await import('./fork-loops/handlers.js')).LOOP_HANDLERS"
+      ]
+    },
+    {
+      "path": "src/cli/root-help-text-primary.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "  'Loops:',",
+        "  '  loop create               Start an agent loop in a worktree',",
+        "  '  loop list                 List loops',",
+        "  '  loop show                 Show a loop and its recent iterations',",
+        "  '  loop pause                Pause a loop after the current iteration',",
+        "  '  loop resume               Resume a paused loop, optionally adding iterations',",
+        "  '  loop stop                 Stop a loop after the iteration, or now with --now',",
+        "  '  loop steer                Add a note to the next iteration prompt',",
+        "  '  loop edit                 Change a loop prompt, done signal, or caps',"
+      ]
+    },
+    {
+      "path": "src/cli/root-help-text-secondary.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "  '  orca loop create --agent <agent> [--worktree <selector>] [--preset until-done|interval|queue] (--prompt <text>|--queue-item <text>...) [--every <minutes>] [--check <command>] [--evaluator <condition>] [--max-iterations <n>] [--json]',",
+        "  '  orca loop list [--worktree <selector>] [--json]',",
+        "  '  orca loop show|pause <loopId> [--json]',",
+        "  '  orca loop resume <loopId> [--add-iterations <n>] [--json]',",
+        "  '  orca loop stop <loopId> [--now] [--json]',",
+        "  '  orca loop steer <loopId> <text> [--json]',",
+        "  '  orca loop edit <loopId> [--prompt <text>] [--check <command>] [--max-iterations <n>] [--json]',"
+      ]
+    },
+    {
+      "path": "src/cli/specs/index.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { LOOP_COMMAND_SPECS } from '../fork-loops/specs'",
+        "  ...LOOP_COMMAND_SPECS,"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-get-worktree-ps.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { requireLoopService } from './rpc/methods/fork-loops/service-binding'",
+        "import { attachWorktreeLoopSummaries } from '../fork-loops/worktree-ps-loop-summary'",
+        "    attachWorktreeLoopSummaries(summaries, () => requireLoopService(this))"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { LoopErrorCodeSchema } from '../../../shared/fork-loops/loop-types'",
+        "  ...LoopErrorCodeSchema.options,"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/index.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": ["import { LOOPS_METHODS } from './fork-loops/loops'", "  ...LOOPS_METHODS,"]
+    },
+    {
+      "path": "src/main/startup/cli-command-names.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": ["  'loop',"]
+    },
+    {
+      "path": "src/main/startup/main-process-quit.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { beginLoopsShutdown } from '../fork-loops/registration'",
+        "      { name: 'loops', promise: beginLoopsShutdown(state.loops) },"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-runtime-service.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { startLoops } from '../fork-loops/registration'",
+        "  state.loops = startLoops(runtime, store, state.isServeMode)"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-state.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import type { LoopService } from '../fork-loops/loop-service'",
+        "  loops: null as LoopService | null,"
+      ]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "fork-loops",
+      "kind": "passthrough",
+      "lines": ["import type { LoopsApi } from '../shared/fork-loops/api'", "  loops: LoopsApi"]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkLoopsApi } from './fork-loops/loops-preload-api'",
+        "  loops: buildForkLoopsApi(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/App.tsx",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { LoopCloseDialogHost } from './fork-loops/LoopCloseDialogHost'",
+        "import { LoopSetupDialogHost } from './fork-loops/LoopSetupDialogHost'",
+        "      <LoopSetupDialogHost />",
+        "      <LoopCloseDialogHost />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { useLoopGlyph, withLoopGlyph } from '@/fork-loops/loop-status-glyph'",
+        "  const loopGlyph = useLoopGlyph(worktreeId, status, passiveStatusAnnouncement, className)",
+        "      loopGlyph ?? heimdallGlyph ?? passiveStatus,",
+        "                {withLoopGlyph(loopGlyph, withHeimdallGlyph(heimdallGlyph, status))}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/tab-bar/tab-bar-surface.tsx",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { LoopMenuItem } from '@/fork-loops/LoopMenuItem'",
+        "              <LoopMenuItem worktreeId={worktreeId} groupId={resolvedGroupId} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { useTerminalPaneLoopRail } from '@/fork-loops/use-terminal-pane-loop-rail'",
+        "  const loopRail = useTerminalPaneLoopRail(controller)",
+        "      {loopRail}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal/terminal-tab-actions.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { guardLoopTerminalClose } from '@/fork-loops/loop-close-guard'",
+        "    guardLoopTerminalClose(terminalTabId, options, () =>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/ipc-events/app-lifetime-ipc-bridge.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { wireLoopsIpcEvents } from '@/fork-loops/wire-loops-ipc-events'",
+        "  unsubs.push(wireLoopsIpcEvents(useAppStore))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/index.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { createLoopsSlice } from '@/fork-loops/loops-slice'",
+        "        ...createLoopsSlice(...a),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/store-test-helpers.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { createLoopsSlice } from '@/fork-loops/loops-slice'",
+        "    ...createLoopsSlice(...a),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/types.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": ["import type { LoopsSlice } from '@/fork-loops/loops-slice'", "  LoopsSlice &"]
+    },
+    {
+      "path": "src/shared/protocol-version.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { LOOPS_RUNTIME_CAPABILITY } from './fork-loops/capability'",
+        "  LOOPS_RUNTIME_CAPABILITY,"
+      ]
+    },
+    {
+      "path": "src/shared/runtime-worktree-contracts.ts",
+      "feature": "fork-loops",
+      "kind": "passthrough",
+      "lines": [
+        "import type { LoopWorktreeSummary } from './fork-loops/loop-types'",
+        "  loop?: LoopWorktreeSummary"
+      ]
     }
   ],
   "exceptions": [
@@ -6524,7 +6818,7 @@
       "removed": 1
     },
     "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx": {
-      "added": 4,
+      "added": 9,
       "removed": 7
     },
     ".gitignore": {
@@ -6556,7 +6850,7 @@
       "removed": 22
     },
     "config/scripts/generate-bundled-skill-guides.mjs": {
-      "added": 9,
+      "added": 12,
       "removed": 0
     },
     "config/scripts/mac-build-compatibility.test.mjs": {
@@ -6580,7 +6874,7 @@
       "removed": 0
     },
     "src/cli/args.ts": {
-      "added": 2,
+      "added": 3,
       "removed": 0
     },
     "src/cli/artifact-format.ts": {
@@ -6588,11 +6882,11 @@
       "removed": 7
     },
     "src/cli/bundled-skill-guides.ts": {
-      "added": 33,
+      "added": 44,
       "removed": 0
     },
     "src/cli/handler-group-manifest.ts": {
-      "added": 41,
+      "added": 55,
       "removed": 0
     },
     "src/cli/handlers/artifacts.ts": {
@@ -6600,11 +6894,11 @@
       "removed": 1
     },
     "src/cli/root-help-text-primary.ts": {
-      "added": 32,
+      "added": 42,
       "removed": 0
     },
     "src/cli/root-help-text-secondary.ts": {
-      "added": 16,
+      "added": 23,
       "removed": 0
     },
     "src/cli/specs/artifacts.ts": {
@@ -6612,7 +6906,7 @@
       "removed": 2
     },
     "src/cli/specs/index.ts": {
-      "added": 6,
+      "added": 8,
       "removed": 0
     },
     "src/main/agent-hooks/server/server-lifecycle.ts": {
@@ -6820,7 +7114,7 @@
       "removed": 1
     },
     "src/main/runtime/rpc/methods/index.ts": {
-      "added": 8,
+      "added": 10,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
@@ -6888,7 +7182,7 @@
       "removed": 0
     },
     "src/main/startup/cli-command-names.ts": {
-      "added": 3,
+      "added": 4,
       "removed": 0
     },
     "src/main/startup/main-process-account-services.ts": {
@@ -6908,15 +7202,15 @@
       "removed": 0
     },
     "src/main/startup/main-process-runtime-service.ts": {
-      "added": 19,
+      "added": 21,
       "removed": 2
     },
     "src/main/startup/main-process-state.ts": {
-      "added": 3,
+      "added": 6,
       "removed": 0
     },
     "src/main/startup/main-process-quit.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 0
     },
     "src/main/telemetry/client.ts": {
@@ -6948,7 +7242,7 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 21,
+      "added": 23,
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
@@ -6972,7 +7266,7 @@
       "removed": 0
     },
     "src/preload/index.ts": {
-      "added": 12,
+      "added": 14,
       "removed": 0
     },
     "src/relay/relay-runtime-services.ts": {
@@ -7364,7 +7658,7 @@
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
-      "added": 6,
+      "added": 9,
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
@@ -7444,7 +7738,7 @@
       "removed": 1
     },
     "src/renderer/src/hooks/ipc-events/app-lifetime-ipc-bridge.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 0
     },
     "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
@@ -7620,7 +7914,7 @@
       "removed": 1
     },
     "src/renderer/src/store/index.ts": {
-      "added": 7,
+      "added": 9,
       "removed": 1
     },
     "src/renderer/src/store/right-sidebar-route.ts": {
@@ -7636,7 +7930,7 @@
       "removed": 0
     },
     "src/renderer/src/store/slices/store-test-helpers.ts": {
-      "added": 7,
+      "added": 9,
       "removed": 1
     },
     "src/renderer/src/store/slices/tabs/create-tabs-slice.ts": {
@@ -7676,7 +7970,7 @@
       "removed": 2
     },
     "src/renderer/src/store/types.ts": {
-      "added": 7,
+      "added": 9,
       "removed": 1
     },
     "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
@@ -7764,7 +8058,7 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 32,
+      "added": 34,
       "removed": 0
     },
     "src/shared/remote-runtime-client-capabilities.ts": {
@@ -7984,7 +8278,7 @@
       "removed": 0
     },
     "src/main/runtime/rpc/errors.ts": {
-      "added": 11,
+      "added": 13,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/client-ui.test.ts": {
@@ -8722,6 +9016,38 @@
     "src/renderer/src/components/terminal-pane/terminal-pane-paste-listeners.ts": {
       "added": 1,
       "removed": 1
+    },
+    "mobile/src/components/WorktreeListRow.tsx": {
+      "added": 4,
+      "removed": 0
+    },
+    "mobile/src/worktree/worktree-list-snapshot.test.ts": {
+      "added": 47,
+      "removed": 0
+    },
+    "mobile/src/worktree/worktree-list-snapshot.ts": {
+      "added": 23,
+      "removed": 2
+    },
+    "src/main/runtime/orca-runtime-get-worktree-ps.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/App.tsx": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/tab-bar/tab-bar-surface.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal/terminal-tab-actions.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/shared/runtime-worktree-contracts.ts": {
+      "added": 2,
+      "removed": 0
     }
   }
 }

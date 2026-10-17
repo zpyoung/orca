@@ -1,0 +1,239 @@
+{
+  "fork": {
+    "loops": {
+      "setup": {
+        "presetInterval": "À intervalle régulier",
+        "presetQueue": "File d'attente",
+        "presetUntilDone": "Jusqu'à la fin",
+        "errorWholeNumber": "Saisissez un nombre entier supérieur ou égal à 1.",
+        "createFailed": "Impossible de démarrer la boucle.",
+        "runningLoopWarning": "Cet espace de travail a déjà une boucle en cours. Une deuxième boucle modifie les mêmes fichiers en même temps.",
+        "name": "Nom",
+        "namePlaceholder": "Par défaut, le prompt",
+        "agent": "Agent",
+        "noAgents": "Aucun agent détecté",
+        "preset": "Exécution",
+        "queueItems": "File d'attente",
+        "queueItem": "Élément {{n}} de la file",
+        "queueMoveUp": "Monter l'élément {{n}} de la file",
+        "queueMoveDown": "Descendre l'élément {{n}} de la file",
+        "queueRemove": "Retirer l'élément {{n}} de la file",
+        "queueNew": "Nouvel élément de la file",
+        "queueNewPlaceholder": "Un prompt pour une itération",
+        "queueAdd": "Ajouter à la file",
+        "errorQueueEmpty": "Ajoutez au moins un prompt à la file.",
+        "errorQueueBlankItem": "Les prompts de la file ne peuvent pas être vides.",
+        "repeatQueue": "Recommencer quand la file est vide",
+        "prompt": "Prompt",
+        "promptPlaceholder": "Que doit faire l'agent à chaque itération ?",
+        "intervalMinutes": "Exécuter toutes les (minutes)",
+        "session": "Session",
+        "sessionFresh": "Nouvelle session à chaque itération",
+        "sessionContinue": "Continuer la même session",
+        "maxIterations": "Nombre maximal d'itérations",
+        "maxIterationsHint": "Laissez vide pour ne pas limiter.",
+        "advanced": "Avancé",
+        "checkCommand": "Commande de vérification",
+        "checkHint": "S'exécute dans l'espace de travail. Le code de sortie 0 signifie que le travail est terminé.",
+        "evaluator": "Condition d'achèvement",
+        "evaluatorHint": "Un second agent lit les changements et juge si cette condition est remplie.",
+        "maxCost": "Coût maximal (USD)",
+        "errorCost": "Saisissez un montant supérieur à 0.",
+        "protectedPaths": "Chemins protégés",
+        "protectedPathsHint": "Un chemin ou motif par ligne. La boucle se met en pause si l'agent en modifie un.",
+        "noProgress": "Mettre en pause après 3 itérations sans changement",
+        "checkpointCommits": "Faire un commit de point de contrôle après chaque itération",
+        "askBeforeNext": "Demander avant chaque nouvelle itération",
+        "resumeAtLimitReset": "Reprendre à la réinitialisation de la limite d'usage",
+        "cancel": "Annuler",
+        "start": "Démarrer la boucle",
+        "title": "Nouvelle boucle",
+        "description": "Exécute un agent dans cet espace de travail, encore et encore, jusqu'à ce que le travail soit terminé.",
+        "menuItem": "Boucle…",
+        "intervalAnchor": "Compté depuis",
+        "anchorFromEnd": "La fin de la dernière itération",
+        "anchorWallClock": "L'horloge",
+        "checkTimeout": "Délai de la vérification (secondes)",
+        "errorCheckTimeout": "Saisissez de 1 à 600 secondes.",
+        "checkRunWhen": "Lancer la vérification",
+        "runEveryIteration": "Après chaque itération",
+        "runOnClaim": "Quand l'agent dit avoir terminé",
+        "maxActiveMinutes": "Minutes actives maximales",
+        "errorPrompt": "Saisissez un prompt pour démarrer la boucle."
+      },
+      "rail": {
+        "action": {
+          "cancel": "Annuler",
+          "edit": "Modifier",
+          "pause": "Mettre en pause",
+          "resume": "Reprendre",
+          "steer": "Orienter…",
+          "stop": "Arrêter"
+        },
+        "actionFailed": "L’action n’a pas abouti. Réessayez.",
+        "badge": {
+          "fail": "Échec",
+          "none": "Sans vérification",
+          "pass": "Réussi"
+        },
+        "check": {
+          "failed": "Vérification échouée",
+          "none": "Sans vérification",
+          "passed": "Vérification réussie"
+        },
+        "detail": {
+          "added": "{{value}} ajoutées",
+          "back": "Retour",
+          "changes": "Modifications",
+          "check": "Vérification de fin",
+          "checkStderr": "Erreurs de la vérification",
+          "checkStdout": "Sortie de la vérification",
+          "cost": "Coût",
+          "duration": "Durée",
+          "evaluator": "Évaluateur",
+          "evaluatorMet": "Condition remplie",
+          "evaluatorNotMet": "Condition non remplie",
+          "evaluatorReason": "Motif de l’évaluateur",
+          "loadFailed": "Impossible de charger la sortie de cette itération.",
+          "loading": "Chargement de la sortie…",
+          "noChanges": "Non mesuré",
+          "noOutput": "Aucune sortie de l’agent n’a été capturée.",
+          "noRecord": "Aucune sortie enregistrée pour cette itération.",
+          "outcome": "Résultat",
+          "outputTail": "Sortie de l’agent",
+          "removed": "{{value}} supprimées",
+          "title": "Itération {{n}}"
+        },
+        "edit": {
+          "maxCost": "Coût maximal (USD)",
+          "maxIterations": "Nombre maximal d’itérations",
+          "maxMinutes": "Minutes actives maximales",
+          "name": "Nom",
+          "save": "Enregistrer"
+        },
+        "endReason": {
+          "crashed": "L’agent a planté",
+          "interrupted": "Interrompue",
+          "running": "En cours",
+          "settled": "Terminée",
+          "stopped": "Arrêtée"
+        },
+        "iteration": {
+          "current": "Itération {{n}}",
+          "currentOfMax": "Itération {{n}} sur {{max}}",
+          "done": "{{n}} itérations terminées",
+          "doneOfMax": "{{n}} itérations sur {{max}} terminées"
+        },
+        "iterations": {
+          "empty": "Aucune itération terminée pour l’instant",
+          "title": "Itérations"
+        },
+        "label": "Boucle",
+        "lastCheck": {
+          "failed": "Échec à l’itération {{n}}",
+          "passed": "Réussi à l’itération {{n}}",
+          "title": "Dernière vérification"
+        },
+        "meter": {
+          "cost": "Coût",
+          "ofCap": "{{spent}} sur {{cap}}",
+          "time": "Temps"
+        },
+        "pause": {
+          "agentBlocked": "L’agent est bloqué",
+          "agentDecide": "L’agent attend une décision",
+          "askBeforeNext": "En attente de votre feu vert",
+          "capCost": "Plafond de coût atteint",
+          "capIterations": "Plafond d’itérations atteint",
+          "capTime": "Plafond de temps atteint",
+          "crashed": "L’agent n’a cessé de planter",
+          "interruptedByRestart": "Interrompu par un redémarrage de l’app",
+          "noProgress": "Aucun progrès sur les dernières itérations",
+          "protectedPath": "A touché un chemin protégé",
+          "queueExhausted": "La file d’attente est vide",
+          "unverifiable": "Contact perdu avec l’hôte de l’agent",
+          "usageLimit": "Limite d’utilisation de l’agent atteinte",
+          "user": "Mis en pause par vous"
+        },
+        "phase": {
+          "checking": "Exécution de la vérification de fin",
+          "evaluating": "Évaluation du résultat",
+          "needsYou": "En attente de votre action",
+          "relaunching": "Redémarrage de l’agent",
+          "sending": "Envoi du prompt",
+          "waiting": "En attente de la prochaine itération",
+          "working": "L’agent travaille"
+        },
+        "preset": {
+          "interval": "Toutes les {{minutes}} min",
+          "queue": "Parcourir une file",
+          "untilDone": "Jusqu’à la fin"
+        },
+        "question": {
+          "blocked": "Bloqué",
+          "decide": "Décision requise"
+        },
+        "queue": {
+          "add": "Ajouter",
+          "done": "Terminé",
+          "editLabel": "Modifier l'élément de la file",
+          "empty": "La file d'attente est vide",
+          "inFlight": "En cours",
+          "moveDown": "Descendre",
+          "moveUp": "Monter",
+          "newLabel": "Nouvel élément de la file",
+          "placeholder": "Décrivez la tâche suivante",
+          "remove": "Retirer",
+          "title": "File d'attente"
+        },
+        "resume": {
+          "addLabel": "Itérations à ajouter",
+          "iterations": "itérations"
+        },
+        "state": {
+          "completed": "Terminé",
+          "needsYou": "Votre action est requise",
+          "paused": "En pause",
+          "running": "En cours",
+          "stopped": "Arrêté"
+        },
+        "steer": {
+          "label": "Note d’orientation",
+          "placeholder": "Consignes pour la prochaine itération",
+          "send": "Envoyer"
+        },
+        "stop": {
+          "afterIteration": "Après cette itération",
+          "now": "Maintenant",
+          "prompt": "Arrêter la boucle"
+        },
+        "strip": {
+          "label": "État de la boucle",
+          "sessionFresh": "nouvelle session",
+          "sessionContinued": "session poursuivie"
+        }
+      },
+      "status": {
+        "glyph": {
+          "tooltip": "Boucle {{n}} · {{state}}",
+          "tooltipWithCap": "Boucle {{n}}/{{max}} · {{state}}",
+          "open": "Ouvrir la boucle",
+          "state": {
+            "running": "En cours",
+            "needsYou": "Votre action requise",
+            "paused": "En pause",
+            "detached": "Détachée"
+          }
+        },
+        "close": {
+          "title": "Fermer une boucle en cours ?",
+          "description": "Cet onglet exécute la boucle « {{name}} ». Laissez-la tourner en arrière-plan ou arrêtez-la maintenant.",
+          "cancel": "Annuler",
+          "stop": "Arrêter la boucle",
+          "keepRunning": "Continuer en arrière-plan",
+          "failed": "Impossible de mettre à jour la boucle, l'onglet reste donc ouvert."
+        }
+      }
+    }
+  }
+}

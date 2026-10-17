@@ -1,0 +1,239 @@
+{
+  "fork": {
+    "loops": {
+      "setup": {
+        "presetInterval": "Cada cierto tiempo",
+        "presetQueue": "Cola",
+        "presetUntilDone": "Hasta terminar",
+        "errorWholeNumber": "Introduce un número entero de al menos 1.",
+        "createFailed": "No se pudo iniciar el bucle.",
+        "runningLoopWarning": "Este espacio de trabajo ya tiene un bucle en ejecución. Un segundo bucle editará los mismos archivos al mismo tiempo.",
+        "name": "Nombre",
+        "namePlaceholder": "Por defecto, el prompt",
+        "agent": "Agente",
+        "noAgents": "No se detectaron agentes",
+        "preset": "Ejecución",
+        "queueItems": "Cola",
+        "queueItem": "Elemento {{n}} de la cola",
+        "queueMoveUp": "Subir el elemento {{n}} de la cola",
+        "queueMoveDown": "Bajar el elemento {{n}} de la cola",
+        "queueRemove": "Quitar el elemento {{n}} de la cola",
+        "queueNew": "Nuevo elemento de la cola",
+        "queueNewPlaceholder": "Un prompt para una iteración",
+        "queueAdd": "Añadir a la cola",
+        "errorQueueEmpty": "Añade al menos un prompt a la cola.",
+        "errorQueueBlankItem": "Los prompts de la cola no pueden estar en blanco.",
+        "repeatQueue": "Empezar de nuevo cuando la cola esté vacía",
+        "prompt": "Prompt",
+        "promptPlaceholder": "¿Qué debe hacer el agente en cada iteración?",
+        "intervalMinutes": "Ejecutar cada (minutos)",
+        "session": "Sesión",
+        "sessionFresh": "Sesión nueva en cada iteración",
+        "sessionContinue": "Continuar la misma sesión",
+        "maxIterations": "Máximo de iteraciones",
+        "maxIterationsHint": "Déjalo vacío para no poner límite.",
+        "advanced": "Avanzado",
+        "checkCommand": "Comando de comprobación",
+        "checkHint": "Se ejecuta en el espacio de trabajo. El código de salida 0 significa que el trabajo está terminado.",
+        "evaluator": "Condición de finalización",
+        "evaluatorHint": "Un segundo agente lee los cambios y juzga si esto se cumple.",
+        "maxCost": "Costo máximo (USD)",
+        "errorCost": "Introduce una cantidad mayor que 0.",
+        "protectedPaths": "Rutas protegidas",
+        "protectedPathsHint": "Una ruta o patrón por línea. El bucle se pausa si el agente cambia alguna.",
+        "noProgress": "Pausar tras 3 iteraciones sin cambios",
+        "checkpointCommits": "Hacer un commit de punto de control tras cada iteración",
+        "askBeforeNext": "Preguntar antes de cada nueva iteración",
+        "resumeAtLimitReset": "Reanudar cuando se restablezca el límite de uso",
+        "cancel": "Cancelar",
+        "start": "Iniciar bucle",
+        "title": "Nuevo bucle",
+        "description": "Ejecuta un agente en este espacio de trabajo una y otra vez hasta que el trabajo esté terminado.",
+        "menuItem": "Bucle…",
+        "intervalAnchor": "Contado desde",
+        "anchorFromEnd": "El final de la última iteración",
+        "anchorWallClock": "El reloj",
+        "checkTimeout": "Tiempo límite de la comprobación (segundos)",
+        "errorCheckTimeout": "Introduce de 1 a 600 segundos.",
+        "checkRunWhen": "Ejecutar la comprobación",
+        "runEveryIteration": "Después de cada iteración",
+        "runOnClaim": "Cuando el agente dice que terminó",
+        "maxActiveMinutes": "Máximo de minutos activos",
+        "errorPrompt": "Introduce un prompt para iniciar el bucle."
+      },
+      "rail": {
+        "action": {
+          "cancel": "Cancelar",
+          "edit": "Editar",
+          "pause": "Pausar",
+          "resume": "Reanudar",
+          "steer": "Dirigir…",
+          "stop": "Detener"
+        },
+        "actionFailed": "No se pudo completar la acción. Inténtalo de nuevo.",
+        "badge": {
+          "fail": "Fallo",
+          "none": "Sin comprobación",
+          "pass": "Correcto"
+        },
+        "check": {
+          "failed": "Comprobación fallida",
+          "none": "Sin comprobación",
+          "passed": "Comprobación superada"
+        },
+        "detail": {
+          "added": "{{value}} añadidas",
+          "back": "Volver",
+          "changes": "Cambios",
+          "check": "Comprobación de finalización",
+          "checkStderr": "Errores de la verificación",
+          "checkStdout": "Salida de la verificación",
+          "cost": "Coste",
+          "duration": "Duración",
+          "evaluator": "Evaluador",
+          "evaluatorMet": "Condición cumplida",
+          "evaluatorNotMet": "Condición no cumplida",
+          "evaluatorReason": "Motivo del evaluador",
+          "loadFailed": "No se pudo cargar la salida de esta iteración.",
+          "loading": "Cargando la salida…",
+          "noChanges": "Sin medir",
+          "noOutput": "No se capturó salida del agente.",
+          "noRecord": "No se registró salida para esta iteración.",
+          "outcome": "Resultado",
+          "outputTail": "Salida del agente",
+          "removed": "{{value}} eliminadas",
+          "title": "Iteración {{n}}"
+        },
+        "edit": {
+          "maxCost": "Coste máximo (USD)",
+          "maxIterations": "Máximo de iteraciones",
+          "maxMinutes": "Máximo de minutos activos",
+          "name": "Nombre",
+          "save": "Guardar"
+        },
+        "endReason": {
+          "crashed": "El agente falló",
+          "interrupted": "Interrumpida",
+          "running": "En curso",
+          "settled": "Terminada",
+          "stopped": "Detenida"
+        },
+        "iteration": {
+          "current": "Iteración {{n}}",
+          "currentOfMax": "Iteración {{n}} de {{max}}",
+          "done": "{{n}} iteraciones completadas",
+          "doneOfMax": "{{n}} de {{max}} iteraciones completadas"
+        },
+        "iterations": {
+          "empty": "Aún no hay iteraciones terminadas",
+          "title": "Iteraciones"
+        },
+        "label": "Bucle",
+        "lastCheck": {
+          "failed": "Fallo en la iteración {{n}}",
+          "passed": "Superada en la iteración {{n}}",
+          "title": "Última comprobación"
+        },
+        "meter": {
+          "cost": "Coste",
+          "ofCap": "{{spent}} de {{cap}}",
+          "time": "Tiempo"
+        },
+        "pause": {
+          "agentBlocked": "El agente está bloqueado",
+          "agentDecide": "El agente necesita una decisión",
+          "askBeforeNext": "Esperando tu visto bueno",
+          "capCost": "Se alcanzó el límite de coste",
+          "capIterations": "Se alcanzó el límite de iteraciones",
+          "capTime": "Se alcanzó el límite de tiempo",
+          "crashed": "El agente siguió fallando",
+          "interruptedByRestart": "Interrumpido por un reinicio de la app",
+          "noProgress": "Sin avances en las últimas iteraciones",
+          "protectedPath": "Tocó una ruta protegida",
+          "queueExhausted": "La cola está vacía",
+          "unverifiable": "Se perdió el contacto con el host del agente",
+          "usageLimit": "Se alcanzó el límite de uso del agente",
+          "user": "Pausado por ti"
+        },
+        "phase": {
+          "checking": "Ejecutando la comprobación de finalización",
+          "evaluating": "Evaluando el resultado",
+          "needsYou": "Esperándote",
+          "relaunching": "Reiniciando el agente",
+          "sending": "Enviando el prompt",
+          "waiting": "Esperando la siguiente iteración",
+          "working": "El agente está trabajando"
+        },
+        "preset": {
+          "interval": "Cada {{minutes}} min",
+          "queue": "Recorrer una cola",
+          "untilDone": "Hasta terminar"
+        },
+        "question": {
+          "blocked": "Bloqueado",
+          "decide": "Se necesita una decisión"
+        },
+        "queue": {
+          "add": "Añadir",
+          "done": "Hecho",
+          "editLabel": "Editar elemento de la cola",
+          "empty": "La cola está vacía",
+          "inFlight": "En curso",
+          "moveDown": "Bajar",
+          "moveUp": "Subir",
+          "newLabel": "Nuevo elemento de la cola",
+          "placeholder": "Describe la siguiente tarea",
+          "remove": "Quitar",
+          "title": "Cola"
+        },
+        "resume": {
+          "addLabel": "Iteraciones que añadir",
+          "iterations": "iteraciones"
+        },
+        "state": {
+          "completed": "Completado",
+          "needsYou": "Te necesita",
+          "paused": "En pausa",
+          "running": "En ejecución",
+          "stopped": "Detenido"
+        },
+        "steer": {
+          "label": "Nota de orientación",
+          "placeholder": "Indicaciones para la siguiente iteración",
+          "send": "Enviar"
+        },
+        "stop": {
+          "afterIteration": "Tras esta iteración",
+          "now": "Ahora",
+          "prompt": "Detener el bucle"
+        },
+        "strip": {
+          "label": "Estado del bucle",
+          "sessionFresh": "sesión nueva",
+          "sessionContinued": "sesión continuada"
+        }
+      },
+      "status": {
+        "glyph": {
+          "tooltip": "Bucle {{n}} · {{state}}",
+          "tooltipWithCap": "Bucle {{n}}/{{max}} · {{state}}",
+          "open": "Abrir bucle",
+          "state": {
+            "running": "En ejecución",
+            "needsYou": "Te necesita",
+            "paused": "En pausa",
+            "detached": "Desacoplado"
+          }
+        },
+        "close": {
+          "title": "¿Cerrar un bucle en ejecución?",
+          "description": "Esta pestaña ejecuta el bucle \"{{name}}\". Déjalo en segundo plano o deténlo ahora.",
+          "cancel": "Cancelar",
+          "stop": "Detener bucle",
+          "keepRunning": "Seguir ejecutando",
+          "failed": "No se pudo actualizar el bucle, así que la pestaña sigue abierta."
+        }
+      }
+    }
+  }
+}
