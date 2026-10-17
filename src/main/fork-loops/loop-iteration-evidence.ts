@@ -133,6 +133,9 @@ export type GatherArgs = {
   onPhase(phase: IterationPhase): void
 }
 
+export const PROTECTED_PATHS_UNVERIFIED =
+  'protected paths unverified: working tree snapshot unavailable'
+
 /**
  * Collects the evidence of a settled iteration: markers, tree diff, protected-path hits, the
  * check, the evaluator, an optional checkpoint commit and the usage delta. Protected-path hits
@@ -153,7 +156,12 @@ export async function gatherIterationEvidence(args: GatherArgs): Promise<Gathere
   const markers = parseLoopMarkers(settlement.lastAssistantMessage ?? outputTail)
   const after = ws ? await tools.snapshotTree(ws) : null
   const diff = ctx.before && after && ws ? await tools.diffTrees(ctx.before, after, ws) : null
-  const hits = protectedPathHits(diff?.files ?? [], config.protectedPaths ?? [])
+  const protectedPaths = config.protectedPaths ?? []
+  // an unmeasurable diff must not read as "nothing protected was touched"
+  const hits =
+    ws?.kind === 'git' && protectedPaths.length > 0 && diff === null
+      ? [PROTECTED_PATHS_UNVERIFIED]
+      : protectedPathHits(diff?.files ?? [], protectedPaths)
   const check = config.done.check
   const claimed = markers.some((marker) => marker.kind === 'done')
   let checkOutcome: CheckOutcome | null = null
@@ -161,7 +169,7 @@ export async function gatherIterationEvidence(args: GatherArgs): Promise<Gathere
     checkOutcome = ctx.targets ? await tools.runCheck(config, ctx.targets.check) : NOT_RUN_CHECK
   }
   let evaluator: EvaluatorVerdict | null = null
-  if (config.done.evaluator && (!check || checkOutcome?.pass === true)) {
+  if (config.done.evaluator) {
     args.onPhase('evaluating')
     evaluator = await tools.evaluate({
       condition: config.done.evaluator.condition,
