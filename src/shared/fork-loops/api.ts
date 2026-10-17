@@ -1,4 +1,10 @@
-import type { LoopCreateInput, LoopEditPatch, LoopSnapshot, QueueOp } from './loop-types'
+import type {
+  IterationRecord,
+  LoopCreateInput,
+  LoopEditPatch,
+  LoopSnapshot,
+  QueueOp
+} from './loop-types'
 
 export const LOOPS_CHANNELS = {
   create: 'loops:create',
@@ -12,10 +18,14 @@ export const LOOPS_CHANNELS = {
   queue: 'loops:queue',
   bindTab: 'loops:bindTab',
   detach: 'loops:detach',
-  openTab: 'loops:openTab'
+  openTab: 'loops:openTab',
+  iterations: 'loops:iterations'
 } as const
 
 export const LOOPS_CHANGED_CHANNEL = 'loops:changed' as const
+
+/** A finished iteration plus the tail of the agent's output, which `IterationRecord` omits. */
+export type IterationDetail = IterationRecord & { outputTail: string | null }
 
 export type LoopsApi = {
   create: (input: LoopCreateInput) => Promise<LoopSnapshot>
@@ -30,5 +40,6 @@ export type LoopsApi = {
   bindTab: (loopId: string, tab: { tabId: string; paneKey: string }) => Promise<LoopSnapshot>
   detach: (loopId: string) => Promise<LoopSnapshot>
   openTab: (loopId: string) => Promise<LoopSnapshot>
+  iterations: (loopId: string, opts?: { limit?: number }) => Promise<IterationDetail[]>
   onChanged: (listener: (snapshot: LoopSnapshot) => void) => () => void
 }

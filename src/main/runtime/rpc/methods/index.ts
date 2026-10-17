@@ -59,6 +59,7 @@ import { AGENT_HOOK_METHODS } from './agent-hooks'
 import { AGENT_LAUNCH_METHODS } from './agent-launch'
 import { ASK_METHODS } from './fork-ask-question-tool/ask'
 import { HEIMDALL_METHODS } from './fork-heimdall/heimdall'
+import { LOOPS_METHODS } from './fork-loops/loops'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -74,6 +75,7 @@ export const ALL_RPC_METHODS = [
   ...ARTIFACT_PASSWORD_METHODS,
   ...ASK_METHODS,
   ...HEIMDALL_METHODS,
+  ...LOOPS_METHODS,
   ...AUTOMATION_METHODS,
   ...REPO_METHODS,
   ...WORKTREE_METHODS,

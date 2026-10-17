@@ -26,6 +26,7 @@ export function buildForkLoopsApi(): LoopsApi {
     bindTab: (loopId, tab) => call(LOOPS_CHANNELS.bindTab, { loopId, ...tab }),
     detach: (loopId) => call(LOOPS_CHANNELS.detach, { loopId }),
     openTab: (loopId) => call(LOOPS_CHANNELS.openTab, { loopId }),
+    iterations: (loopId, opts) => call(LOOPS_CHANNELS.iterations, { loopId, ...opts }),
     onChanged: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, snapshot: LoopSnapshot): void =>
         listener(snapshot)

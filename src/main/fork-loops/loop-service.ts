@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { IterationDetail } from '../../shared/fork-loops/api'
 import {
   LOOP_RECENT_ITERATIONS_LIMIT,
   LoopConfigSchema,
@@ -108,6 +109,35 @@ export class LoopService {
     this.start()
     const loop = this.deps.store.getLoop(loopId)
     return loop ? this.snapshot(loop) : null
+  }
+
+  /** Finished iterations of one loop, oldest first, with the evidence tails the snapshot omits. */
+  listIterations(loopId: string, opts: { limit?: number } = {}): IterationDetail[] {
+    this.getOrThrow(loopId)
+    const details: IterationDetail[] = []
+    for (const row of this.deps.store.listIterations(loopId, opts)) {
+      if (row.endedAt === null || row.endReason === null) {
+        continue
+      }
+      details.push({
+        n: row.n,
+        attempt: row.attempt,
+        startedAt: row.startedAt,
+        endedAt: row.endedAt,
+        endReason: row.endReason,
+        check: row.check,
+        evaluator: row.evaluator,
+        diff: row.diff,
+        treeBefore: row.treeBefore,
+        treeAfter: row.treeAfter,
+        costUsd: row.costUsd,
+        markers: row.markers,
+        protectedPathHits: row.protectedPathHits,
+        checkpointCommit: row.checkpointCommit,
+        outputTail: row.outputTail
+      })
+    }
+    return details
   }
 
   async create(input: LoopCreateInput): Promise<LoopSnapshot> {
