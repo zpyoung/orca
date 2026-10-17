@@ -153,6 +153,7 @@ export const LoopSnapshotSchema = z
     activeMs: z.number().nonnegative(),
     costUsd: z.number().optional(),
     nextIterationAt: TimestampMsSchema.optional(),
+    unverifiableSince: TimestampMsSchema.optional(),
     pendingQuestion: z
       .object({ kind: z.enum(['blocked', 'decide']), text: z.string() })
       .strict()
