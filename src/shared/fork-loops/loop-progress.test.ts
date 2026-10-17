@@ -95,6 +95,11 @@ describe('isNoProgress', () => {
 })
 
 describe('protectedPathHits', () => {
+  it('treats an uncompilable character class as a literal instead of throwing', () => {
+    expect(protectedPathHits(['src/a.ts', '[z-a]'], ['[z-a]'])).toEqual(['[z-a]'])
+    expect(protectedPathHits(['a.ts'], ['[z-a]'])).toEqual([])
+  })
+
   it('matches recursive and single-segment globs', () => {
     const files = ['.github/workflows/ci.yml', 'src/a.ts', 'src/deep/b.ts', 'README.md']
     expect(protectedPathHits(files, ['.github/**'])).toEqual(['.github/workflows/ci.yml'])

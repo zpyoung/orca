@@ -53,6 +53,18 @@ function normalizeRepoPath(value: string): string {
   return value.replaceAll('\\', '/').replace(/^(\.\/)+/, '')
 }
 
+// an uncompilable class (e.g. an out-of-order range) falls back to a literal `[` so matching never throws
+function toCharacterClass(body: string): string | null {
+  const negated = body.startsWith('!') || body.startsWith('^')
+  const source = `[${negated ? '^' : ''}${(negated ? body.slice(1) : body).replace(/[\\\]]/g, '\\$&')}]`
+  try {
+    new RegExp(source)
+  } catch {
+    return null
+  }
+  return source
+}
+
 function globToRegExp(glob: string): RegExp {
   const pattern = normalizeRepoPath(glob)
   const expanded = pattern.endsWith('/') ? `${pattern}**` : pattern
@@ -72,12 +84,11 @@ function globToRegExp(glob: string): RegExp {
       source += '[^/]'
     } else if (char === '[') {
       const close = expanded.indexOf(']', i + 2)
-      if (close === -1) {
+      const characterClass = close === -1 ? null : toCharacterClass(expanded.slice(i + 1, close))
+      if (characterClass === null) {
         source += '\\['
       } else {
-        const body = expanded.slice(i + 1, close)
-        const negated = body.startsWith('!') || body.startsWith('^')
-        source += `[${negated ? '^' : ''}${(negated ? body.slice(1) : body).replace(/[\\\]]/g, '\\$&')}]`
+        source += characterClass
         i = close
       }
     } else if (char === '{') {
