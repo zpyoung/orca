@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-contracts'
-import { LoopRuntimeUnavailableError, relaunchAgentInNewTab } from './agent-session-relaunch'
+import {
+  LoopRuntimeUnavailableError,
+  relaunchAgentInNewTab,
+  requireLaunchedTabIdentity
+} from './agent-session-relaunch'
 
 function created(overrides: Partial<RuntimeTerminalCreate> = {}): RuntimeTerminalCreate {
   return {
@@ -144,5 +148,28 @@ describe('relaunchAgentInNewTab', () => {
     await expect(relaunchAgentInNewTab({ launchAgentTerminal }, baseArgs)).resolves.toMatchObject({
       handle: 'term-new'
     })
+  })
+})
+
+describe('requireLaunchedTabIdentity', () => {
+  it('returns the identity of a complete launch without closing it', async () => {
+    const runtime = runtimeDouble()
+
+    await expect(requireLaunchedTabIdentity(runtime, created())).resolves.toEqual({
+      handle: 'term-new',
+      tabId: 'tab-new',
+      paneKey: 'tab-new:leaf-new',
+      ptyId: 'pty-new'
+    })
+    expect(runtime.closeTerminalTab).not.toHaveBeenCalled()
+  })
+
+  it('closes a launch that is missing its pty identity and fails', async () => {
+    const runtime = runtimeDouble()
+
+    await expect(
+      requireLaunchedTabIdentity(runtime, created({ ptyId: undefined }))
+    ).rejects.toThrow('agent launch did not report its tab identity')
+    expect(runtime.closeTerminalTab).toHaveBeenCalledWith('term-new')
   })
 })

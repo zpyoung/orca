@@ -1,5 +1,4 @@
 import { decideNext, type LoopAction } from '../../shared/fork-loops/loop-decision'
-import { composeIterationPrompt } from '../../shared/fork-loops/loop-prompt'
 import type {
   IterationEvidence,
   IterationPhase,
@@ -13,20 +12,24 @@ import {
   abortableSleep,
   awaitLaunchedAgent,
   errorMessage,
+  interruptForStop,
   observeUntilSettled,
   relaunchLoopAgent,
   resolvePane,
   sendAgentPrompt
 } from './loop-agent-session'
-import type { QueueItem, StoredLoop, LoopPatch } from './loop-database'
+import type { StoredLoop, LoopPatch } from './loop-database'
 import type { IterationContext, LoopDriverDeps } from './loop-driver-types'
 import {
   buildRuntimeState,
   gatherIterationEvidence,
+  iterationEvidenceOf,
   skippedWallClockTicks,
   toRecord
 } from './loop-iteration-evidence'
-import { appendLoopLogLine, loopNotesPath } from './loop-notes-file'
+import { appendLoopLogLine } from './loop-notes-file'
+import { composeLoopPrompt } from './loop-iteration-prompt'
+import { claimQueueItem } from './loop-queue-claim'
 
 export type {
   LoopDriverDeps,
@@ -55,6 +58,7 @@ export class LoopDriver {
   private abort = new AbortController()
   private wake = new AbortController()
   private finished: Promise<void> = Promise.resolve()
+  private reopening: Promise<void> | null = null
 
   constructor(
     private readonly loopId: string,
@@ -109,6 +113,28 @@ export class LoopDriver {
     this.abort.abort()
     this.poke()
     await this.finished
+  }
+
+  /**
+   * Runs a launch that replaces the loop's pane while no iteration is running, then marks that
+   * pane as a fresh unused session. Returns false, without running `launch`, when an iteration or
+   * another reopen is in flight, because either would launch a second agent.
+   */
+  async reopenPane(launch: () => Promise<void>): Promise<boolean> {
+    if (this.iteration !== null || this.reopening !== null) {
+      return false
+    }
+    const pending = launch().then(() => {
+      this.sessionUsed = false
+      this.preambleSent = false
+    })
+    this.reopening = pending.catch(() => undefined)
+    try {
+      await pending
+    } finally {
+      this.reopening = null
+    }
+    return true
   }
 
   whenIdle(): Promise<void> {
@@ -192,6 +218,19 @@ export class LoopDriver {
   private userTyping(loop: StoredLoop): boolean {
     const pane = resolvePane(this.deps.runtime, loop.paneKey)
     return pane !== null && !this.deps.inputAttribution.userIdleFor(pane.ptyId, LOOP_USER_IDLE_MS)
+  }
+
+  private inputActive(loop: StoredLoop): boolean {
+    return this.userTyping(loop) || this.agentBusy(loop)
+  }
+
+  /** Polls until neither the user nor the agent is active; false when stop-now or shutdown aborts. */
+  private async waitForInputIdle(loop: StoredLoop): Promise<boolean> {
+    const { signal } = this.abort
+    while (this.inputActive(loop) && !signal.aborted && !this.disposed) {
+      await (this.deps.sleep ?? abortableSleep)(this.deps.pollMs ?? 1000, signal)
+    }
+    return !signal.aborted && !this.disposed
   }
 
   private agentBusy(loop: StoredLoop): boolean {
@@ -284,37 +323,13 @@ export class LoopDriver {
     this.commit({ state: 'running' }, phase)
   }
 
-  private queueItemFor(
-    source: 'repeat' | { queueItemId: string },
-    reuseInFlight: boolean
-  ): QueueItem | null {
-    const { store } = this.deps
-    const items = store.listQueue(this.loopId)
-    const inFlight = items.find((item) => item.state === 'in-flight')
-    if (reuseInFlight && inFlight) {
-      return inFlight
-    }
-    if (source === 'repeat') {
-      return null
-    }
-    const chosen = items.find((item) => item.id === source.queueItemId) ?? null
-    if (chosen?.state === 'done') {
-      for (const item of items) {
-        store.setQueueItemState(this.loopId, item.id, 'pending')
-      }
-    }
-    if (chosen) {
-      store.setQueueItemState(this.loopId, chosen.id, 'in-flight')
-    }
-    return chosen
-  }
-
   private async runIteration(
     freshSession: boolean,
     source: 'repeat' | { queueItemId: string },
     isRetry: boolean
   ): Promise<void> {
     const { store, tools } = this.deps
+    await this.reopening
     let loop = this.row()
     const lastRow = store.listIterations(this.loopId, { limit: 1 }).at(-1) ?? null
     const reRun = lastRow?.endReason === 'interrupted'
@@ -345,7 +360,7 @@ export class LoopDriver {
       usageBefore: null,
       error: null
     }
-    const item = this.queueItemFor(source, isRetry || reRun)
+    const item = claimQueueItem(store, this.loopId, source, isRetry || reRun)
 
     let pane = resolvePane(this.deps.runtime, loop.paneKey)
     if (!pane || isRetry || (freshSession && this.sessionUsed)) {
@@ -384,12 +399,30 @@ export class LoopDriver {
       }
     }
 
-    ctx.before = targets ? await tools.snapshotTree(targets.workspace) : null
-    ctx.usageBefore = loop.paneKey
-      ? await tools.readUsage(loop.paneKey, loop.worktreeId, loop.agent)
-      : null
+    for (;;) {
+      ctx.before = targets ? await tools.snapshotTree(targets.workspace) : null
+      ctx.usageBefore = loop.paneKey
+        ? await tools.readUsage(loop.paneKey, loop.worktreeId, loop.agent)
+        : null
+      if (!this.inputActive(loop)) {
+        break
+      }
+      this.commit({}, 'waiting')
+      if (!(await this.waitForInputIdle(loop))) {
+        return this.endIteration(ctx, { kind: 'aborted' })
+      }
+      this.commit({}, 'sending')
+    }
     const notes = store.takePendingSteerNotes(this.loopId, n).map((note) => note.body)
-    const prompt = this.composePrompt(loop, ctx, item, notes)
+    const prompt = composeLoopPrompt({
+      loop,
+      ctx,
+      item,
+      notes,
+      history: this.history(),
+      includePreamble: !this.preambleSent
+    })
+    ctx.promptSent = prompt
     const sentAt = this.now()
     store.updateIteration(this.loopId, n, attempt, { promptSent: prompt })
     const freshForUsage = !this.sessionUsed
@@ -432,30 +465,6 @@ export class LoopDriver {
     }
   }
 
-  private composePrompt(
-    loop: StoredLoop,
-    ctx: IterationContext,
-    item: QueueItem | null,
-    notes: string[]
-  ): string {
-    const { config } = loop
-    const history = this.history()
-    const body =
-      item?.body ?? (config.promptSource.kind === 'repeat' ? config.promptSource.body : '')
-    return composeIterationPrompt({
-      loop: config,
-      iteration: ctx.n,
-      maxIterations: config.caps.maxIterations ?? null,
-      previousCheck: history.at(-1)?.check ?? null,
-      steerNotes: notes,
-      body,
-      notesPath: ctx.targets
-        ? loopNotesPath(ctx.targets.workspace, loop.slug)
-        : `.orca/loops/${loop.slug}/notes.md`,
-      includePreamble: !this.preambleSent
-    })
-  }
-
   private async endIteration(
     ctx: IterationContext,
     settlement: IterationSettlement,
@@ -466,6 +475,15 @@ export class LoopDriver {
       return
     }
     const { store, tools } = this.deps
+    const interruptError =
+      settlement.kind === 'aborted' && this.stopRequested === 'now' && paneHandle
+        ? await interruptForStop(this.deps.runtime, this.deps.inputAttribution, paneHandle, () =>
+            this.now()
+          )
+        : null
+    if (this.disposed) {
+      return
+    }
     const gathered =
       settlement.kind === 'settled'
         ? await gatherIterationEvidence({
@@ -484,19 +502,10 @@ export class LoopDriver {
     const stopped =
       settlement.kind === 'aborted' || (gathered !== null && this.abort.signal.aborted)
     const endedAt = this.now()
-    const evidence = {
-      check: gathered?.check ?? null,
-      evaluator: gathered?.evaluator ?? null,
-      diff: gathered?.diff ?? null,
-      treeBefore: gathered?.treeBefore ?? ctx.before?.treeId ?? null,
-      treeAfter: gathered?.treeAfter ?? null,
-      costUsd: gathered?.costUsd ?? null,
-      markers: gathered?.markers ?? [],
-      protectedPathHits: gathered?.protectedPathHits ?? [],
-      checkpointCommit: gathered?.checkpointCommit ?? null
-    }
+    const evidence = iterationEvidenceOf(gathered, ctx)
     const endReason = stopped ? 'stopped' : settlement.kind === 'crashed' ? 'crashed' : 'settled'
-    const error = failure ?? gathered?.error ?? ctx.error
+    const error =
+      [failure ?? gathered?.error ?? ctx.error, interruptError].filter(Boolean).join('; ') || null
     store.updateIteration(this.loopId, ctx.n, ctx.attempt, {
       endedAt,
       endReason,

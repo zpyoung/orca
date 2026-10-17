@@ -52,6 +52,15 @@ export type LoopDriverRuntime = AgentRelaunchRuntime & {
       afterWrite?: (ptyId: string) => void | Promise<void>
     }
   ): Promise<unknown>
+  sendTerminal?(
+    handle: string,
+    action: { interrupt: true },
+    options: {
+      inputKind: 'driving'
+      beforeWrite?: (ptyId: string) => void | Promise<void>
+      afterWrite?: (ptyId: string) => void | Promise<void>
+    }
+  ): Promise<unknown>
   waitForTerminal?(
     handle: string,
     options?: {
@@ -110,4 +119,5 @@ export type IterationContext = {
   before: TreeSnapshot | null
   usageBefore: UsageTotals | null
   error: string | null
+  promptSent?: string
 }

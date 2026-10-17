@@ -252,6 +252,39 @@ export async function sendAgentPrompt(
   }
 }
 
+/** Interrupts the agent's in-flight turn; the write is recorded so it is not read as user input. */
+export async function interruptAgentTurn(
+  runtime: LoopDriverRuntime,
+  inputAttribution: Pick<InputAttribution, 'noteLoopWrite'>,
+  handle: string,
+  now: () => number
+): Promise<void> {
+  if (typeof runtime.sendTerminal !== 'function') {
+    throw new LoopRuntimeUnavailableError('the runtime cannot interrupt an agent turn')
+  }
+  const noteWrite = (ptyId: string): void => inputAttribution.noteLoopWrite(ptyId, now())
+  await runtime.sendTerminal(
+    handle,
+    { interrupt: true },
+    { inputKind: 'driving', beforeWrite: noteWrite, afterWrite: noteWrite }
+  )
+}
+
+/** Best-effort stop-now interrupt; a failure comes back as text for the iteration record. */
+export async function interruptForStop(
+  runtime: LoopDriverRuntime,
+  inputAttribution: Pick<InputAttribution, 'noteLoopWrite'>,
+  handle: string,
+  now: () => number
+): Promise<string | null> {
+  try {
+    await interruptAgentTurn(runtime, inputAttribution, handle, now)
+    return null
+  } catch (error) {
+    return `agent turn was not interrupted: ${errorMessage(error)}`
+  }
+}
+
 export type ObserveArgs = {
   runtime: LoopDriverRuntime
   observer: Pick<IterationObserver, 'observeIteration'>

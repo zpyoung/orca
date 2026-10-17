@@ -250,6 +250,25 @@ describe('LoopService.create', () => {
     expect(row?.slug).toMatch(/^fix-tests-[0-9a-f]{8}$/)
   })
 
+  it('closes the launch and persists nothing when it reports no pty identity', async () => {
+    const h = createHarness()
+    h.runtime.launchAgentTerminal.mockImplementationOnce(async () => ({
+      handle: 'term-orphan',
+      tabId: 'tab-9',
+      paneKey: 'tab-9:leaf-9',
+      worktreeId: 'wt-1',
+      title: 'Fix tests'
+    }))
+
+    await expect(h.service.create(INPUT)).rejects.toThrow(
+      'agent launch did not report its tab identity'
+    )
+
+    expect(h.runtime.closeTerminalTab).toHaveBeenCalledWith('term-orphan')
+    expect(h.store.listLoops()).toEqual([])
+    expect(h.observeIteration).not.toHaveBeenCalled()
+  })
+
   it('warns when another loop is already running in the worktree', async () => {
     const h = createHarness({ hold: true })
     await h.service.create(INPUT)
@@ -765,11 +784,52 @@ describe('LoopService tab binding', () => {
     expect(await codeOf(h.service.openTab('loop-seed'))).toBe('loop_runtime_unavailable')
   })
 
-  it('refuses to open a loop whose terminal is gone', async () => {
+  it('relaunches the agent in a new tab and binds it when the background terminal is gone', async () => {
     const h = createHarness()
-    h.seed({ state: 'paused' })
+    h.seed({ state: 'paused', detached: true })
+
+    const reopened = await h.service.openTab('loop-seed')
+
+    expect(h.runtime.launchAgentTerminal).toHaveBeenCalledWith('id:wt-1', {
+      agent: 'claude',
+      prompt: '',
+      title: 'Seed'
+    })
+    expect(h.runtime.closeTerminalTab).not.toHaveBeenCalled()
+    expect(reopened.detached).toBe(false)
+    expect(reopened.tab).toEqual({ tabId: 'tab-1', paneKey: 'tab-1:leaf-1' })
+    expect(h.store.getLoop('loop-seed')?.ptyId).toBe('pty-1')
+  })
+
+  it('launches once when the terminal is reopened twice at the same time', async () => {
+    const h = createHarness()
+    h.seed({ state: 'paused', detached: true })
+
+    const codes = await Promise.all([
+      codeOf(h.service.openTab('loop-seed')),
+      codeOf(h.service.openTab('loop-seed'))
+    ])
+
+    expect(h.runtime.launchAgentTerminal).toHaveBeenCalledTimes(1)
+    expect(codes).toContain('loop_invalid_transition')
+  })
+
+  it('refuses to reopen the terminal of an ended loop', async () => {
+    const h = createHarness()
+    h.seed({ state: 'stopped' })
 
     expect(await codeOf(h.service.openTab('loop-seed'))).toBe('loop_invalid_transition')
+    expect(h.runtime.launchAgentTerminal).not.toHaveBeenCalled()
+  })
+
+  it('refuses to reopen the terminal while an iteration is running', async () => {
+    const h = createHarness({ hold: true })
+    const created = await h.service.create(INPUT)
+    await vi.waitFor(() => expect(h.observeIteration).toHaveBeenCalled())
+    h.panes.clear()
+
+    expect(await codeOf(h.service.openTab(created.id))).toBe('loop_invalid_transition')
+    expect(h.runtime.launchAgentTerminal).toHaveBeenCalledTimes(1)
   })
 })
 
