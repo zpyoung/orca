@@ -83,6 +83,7 @@ function decide(
     state?: Partial<LoopRuntimeState>
     history?: DecideNextInput['history']
     latest?: IterationEvidence | null
+    latestDone?: LoopConfig['done']
     hold?: Partial<HoldSignals>
     queue?: DecideNextInput['queue']
   } = {}
@@ -93,6 +94,7 @@ function decide(
     state: { ...baseState, ...overrides.state },
     history: overrides.history ?? (latest ? [latest] : []),
     latest,
+    ...(overrides.latestDone ? { latestDone: overrides.latestDone } : {}),
     now: NOW,
     hold: { ...baseHold, ...overrides.hold },
     queue: overrides.queue
@@ -180,6 +182,33 @@ describe('decideNext completion', () => {
       latest: evidence({ check: check({ pass: false, exitCode: 1 }), markers: [{ kind: 'done' }] })
     })
     expect(action).toEqual(START_REPEAT)
+  })
+
+  it('does not complete on evidence gathered under a different done configuration', () => {
+    const doneCheck = (command: string): LoopConfig['done'] => ({
+      check: { command, timeoutSeconds: 10, runWhen: 'every-iteration' }
+    })
+    const passing = evidence({ check: check() })
+    expect(
+      decide({ loop: { done: doneCheck('new') }, latestDone: doneCheck('old'), latest: passing })
+    ).toEqual(START_REPEAT)
+    expect(
+      decide({ loop: { done: doneCheck('same') }, latestDone: doneCheck('same'), latest: passing })
+    ).toEqual({ kind: 'complete' })
+    expect(decide({ loop: { done: doneCheck('new') }, latest: passing })).toEqual({
+      kind: 'complete'
+    })
+  })
+
+  it('still applies the pause rules to evidence from a different done configuration', () => {
+    const action = decide({
+      loop: {
+        done: { check: { command: 'new', timeoutSeconds: 10, runWhen: 'every-iteration' } }
+      },
+      latestDone: { check: { command: 'old', timeoutSeconds: 10, runWhen: 'every-iteration' } },
+      latest: evidence({ check: check(), protectedPathHits: ['secrets/.env'] })
+    })
+    expect(action).toEqual({ kind: 'pause', reason: 'protected-path', detail: 'secrets/.env' })
   })
 
   it('LOOP_DONE alone never completes', () => {

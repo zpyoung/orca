@@ -1,3 +1,4 @@
+import { structuralValuesEqual } from '../structural-value-equality'
 import { isNoProgress } from './loop-progress'
 import type {
   HoldSignals,
@@ -34,6 +35,11 @@ export type DecideNextInput = {
   state: LoopRuntimeState
   history: IterationRecord[]
   latest: IterationEvidence | null
+  /**
+   * The done configuration `latest` was gathered under. When it differs from `loop.done`, that
+   * evidence cannot complete the loop; absent means it is taken to match.
+   */
+  latestDone?: LoopConfig['done']
   now: number
   hold: HoldSignals
   /** Queue items for `promptSource.kind === 'queue'`; absent is treated as an empty queue. */
@@ -240,7 +246,9 @@ export function decideNext(input: DecideNextInput): LoopAction {
     if (outcome) {
       return outcome
     }
-    if (doneSignalsPassed(loop.done, latest)) {
+    const evidenceMatchesDone =
+      input.latestDone === undefined || structuralValuesEqual(input.latestDone, loop.done)
+    if (evidenceMatchesDone && doneSignalsPassed(loop.done, latest)) {
       return { kind: 'complete' }
     }
     const paused = evidencePause(input, latest)

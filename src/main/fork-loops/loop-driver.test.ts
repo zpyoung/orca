@@ -935,7 +935,8 @@ describe('LoopDriver unverifiable hosts', () => {
 
     await h.run()
 
-    expect(sinceDuringHold.every((since) => since !== null)).toBe(true)
+    // the third probe is the between-iterations check, made after the hold ended
+    expect(sinceDuringHold.slice(0, 2).every((since) => since !== null)).toBe(true)
     expect(h.heldSinces.some((since) => since !== null)).toBe(true)
     expect(h.driver.unverifiableSince()).toBeNull()
     expect(h.row().activeMs).toBe(h.state.clock - 1_000_000 - 20)
@@ -954,6 +955,60 @@ describe('LoopDriver unverifiable hosts', () => {
       [1, 'settled']
     ])
     expect(h.runtime.launchAgentTerminal).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('LoopDriver connection between iterations', () => {
+  it('holds while the host is unreachable after an iteration and resumes once it is live', async () => {
+    const h = createHarness({ checks: [FAIL, PASS] })
+    h.liveness.push(
+      { status: 'unverifiable', reason: 'ssh down' },
+      { status: 'unverifiable', reason: 'ssh down' }
+    )
+
+    await h.run()
+
+    expect(h.heldSinces.some((since) => since !== null)).toBe(true)
+    expect(h.driver.unverifiableSince()).toBeNull()
+    expect(h.row().state).toBe('completed')
+    expect(h.row().iterationsCompleted).toBe(2)
+    expect(h.row().activeMs).toBe(h.state.clock - 1_000_000 - 20)
+  })
+
+  it('does not hold when the pty exited between iterations', async () => {
+    const h = createHarness({ checks: [FAIL, PASS] })
+    h.liveness.push({ status: 'exited' })
+
+    await h.run()
+
+    expect(h.heldSinces.every((since) => since === null)).toBe(true)
+    expect(h.row().iterationsCompleted).toBe(2)
+  })
+})
+
+describe('LoopDriver done configuration edits', () => {
+  it('does not complete on a passing check that ran under the previous done configuration', async () => {
+    const h = createHarness({ checks: [PASS, PASS] })
+    h.steps.push(() => {
+      const row = h.row()
+      h.store.updateLoop('loop-1', {
+        config: {
+          ...row.config,
+          done: { check: { command: 'pnpm lint', timeoutSeconds: 60, runWhen: 'every-iteration' } }
+        }
+      })
+      return settled(h)
+    })
+
+    await h.run()
+
+    expect(h.row().iterationsCompleted).toBe(2)
+    expect(h.row().state).toBe('completed')
+    expect(h.tools.runCheck).toHaveBeenCalledTimes(2)
+    expect(h.tools.runCheck.mock.calls.map(([config]) => config.done.check?.command)).toEqual([
+      'pnpm test',
+      'pnpm lint'
+    ])
   })
 })
 
