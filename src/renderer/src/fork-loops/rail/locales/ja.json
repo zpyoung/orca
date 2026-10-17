@@ -102,6 +102,19 @@
     "blocked": "ブロック中",
     "decide": "判断が必要です"
   },
+  "queue": {
+    "add": "追加",
+    "done": "完了",
+    "editLabel": "キュー項目を編集",
+    "empty": "キューは空です",
+    "inFlight": "実行中",
+    "moveDown": "下へ移動",
+    "moveUp": "上へ移動",
+    "newLabel": "新しいキュー項目",
+    "placeholder": "次のタスクを入力してください",
+    "remove": "削除",
+    "title": "キュー"
+  },
   "resume": {
     "addLabel": "追加するイテレーション数",
     "iterations": "イテレーション"

@@ -102,6 +102,19 @@
     "blocked": "Bloqueado",
     "decide": "Se necesita una decisión"
   },
+  "queue": {
+    "add": "Añadir",
+    "done": "Hecho",
+    "editLabel": "Editar elemento de la cola",
+    "empty": "La cola está vacía",
+    "inFlight": "En curso",
+    "moveDown": "Bajar",
+    "moveUp": "Subir",
+    "newLabel": "Nuevo elemento de la cola",
+    "placeholder": "Describe la siguiente tarea",
+    "remove": "Quitar",
+    "title": "Cola"
+  },
   "resume": {
     "addLabel": "Iteraciones que añadir",
     "iterations": "iteraciones"

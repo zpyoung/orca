@@ -102,6 +102,19 @@
     "blocked": "Bloqué",
     "decide": "Décision requise"
   },
+  "queue": {
+    "add": "Ajouter",
+    "done": "Terminé",
+    "editLabel": "Modifier l'élément de la file",
+    "empty": "La file d'attente est vide",
+    "inFlight": "En cours",
+    "moveDown": "Descendre",
+    "moveUp": "Monter",
+    "newLabel": "Nouvel élément de la file",
+    "placeholder": "Décrivez la tâche suivante",
+    "remove": "Retirer",
+    "title": "File d'attente"
+  },
   "resume": {
     "addLabel": "Itérations à ajouter",
     "iterations": "itérations"

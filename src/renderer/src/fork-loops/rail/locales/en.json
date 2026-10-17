@@ -102,6 +102,19 @@
     "blocked": "Blocked",
     "decide": "Decision needed"
   },
+  "queue": {
+    "add": "Add",
+    "done": "Done",
+    "editLabel": "Edit queue item",
+    "empty": "The queue is empty",
+    "inFlight": "In progress",
+    "moveDown": "Move down",
+    "moveUp": "Move up",
+    "newLabel": "New queue item",
+    "placeholder": "Describe the next task",
+    "remove": "Remove",
+    "title": "Queue"
+  },
   "resume": {
     "addLabel": "Iterations to add",
     "iterations": "iterations"

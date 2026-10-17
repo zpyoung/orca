@@ -102,6 +102,19 @@
     "blocked": "已阻塞",
     "decide": "需要决定"
   },
+  "queue": {
+    "add": "添加",
+    "done": "已完成",
+    "editLabel": "编辑队列项",
+    "empty": "队列为空",
+    "inFlight": "进行中",
+    "moveDown": "下移",
+    "moveUp": "上移",
+    "newLabel": "新的队列项",
+    "placeholder": "描述下一项任务",
+    "remove": "移除",
+    "title": "队列"
+  },
   "resume": {
     "addLabel": "要增加的迭代次数",
     "iterations": "次迭代"

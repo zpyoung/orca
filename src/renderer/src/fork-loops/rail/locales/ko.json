@@ -102,6 +102,19 @@
     "blocked": "막힘",
     "decide": "결정이 필요합니다"
   },
+  "queue": {
+    "add": "추가",
+    "done": "완료",
+    "editLabel": "대기열 항목 편집",
+    "empty": "대기열이 비어 있습니다",
+    "inFlight": "진행 중",
+    "moveDown": "아래로 이동",
+    "moveUp": "위로 이동",
+    "newLabel": "새 대기열 항목",
+    "placeholder": "다음 작업을 설명하세요",
+    "remove": "제거",
+    "title": "대기열"
+  },
   "resume": {
     "addLabel": "추가할 반복 횟수",
     "iterations": "회 반복"
