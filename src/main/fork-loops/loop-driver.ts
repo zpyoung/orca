@@ -3,6 +3,7 @@ import type {
   IterationEvidence,
   IterationPhase,
   IterationRecord,
+  LoopConfig,
   NeedsYouReason,
   PauseReason
 } from '../../shared/fork-loops/loop-types'
@@ -14,6 +15,8 @@ import {
   interruptForStop,
   isAgentBusy,
   isUserTyping,
+  loopConnection,
+  nextIterationSlot,
   observeUntilSettled,
   relaunchLoopAgent,
   resolvePane
@@ -51,6 +54,7 @@ export class LoopDriver {
   private userPaused = false
   private stopRequested: 'after-iteration' | 'now' | null = null
   private latest: IterationEvidence | null = null
+  private latestDone: LoopConfig['done'] | null = null
   private sessionUsed = false
   private preambleSent = false
   private iteration: { n: number; startedAt: number; phase: IterationPhase } | null = null
@@ -94,6 +98,7 @@ export class LoopDriver {
     this.userPaused = false
     this.stopRequested = null
     this.latest = null
+    this.latestDone = null
     this.start()
   }
 
@@ -175,6 +180,7 @@ export class LoopDriver {
     await Promise.resolve()
     while (!this.disposed) {
       const action = this.decide()
+      this.syncHold(action)
       switch (action.kind) {
         case 'start-iteration':
           await this.runIteration(action.freshSession, action.promptSource, false)
@@ -209,12 +215,13 @@ export class LoopDriver {
       state: buildRuntimeState(loop, last, history),
       history,
       latest: this.latest,
+      ...(this.latest && this.latestDone ? { latestDone: this.latestDone } : {}),
       now: this.now(),
       hold: {
         userPaused: this.userPaused,
         stopRequested: this.stopRequested,
         awaitingApproval: isAgentBusy(this.deps.runtime, loop.paneKey),
-        connection: 'live',
+        connection: last ? loopConnection(this.deps.runtime, loop) : 'live',
         userTyping: isUserTyping(this.deps, loop.paneKey)
       },
       ...(promptSource.kind === 'queue' ? { queue: this.deps.store.listQueue(this.loopId) } : {})
@@ -232,6 +239,16 @@ export class LoopDriver {
       Math.max(0, Math.min(ms, MAX_WAIT_SLICE_MS)),
       this.wake.signal
     )
+  }
+
+  private syncHold(action: LoopAction): void {
+    const held = action.kind === 'wait' && action.reason === 'unverifiable'
+    if (held && this.unverifiableSinceMs === null) {
+      this.startHold()
+    } else if (!held && this.unverifiableSinceMs !== null) {
+      this.endHold()
+      this.commit({})
+    }
   }
 
   private startHold(): void {
@@ -325,15 +342,7 @@ export class LoopDriver {
   ): Promise<void> {
     const { store } = this.deps
     let loop = this.row()
-    const lastRow = store.listIterations(this.loopId, { limit: 1 }).at(-1) ?? null
-    const reRun = lastRow?.endReason === 'interrupted'
-    const n =
-      isRetry || reRun ? (lastRow?.n ?? loop.iterationsCompleted + 1) : loop.iterationsCompleted + 1
-    // a resumed loop re-enters an iteration number whose crashed attempts must stay on record
-    const attempt = store
-      .listIterations(this.loopId)
-      .filter((row) => row.n === n)
-      .reduce((next, row) => Math.max(next, row.attempt + 1), 0)
+    const { n, attempt, reRun } = nextIterationSlot(store, this.loopId, loop, isRetry)
     // claimed before the first await so a queue edit cannot land between the decision and the claim
     const item = claimQueueItem(store, this.loopId, source, isRetry || reRun)
     if (loop.config.promptSource.kind === 'queue' && item === null) {
@@ -502,6 +511,7 @@ export class LoopDriver {
       error
     })
     const usageLimit = stopped ? null : tools.readUsageLimit(ctx.loop.agent)
+    this.latestDone = ctx.loop.config.done
     this.latest = {
       n: ctx.n,
       attempt: ctx.attempt,

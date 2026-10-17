@@ -12,6 +12,7 @@ import {
 import { LOOP_USER_IDLE_MS, type InputAttribution } from './input-attribution'
 import type { IterationObserver, IterationSettlement } from './iteration-observer'
 import type { StoredLoop } from './loop-database'
+import type { LoopStore } from './loop-store'
 import type { LoopDriverDeps, LoopDriverRuntime, PaneRef } from './loop-driver-types'
 
 const AGENT_READY_TIMEOUT_MS = 120_000
@@ -57,6 +58,44 @@ export function resolvePane(runtime: LoopDriverRuntime, paneKey: string | null):
     return handle && ptyId ? { handle, ptyId } : null
   } catch {
     return null
+  }
+}
+
+/** The iteration number and attempt to record next; a retry or an interrupted run reuses its number. */
+export function nextIterationSlot(
+  store: Pick<LoopStore, 'listIterations'>,
+  loopId: string,
+  loop: Pick<StoredLoop, 'iterationsCompleted'>,
+  isRetry: boolean
+): { n: number; attempt: number; reRun: boolean } {
+  const lastRow = store.listIterations(loopId, { limit: 1 }).at(-1) ?? null
+  const reRun = lastRow?.endReason === 'interrupted'
+  const n =
+    isRetry || reRun ? (lastRow?.n ?? loop.iterationsCompleted + 1) : loop.iterationsCompleted + 1
+  // a resumed loop re-enters an iteration number whose crashed attempts must stay on record
+  const attempt = store
+    .listIterations(loopId)
+    .filter((row) => row.n === n)
+    .reduce((next, row) => Math.max(next, row.attempt + 1), 0)
+  return { n, attempt, reRun }
+}
+
+/**
+ * Whether the loop's host can still vouch for its pty. Only a positive `unverifiable` verdict
+ * counts: an `exited` pty needs no hold because the next iteration relaunches the agent.
+ */
+export function loopConnection(
+  runtime: LoopDriverRuntime,
+  loop: Pick<StoredLoop, 'paneKey' | 'ptyId'>
+): 'live' | 'unverifiable' {
+  const ptyId = resolvePane(runtime, loop.paneKey)?.ptyId ?? loop.ptyId
+  if (!ptyId || typeof runtime.getPtyLivenessVerdict !== 'function') {
+    return 'live'
+  }
+  try {
+    return runtime.getPtyLivenessVerdict(ptyId)?.status === 'unverifiable' ? 'unverifiable' : 'live'
+  } catch {
+    return 'live'
   }
 }
 
