@@ -1,1 +1,21 @@
-{}
+{
+  "glyph": {
+    "tooltip": "Boucle {{n}} · {{state}}",
+    "tooltipWithCap": "Boucle {{n}}/{{max}} · {{state}}",
+    "open": "Ouvrir la boucle",
+    "state": {
+      "running": "En cours",
+      "needsYou": "Votre action requise",
+      "paused": "En pause",
+      "detached": "Détachée"
+    }
+  },
+  "close": {
+    "title": "Fermer une boucle en cours ?",
+    "description": "Cet onglet exécute la boucle « {{name}} ». Laissez-la tourner en arrière-plan ou arrêtez-la maintenant.",
+    "cancel": "Annuler",
+    "stop": "Arrêter la boucle",
+    "keepRunning": "Continuer en arrière-plan",
+    "failed": "Impossible de mettre à jour la boucle, l'onglet reste donc ouvert."
+  }
+}

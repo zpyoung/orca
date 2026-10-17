@@ -1,1 +1,21 @@
-{}
+{
+  "glyph": {
+    "tooltip": "루프 {{n}} · {{state}}",
+    "tooltipWithCap": "루프 {{n}}/{{max}} · {{state}}",
+    "open": "루프 열기",
+    "state": {
+      "running": "실행 중",
+      "needsYou": "확인 필요",
+      "paused": "일시 중지됨",
+      "detached": "분리됨"
+    }
+  },
+  "close": {
+    "title": "실행 중인 루프를 닫을까요?",
+    "description": "이 탭은 루프 \"{{name}}\"을(를) 실행 중입니다. 백그라운드에서 계속 실행하거나 지금 중지하세요.",
+    "cancel": "취소",
+    "stop": "루프 중지",
+    "keepRunning": "계속 실행",
+    "failed": "루프를 업데이트할 수 없어 탭을 열어 둡니다."
+  }
+}
