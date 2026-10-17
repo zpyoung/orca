@@ -10,7 +10,10 @@ function outputSignature(record: IterationRecord): string | null {
   return check ? `${check.exitCode}|${check.stdoutTail}|${check.stderrTail}` : null
 }
 
-function settledWindow(history: IterationRecord[], latest: IterationRecord | null): IterationRecord[] {
+function settledWindow(
+  history: IterationRecord[],
+  latest: IterationRecord | null
+): IterationRecord[] {
   const settled = history.filter((record) => record.endReason === 'settled')
   const latestMissing =
     latest !== null &&
@@ -34,15 +37,14 @@ export function isNoProgress(history: IterationRecord[], latest: IterationRecord
   if (new Set(window.map(outcomeSignature)).size !== 1) {
     return false
   }
-  const treeless = window.filter((record) => record.treeBefore === null || record.treeAfter === null)
   const treed = window.filter((record) => record.treeBefore !== null && record.treeAfter !== null)
   if (treed.some((record) => record.treeBefore !== record.treeAfter)) {
     return false
   }
-  if (treeless.length === 0) {
+  if (treed.length === window.length && window.every((record) => record.check === null)) {
     return true
   }
-  const signatures = treeless.map(outputSignature)
+  const signatures = window.map(outputSignature)
   if (signatures.some((signature) => signature === null)) {
     return false
   }

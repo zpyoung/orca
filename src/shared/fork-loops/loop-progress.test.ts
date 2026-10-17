@@ -57,11 +57,7 @@ describe('isNoProgress', () => {
   })
 
   it('is false when the check outcome differs across the window', () => {
-    const history = [
-      record(1),
-      record(2, { check: check({ pass: true, exitCode: 0 }) }),
-      record(3)
-    ]
+    const history = [record(1), record(2, { check: check({ pass: true, exitCode: 0 }) }), record(3)]
     expect(isNoProgress(history, record(3))).toBe(false)
   })
 
@@ -85,6 +81,19 @@ describe('isNoProgress', () => {
       record(3, noTree)
     ]
     expect(isNoProgress(changing, record(3, noTree))).toBe(false)
+  })
+
+  it('is false when git trees are unchanged but check output differs each iteration', () => {
+    const history = ['failure A', 'failure B', 'failure C'].map((out, i) =>
+      record(i + 1, { check: check({ stdoutTail: out }) })
+    )
+    expect(isNoProgress(history, history[2] ?? null)).toBe(false)
+  })
+
+  it('counts unchanged trees alone as no progress when no check is configured', () => {
+    const noCheck = { check: null }
+    const history = [record(1, noCheck), record(2, noCheck), record(3, noCheck)]
+    expect(isNoProgress(history, record(3, noCheck))).toBe(true)
   })
 
   it('has no signal without trees or a check', () => {
@@ -114,9 +123,9 @@ describe('protectedPathHits', () => {
   })
 
   it('normalizes windows separators and a leading ./', () => {
-    expect(protectedPathHits(['.\\config\\app.json', './x.txt'], ['config/*.json', 'x.txt'])).toEqual(
-      ['.\\config\\app.json', './x.txt']
-    )
+    expect(
+      protectedPathHits(['.\\config\\app.json', './x.txt'], ['config/*.json', 'x.txt'])
+    ).toEqual(['.\\config\\app.json', './x.txt'])
   })
 
   it('treats a trailing slash as a directory prefix', () => {
