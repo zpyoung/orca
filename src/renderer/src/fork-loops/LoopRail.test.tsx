@@ -160,7 +160,7 @@ describe('LoopRail', () => {
     expect(api.steer).toHaveBeenCalledWith('loop-1', 'focus on the parser')
   })
 
-  it('shows the pending decision text with a Resume that continues the loop', async () => {
+  it('shows the pending decision text without a Resume, since the user answers in the terminal', () => {
     const api = installApi()
     seed(
       makeLoop({
@@ -172,11 +172,37 @@ describe('LoopRail', () => {
 
     render(<LoopRail paneKey={PANE_KEY} />)
     expect(screen.getByText('Use the old parser or rewrite it?')).toBeInTheDocument()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
-    })
+    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument()
+    expect(api.resume).not.toHaveBeenCalled()
+  })
 
-    expect(api.resume).toHaveBeenCalledWith('loop-1')
+  it('offers no Resume for a needs-you loop without a pending question', () => {
+    installApi()
+    seed(makeLoop({ state: 'needs-you', pauseReason: 'agent-blocked' }))
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+
+    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument()
+  })
+
+  it('opens the attempt that was clicked when an iteration was retried after a crash', () => {
+    installApi()
+    seed(
+      makeLoop({
+        recentIterations: [
+          iteration({ n: 4, attempt: 0, endReason: 'crashed', checkPass: false }),
+          iteration({ n: 4, attempt: 1, endReason: 'settled', checkPass: true })
+        ]
+      })
+    )
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    const rows = screen.getAllByRole('button', { name: /Iteration 4/ })
+    expect(rows).toHaveLength(2)
+    fireEvent.click(rows[0])
+
+    expect(screen.getByText('Check passed')).toBeInTheDocument()
+    expect(screen.queryByText('Check failed')).not.toBeInTheDocument()
   })
 
   it('opens an iteration row into its detail with the check result and diff counts', () => {
