@@ -36,6 +36,7 @@ export type LoopLogEntry = {
   added: number | null
   removed: number | null
   costUsd: number | null
+  skippedTicks?: number
 }
 
 export function createLocalLoopFilesystem(): LoopHostFilesystem {
@@ -128,8 +129,8 @@ async function excludeLoopsDirectory(
 
 /**
  * Creates `.orca/loops/<slug>/notes.md` if absent and, for git workspaces, keeps `.orca/loops/`
- * out of status via the repository's private exclude file. `.gitignore` is never touched, and
- * existing notes content is never rewritten.
+ * out of status via the repository's private exclude file; it throws when that entry cannot be
+ * installed. `.gitignore` is never touched, and existing notes content is never rewritten.
  */
 export async function ensureLoopNotesFile(
   target: LoopWorkspaceTarget,
@@ -143,7 +144,12 @@ export async function ensureLoopNotesFile(
       `# ${slug}\n\nNotes for this loop. Edit freely; Orca does not rewrite this file.\n`
     )
   }
-  if (target.kind === 'git' && target.runGit) {
+  if (target.kind === 'git') {
+    if (!target.runGit) {
+      throw new Error(
+        'git is unavailable on the workspace host, so .orca/loops/ cannot be excluded'
+      )
+    }
     await excludeLoopsDirectory(target, target.runGit)
   }
   return { notesPath, logPath: loopLogPath(target, slug) }
@@ -154,7 +160,9 @@ export function formatLoopLogLine(entry: LoopLogEntry): string {
   const diff =
     entry.added === null || entry.removed === null ? 'n/a' : `+${entry.added} -${entry.removed}`
   const cost = entry.costUsd === null ? 'n/a' : `$${entry.costUsd.toFixed(2)}`
-  return `#${entry.n} ${entry.endReason} | check ${check} | diff ${diff} | cost ${cost}`
+  const skipped =
+    entry.skippedTicks && entry.skippedTicks > 0 ? ` | skipped ${entry.skippedTicks} ticks` : ''
+  return `#${entry.n} ${entry.endReason} | check ${check} | diff ${diff} | cost ${cost}${skipped}`
 }
 
 /**

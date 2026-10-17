@@ -16,7 +16,7 @@ import { validateLoopCheckHost, type LoopCheckTarget } from './loop-check'
 import { LoopStoreError, type LoopPatch, type StoredLoop } from './loop-database'
 import { LoopDriver, type LoopDriverDeps, type LoopDriverRuntime } from './loop-driver'
 import { isLoopEvaluatorAvailable } from './loop-evaluator'
-import { ensureLoopNotesFile, loopNotesPath, type LoopWorkspaceTarget } from './loop-notes-file'
+import { ensureLoopNotesFile } from './loop-notes-file'
 import type { LoopStore } from './loop-store'
 
 export type LoopServiceRuntime = LoopDriverRuntime & {
@@ -38,21 +38,6 @@ export type LoopServiceDeps = {
 }
 
 type LoopListener = (snapshot: LoopSnapshot) => void
-
-/** Fails when the notes file cannot be written; a failed git-exclude update alone is tolerated. */
-async function ensureNotesFile(workspace: LoopWorkspaceTarget, slug: string): Promise<void> {
-  try {
-    await ensureLoopNotesFile(workspace, slug)
-  } catch (error) {
-    const written = await workspace.fs.stat(loopNotesPath(workspace, slug)).then(
-      () => true,
-      () => false
-    )
-    if (!written) {
-      throw error
-    }
-  }
-}
 
 function fail(code: LoopErrorCode, message: string): never {
   throw new LoopStoreError(code, message)
@@ -184,7 +169,7 @@ export class LoopService {
     let inserted = false
     try {
       const slug = slugFor(input.name, id)
-      await ensureNotesFile(targets.workspace, slug)
+      await ensureLoopNotesFile(targets.workspace, slug)
       // paused until the queue is seeded so a failure here never leaves a persisted running loop
       store.insertLoop({
         id,
@@ -470,7 +455,9 @@ export class LoopService {
       (loop.pauseReason === 'agent-blocked' || loop.pauseReason === 'agent-decide')
         ? iterations.at(-1)?.markers.find((m) => m.kind === 'blocked' || m.kind === 'decide')
         : undefined
-    const current = this.drivers.get(loop.id)?.current()
+    const driver = this.drivers.get(loop.id)
+    const current = driver?.current()
+    const unverifiableSince = driver?.unverifiableSince() ?? null
     return {
       id: loop.id,
       worktreeId: loop.worktreeId,
@@ -491,6 +478,7 @@ export class LoopService {
       activeMs: loop.activeMs,
       ...(loop.costUsd === null ? {} : { costUsd: loop.costUsd }),
       ...(loop.nextIterationAt === null ? {} : { nextIterationAt: loop.nextIterationAt }),
+      ...(unverifiableSince === null ? {} : { unverifiableSince }),
       ...(marker && marker.kind !== 'done'
         ? { pendingQuestion: { kind: marker.kind, text: marker.text ?? '' } }
         : {}),

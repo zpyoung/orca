@@ -142,8 +142,8 @@ function createHarness(options: {
         prompt: string,
         sendOptions: { beforeWrite?: (ptyId: string) => void | Promise<void> }
       ) => {
-        prompts.push({ handle, prompt })
         await sendOptions.beforeWrite?.('pty')
+        prompts.push({ handle, prompt })
         return {}
       }
     ),
@@ -214,12 +214,16 @@ function createHarness(options: {
   const notifications: { event: string; detail?: string }[] = []
   const typing = { busy: 0 }
   const noteLoopWrite = vi.fn()
+  const userInputSince = vi.fn((_ptyId: string, _since: number) => false)
+  const logFiles = new Map<string, string>()
+  const heldSinces: (number | null)[] = []
   const deps: LoopDriverDeps = {
     store,
     runtime,
     observer: { observeIteration },
     inputAttribution: {
       noteLoopWrite,
+      userInputSince,
       userIdleFor: () => {
         if (typing.busy > 0) {
           typing.busy -= 1
@@ -237,18 +241,24 @@ function createHarness(options: {
         workspacePath: '/work',
         pathFlavor: 'posix',
         fs: {
-          readFile: async () => ({ content: '', isBinary: false }),
-          writeFile: async () => undefined,
+          readFile: async (path) => ({ content: logFiles.get(path) ?? '', isBinary: false }),
+          writeFile: async (path, content) => {
+            logFiles.set(path, content)
+          },
           createDir: async () => undefined,
           deletePath: async () => undefined,
-          stat: async () => {
-            throw new Error('missing')
+          stat: async (path) => {
+            if (!logFiles.has(path)) {
+              throw new Error('missing')
+            }
+            return { size: 0, type: 'file', mtime: 0, mtimeMs: 0 }
           }
         },
         runGit
       }
     }),
     changed: () => {
+      heldSinces.push(driver.unverifiableSince())
       const row = store.getLoop('loop-1')
       const phase = driver.current()?.phase ?? '-'
       changes.push(`${row?.state}|${phase}|${row?.iterationsCompleted}`)
@@ -276,6 +286,9 @@ function createHarness(options: {
     steps,
     typing,
     noteLoopWrite,
+    userInputSince,
+    logFiles,
+    heldSinces,
     liveness,
     row: (): StoredLoop => {
       const row = store.getLoop('loop-1')
@@ -592,6 +605,42 @@ describe('LoopDriver holds and stops', () => {
     expect(h.store.listIterations('loop-1')[0]?.endReason).toBe('stopped')
   })
 
+  it('vetoes the write when the user types after the idle check and sends once they are idle', async () => {
+    const h = createHarness({})
+    h.store.addSteerNote('loop-1', 'prefer small diffs')
+    h.userInputSince.mockImplementationOnce(() => {
+      h.typing.busy = 2
+      return true
+    })
+
+    await h.run()
+
+    expect(h.userInputSince).toHaveBeenCalledWith('pty', 1_000_000)
+    expect(h.runtime.sendTerminalAgentPrompt).toHaveBeenCalledTimes(2)
+    expect(h.prompts).toHaveLength(1)
+    expect(h.prompts[0]?.prompt).toContain('prefer small diffs')
+    expect(h.noteLoopWrite).toHaveBeenCalledTimes(1)
+    expect(h.store.listIterations('loop-1').map((it) => [it.attempt, it.endReason])).toEqual([
+      [0, 'settled']
+    ])
+    expect(h.changes).toContain('running|waiting|0')
+  })
+
+  it('does not retry a vetoed write when stop now arrives meanwhile', async () => {
+    const h = createHarness({})
+    h.userInputSince.mockImplementationOnce(() => {
+      h.driver.requestStop('now')
+      return true
+    })
+
+    await h.run()
+
+    expect(h.prompts).toHaveLength(0)
+    expect(h.runtime.sendTerminalAgentPrompt).toHaveBeenCalledTimes(1)
+    expect(h.row().state).toBe('stopped')
+    expect(h.store.listIterations('loop-1')[0]?.promptSent).toBe('')
+  })
+
   it('clears the pause when resumed and judges the next iteration afresh', async () => {
     const h = createHarness({ config: { askBeforeNext: true, done: {} } })
 
@@ -645,6 +694,52 @@ describe('LoopDriver steer notes and queue', () => {
     ])
     expect(h.row().state).toBe('completed')
     expect(h.store.listQueue('loop-1').every((item) => item.state === 'done')).toBe(true)
+  })
+})
+
+describe('LoopDriver queue claim', () => {
+  it('locks the selected item before setup awaits so it cannot be removed mid-setup', async () => {
+    const h = createHarness({
+      config: { promptSource: { kind: 'queue', repeatQueue: false }, done: {} },
+      loop: { preset: 'queue' },
+      queue: ['first task']
+    })
+    const [item] = h.store.listQueue('loop-1')
+    let removal: unknown = null
+    h.tools.snapshotTree.mockImplementationOnce(async () => {
+      try {
+        h.store.applyQueueOp('loop-1', { op: 'remove', id: item?.id ?? '' })
+      } catch (error) {
+        removal = error
+      }
+      return { treeId: 'tree-1', headSha: 'head' }
+    })
+
+    await h.run()
+
+    expect(removal).toMatchObject({ code: 'loop_invalid_transition' })
+    expect(h.prompts[0]?.prompt).toContain('first task')
+  })
+
+  it('skips an attempt whose selected item is gone at claim time and lets the next decision pick again', async () => {
+    const h = createHarness({
+      config: { promptSource: { kind: 'queue', repeatQueue: false }, done: {} },
+      loop: { preset: 'queue' },
+      queue: ['first task']
+    })
+    const real = h.store.listQueue.bind(h.store)
+    let calls = 0
+    vi.spyOn(h.store, 'listQueue').mockImplementation((loopId) => {
+      calls += 1
+      return calls === 2 ? [] : real(loopId)
+    })
+
+    await h.run()
+
+    expect(h.prompts).toHaveLength(1)
+    expect(h.prompts[0]?.prompt).toContain('first task')
+    expect(h.store.listIterations('loop-1').map((it) => [it.n, it.attempt])).toEqual([[1, 0]])
+    expect(h.row().iterationsCompleted).toBe(1)
   })
 })
 
@@ -827,6 +922,25 @@ describe('LoopDriver unverifiable hosts', () => {
     expect(h.row().state).toBe('completed')
   })
 
+  it('publishes unverifiableSince and stops accruing active time while the host is unreachable', async () => {
+    const h = createHarness({})
+    h.steps.push({ kind: 'unverifiable' })
+    const sinceDuringHold: (number | null)[] = []
+    h.runtime.getPtyLivenessVerdict.mockImplementation((ptyId: string) => {
+      sinceDuringHold.push(h.driver.unverifiableSince())
+      return sinceDuringHold.length < 2
+        ? { status: 'unverifiable', reason: 'ssh down' }
+        : { status: 'live', ptyIds: [ptyId] }
+    })
+
+    await h.run()
+
+    expect(sinceDuringHold.every((since) => since !== null)).toBe(true)
+    expect(h.heldSinces.some((since) => since !== null)).toBe(true)
+    expect(h.driver.unverifiableSince()).toBeNull()
+    expect(h.row().activeMs).toBe(h.state.clock - 1_000_000 - 20)
+  })
+
   it('ends the iteration crashed, taking the single retry, when the pty exited meanwhile', async () => {
     const h = createHarness({})
     h.steps.push({ kind: 'unverifiable' })
@@ -890,6 +1004,27 @@ describe('LoopDriver checkpoint commits', () => {
     await h.run()
 
     expect(h.gitCalls).toEqual([])
+  })
+})
+
+describe('LoopDriver skipped wall-clock ticks', () => {
+  it('writes the ticks skipped during an iteration to the loop log', async () => {
+    const h = createHarness({
+      config: {
+        pacing: { kind: 'interval', minutes: 1, anchor: 'wall-clock' },
+        caps: { maxIterations: 1 },
+        done: {}
+      }
+    })
+    h.steps.push(async () => {
+      h.state.clock += 150_000
+      return settled(h)
+    })
+
+    await h.run()
+
+    expect(h.row().skippedTicks).toBe(2)
+    expect([...h.logFiles.values()].join('')).toContain('| skipped 2 ticks')
   })
 })
 
