@@ -504,6 +504,123 @@ describe('orca loop edit', () => {
     ])
   })
 
+  it('clears the done signals, caps, and protected paths named by the --no- flags', async () => {
+    primeCapabilities()
+    const current = snapshot()
+    current.config.done = {
+      check: { command: 'pnpm test', timeoutSeconds: 300, runWhen: 'every-iteration' },
+      evaluator: { condition: 'no skipped tests' }
+    }
+    current.config.caps = { maxIterations: 10, maxActiveMinutes: 60, maxCostUsd: 5 }
+    current.config.protectedPaths = ['secrets/**']
+    callMock.mockResolvedValueOnce(response(current)).mockResolvedValueOnce(response(snapshot()))
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await LOOP_HANDLERS['loop edit'](
+      context([
+        ['loop-id', 'loop-1'],
+        ['no-check', true],
+        ['no-max-iterations', true],
+        ['no-max-minutes', true],
+        ['no-max-cost', true],
+        ['no-protected-paths', true]
+      ])
+    )
+
+    expect(rpcCalls()[1]).toEqual([
+      LOOPS_CHANNELS.edit,
+      {
+        loopId: 'loop-1',
+        patch: {
+          done: { evaluator: { condition: 'no skipped tests' } },
+          caps: {},
+          protectedPaths: []
+        }
+      }
+    ])
+  })
+
+  it('clears only the evaluator with --no-evaluator and keeps the check', async () => {
+    primeCapabilities()
+    const current = snapshot()
+    const check = { command: 'pnpm test', timeoutSeconds: 300, runWhen: 'every-iteration' } as const
+    current.config.done = { check, evaluator: { condition: 'no skipped tests' } }
+    callMock.mockResolvedValueOnce(response(current)).mockResolvedValueOnce(response(snapshot()))
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await LOOP_HANDLERS['loop edit'](
+      context([
+        ['loop-id', 'loop-1'],
+        ['no-evaluator', true]
+      ])
+    )
+
+    expect(rpcCalls()[1]).toEqual([
+      LOOPS_CHANNELS.edit,
+      { loopId: 'loop-1', patch: { done: { check } } }
+    ])
+  })
+
+  it.each<[string, [string, string | boolean][]]>([
+    [
+      '--no-check',
+      [
+        ['no-check', true],
+        ['check', 'pnpm test']
+      ]
+    ],
+    [
+      '--no-check',
+      [
+        ['no-check', true],
+        ['check-timeout', '30']
+      ]
+    ],
+    [
+      '--no-evaluator',
+      [
+        ['no-evaluator', true],
+        ['evaluator', 'done']
+      ]
+    ],
+    [
+      '--no-max-iterations',
+      [
+        ['no-max-iterations', true],
+        ['max-iterations', '5']
+      ]
+    ],
+    [
+      '--no-max-minutes',
+      [
+        ['no-max-minutes', true],
+        ['max-minutes', '5']
+      ]
+    ],
+    [
+      '--no-max-cost',
+      [
+        ['no-max-cost', true],
+        ['max-cost', '5']
+      ]
+    ],
+    [
+      '--no-protected-paths',
+      [
+        ['no-protected-paths', true],
+        ['protected-path', 'secrets/**']
+      ]
+    ]
+  ])('rejects %s combined with its setting flag', async (_name, flags) => {
+    primeCapabilities()
+    callMock.mockResolvedValueOnce(response(snapshot()))
+
+    await expect(
+      LOOP_HANDLERS['loop edit'](context([['loop-id', 'loop-1'], ...flags]))
+    ).rejects.toMatchObject({ code: 'invalid_argument' })
+    expect(rpcCalls().map(([method]) => method)).toEqual([LOOPS_CHANNELS.get])
+  })
+
   it('refuses an edit with no changes', async () => {
     primeCapabilities()
     callMock.mockResolvedValueOnce(response(snapshot()))
