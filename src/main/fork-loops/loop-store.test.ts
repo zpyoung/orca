@@ -264,6 +264,16 @@ describe('iterations', () => {
     expect(store.listIterations('a', { limit: 2 }).map((row) => row.n)).toEqual([4, 5])
     expect(store.listIterations('a').map((row) => row.n)).toEqual([1, 2, 3, 4, 5])
   })
+
+  it('applies the limit after dropping unfinished rows when finishedOnly is set', () => {
+    addIterations('a', 3)
+    store.updateIteration('a', 1, 0, { endedAt: 5, endReason: 'settled' })
+    store.updateIteration('a', 2, 0, { endedAt: 6, endReason: 'settled' })
+    expect(store.listIterations('a', { limit: 2, finishedOnly: true }).map((row) => row.n)).toEqual(
+      [1, 2]
+    )
+    expect(store.listIterations('a', { limit: 2 }).map((row) => row.n)).toEqual([2, 3])
+  })
 })
 
 describe('queue', () => {

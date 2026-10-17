@@ -115,7 +115,7 @@ export class LoopService {
   listIterations(loopId: string, opts: { limit?: number } = {}): IterationDetail[] {
     this.getOrThrow(loopId)
     const details: IterationDetail[] = []
-    for (const row of this.deps.store.listIterations(loopId, opts)) {
+    for (const row of this.deps.store.listIterations(loopId, { ...opts, finishedOnly: true })) {
       if (row.endedAt === null || row.endReason === null) {
         continue
       }
