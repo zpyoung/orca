@@ -15,7 +15,7 @@ import { validateLoopCheckHost, type LoopCheckTarget } from './loop-check'
 import { LoopStoreError, type LoopPatch, type StoredLoop } from './loop-database'
 import { LoopDriver, type LoopDriverDeps, type LoopDriverRuntime } from './loop-driver'
 import { isLoopEvaluatorAvailable } from './loop-evaluator'
-import { ensureLoopNotesFile } from './loop-notes-file'
+import { ensureLoopNotesFile, loopNotesPath, type LoopWorkspaceTarget } from './loop-notes-file'
 import type { LoopStore } from './loop-store'
 
 export type LoopServiceRuntime = LoopDriverRuntime & {
@@ -37,6 +37,21 @@ export type LoopServiceDeps = {
 }
 
 type LoopListener = (snapshot: LoopSnapshot) => void
+
+/** Fails when the notes file cannot be written; a failed git-exclude update alone is tolerated. */
+async function ensureNotesFile(workspace: LoopWorkspaceTarget, slug: string): Promise<void> {
+  try {
+    await ensureLoopNotesFile(workspace, slug)
+  } catch (error) {
+    const written = await workspace.fs.stat(loopNotesPath(workspace, slug)).then(
+      () => true,
+      () => false
+    )
+    if (!written) {
+      throw error
+    }
+  }
+}
 
 function fail(code: LoopErrorCode, message: string): never {
   throw new LoopStoreError(code, message)
@@ -163,7 +178,7 @@ export class LoopService {
     let inserted = false
     try {
       const slug = slugFor(input.name, id)
-      await ensureLoopNotesFile(targets.workspace, slug).catch(() => undefined)
+      await ensureNotesFile(targets.workspace, slug)
       // paused until the queue is seeded so a failure here never leaves a persisted running loop
       store.insertLoop({
         id,

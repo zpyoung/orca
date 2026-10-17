@@ -64,6 +64,7 @@ type Options = {
   checkTarget?: LoopCheckTarget
   evaluatorAvailable?: boolean
   hold?: boolean
+  workspace?: Partial<LoopTargets['workspace']>
 }
 
 function createHarness(options: Options = {}) {
@@ -135,7 +136,8 @@ function createHarness(options: Options = {}) {
           throw new Error('missing')
         }
       },
-      runGit: async () => ({ stdout: '.git/info/exclude', stderr: '' })
+      runGit: async () => ({ stdout: '.git/info/exclude', stderr: '' }),
+      ...options.workspace
     }
   }
 
@@ -301,6 +303,66 @@ describe('LoopService.create', () => {
     expect(h.store.listLoops().map((loop) => loop.state)).toEqual(['stopped'])
     expect(h.observeIteration).not.toHaveBeenCalled()
     expect(h.snapshots).toEqual([])
+  })
+
+  it('fails creation, closes the terminal, and persists nothing when the notes file cannot be written', async () => {
+    const files = new Map<string, string>()
+    const h = createHarness({
+      hold: true,
+      workspace: {
+        fs: {
+          readFile: async (path) => ({ content: files.get(path) ?? '', isBinary: false }),
+          writeFile: async () => {
+            throw new Error('disk full')
+          },
+          createDir: async () => undefined,
+          deletePath: async () => undefined,
+          stat: async (path) => {
+            if (!files.has(path)) {
+              throw new Error('missing')
+            }
+            return { size: 0, type: 'file', mtime: 0, mtimeMs: 0 }
+          }
+        }
+      }
+    })
+
+    await expect(h.service.create(INPUT)).rejects.toThrow('disk full')
+
+    expect(h.runtime.closeTerminalTab).toHaveBeenCalledWith('term-1')
+    expect(h.store.listLoops()).toEqual([])
+    expect(h.snapshots).toEqual([])
+  })
+
+  it('still creates the loop when only the git exclude update fails', async () => {
+    const files = new Map<string, string>()
+    const h = createHarness({
+      hold: true,
+      workspace: {
+        fs: {
+          readFile: async (path) => ({ content: files.get(path) ?? '', isBinary: false }),
+          writeFile: async (path, content) => {
+            files.set(path, content)
+          },
+          createDir: async () => undefined,
+          deletePath: async () => undefined,
+          stat: async (path) => {
+            if (!files.has(path)) {
+              throw new Error('missing')
+            }
+            return { size: 0, type: 'file', mtime: 0, mtimeMs: 0 }
+          }
+        },
+        runGit: async () => {
+          throw new Error('git unavailable')
+        }
+      }
+    })
+
+    const snapshot = await h.service.create(INPUT)
+
+    expect(snapshot.state).toBe('running')
+    expect([...files.keys()].some((path) => path.endsWith('/notes.md'))).toBe(true)
   })
 
   it('surfaces the original error even when closing the terminal also fails', async () => {
