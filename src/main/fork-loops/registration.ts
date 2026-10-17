@@ -6,6 +6,7 @@ import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import type { Store } from '../persistence'
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRegisteredSshState } from '../ssh/ssh-target-registry'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { parseWslPath } from '../wsl'
 import { resolveWorktreeHostRouting } from '../runtime/worktree-launch-host-repo'
@@ -47,9 +48,15 @@ export function beginLoopsShutdown(service: LoopService | null): Promise<void> {
   return service?.shutdown() ?? Promise.resolve()
 }
 
-async function resolveLoopTargets(
-  runtime: OrcaRuntimeService,
-  store: Store,
+type LoopTargetRuntime = {
+  showManagedWorktree(
+    selector: string
+  ): Promise<{ repoId: string; path: string; hostId?: string | null }>
+}
+
+export async function resolveLoopTargets(
+  runtime: LoopTargetRuntime,
+  store: Pick<Store, 'getRepo' | 'getRepos'>,
   worktreeId: string
 ): Promise<LoopTargets> {
   const worktree = await runtime.showManagedWorktree(`id:${worktreeId}`)
@@ -94,7 +101,12 @@ async function resolveLoopTargets(
   }
   return {
     executionHostId,
-    check: { type: 'ssh', cwd: path, connectionId: host.targetId, remotePlatform: undefined },
+    check: {
+      type: 'ssh',
+      cwd: path,
+      connectionId: host.targetId,
+      remotePlatform: getRegisteredSshState(host.targetId)?.remotePlatform
+    },
     workspace: {
       kind,
       workspacePath: path,
