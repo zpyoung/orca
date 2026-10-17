@@ -102,20 +102,26 @@ function createHarness(options: {
   const checks = [...(options.checks ?? [])]
   let tree = 0
 
+  const launchPane = async (): Promise<RuntimeTerminalCreate> => {
+    state.launches += 1
+    const id = state.launches
+    panes.set(`tab-${id}:leaf-${id}`, { handle: `term-${id}`, ptyId: `pty-${id}` })
+    return {
+      handle: `term-${id}`,
+      tabId: `tab-${id}`,
+      paneKey: `tab-${id}:leaf-${id}`,
+      ptyId: `pty-${id}`,
+      worktreeId: 'wt-1',
+      title: 'Fix tests'
+    }
+  }
+
   const runtime = {
-    launchAgentTerminal: vi.fn(async (): Promise<RuntimeTerminalCreate> => {
-      state.launches += 1
-      const id = state.launches
-      panes.set(`tab-${id}:leaf-${id}`, { handle: `term-${id}`, ptyId: `pty-${id}` })
-      return {
-        handle: `term-${id}`,
-        tabId: `tab-${id}`,
-        paneKey: `tab-${id}:leaf-${id}`,
-        ptyId: `pty-${id}`,
-        worktreeId: 'wt-1',
-        title: 'Fix tests'
-      }
-    }),
+    launchAgentTerminal: vi.fn(launchPane),
+    createTerminal: vi.fn(
+      (_selector: string, _options: { startupAgent: string; rendererBacked?: boolean }) =>
+        launchPane()
+    ),
     closeTerminalTab: vi.fn(async (handle: string) => {
       for (const [key, pane] of panes) {
         if (pane.handle === handle) {
@@ -425,6 +431,18 @@ describe('LoopDriver steer notes and queue', () => {
     expect(h.prompts[1]?.prompt).not.toContain('prefer small diffs')
   })
 
+  it('keeps a steer note pending when the prompt write fails so the retry carries it', async () => {
+    const h = createHarness({})
+    h.store.addSteerNote('loop-1', 'prefer small diffs')
+    h.runtime.sendTerminalAgentPrompt.mockRejectedValueOnce(new Error('write failed'))
+
+    await h.run()
+
+    expect(h.prompts).toHaveLength(1)
+    expect(h.prompts[0]?.prompt).toContain('prefer small diffs')
+    expect(h.store.takePendingSteerNotes('loop-1', 99)).toEqual([])
+  })
+
   it('consumes queue items in order and completes when none is left', async () => {
     const h = createHarness({
       config: { promptSource: { kind: 'queue', repeatQueue: false }, done: {} },
@@ -454,7 +472,12 @@ describe('LoopDriver detached and relaunch', () => {
 
     await h.run()
 
-    expect(h.runtime.launchAgentTerminal).toHaveBeenCalledTimes(1)
+    expect(h.runtime.launchAgentTerminal).not.toHaveBeenCalled()
+    expect(h.runtime.createTerminal).toHaveBeenCalledTimes(1)
+    const [selector, options] = h.runtime.createTerminal.mock.calls[0] ?? []
+    expect(selector).toBe('id:wt-1')
+    expect(options).toMatchObject({ startupAgent: 'claude', title: 'Fix tests' })
+    expect(options).not.toHaveProperty('rendererBacked')
     expect(h.runtime.closeTerminalTab).not.toHaveBeenCalled()
     expect(h.prompts).toHaveLength(1)
     expect(h.prompts[0]?.handle).toBe('term-1')

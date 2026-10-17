@@ -383,7 +383,8 @@ export class LoopDriver {
     ctx.usageBefore = loop.paneKey
       ? await tools.readUsage(loop.paneKey, loop.worktreeId, loop.agent)
       : null
-    const prompt = this.composePrompt(loop, ctx, item)
+    const notes = store.takePendingSteerNotes(this.loopId, n).map((note) => note.body)
+    const prompt = this.composePrompt(loop, ctx, item, notes)
     const sentAt = this.now()
     store.updateIteration(this.loopId, n, attempt, { promptSent: prompt })
     const freshForUsage = !this.sessionUsed
@@ -392,6 +393,9 @@ export class LoopDriver {
         this.now()
       )
     } catch (error) {
+      for (const body of notes) {
+        store.addSteerNote(this.loopId, body)
+      }
       return this.endIteration(ctx, { kind: 'crashed', exitCode: null }, errorMessage(error))
     }
     this.sessionUsed = true
@@ -423,12 +427,16 @@ export class LoopDriver {
     }
   }
 
-  private composePrompt(loop: StoredLoop, ctx: IterationContext, item: QueueItem | null): string {
+  private composePrompt(
+    loop: StoredLoop,
+    ctx: IterationContext,
+    item: QueueItem | null,
+    notes: string[]
+  ): string {
     const { config } = loop
     const history = this.history()
     const body =
       item?.body ?? (config.promptSource.kind === 'repeat' ? config.promptSource.body : '')
-    const notes = this.deps.store.takePendingSteerNotes(this.loopId, ctx.n).map((note) => note.body)
     return composeIterationPrompt({
       loop: config,
       iteration: ctx.n,

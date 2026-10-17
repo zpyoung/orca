@@ -60,6 +60,32 @@ export function resolvePane(runtime: LoopDriverRuntime, paneKey: string | null):
   }
 }
 
+/** Launches through `createTerminal` with no `rendererBacked`, which the runtime builds as a background terminal. */
+function backgroundAgentLauncher(
+  runtime: LoopDriverRuntime
+): AgentRelaunchRuntime['launchAgentTerminal'] {
+  if (!('createTerminal' in runtime) || typeof runtime.createTerminal !== 'function') {
+    return undefined
+  }
+  const create = runtime.createTerminal.bind(runtime)
+  return (worktreeSelector, opts) => {
+    const { model, optionValues, agentArgs } = opts.launchOverrides ?? {}
+    return create(worktreeSelector, {
+      startupAgent: opts.agent,
+      ...(opts.title ? { title: opts.title } : {}),
+      ...(agentArgs !== undefined ? { agentArgs } : {}),
+      ...(model !== undefined || optionValues !== undefined
+        ? {
+            launchPreferences: {
+              ...(model !== undefined ? { model } : {}),
+              ...(optionValues !== undefined ? { optionValues } : {})
+            }
+          }
+        : {})
+    })
+  }
+}
+
 /**
  * Starts a fresh agent for the loop and closes `previous`. A close that fails after the new tab
  * launched is reported in `closeError` instead of failing, so the loop still binds the new tab.
@@ -72,7 +98,9 @@ export async function relaunchLoopAgent(
   let closeError: string | null = null
   const close = runtime.closeTerminalTab?.bind(runtime)
   const wrapped: AgentRelaunchRuntime = {
-    launchAgentTerminal: runtime.launchAgentTerminal?.bind(runtime),
+    launchAgentTerminal: loop.detached
+      ? backgroundAgentLauncher(runtime)
+      : runtime.launchAgentTerminal?.bind(runtime),
     closeTerminalTab: close
       ? async (handle) => {
           try {
