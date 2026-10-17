@@ -105,10 +105,12 @@
           "title": "イテレーション {{n}}"
         },
         "edit": {
-          "maxCost": "コスト上限 (USD)",
-          "maxIterations": "最大イテレーション数",
-          "maxMinutes": "最大稼働時間（分）",
+          "errorName": "名前を入力してください。",
+          "errorPrompt": "プロンプトを入力してください。",
           "name": "名前",
+          "pacing": "実行間隔",
+          "pacingInterval": "一定間隔で実行",
+          "pacingOnIdle": "Agent がアイドルになり次第",
           "save": "保存"
         },
         "endReason": {

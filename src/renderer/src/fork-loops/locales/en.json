@@ -105,10 +105,12 @@
           "title": "Iteration {{n}}"
         },
         "edit": {
-          "maxCost": "Max cost (USD)",
-          "maxIterations": "Max iterations",
-          "maxMinutes": "Max active minutes",
+          "errorName": "Enter a name.",
+          "errorPrompt": "Enter a prompt.",
           "name": "Name",
+          "pacing": "Pacing",
+          "pacingInterval": "On an interval",
+          "pacingOnIdle": "As soon as the agent is idle",
           "save": "Save"
         },
         "endReason": {

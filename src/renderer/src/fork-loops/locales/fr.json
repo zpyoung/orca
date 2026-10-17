@@ -105,10 +105,12 @@
           "title": "Itération {{n}}"
         },
         "edit": {
-          "maxCost": "Coût maximal (USD)",
-          "maxIterations": "Nombre maximal d’itérations",
-          "maxMinutes": "Minutes actives maximales",
+          "errorName": "Saisissez un nom.",
+          "errorPrompt": "Saisissez un prompt.",
           "name": "Nom",
+          "pacing": "Cadence",
+          "pacingInterval": "À intervalle régulier",
+          "pacingOnIdle": "Dès que l’agent est inactif",
           "save": "Enregistrer"
         },
         "endReason": {

@@ -1,13 +1,12 @@
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import type { LoopsApi } from '../../../shared/fork-loops/api'
-import type { IterationSummary, LoopCaps, LoopSnapshot } from '../../../shared/fork-loops/loop-types'
+import type { IterationSummary, LoopSnapshot } from '../../../shared/fork-loops/loop-types'
+import { LoopEditForm } from './LoopEditForm'
 import { LoopIterationDetail, LoopResumeWithMoreIterations } from './LoopIterationDetail'
 import { LoopQueueEditor } from './LoopQueueEditor'
 import {
@@ -32,102 +31,6 @@ const RAIL_BASE =
 const RAIL_PLACEMENT: Record<LoopRailPlacement, string> = {
   side: 'absolute inset-y-0 right-0 w-80 border-l border-border',
   bottom: 'absolute inset-x-0 bottom-0 h-72 border-t border-border'
-}
-
-function LoopEditForm({
-  loop,
-  busy,
-  onSave,
-  onCancel
-}: {
-  loop: LoopSnapshot
-  busy: boolean
-  onSave: (patch: { name: string; caps: LoopCaps }) => void
-  onCancel: () => void
-}): React.JSX.Element {
-  const idPrefix = useId()
-  const [name, setName] = useState(loop.name)
-  const [maxIterations, setMaxIterations] = useState(String(loop.config.caps.maxIterations ?? ''))
-  const [maxMinutes, setMaxMinutes] = useState(String(loop.config.caps.maxActiveMinutes ?? ''))
-  const [maxCost, setMaxCost] = useState(String(loop.config.caps.maxCostUsd ?? ''))
-
-  const parsedIterations = maxIterations.trim() === '' ? undefined : Number(maxIterations)
-  const parsedMinutes = maxMinutes.trim() === '' ? undefined : Number(maxMinutes)
-  const parsedCost = maxCost.trim() === '' ? undefined : Number(maxCost)
-  const invalid =
-    name.trim() === '' ||
-    (parsedIterations !== undefined &&
-      !(Number.isInteger(parsedIterations) && parsedIterations >= 1)) ||
-    (parsedMinutes !== undefined && !(Number.isInteger(parsedMinutes) && parsedMinutes >= 1)) ||
-    (parsedCost !== undefined && !(parsedCost > 0))
-
-  return (
-    <form
-      className="space-y-2"
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (invalid) {
-          return
-        }
-        onSave({
-          name: name.trim(),
-          caps: {
-            ...(parsedIterations === undefined ? {} : { maxIterations: parsedIterations }),
-            ...(parsedMinutes === undefined ? {} : { maxActiveMinutes: parsedMinutes }),
-            ...(parsedCost === undefined ? {} : { maxCostUsd: parsedCost })
-          }
-        })
-      }}
-    >
-      <div className="space-y-1">
-        <Label htmlFor={`${idPrefix}-name`}>{translate('fork.loops.rail.edit.name', 'Name')}</Label>
-        <Input id={`${idPrefix}-name`} value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor={`${idPrefix}-iterations`}>
-          {translate('fork.loops.rail.edit.maxIterations', 'Max iterations')}
-        </Label>
-        <Input
-          id={`${idPrefix}-iterations`}
-          inputMode="numeric"
-          value={maxIterations}
-          onChange={(e) => setMaxIterations(e.target.value)}
-        />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor={`${idPrefix}-minutes`}>
-          {translate('fork.loops.rail.edit.maxMinutes', 'Max active minutes')}
-        </Label>
-        <Input
-          id={`${idPrefix}-minutes`}
-          inputMode="numeric"
-          value={maxMinutes}
-          onChange={(e) => setMaxMinutes(e.target.value)}
-        />
-      </div>
-      {loop.costUsd === undefined && loop.config.caps.maxCostUsd === undefined ? null : (
-        <div className="space-y-1">
-          <Label htmlFor={`${idPrefix}-cost`}>
-            {translate('fork.loops.rail.edit.maxCost', 'Max cost (USD)')}
-          </Label>
-          <Input
-            id={`${idPrefix}-cost`}
-            inputMode="decimal"
-            value={maxCost}
-            onChange={(e) => setMaxCost(e.target.value)}
-          />
-        </div>
-      )}
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={busy || invalid}>
-          {translate('fork.loops.rail.edit.save', 'Save')}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-          {translate('fork.loops.rail.action.cancel', 'Cancel')}
-        </Button>
-      </div>
-    </form>
-  )
 }
 
 function LoopRailPanel({

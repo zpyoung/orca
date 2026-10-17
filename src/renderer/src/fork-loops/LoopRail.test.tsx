@@ -159,6 +159,35 @@ describe('LoopRail', () => {
     expect(api.pause).toHaveBeenCalledWith('loop-1', 'after-iteration')
   })
 
+  it('lets Edit change the prompt, pacing, done signal, and options, not only name and caps', async () => {
+    const api = installApi()
+    seed(makeLoop())
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getByLabelText('Prompt')).toHaveValue('keep going')
+    expect(screen.getByText('Pacing')).toBeInTheDocument()
+    expect(screen.getByText('Session')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }))
+    expect(screen.getByLabelText('Done check command')).toBeInTheDocument()
+    expect(screen.getByLabelText('Protected paths')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'ship it' } })
+    fireEvent.change(screen.getByLabelText('Done check command'), {
+      target: { value: 'pnpm test' }
+    })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ask before each new iteration' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    })
+
+    expect(api.edit).toHaveBeenCalledWith('loop-1', {
+      promptSource: { kind: 'repeat', body: 'ship it' },
+      done: { check: { command: 'pnpm test', timeoutSeconds: 300, runWhen: 'every-iteration' } },
+      askBeforeNext: true
+    })
+  })
+
   it('offers both stop modes and sends the chosen one', async () => {
     const api = installApi()
     seed(makeLoop())

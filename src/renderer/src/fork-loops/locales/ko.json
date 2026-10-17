@@ -105,10 +105,12 @@
           "title": "반복 {{n}}"
         },
         "edit": {
-          "maxCost": "최대 비용 (USD)",
-          "maxIterations": "최대 반복 횟수",
-          "maxMinutes": "최대 활성 시간(분)",
+          "errorName": "이름을 입력하세요.",
+          "errorPrompt": "프롬프트를 입력하세요.",
           "name": "이름",
+          "pacing": "실행 간격",
+          "pacingInterval": "일정 간격으로",
+          "pacingOnIdle": "에이전트가 유휴 상태가 되는 즉시",
           "save": "저장"
         },
         "endReason": {
