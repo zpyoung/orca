@@ -29,6 +29,7 @@ import type { TerminalPaneController } from './use-terminal-pane-controller'
 import { useAppStore } from '@/store'
 import { isTerminalPaneOnClient } from './terminal-pane-client-host'
 import { useTerminalPaneDockSurface } from './fork-terminal-dock/use-terminal-pane-dock-surface'
+import { useTerminalPaneLoopRail } from '@/fork-loops/use-terminal-pane-loop-rail'
 
 export function TerminalPaneSurface({
   controller
@@ -122,6 +123,7 @@ export function TerminalPaneSurface({
   const paneOnClient = useAppStore((state) => isTerminalPaneOnClient(state, worktreeId))
   const { dockMounts, contextMenuProps: terminalDockMenuProps } =
     useTerminalPaneDockSurface(controller)
+  const loopRail = useTerminalPaneLoopRail(controller)
 
   return (
     <>
@@ -251,6 +253,7 @@ export function TerminalPaneSurface({
       />
       <TerminalPaneNativeChatPortal controller={controller} />
       {dockMounts}
+      {loopRail}
       <TerminalContextMenu
         {...terminalDockMenuProps}
         open={contextMenu.open}
