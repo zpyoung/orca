@@ -149,6 +149,23 @@ describe('iteration observer with hook rows', () => {
     })
   })
 
+  it('holds the no-busy-edge settle while the user is typing and releases it once they are idle', async () => {
+    const h = hooked()
+    h.inputAttribution.userInputSince.mockReturnValue(true)
+    h.inputAttribution.userIdleFor.mockReturnValue(false)
+    let settled = false
+    const result = h.observe().then((value) => {
+      settled = true
+      return value
+    })
+    await advance(ITERATION_NO_BUSY_EDGE_SETTLE_MS + 5_000)
+
+    expect(settled).toBe(false)
+    h.inputAttribution.userIdleFor.mockReturnValue(true)
+    await advance(1_000)
+    await expect(result).resolves.toMatchObject({ kind: 'settled' })
+  })
+
   it('treats a turn that started after the send as a busy edge even when the working row was folded away', async () => {
     const h = hooked()
     const result = h.observe()
