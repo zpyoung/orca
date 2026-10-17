@@ -51,8 +51,8 @@ import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-h
 import { createStructuredSessionLaunchDirectorySlice } from './structured-session-launch-directories'
 import { createAsksSlice } from './fork-ask-question-tool/asks'
 import { createLedgerSlice } from './ledger'
-import { createHeimdallFleetSlice } from './fork-heimdall/fleet'
 import { createLoopsSlice } from '@/fork-loops/loops-slice'
+import { createHeimdallFleetSlice } from './fork-heimdall/fleet'
 import '@/i18n/i18n'
 import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
 export { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
@@ -114,8 +114,8 @@ export function createTestStore() {
     ...createStructuredSessionLaunchDirectorySlice(...a),
     ...createLedgerSlice(...a),
     ...createAsksSlice(...a),
-    ...createHeimdallFleetSlice(...a),
-    ...createLoopsSlice(...a)
+    ...createLoopsSlice(...a),
+    ...createHeimdallFleetSlice(...a)
   }))
 }
 
