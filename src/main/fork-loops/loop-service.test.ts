@@ -487,6 +487,56 @@ describe('LoopService.start reconcile', () => {
   })
 })
 
+describe('LoopService iteration retention', () => {
+  function seedIterations(h: ReturnType<typeof createHarness>, loopId: string, count: number) {
+    for (let n = 1; n <= count; n += 1) {
+      h.store.insertIteration(loopId, { n, attempt: 0, promptSent: 'p', startedAt: n })
+    }
+  }
+
+  it('trims loops that ended before this process when the service starts', () => {
+    const h = createHarness()
+    h.seed({ id: 'loop-done', state: 'completed', pauseReason: undefined })
+    h.seed({ id: 'loop-open', slug: 'open-1', state: 'paused' })
+    seedIterations(h, 'loop-done', 201)
+    seedIterations(h, 'loop-open', 201)
+
+    h.service.start()
+
+    expect(h.store.listIterations('loop-done')).toHaveLength(200)
+    expect(h.store.listIterations('loop-open')).toHaveLength(201)
+  })
+
+  it('trims a loop when it reaches an ended state', async () => {
+    const h = createHarness()
+    h.seed({ state: 'paused' })
+    seedIterations(h, 'loop-seed', 201)
+    h.service.start()
+    expect(h.store.listIterations('loop-seed')).toHaveLength(201)
+
+    await h.service.stop('loop-seed', 'now')
+
+    expect(h.store.getLoop('loop-seed')?.state).toBe('stopped')
+    expect(h.store.listIterations('loop-seed')).toHaveLength(200)
+  })
+
+  it('logs and ignores a failed prune', async () => {
+    const h = createHarness()
+    h.seed({ state: 'paused' })
+    vi.spyOn(h.store, 'pruneEndedLoopIterations').mockImplementation(() => {
+      throw new Error('disk full')
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    expect(() => h.service.start()).not.toThrow()
+    const stopped = await h.service.stop('loop-seed', 'now')
+
+    expect(stopped.state).toBe('stopped')
+    expect(warn).toHaveBeenCalledWith('[loops] iteration retention failed:', expect.any(Error))
+    warn.mockRestore()
+  })
+})
+
 describe('LoopService transitions', () => {
   it('emits exactly one change per mutation on a paused loop', async () => {
     const h = createHarness()

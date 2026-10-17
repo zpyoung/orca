@@ -79,6 +79,7 @@ export class LoopService {
   private readonly drivers = new Map<string, LoopDriver>()
   private readonly listeners = new Set<LoopListener>()
   private started = false
+  private readonly pruned = new Set<string>()
 
   constructor(private readonly deps: LoopServiceDeps) {}
 
@@ -89,6 +90,7 @@ export class LoopService {
     }
     this.started = true
     const { store } = this.deps
+    this.pruneEndedIterations()
     const endedAt = this.now()
     for (const loop of store.listLoops()) {
       if (loop.state !== 'running' && loop.state !== 'needs-you') {
@@ -377,6 +379,14 @@ export class LoopService {
     }
   }
 
+  private pruneEndedIterations(): void {
+    try {
+      this.deps.store.pruneEndedLoopIterations()
+    } catch (error) {
+      console.warn('[loops] iteration retention failed:', error)
+    }
+  }
+
   private driverFor(loopId: string): LoopDriver {
     let driver = this.drivers.get(loopId)
     if (!driver) {
@@ -399,6 +409,10 @@ export class LoopService {
     const snapshot = this.snapshot(loop, warnings)
     if (isEnded(loop)) {
       this.drivers.delete(loopId)
+      if (!this.pruned.has(loopId)) {
+        this.pruned.add(loopId)
+        this.pruneEndedIterations()
+      }
     }
     for (const listener of this.listeners) {
       try {

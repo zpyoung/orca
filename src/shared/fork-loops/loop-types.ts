@@ -211,6 +211,10 @@ export const LoopCreateInputSchema = z
     queueItems: z.array(z.string().min(1)).optional()
   })
   .strict()
+  .refine(
+    (input) => input.config.promptSource.kind !== 'queue' || (input.queueItems?.length ?? 0) > 0,
+    { message: 'A queue loop needs at least one queue item', path: ['queueItems'] }
+  )
 export type LoopCreateInput = Omit<z.infer<typeof LoopCreateInputSchema>, 'agent'> & {
   agent: TuiAgent
 }
