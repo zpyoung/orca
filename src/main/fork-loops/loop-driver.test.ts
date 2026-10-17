@@ -966,8 +966,8 @@ describe('LoopDriver checkpoint commits', () => {
     await h.run()
 
     expect(h.gitCalls).toEqual([
-      ['add', '-A', '--', '.', ':(exclude).orca/loops'],
-      ['commit', '-m', 'loop(Fix tests): iteration 1'],
+      ['add', '-A', '--', ':(top,literal)src/app.ts'],
+      ['commit', '--only', '-m', 'loop(Fix tests): iteration 1', '--', ':(top,literal)src/app.ts'],
       ['rev-parse', 'HEAD']
     ])
     expect(h.store.listIterations('loop-1')[0]?.checkpointCommit).toBe('abc123')
