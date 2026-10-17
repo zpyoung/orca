@@ -7,7 +7,7 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import type { LoopsApi } from '../../../shared/fork-loops/api'
-import type { IterationSummary, LoopSnapshot } from '../../../shared/fork-loops/loop-types'
+import type { IterationSummary, LoopCaps, LoopSnapshot } from '../../../shared/fork-loops/loop-types'
 import { LoopIterationDetail, LoopResumeWithMoreIterations } from './LoopIterationDetail'
 import { LoopQueueEditor } from './LoopQueueEditor'
 import {
