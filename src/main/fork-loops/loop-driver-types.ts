@@ -7,7 +7,11 @@ import type {
   UsageTotals
 } from '../../shared/fork-loops/loop-types'
 import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
-import type { RuntimeTerminalWait } from '../../shared/runtime-terminal-contracts'
+import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import type {
+  RuntimeTerminalCreate,
+  RuntimeTerminalWait
+} from '../../shared/runtime-terminal-contracts'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { AgentRelaunchRuntime } from './agent-session-relaunch'
 import type { InputAttribution } from './input-attribution'
@@ -27,6 +31,15 @@ export type LoopTargets = {
 
 /** The runtime surface a driver uses; every member is optional so partial doubles stay valid. */
 export type LoopDriverRuntime = AgentRelaunchRuntime & {
+  createTerminal?(
+    worktreeSelector: string,
+    opts: {
+      startupAgent: TuiAgent
+      title?: string
+      agentArgs?: string | null
+      launchPreferences?: AgentLaunchPreferences
+    }
+  ): Promise<RuntimeTerminalCreate>
   sendTerminalAgentPrompt?(
     handle: string,
     prompt: string,
