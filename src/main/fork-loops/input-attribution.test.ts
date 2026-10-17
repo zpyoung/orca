@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createInputAttribution,
-  LOOP_USER_IDLE_MS,
-  LOOP_WRITE_ATTRIBUTION_SLACK_MS
-} from './input-attribution'
+import { createInputAttribution, LOOP_USER_IDLE_MS } from './input-attribution'
 
 function runtimeWithInput(initial: number | null = null) {
   const state = { lastInputAt: initial }
@@ -32,30 +28,31 @@ describe('createInputAttribution', () => {
     expect(attribution.userInputSince('pty-1', 9_000)).toBe(false)
   })
 
-  it('still attributes input within the slack after the write settled', () => {
+  it('attributes input stamped exactly at the write settle to the loop', () => {
     const { state, runtime } = runtimeWithInput()
     const { time, now } = clock(10_000)
     const attribution = createInputAttribution(runtime, { now })
 
     attribution.noteLoopWrite('pty-1', 10_000)
     attribution.noteLoopWrite('pty-1', 10_400)
-    state.lastInputAt = 10_400 + LOOP_WRITE_ATTRIBUTION_SLACK_MS
+    state.lastInputAt = 10_400
     time.now = 13_000
 
     expect(attribution.userInputSince('pty-1', 9_000)).toBe(false)
   })
 
-  it('treats input after the slack as the user', () => {
+  it('treats a keystroke 1 ms after the closed window as the user', () => {
     const { state, runtime } = runtimeWithInput()
     const { time, now } = clock(10_000)
     const attribution = createInputAttribution(runtime, { now })
 
     attribution.noteLoopWrite('pty-1', 10_000)
     attribution.noteLoopWrite('pty-1', 10_400)
-    state.lastInputAt = 10_400 + LOOP_WRITE_ATTRIBUTION_SLACK_MS + 1
+    state.lastInputAt = 10_401
     time.now = 13_000
 
     expect(attribution.userInputSince('pty-1', 9_000)).toBe(true)
+    expect(attribution.userIdleFor('pty-1', LOOP_USER_IDLE_MS)).toBe(false)
   })
 
   it('does not count user input older than the since bound', () => {

@@ -1,6 +1,6 @@
 import type { AutomationPrecheckResult } from '../../shared/automations-types'
 import type { CheckOutcome, LoopConfig } from '../../shared/fork-loops/loop-types'
-import { runAutomationPrecheck } from '../automations/precheck-runner'
+import { PRECHECK_ABORTED_ERROR, runAutomationPrecheck } from './loop-precheck-runner'
 
 export const LOOP_CHECK_DEFAULT_TIMEOUT_SECONDS = 300
 export const LOOP_CHECK_MAX_TIMEOUT_SECONDS = 600
@@ -20,6 +20,7 @@ export type LoopCheckDeps = {
   runPrecheck: (args: {
     precheck: { command: string; timeoutSeconds: number }
     target: { type: 'local'; cwd: string } | { type: 'ssh'; cwd: string; connectionId: string }
+    signal?: AbortSignal
   }) => Promise<AutomationPrecheckResult>
 }
 
@@ -46,23 +47,7 @@ function clampTimeoutSeconds(value: number): number {
   return Math.min(Math.floor(value), LOOP_CHECK_MAX_TIMEOUT_SECONDS)
 }
 
-const ABORTED = Symbol('aborted')
-export const CHECK_ABORTED = 'aborted'
-
-// the precheck runner has no cancel hook, so an aborted check stops being awaited and its process runs out its own timeout
-function raceAbort<T>(
-  work: Promise<T>,
-  signal: AbortSignal | undefined
-): Promise<T | typeof ABORTED> {
-  if (!signal) {
-    return work
-  }
-  return new Promise((resolve, reject) => {
-    const onAbort = (): void => resolve(ABORTED)
-    signal.addEventListener('abort', onAbort, { once: true })
-    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort))
-  })
-}
+export const CHECK_ABORTED = PRECHECK_ABORTED_ERROR
 
 function notRun(error: string): CheckOutcome {
   return {
@@ -103,17 +88,15 @@ export async function runLoopCheck(
       target.type === 'ssh'
         ? { type: 'ssh' as const, cwd: target.cwd, connectionId: target.connectionId }
         : target
-    const result = await raceAbort(
-      deps.runPrecheck({
-        precheck: {
-          command: check.command,
-          timeoutSeconds: clampTimeoutSeconds(check.timeoutSeconds)
-        },
-        target: executionTarget
-      }),
+    const result = await deps.runPrecheck({
+      precheck: {
+        command: check.command,
+        timeoutSeconds: clampTimeoutSeconds(check.timeoutSeconds)
+      },
+      target: executionTarget,
       signal
-    )
-    if (result === ABORTED) {
+    })
+    if (signal?.aborted) {
       return notRun(CHECK_ABORTED)
     }
     const started = result.timedOut || result.exitCode !== null || result.error === null

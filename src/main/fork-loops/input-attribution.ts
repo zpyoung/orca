@@ -1,4 +1,3 @@
-export const LOOP_WRITE_ATTRIBUTION_SLACK_MS = 1500
 export const LOOP_USER_IDLE_MS = 20000
 
 // a write whose settle note never arrives must not swallow the user's typing forever
@@ -70,7 +69,7 @@ export function createInputAttribution(
           ? sampledAt - window.start < LOOP_WRITE_OPEN_WINDOW_MAX_MS
             ? Number.POSITIVE_INFINITY
             : window.start
-          : window.end + LOOP_WRITE_ATTRIBUTION_SLACK_MS
+          : window.end
       return at >= window.start && at <= end
     })
 
