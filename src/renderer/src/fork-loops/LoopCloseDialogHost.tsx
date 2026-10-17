@@ -40,10 +40,10 @@ export function LoopCloseDialogHost(): React.JSX.Element | null {
     >
       <DialogContent className="max-w-sm" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle className="text-sm">
+          <DialogTitle>
             {translate('fork.loops.status.close.title', 'Close a running loop?')}
           </DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogDescription>
             {translate(
               'fork.loops.status.close.description',
               'This tab runs the loop "{{name}}". Keep it running in the background, or stop it now.',
@@ -51,7 +51,7 @@ export function LoopCloseDialogHost(): React.JSX.Element | null {
             )}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="gap-2">
+        <DialogFooter>
           <Button
             type="button"
             variant="outline"
