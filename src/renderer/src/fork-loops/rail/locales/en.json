@@ -1,1 +1,131 @@
-{}
+{
+  "action": {
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "pause": "Pause",
+    "resume": "Resume",
+    "steer": "Steer…",
+    "stop": "Stop"
+  },
+  "actionFailed": "That did not go through. Try again.",
+  "badge": {
+    "fail": "Fail",
+    "none": "No check",
+    "pass": "Pass"
+  },
+  "check": {
+    "failed": "Check failed",
+    "none": "No check",
+    "passed": "Check passed"
+  },
+  "detail": {
+    "added": "{{value}} added",
+    "back": "Back",
+    "changes": "Changes",
+    "check": "Done check",
+    "cost": "Cost",
+    "duration": "Duration",
+    "evaluator": "Evaluator",
+    "evaluatorMet": "Condition met",
+    "evaluatorNotMet": "Condition not met",
+    "noChanges": "Not measured",
+    "outcome": "Outcome",
+    "removed": "{{value}} removed",
+    "title": "Iteration {{n}}"
+  },
+  "edit": {
+    "maxCost": "Max cost (USD)",
+    "maxIterations": "Max iterations",
+    "maxMinutes": "Max active minutes",
+    "name": "Name",
+    "save": "Save"
+  },
+  "endReason": {
+    "crashed": "Agent crashed",
+    "interrupted": "Interrupted",
+    "running": "In progress",
+    "settled": "Finished",
+    "stopped": "Stopped"
+  },
+  "iteration": {
+    "current": "Iteration {{n}}",
+    "currentOfMax": "Iteration {{n}} of {{max}}",
+    "done": "{{n}} iterations done",
+    "doneOfMax": "{{n}} of {{max}} iterations done"
+  },
+  "iterations": {
+    "empty": "No iterations finished yet",
+    "title": "Iterations"
+  },
+  "label": "Loop",
+  "lastCheck": {
+    "failed": "Failed in iteration {{n}}",
+    "passed": "Passed in iteration {{n}}",
+    "title": "Last check"
+  },
+  "meter": {
+    "cost": "Cost",
+    "ofCap": "{{spent}} of {{cap}}",
+    "time": "Time"
+  },
+  "pause": {
+    "agentBlocked": "The agent is blocked",
+    "agentDecide": "The agent needs a decision",
+    "askBeforeNext": "Waiting for your go-ahead",
+    "capCost": "Cost cap reached",
+    "capIterations": "Iteration cap reached",
+    "capTime": "Time cap reached",
+    "crashed": "The agent kept crashing",
+    "interruptedByRestart": "Interrupted by an app restart",
+    "noProgress": "No progress in recent iterations",
+    "protectedPath": "Touched a protected path",
+    "queueExhausted": "The queue is empty",
+    "unverifiable": "Lost contact with the agent host",
+    "usageLimit": "Agent usage limit reached",
+    "user": "Paused by you"
+  },
+  "phase": {
+    "checking": "Running the done check",
+    "evaluating": "Evaluating the result",
+    "needsYou": "Waiting on you",
+    "relaunching": "Restarting the agent",
+    "sending": "Sending the prompt",
+    "waiting": "Waiting for the next iteration",
+    "working": "Agent working"
+  },
+  "preset": {
+    "interval": "Every {{minutes}} min",
+    "queue": "Work through a queue",
+    "untilDone": "Until done"
+  },
+  "question": {
+    "blocked": "Blocked",
+    "decide": "Decision needed"
+  },
+  "resume": {
+    "addLabel": "Iterations to add",
+    "iterations": "iterations"
+  },
+  "state": {
+    "completed": "Completed",
+    "needsYou": "Needs you",
+    "paused": "Paused",
+    "running": "Running",
+    "stopped": "Stopped"
+  },
+  "steer": {
+    "label": "Steering note",
+    "placeholder": "Guidance for the next iteration",
+    "send": "Send"
+  },
+  "stop": {
+    "afterIteration": "After this iteration",
+    "now": "Now",
+    "prompt": "Stop the loop"
+  },
+  "strip": {
+    "label": "Loop status",
+    "sessionFresh": "fresh session",
+    "sessionContinued": "continued session"
+  }
+}

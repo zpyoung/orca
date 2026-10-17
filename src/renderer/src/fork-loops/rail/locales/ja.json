@@ -1,1 +1,131 @@
-{}
+{
+  "action": {
+    "cancel": "キャンセル",
+    "edit": "編集",
+    "pause": "一時停止",
+    "resume": "再開",
+    "steer": "指示する…",
+    "stop": "停止"
+  },
+  "actionFailed": "操作を完了できませんでした。もう一度お試しください。",
+  "badge": {
+    "fail": "失敗",
+    "none": "チェックなし",
+    "pass": "成功"
+  },
+  "check": {
+    "failed": "チェック失敗",
+    "none": "チェックなし",
+    "passed": "チェック成功"
+  },
+  "detail": {
+    "added": "{{value}} 追加",
+    "back": "戻る",
+    "changes": "変更",
+    "check": "完了チェック",
+    "cost": "コスト",
+    "duration": "所要時間",
+    "evaluator": "評価",
+    "evaluatorMet": "条件を満たした",
+    "evaluatorNotMet": "条件を満たしていない",
+    "noChanges": "未計測",
+    "outcome": "結果",
+    "removed": "{{value}} 削除",
+    "title": "イテレーション {{n}}"
+  },
+  "edit": {
+    "maxCost": "コスト上限 (USD)",
+    "maxIterations": "最大イテレーション数",
+    "maxMinutes": "最大稼働時間（分）",
+    "name": "名前",
+    "save": "保存"
+  },
+  "endReason": {
+    "crashed": "エージェントがクラッシュ",
+    "interrupted": "中断",
+    "running": "実行中",
+    "settled": "完了",
+    "stopped": "停止"
+  },
+  "iteration": {
+    "current": "イテレーション {{n}}",
+    "currentOfMax": "イテレーション {{n}} / {{max}}",
+    "done": "{{n}} 回のイテレーションが完了",
+    "doneOfMax": "{{max}} 回中 {{n}} 回のイテレーションが完了"
+  },
+  "iterations": {
+    "empty": "完了したイテレーションはまだありません",
+    "title": "イテレーション"
+  },
+  "label": "ループ",
+  "lastCheck": {
+    "failed": "イテレーション {{n}} で失敗",
+    "passed": "イテレーション {{n}} で成功",
+    "title": "直近のチェック"
+  },
+  "meter": {
+    "cost": "コスト",
+    "ofCap": "{{spent}} / {{cap}}",
+    "time": "時間"
+  },
+  "pause": {
+    "agentBlocked": "エージェントがブロックされています",
+    "agentDecide": "エージェントが判断を求めています",
+    "askBeforeNext": "続行の承認待ち",
+    "capCost": "コスト上限に達しました",
+    "capIterations": "イテレーション上限に達しました",
+    "capTime": "時間上限に達しました",
+    "crashed": "エージェントがクラッシュし続けました",
+    "interruptedByRestart": "アプリの再起動により中断されました",
+    "noProgress": "直近のイテレーションで進捗がありません",
+    "protectedPath": "保護されたパスに変更がありました",
+    "queueExhausted": "キューが空です",
+    "unverifiable": "エージェントのホストとの接続が失われました",
+    "usageLimit": "エージェントの利用上限に達しました",
+    "user": "ユーザーが一時停止しました"
+  },
+  "phase": {
+    "checking": "完了チェックを実行中",
+    "evaluating": "結果を評価中",
+    "needsYou": "あなたの対応待ち",
+    "relaunching": "エージェントを再起動中",
+    "sending": "プロンプトを送信中",
+    "waiting": "次のイテレーションを待機中",
+    "working": "エージェントが作業中"
+  },
+  "preset": {
+    "interval": "{{minutes}} 分ごと",
+    "queue": "キューを順に処理",
+    "untilDone": "完了するまで"
+  },
+  "question": {
+    "blocked": "ブロック中",
+    "decide": "判断が必要です"
+  },
+  "resume": {
+    "addLabel": "追加するイテレーション数",
+    "iterations": "イテレーション"
+  },
+  "state": {
+    "completed": "完了",
+    "needsYou": "対応が必要",
+    "paused": "一時停止中",
+    "running": "実行中",
+    "stopped": "停止"
+  },
+  "steer": {
+    "label": "指示メモ",
+    "placeholder": "次のイテレーションへの指示",
+    "send": "送信"
+  },
+  "stop": {
+    "afterIteration": "このイテレーションの後",
+    "now": "今すぐ",
+    "prompt": "ループを停止"
+  },
+  "strip": {
+    "label": "ループの状態",
+    "sessionFresh": "新規セッション",
+    "sessionContinued": "継続セッション"
+  }
+}
