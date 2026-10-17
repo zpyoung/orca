@@ -288,7 +288,7 @@ describe('gatherIterationEvidence checkpoint commits', () => {
     })
   }
 
-  it('never stages the loop directory, so a failed exclude-file write cannot leak notes', async () => {
+  it('stages and commits only the iteration paths, as top-relative literal pathspecs', async () => {
     const calls: string[][] = []
     const runGit: LoopGitRunner = async (args) => {
       calls.push(args)
@@ -297,10 +297,24 @@ describe('gatherIterationEvidence checkpoint commits', () => {
 
     await gatherWith(
       gitContext(checkpointing(), runGit),
-      commitTools({ added: 1, removed: 0, files: ['a.ts'] })
+      commitTools({ added: 1, removed: 0, files: ['a.ts', '.orca/loops/loop/notes.md', 'b/c.ts'] })
     )
 
-    expect(calls[0]).toEqual(['add', '-A', '--', '.', ':(exclude).orca/loops'])
+    const paths = [':(top,literal)a.ts', ':(top,literal)b/c.ts']
+    expect(calls[0]).toEqual(['add', '-A', '--', ...paths])
+    expect(calls[1]).toEqual(['commit', '--only', '-m', 'loop(loop): iteration 1', '--', ...paths])
+  })
+
+  it('skips the commit when every changed path is a loop file', async () => {
+    const runGit = vi.fn<LoopGitRunner>(async () => ({ stdout: '', stderr: '' }))
+
+    const evidence = await gatherWith(
+      gitContext(checkpointing(), runGit),
+      commitTools({ added: 1, removed: 0, files: ['.orca/loops/loop/notes.md'] })
+    )
+
+    expect(runGit).not.toHaveBeenCalled()
+    expect(evidence.checkpointCommit).toBeNull()
   })
 
   it('does not commit when the diff could not be measured', async () => {
@@ -360,7 +374,7 @@ describe('gatherIterationEvidence checkpoint commits', () => {
       await rm(root, { recursive: true, force: true })
     })
 
-    it('commits the change but leaves untracked loop files out of the commit', async () => {
+    async function openRepository() {
       root = await mkdtemp(join(tmpdir(), 'orca-loop-evidence-'))
       const env: NodeJS.ProcessEnv = {}
       for (const [key, value] of Object.entries(process.env)) {
@@ -374,6 +388,8 @@ describe('gatherIterationEvidence checkpoint commits', () => {
       await runGit(['config', 'user.email', 'loop@example.com'])
       await runGit(['config', 'user.name', 'Loop'])
       await writeFile(join(root, 'tracked.txt'), 'one\n')
+      await writeFile(join(root, 'doomed.txt'), 'bye\n')
+      await writeFile(join(root, 'user.txt'), 'mine\n')
       await runGit(['add', '-A'])
       await runGit(['commit', '-q', '-m', 'initial'])
       const ctx = gitContext(checkpointing(), runGit)
@@ -384,23 +400,70 @@ describe('gatherIterationEvidence checkpoint commits', () => {
         fs: createLocalLoopFilesystem(),
         runGit
       }
-      const before = await snapshotWorkingTree(workspace)
+      return {
+        runGit,
+        before: () => snapshotWorkingTree(workspace),
+        gatherAfter: async (before: Awaited<ReturnType<typeof snapshotWorkingTree>>) =>
+          gatherWith(
+            { ...ctx, before, targets: ctx.targets && { ...ctx.targets, workspace } },
+            {
+              ...toolsWith({ ...FAILED_CHECK, pass: true }),
+              snapshotTree: snapshotWorkingTree,
+              diffTrees: diffSnapshots
+            }
+          )
+      }
+    }
+
+    it('commits the change but leaves untracked loop files out of the commit', async () => {
+      const repo = await openRepository()
+      const before = await repo.before()
       await writeFile(join(root, 'tracked.txt'), 'one\ntwo\n')
       await mkdir(join(root, '.orca', 'loops', 'loop'), { recursive: true })
       await writeFile(join(root, '.orca', 'loops', 'loop', 'notes.md'), 'notes\n')
 
-      const evidence = await gatherWith(
-        { ...ctx, before, targets: ctx.targets && { ...ctx.targets, workspace } },
-        {
-          ...toolsWith({ ...FAILED_CHECK, pass: true }),
-          snapshotTree: snapshotWorkingTree,
-          diffTrees: diffSnapshots
-        }
-      )
+      const evidence = await repo.gatherAfter(before)
 
-      const committed = await runGit(['show', '--name-only', '--format=', 'HEAD'])
+      const committed = await repo.runGit(['show', '--name-only', '--format=', 'HEAD'])
       expect(evidence.checkpointCommit).not.toBeNull()
       expect(committed.stdout.trim().split('\n')).toEqual(['tracked.txt'])
+    })
+
+    it('commits an iteration deletion and new file together', async () => {
+      const repo = await openRepository()
+      const before = await repo.before()
+      await rm(join(root, 'doomed.txt'))
+      await mkdir(join(root, 'sub'), { recursive: true })
+      await writeFile(join(root, 'sub', 'fresh.txt'), 'new\n')
+
+      const evidence = await repo.gatherAfter(before)
+
+      const committed = await repo.runGit(['show', '--name-status', '--format=', 'HEAD'])
+      expect(evidence.checkpointCommit).not.toBeNull()
+      expect(committed.stdout.trim().split('\n').sort()).toEqual([
+        'A\tsub/fresh.txt',
+        'D\tdoomed.txt'
+      ])
+    })
+
+    it('leaves pre-existing untracked and staged user work out of the commit and as it was', async () => {
+      const repo = await openRepository()
+      await writeFile(join(root, 'user.txt'), 'mine\nedited\n')
+      await repo.runGit(['add', 'user.txt'])
+      await writeFile(join(root, 'scratch.out'), 'stray\n')
+      const before = await repo.before()
+      await writeFile(join(root, 'tracked.txt'), 'one\ntwo\n')
+
+      const evidence = await repo.gatherAfter(before)
+
+      const committed = await repo.runGit(['show', '--name-only', '--format=', 'HEAD'])
+      const status = await repo.runGit(['status', '--porcelain'])
+      expect(evidence.checkpointCommit).not.toBeNull()
+      expect(committed.stdout.trim().split('\n')).toEqual(['tracked.txt'])
+      expect(status.stdout.split('\n').filter(Boolean).sort()).toEqual([
+        '?? scratch.out',
+        'M  user.txt'
+      ])
     })
   })
 })
