@@ -281,7 +281,7 @@ describe('iteration observer with hook rows', () => {
 
   it('reports crashed when the pty is verified exited', async () => {
     const h = hooked()
-    h.runtime.getPtyLivenessVerdict.mockReturnValue({ status: 'exited' })
+    h.runtime.getPtyLivenessVerdict?.mockReturnValue({ status: 'exited' })
     h.runtime.waitForTerminal.mockResolvedValue(
       wait({ condition: 'exit', status: 'exited', exitCode: 137 })
     )
@@ -294,7 +294,7 @@ describe('iteration observer with hook rows', () => {
 
   it('never calls an unreachable host crashed', async () => {
     const h = hooked()
-    h.runtime.getPtyLivenessVerdict.mockImplementation(() => {
+    h.runtime.getPtyLivenessVerdict?.mockImplementation(() => {
       throw new Error('ssh relay disconnected')
     })
     const result = h.observe()
