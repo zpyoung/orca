@@ -35,6 +35,7 @@ import { registerWorkspaceShortcutIpcBridge } from './workspace-shortcut-ipc-bri
 import { registerZoomIpcBridge } from './zoom-ipc-bridge'
 import { wireAskIpcEvents } from '@/components/fork-ask-question-tool/wire-ask-ipc-events'
 import { wireHeimdallIpcEvents } from '@/fork-heimdall/wire-heimdall-ipc-events'
+import { wireLoopsIpcEvents } from '@/fork-loops/wire-loops-ipc-events'
 
 function isRuntimeEnvironmentActive(): boolean {
   return Boolean(useAppStore.getState().settings?.activeRuntimeEnvironmentId?.trim())
@@ -62,6 +63,7 @@ export function installAppLifetimeIpcEvents(
   const unsubs: (() => void)[] = []
   unsubs.push(wireAskIpcEvents(useAppStore))
   unsubs.push(wireHeimdallIpcEvents(useAppStore))
+  unsubs.push(wireLoopsIpcEvents(useAppStore))
   const directSshRuntime = createDirectSshBridgeRuntime()
   const backgroundWakeDispatcher = createBackgroundSleepingAgentWakeDispatcher()
   unsubs.push(backgroundWakeDispatcher.dispose)

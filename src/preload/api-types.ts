@@ -1,6 +1,7 @@
 import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
 import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'
 import type { HeimdallApi } from '../shared/fork-heimdall/api'
+import type { LoopsApi } from '../shared/fork-loops/api'
 import type { HostedReviewAgentApi } from '../shared/fork-hosted-review-sitter/api'
 import type {
   ClaudeAccountsApi,
@@ -175,6 +176,7 @@ export type PreloadApi = {
   agentStatus: AgentStatusApi
   asks: AskApi
   heimdall: HeimdallApi
+  loops: LoopsApi
   hostedReviewAgent: HostedReviewAgentApi
   mobile: MobileApi
   speech: SpeechApi
