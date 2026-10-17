@@ -27,10 +27,15 @@ function runtimeDouble() {
   return { calls, launchAgentTerminal, closeTerminalTab }
 }
 
-const baseArgs = {
+const baseArgs: {
+  worktreeId: string
+  previousHandle: string | null
+  agent: 'claude'
+  title: string
+} = {
   worktreeId: 'wt-1',
-  previousHandle: 'term-old' as string | null,
-  agent: 'claude' as const,
+  previousHandle: 'term-old',
+  agent: 'claude',
   title: 'Loop'
 }
 

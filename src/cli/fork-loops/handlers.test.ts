@@ -75,7 +75,7 @@ afterEach(() => {
 })
 
 describe('orca loop capability gate', () => {
-  it.each([
+  it.each<[string, [string, string][]]>([
     [
       'loop create',
       [
@@ -103,18 +103,15 @@ describe('orca loop capability gate', () => {
         ['name', 'renamed']
       ]
     ]
-  ] as [string, [string, string][]][])(
-    '%s throws incompatible_runtime when loops.v1 is missing',
-    async (command, flags) => {
-      primeCapabilities(['something.else'])
+  ])('%s throws incompatible_runtime when loops.v1 is missing', async (command, flags) => {
+    primeCapabilities(['something.else'])
 
-      await expect(LOOP_HANDLERS[command](context(flags))).rejects.toMatchObject({
-        code: 'incompatible_runtime'
-      })
-      expect(callMock).toHaveBeenCalledTimes(1)
-      expect(callMock).toHaveBeenCalledWith('status.get')
-    }
-  )
+    await expect(LOOP_HANDLERS[command](context(flags))).rejects.toMatchObject({
+      code: 'incompatible_runtime'
+    })
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(callMock).toHaveBeenCalledWith('status.get')
+  })
 
   it('treats an absent capabilities list as unsupported', async () => {
     callMock.mockResolvedValueOnce(response({}))
@@ -249,7 +246,7 @@ describe('orca loop create', () => {
     ])
   })
 
-  it.each([
+  it.each<[string, [string, string][]]>([
     ['an until-done loop with no prompt', [['agent', 'claude']]],
     [
       'an interval loop with no --every',
@@ -289,18 +286,15 @@ describe('orca loop create', () => {
         ['max-iterations', '2.5']
       ]
     ]
-  ] as [string, [string, string][]][])(
-    'rejects %s before calling create',
-    async (_label, flags) => {
-      primeCapabilities()
-      callMock.mockResolvedValueOnce(response({ worktree: { id: WORKTREE_ID } }))
+  ])('rejects %s before calling create', async (_label, flags) => {
+    primeCapabilities()
+    callMock.mockResolvedValueOnce(response({ worktree: { id: WORKTREE_ID } }))
 
-      await expect(
-        LOOP_HANDLERS['loop create'](context([['worktree', `id:${WORKTREE_ID}`], ...flags]))
-      ).rejects.toMatchObject({ code: 'invalid_argument' })
-      expect(rpcCalls()).toEqual([])
-    }
-  )
+    await expect(
+      LOOP_HANDLERS['loop create'](context([['worktree', `id:${WORKTREE_ID}`], ...flags]))
+    ).rejects.toMatchObject({ code: 'invalid_argument' })
+    expect(rpcCalls()).toEqual([])
+  })
 
   it('prints the raw response envelope with --json', async () => {
     primeCapabilities()
