@@ -54,7 +54,7 @@ ORCA loop create --agent <agent> [--worktree <selector>] [--name <name>]
 
 ### Choose the done signal
 
-The agent printing `DONE` is only a claim. The loop completes when every configured signal passes:
+The agent printing `LOOP_DONE` on its own line is only a claim. The loop completes when every configured signal passes:
 
 - `--check <command>` runs on the loop's host (exit 0 is a pass). `--check-when on-claim` runs it
   only after the agent claims done; the default runs it after every iteration. `--check-timeout`
@@ -93,7 +93,7 @@ ORCA loop show <loopId> [--json]
 - `list` shows every loop, or one worktree's loops with `--worktree`: id, name, preset, agent,
   status, and iterations against the iteration cap.
 - `show` adds the pause reason and detail, the current iteration phase, the next scheduled
-  iteration, the agent's `BLOCKED` or `DECIDE` question, warnings, and the latest iterations.
+  iteration, the agent's `LOOP_BLOCKED: <reason>` or `LOOP_DECIDE: <question>` message, warnings, and the latest iterations.
 
 Loop status is one of `running`, `needs-you`, `paused: <reason>`, `completed`, `stopped`. Only a
 passing done signal produces `completed`; every other non-user stop is a resumable pause.
