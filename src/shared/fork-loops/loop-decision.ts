@@ -90,7 +90,7 @@ function costUnmeasurable(
   const lastSettled =
     latest?.endReason === 'settled'
       ? latest
-      : history.filter((record) => record.endReason === 'settled').at(-1)
+      : history.findLast((record) => record.endReason === 'settled')
   return lastSettled
     ? lastSettled.costUsd === null
     : state.iterationsCompleted > 0 && state.costUsd === null
