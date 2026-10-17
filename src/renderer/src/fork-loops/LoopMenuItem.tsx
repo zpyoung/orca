@@ -22,7 +22,6 @@ export function LoopMenuItem({
           window.requestAnimationFrame(() => openLoopSetup({ worktreeId, groupId }))
         })
       }}
-      className="gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium"
     >
       <Repeat className="size-4" />
       {translate('fork.loops.setup.menuItem', 'Loop…')}
