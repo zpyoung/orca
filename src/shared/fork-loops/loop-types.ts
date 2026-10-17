@@ -157,6 +157,18 @@ export const LoopSnapshotSchema = z
       .object({ kind: z.enum(['blocked', 'decide']), text: z.string() })
       .strict()
       .optional(),
+    queue: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            position: z.number().int().nonnegative(),
+            body: z.string(),
+            state: z.enum(['pending', 'in-flight', 'done'])
+          })
+          .strict()
+      )
+      .optional(),
     recentIterations: z.array(IterationSummarySchema).max(LOOP_RECENT_ITERATIONS_LIMIT),
     warnings: z.array(z.string()).optional()
   })

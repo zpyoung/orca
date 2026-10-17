@@ -274,6 +274,63 @@ describe('LoopService.create', () => {
     expect(h.prompts[1]?.prompt).toContain('add tests')
   })
 
+  it('closes the launched terminal and persists nothing when the insert fails', async () => {
+    const h = createHarness({ hold: true })
+    vi.spyOn(h.store, 'insertLoop').mockImplementation(() => {
+      throw new Error('database is read-only')
+    })
+
+    await expect(h.service.create(INPUT)).rejects.toThrow('database is read-only')
+
+    expect(h.runtime.closeTerminalTab).toHaveBeenCalledWith('term-1')
+    expect(h.store.listLoops()).toEqual([])
+    expect(h.snapshots).toEqual([])
+  })
+
+  it('stops the loop, closes the terminal, and never starts a driver when queue seeding fails', async () => {
+    const h = createHarness({ hold: true })
+    vi.spyOn(h.store, 'applyQueueOp').mockImplementation(() => {
+      throw new Error('queue write failed')
+    })
+
+    await expect(h.service.create({ ...INPUT, queueItems: ['one'] })).rejects.toThrow(
+      'queue write failed'
+    )
+
+    expect(h.runtime.closeTerminalTab).toHaveBeenCalledWith('term-1')
+    expect(h.store.listLoops().map((loop) => loop.state)).toEqual(['stopped'])
+    expect(h.observeIteration).not.toHaveBeenCalled()
+    expect(h.snapshots).toEqual([])
+  })
+
+  it('surfaces the original error even when closing the terminal also fails', async () => {
+    const h = createHarness({ hold: true })
+    vi.spyOn(h.store, 'insertLoop').mockImplementation(() => {
+      throw new Error('database is read-only')
+    })
+    h.runtime.closeTerminalTab.mockRejectedValueOnce(new Error('close failed'))
+
+    await expect(h.service.create(INPUT)).rejects.toThrow('database is read-only')
+  })
+
+  it('populates the snapshot queue in position order', async () => {
+    const h = createHarness({ hold: true })
+    const created = await h.service.create({
+      ...INPUT,
+      preset: 'queue',
+      config: { ...CONFIG, promptSource: { kind: 'queue', repeatQueue: false }, done: {} },
+      queueItems: ['first', 'second']
+    })
+
+    expect(created.queue?.map((item) => [item.position, item.body, item.state])).toEqual([
+      [0, 'first', 'pending'],
+      [1, 'second', 'pending']
+    ])
+    const added = await h.service.queue(created.id, { op: 'add', body: 'third', position: 0 })
+    expect(added.queue?.map((item) => item.body)).toEqual(['third', 'first', 'second'])
+    expect(h.service.get(created.id)?.queue).toEqual(added.queue)
+  })
+
   it('rejects a check on a Windows SSH host', async () => {
     const h = createHarness({
       checkTarget: { type: 'ssh', cwd: '/w', connectionId: 'c', remotePlatform: 'win32' }

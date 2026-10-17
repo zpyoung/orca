@@ -130,28 +130,46 @@ export class LoopService {
       ...(input.launchOverrides ? { launchOverrides: input.launchOverrides } : {})
     })
     const id = this.deps.newId?.() ?? randomUUID()
-    const slug = slugFor(input.name, id)
-    await ensureLoopNotesFile(targets.workspace, slug).catch(() => undefined)
-    store.insertLoop({
-      id,
-      worktreeId: input.worktreeId,
-      workspaceKind: targets.workspace.kind,
-      executionHostId: targets.executionHostId,
-      name: input.name,
-      slug,
-      agent: input.agent,
-      preset: input.preset,
-      config: input.config,
-      state: 'running',
-      launchOverrides: input.launchOverrides ?? null,
-      tabId: launched.tabId ?? null,
-      paneKey: launched.paneKey ?? null,
-      ptyId: launched.ptyId ?? null
-    })
-    for (const body of input.queueItems ?? []) {
-      store.applyQueueOp(id, { op: 'add', body })
+    let inserted = false
+    try {
+      const slug = slugFor(input.name, id)
+      await ensureLoopNotesFile(targets.workspace, slug).catch(() => undefined)
+      // paused until the queue is seeded so a failure here never leaves a persisted running loop
+      store.insertLoop({
+        id,
+        worktreeId: input.worktreeId,
+        workspaceKind: targets.workspace.kind,
+        executionHostId: targets.executionHostId,
+        name: input.name,
+        slug,
+        agent: input.agent,
+        preset: input.preset,
+        config: input.config,
+        state: 'paused',
+        pauseReason: 'interrupted-by-restart',
+        launchOverrides: input.launchOverrides ?? null,
+        tabId: launched.tabId ?? null,
+        paneKey: launched.paneKey ?? null,
+        ptyId: launched.ptyId ?? null
+      })
+      inserted = true
+      for (const body of input.queueItems ?? []) {
+        store.applyQueueOp(id, { op: 'add', body })
+      }
+      store.updateLoop(id, { state: 'running', pauseReason: null, pauseDetail: null })
+      this.driverFor(id).start()
+    } catch (error) {
+      this.drivers.delete(id)
+      if (inserted) {
+        try {
+          store.updateLoop(id, { state: 'stopped', pauseReason: null, pauseDetail: null })
+        } catch {
+          // the create error is the one worth surfacing
+        }
+      }
+      await runtime.closeTerminalTab?.(launched.handle).catch(() => undefined)
+      throw error
     }
-    this.driverFor(id).start()
     return this.publish(id, warnings)
   }
 
@@ -379,6 +397,12 @@ export class LoopService {
       ...(marker && marker.kind !== 'done'
         ? { pendingQuestion: { kind: marker.kind, text: marker.text ?? '' } }
         : {}),
+      queue: store.listQueue(loop.id).map((item) => ({
+        id: item.id,
+        position: item.position,
+        body: item.body,
+        state: item.state
+      })),
       recentIterations: iterations.map((row) => ({
         n: row.n,
         attempt: row.attempt,
