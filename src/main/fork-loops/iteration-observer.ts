@@ -191,8 +191,7 @@ async function observeIteration(
     if (busyEdgeAt !== null || needsYouSince !== null) {
       return null
     }
-    const at = now()
-    return at - sentAt - pausedMs >= noBusyEdgeSettleMs ? { kind: 'settled', settledAt: at } : null
+    return now() - sentAt - pausedMs >= noBusyEdgeSettleMs ? settleUnlessUserActive() : null
   }
 
   const probeProcess = async (): Promise<IterationSettlement | null> => {
