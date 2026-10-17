@@ -12,7 +12,7 @@ import {
 } from './runtime-worktree-ps-activity'
 import { applyRuntimeWorktreePsUnverifiableTerminals } from './runtime-worktree-ps-unverifiable-terminals'
 import { attachRuntimeWorktreeAgentRows } from './runtime-worktree-agent-rows'
-import { requireLoopService } from '../fork-loops/registration'
+import { requireLoopService } from './rpc/methods/fork-loops/service-binding'
 import { attachWorktreeLoopSummaries } from '../fork-loops/worktree-ps-loop-summary'
 import { compareWorktreePs } from './runtime-worktree-status-projection'
 import type { Repo } from '../../shared/repo-types'

@@ -37,6 +37,7 @@ import { AGENT_LAUNCH_SESSION_ALREADY_EXISTS_CODE } from '../../../shared/agent-
 import { AGENT_LAUNCH_TAB_CLOSED_CODE } from '../../../shared/agent-launch-tab-closed'
 import { AGENT_LAUNCH_TARGET_FORBIDDEN_CODE } from '../../../shared/agent-launch-target-forbidden'
 import { HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE } from '../../../shared/fork-heimdall/enrollment-refusal-error'
+import { LoopErrorCodeSchema } from '../../../shared/fork-loops/loop-types'
 
 export function successResponse(id: string, meta: RpcEnvelopeMeta, result: unknown): RpcSuccess {
   return {
@@ -150,6 +151,7 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'invalid_argument',
   'ledger_ui_proof_invalid',
   HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE,
+  ...LoopErrorCodeSchema.options,
   'ledger_ui_proof_expired',
   'ledger_ui_proof_replayed',
   'ledger_ui_proof_capacity',

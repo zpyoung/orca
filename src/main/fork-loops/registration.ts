@@ -8,6 +8,7 @@ import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { getSshGitProvider } from '../providers/ssh-git-dispatch'
 import { getRegisteredSshState } from '../ssh/ssh-target-registry'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { bindLoopService } from '../runtime/rpc/methods/fork-loops/service-binding'
 import { parseWslPath } from '../wsl'
 import { resolveWorktreeHostRouting } from '../runtime/worktree-launch-host-repo'
 import { mainProcessState } from '../startup/main-process-state'
@@ -29,20 +30,6 @@ import {
   readUsageTotals,
   type LoopUsageDeps
 } from './loop-usage'
-
-const loopServices = new WeakMap<OrcaRuntimeService, LoopService>()
-
-export function bindLoopService(runtime: OrcaRuntimeService, service: LoopService): void {
-  loopServices.set(runtime, service)
-}
-
-export function requireLoopService(runtime: OrcaRuntimeService): LoopService {
-  const service = loopServices.get(runtime)
-  if (!service) {
-    throw new LoopStoreError('loop_runtime_unavailable', 'Loops are unavailable on this runtime')
-  }
-  return service
-}
 
 export function beginLoopsShutdown(service: LoopService | null): Promise<void> {
   return service?.shutdown() ?? Promise.resolve()
