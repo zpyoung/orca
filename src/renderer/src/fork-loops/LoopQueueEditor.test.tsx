@@ -153,6 +153,39 @@ describe('LoopQueueEditor', () => {
     ).toBeDisabled()
   })
 
+  it('keeps controls on done items and lets moves cross them but not the in-flight item', async () => {
+    const queue = installQueueApi()
+    const loop = makeLoop({
+      queue: [
+        { id: 'q-0', position: 0, body: 'Shipped already', state: 'done' },
+        { id: 'q-1', position: 1, body: 'Write the parser', state: 'in-flight' },
+        { id: 'q-2', position: 2, body: 'Add the tests', state: 'pending' },
+        { id: 'q-3', position: 3, body: 'Update the docs', state: 'done' }
+      ]
+    })
+    render(<LoopQueueEditor loop={loop} />)
+
+    const done = itemRow('Shipped already')
+    expect(within(done).getByRole('button', { name: 'Edit' })).toBeEnabled()
+    expect(within(done).getByRole('button', { name: 'Remove' })).toBeEnabled()
+    expect(within(done).getByRole('button', { name: 'Move up' })).toBeDisabled()
+    expect(within(done).getByRole('button', { name: 'Move down' })).toBeDisabled()
+    expect(within(itemRow('Write the parser')).queryAllByRole('button')).toHaveLength(0)
+    expect(
+      within(itemRow('Add the tests')).getByRole('button', { name: 'Move up' })
+    ).toBeDisabled()
+
+    await act(async () => {
+      fireEvent.click(within(itemRow('Add the tests')).getByRole('button', { name: 'Move down' }))
+    })
+    expect(queue).toHaveBeenLastCalledWith('loop-1', { op: 'move', id: 'q-2', position: 3 })
+
+    await act(async () => {
+      fireEvent.click(within(done).getByRole('button', { name: 'Remove' }))
+    })
+    expect(queue).toHaveBeenLastCalledWith('loop-1', { op: 'remove', id: 'q-0' })
+  })
+
   it('removes an item', async () => {
     const queue = installQueueApi()
     render(<LoopQueueEditor loop={makeLoop()} />)
