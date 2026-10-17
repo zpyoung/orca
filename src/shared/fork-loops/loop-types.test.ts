@@ -4,6 +4,7 @@ import {
   LOOP_NO_PROGRESS_ITERATIONS,
   LoopConfigSchema,
   LoopCreateInputSchema,
+  LoopSnapshotSchema,
   PauseReasonSchema
 } from './loop-types'
 
@@ -110,5 +111,40 @@ describe('LoopCreateInputSchema', () => {
 
   it('rejects an empty queue item', () => {
     expect(LoopCreateInputSchema.safeParse({ ...input, queueItems: [''] }).success).toBe(false)
+  })
+})
+
+describe('LoopSnapshotSchema queue', () => {
+  const snapshot = {
+    id: 'l1',
+    worktreeId: 'wt-1',
+    name: 'Run',
+    agent: 'claude',
+    preset: 'queue',
+    config: minimalConfig,
+    state: 'running',
+    iterationsCompleted: 0,
+    detached: false,
+    skippedTicks: 0,
+    activeMs: 0,
+    recentIterations: []
+  }
+
+  it('treats the queue as optional for older hosts', () => {
+    expect(LoopSnapshotSchema.safeParse(snapshot).success).toBe(true)
+  })
+
+  it('accepts ordered queue items in every state', () => {
+    const queue = [
+      { id: 'a', position: 0, body: 'one', state: 'done' },
+      { id: 'b', position: 1, body: 'two', state: 'in-flight' },
+      { id: 'c', position: 2, body: 'three', state: 'pending' }
+    ]
+    expect(LoopSnapshotSchema.safeParse({ ...snapshot, queue }).success).toBe(true)
+  })
+
+  it('rejects an unknown queue item state', () => {
+    const queue = [{ id: 'a', position: 0, body: 'one', state: 'running' }]
+    expect(LoopSnapshotSchema.safeParse({ ...snapshot, queue }).success).toBe(false)
   })
 })
