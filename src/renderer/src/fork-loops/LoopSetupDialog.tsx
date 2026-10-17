@@ -419,17 +419,19 @@ export function LoopSetupDialog({
 }): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="scrollbar-sleek max-h-[85vh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{translate('fork.loops.setup.title', 'New loop')}</DialogTitle>
-          <DialogDescription>
-            {translate(
-              'fork.loops.setup.description',
-              'Run an agent in this workspace over and over until the work is done.'
-            )}
-          </DialogDescription>
-        </DialogHeader>
-        <LoopSetupForm worktreeId={worktreeId} onOpenChange={onOpenChange} />
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-xl">
+        <div className="scrollbar-sleek grid max-h-[calc(85vh-3rem)] gap-4 overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{translate('fork.loops.setup.title', 'New loop')}</DialogTitle>
+            <DialogDescription>
+              {translate(
+                'fork.loops.setup.description',
+                'Run an agent in this workspace over and over until the work is done.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <LoopSetupForm worktreeId={worktreeId} onOpenChange={onOpenChange} />
+        </div>
       </DialogContent>
     </Dialog>
   )

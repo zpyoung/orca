@@ -6,16 +6,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LoopCreateInputSchema } from '../../../shared/fork-loops/loop-types'
 import { LoopSetupDialog } from './LoopSetupDialog'
 
-const mocks = vi.hoisted(() => ({
-  state: {
-    settings: { defaultTuiAgent: 'claude', disabledTuiAgents: [] as string[] },
-    loopsById: {} as Record<string, unknown>,
+type MockState = {
+  settings: { defaultTuiAgent: string; disabledTuiAgents: string[] }
+  loopsById: Record<string, unknown>
+  applyLoopSnapshot: ReturnType<typeof vi.fn>
+}
+
+const mocks = vi.hoisted(() => {
+  const state: MockState = {
+    settings: { defaultTuiAgent: 'claude', disabledTuiAgents: [] },
+    loopsById: {},
     applyLoopSnapshot: vi.fn()
-  },
-  detectedIds: ['claude', 'gemini'] as string[],
-  target: { kind: 'local' } as { kind: string },
-  create: vi.fn()
-}))
+  }
+  const detectedIds: string[] = ['claude', 'gemini']
+  const target: { kind: string } = { kind: 'local' }
+  return { state, detectedIds, target, create: vi.fn() }
+})
 
 vi.mock('@/store', () => ({
   useAppStore: Object.assign(

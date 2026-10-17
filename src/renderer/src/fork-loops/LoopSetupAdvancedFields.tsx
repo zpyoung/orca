@@ -137,9 +137,7 @@ export function CheckboxField({
   return (
     <div className="flex items-center gap-2">
       <Checkbox id={id} checked={checked} onCheckedChange={(next) => onChange(next === true)} />
-      <Label htmlFor={id} className="text-xs font-normal">
-        {label}
-      </Label>
+      <Label htmlFor={id}>{label}</Label>
     </div>
   )
 }
