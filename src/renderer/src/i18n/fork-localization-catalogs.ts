@@ -77,6 +77,7 @@ import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.j
 import { heimdallCatalogs } from '@/fork-heimdall/localization-catalog'
 import { hostedReviewSitterCatalogs } from '@/fork-hosted-review-sitter/localization-catalog'
 import { heimdallObjectiveCatalogs } from '@/fork-heimdall-objective/localization-catalog'
+import { loopsCatalogs } from '@/fork-loops/localization-catalog'
 import launchFieldsEN from '../components/fork-automation-launch-settings/locales/en.json'
 import launchFieldsES from '../components/fork-automation-launch-settings/locales/es.json'
 import launchFieldsJA from '../components/fork-automation-launch-settings/locales/ja.json'
@@ -128,6 +129,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.en,
     hostedReviewSitterCatalogs.en,
     heimdallObjectiveCatalogs.en,
+    loopsCatalogs.en,
     askQuestionToolEN,
     launchFieldsEN,
     automationLaunchEN,
@@ -151,12 +153,13 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.es,
     hostedReviewSitterCatalogs.es,
     heimdallObjectiveCatalogs.es,
+    loopsCatalogs.es,
     askQuestionToolES,
     launchFieldsES,
     automationLaunchES,
     recipeOverridesES
   ],
-  fr: [heimdallCatalogs.fr, heimdallObjectiveCatalogs.fr],
+  fr: [heimdallCatalogs.fr, heimdallObjectiveCatalogs.fr, loopsCatalogs.fr],
   ja: [
     relayJA,
     worktreeGroupsJA,
@@ -175,6 +178,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.ja,
     hostedReviewSitterCatalogs.ja,
     heimdallObjectiveCatalogs.ja,
+    loopsCatalogs.ja,
     askQuestionToolJA,
     launchFieldsJA,
     automationLaunchJA,
@@ -198,6 +202,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.ko,
     hostedReviewSitterCatalogs.ko,
     heimdallObjectiveCatalogs.ko,
+    loopsCatalogs.ko,
     askQuestionToolKO,
     launchFieldsKO,
     automationLaunchKO,
@@ -221,6 +226,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     heimdallCatalogs.zh,
     hostedReviewSitterCatalogs.zh,
     heimdallObjectiveCatalogs.zh,
+    loopsCatalogs.zh,
     askQuestionToolZH,
     launchFieldsZH,
     automationLaunchZH,

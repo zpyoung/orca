@@ -8,6 +8,8 @@ import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-p
 import { SkillFreshnessNudge } from './components/skills/SkillFreshnessNudge'
 import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
 import RunningTerminalCloseDialog from './components/terminal-pane/RunningTerminalCloseDialog'
+import { LoopCloseDialogHost } from './fork-loops/LoopCloseDialogHost'
+import { LoopSetupDialogHost } from './fork-loops/LoopSetupDialogHost'
 import WorktreeBaseFallbackDialog from './components/WorktreeBaseFallbackDialog'
 import { useUnreadDockBadge } from './hooks/useUnreadDockBadge'
 import { AppBackgroundServices } from './app-shell/AppBackgroundServices'
@@ -107,6 +109,8 @@ function App(): React.JSX.Element {
       <WorktreeBaseFallbackDialog />
       <PinnedTabCloseDialog />
       <RunningTerminalCloseDialog />
+      <LoopSetupDialogHost />
+      <LoopCloseDialogHost />
       {/* Why: Electron's drag-region hit-test is DOM-order-based (ignores z-index); render last so WindowControls stay clickable. */}
       {hasCustomTitleBar && <WindowControls />}
     </div>

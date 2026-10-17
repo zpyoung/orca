@@ -49,6 +49,7 @@ import type { StructuredSessionLaunchDirectorySlice } from './slices/structured-
 import type { AsksSlice } from './slices/fork-ask-question-tool/asks'
 import type { LedgerSlice } from './slices/ledger'
 import type { HeimdallFleetSlice } from './slices/fork-heimdall/fleet'
+import type { LoopsSlice } from '@/fork-loops/loops-slice'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -98,4 +99,5 @@ export type AppState = RepoSlice &
   StructuredSessionLaunchDirectorySlice &
   LedgerSlice &
   AsksSlice &
-  HeimdallFleetSlice
+  HeimdallFleetSlice &
+  LoopsSlice
