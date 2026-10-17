@@ -184,8 +184,10 @@ export function LoopQueueEditor({ loop }: { loop: LoopSnapshot }): React.JSX.Ele
       ) : (
         <ul className="space-y-1">
           {items.map((item, index) => {
-            const neighbourPending = (offset: number): boolean =>
-              items[index + offset]?.state === 'pending'
+            const neighbourMovable = (offset: number): boolean => {
+              const neighbour = items[index + offset]
+              return neighbour !== undefined && neighbour.state !== 'in-flight'
+            }
             return (
               <li
                 key={item.id}
@@ -207,11 +209,11 @@ export function LoopQueueEditor({ loop }: { loop: LoopSnapshot }): React.JSX.Ele
                 ) : (
                   <>
                     <QueueItemBody item={item} tone={ITEM_TONE[item.state]} />
-                    {item.state === 'pending' ? (
+                    {item.state !== 'in-flight' ? (
                       <QueueItemControls
                         busy={busy}
-                        canMoveUp={neighbourPending(-1)}
-                        canMoveDown={neighbourPending(1)}
+                        canMoveUp={neighbourMovable(-1)}
+                        canMoveDown={neighbourMovable(1)}
                         onEdit={() => setEditingId(item.id)}
                         onMove={(direction) =>
                           void send({
