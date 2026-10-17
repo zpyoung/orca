@@ -105,8 +105,20 @@ describe('LoopCreateInputSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('treats queue items as optional', () => {
-    expect(LoopCreateInputSchema.safeParse(input).success).toBe(true)
+  it('treats queue items as optional for a repeat prompt', () => {
+    const repeat = {
+      ...input,
+      config: { ...minimalConfig, promptSource: { kind: 'repeat', body: 'go' } }
+    }
+    expect(LoopCreateInputSchema.safeParse(repeat).success).toBe(true)
+  })
+
+  it('rejects a queue loop with no queue items', () => {
+    for (const queueItems of [undefined, []]) {
+      const result = LoopCreateInputSchema.safeParse({ ...input, queueItems })
+      expect(result.success).toBe(false)
+      expect(result.error?.issues[0]?.path).toEqual(['queueItems'])
+    }
   })
 
   it('rejects an empty queue item', () => {
