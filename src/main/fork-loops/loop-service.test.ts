@@ -591,6 +591,13 @@ describe('LoopService.listIterations', () => {
     expect(h.service.listIterations('loop-seed', { limit: 2 }).map((r) => r.n)).toEqual([3, 4])
   })
 
+  it('returns the newest finished iterations when an open one is the latest row', () => {
+    const h = createHarness()
+    seedIterations(h)
+
+    expect(h.service.listIterations('loop-seed', { limit: 2 }).map((r) => r.n)).toEqual([2, 3])
+  })
+
   it('reports an unknown loop without publishing a change', () => {
     const h = createHarness()
 

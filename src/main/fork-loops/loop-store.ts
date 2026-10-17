@@ -225,14 +225,20 @@ export class LoopStore {
     })
   }
 
-  /** The latest `limit` attempts (all when omitted), returned oldest first. */
-  listIterations(loopId: string, options: { limit?: number } = {}): StoredIteration[] {
+  /** The latest `limit` attempts (all when omitted), returned oldest first; `finishedOnly` filters before the limit. */
+  listIterations(
+    loopId: string,
+    options: { limit?: number; finishedOnly?: boolean } = {}
+  ): StoredIteration[] {
     const db = this.database.connection()
     const limit = options.limit ?? -1
+    const finishedClause = options.finishedOnly
+      ? ' AND ended_at IS NOT NULL AND end_reason IS NOT NULL'
+      : ''
     return db
       .prepare(
         `SELECT ${ITERATION_COLUMNS} FROM (
-           SELECT ${ITERATION_COLUMNS} FROM iterations WHERE loop_id = ?
+           SELECT ${ITERATION_COLUMNS} FROM iterations WHERE loop_id = ?${finishedClause}
            ORDER BY n DESC, attempt DESC LIMIT ?
          ) ORDER BY n ASC, attempt ASC`
       )
