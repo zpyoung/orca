@@ -147,6 +147,33 @@ describe('LoopRail', () => {
     expect(screen.getByText('Iteration 5 of 10')).toBeInTheDocument()
   })
 
+  it('reads unverifiable instead of running while the host is unreachable', () => {
+    installApi()
+    seed(makeLoop({ unverifiableSince: 90_000 }))
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+
+    expect(screen.getByText('Unverifiable')).toBeInTheDocument()
+    expect(screen.queryByText('Running')).not.toBeInTheDocument()
+    expect(screen.getByText(/host is unreachable/)).toBeInTheDocument()
+  })
+
+  it('shows how many wall-clock ticks were skipped, and nothing when none were', () => {
+    installApi()
+    seed(makeLoop({ skippedTicks: 3 }))
+
+    const { rerender } = render(<LoopRail paneKey={PANE_KEY} />)
+    expect(screen.getByText('3 ticks skipped')).toBeInTheDocument()
+
+    seed(makeLoop({ skippedTicks: 1 }))
+    rerender(<LoopRail paneKey={PANE_KEY} />)
+    expect(screen.getByText('1 tick skipped')).toBeInTheDocument()
+
+    seed(makeLoop({ skippedTicks: 0 }))
+    rerender(<LoopRail paneKey={PANE_KEY} />)
+    expect(screen.queryByText(/skipped/)).not.toBeInTheDocument()
+  })
+
   it('pauses after the current iteration', async () => {
     const api = installApi()
     seed(makeLoop())
@@ -437,6 +464,28 @@ describe('LoopStatusStrip', () => {
     expect(screen.getByRole('status', { name: 'Loop status' })).toHaveTextContent(
       `Iteration 5 · ${getAgentLabel('claude')} · fresh session · 3m 00s`
     )
+  })
+
+  it('reads unverifiable and freezes the elapsed time while the host is unreachable', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(300_000)
+    seed(
+      makeLoop({
+        currentIteration: { n: 5, startedAt: 120_000, phase: 'working' },
+        unverifiableSince: 180_000
+      })
+    )
+
+    render(<LoopStatusStrip paneKey={PANE_KEY} />)
+    const strip = screen.getByRole('status', { name: 'Loop status' })
+    expect(strip).toHaveTextContent(
+      `Iteration 5 · Unverifiable · ${getAgentLabel('claude')} · fresh session · 1m 00s`
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(strip).toHaveTextContent('1m 00s')
   })
 
   it('renders nothing for a pane that is not bound to a loop', () => {

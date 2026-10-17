@@ -198,7 +198,8 @@
           "needsYou": "Te necesita",
           "paused": "En pausa",
           "running": "En ejecución",
-          "stopped": "Detenido"
+          "stopped": "Detenido",
+          "unverifiable": "No verificable"
         },
         "steer": {
           "label": "Nota de orientación",
@@ -214,7 +215,10 @@
           "label": "Estado del bucle",
           "sessionFresh": "sesión nueva",
           "sessionContinued": "sesión continuada"
-        }
+        },
+        "unverifiableHint": "No se puede contactar con el host del agente, así que el bucle no avanza.",
+        "skippedTicks_one": "{{count}} tic omitido",
+        "skippedTicks_other": "{{count}} tics omitidos"
       },
       "status": {
         "glyph": {
@@ -225,7 +229,8 @@
             "running": "En ejecución",
             "needsYou": "Te necesita",
             "paused": "En pausa",
-            "detached": "Desacoplado"
+            "detached": "Desacoplado",
+            "unverifiable": "No verificable"
           }
         },
         "close": {

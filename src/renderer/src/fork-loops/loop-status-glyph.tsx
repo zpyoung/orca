@@ -11,13 +11,20 @@ import type { LoopSnapshot } from '../../../shared/fork-loops/loop-types'
 
 const REPLACEABLE_STATUSES: readonly WorktreeStatus[] = ['active', 'done', 'inactive']
 
-type LoopGlyphState = 'running' | 'needs-you' | 'paused' | 'detached'
+type LoopGlyphState = 'running' | 'needs-you' | 'unverifiable' | 'paused' | 'detached'
 
-const GLYPH_PRIORITY: readonly LoopGlyphState[] = ['needs-you', 'running', 'paused', 'detached']
+const GLYPH_PRIORITY: readonly LoopGlyphState[] = [
+  'needs-you',
+  'unverifiable',
+  'running',
+  'paused',
+  'detached'
+]
 
 const ICON_TONE_CLASS: Record<LoopGlyphState, string> = {
   running: 'text-status-success',
   'needs-you': 'text-status-warning',
+  unverifiable: 'text-status-warning',
   paused: 'text-muted-foreground',
   detached: 'text-muted-foreground'
 }
@@ -29,6 +36,9 @@ function glyphStateOf(loop: LoopSnapshot): LoopGlyphState | null {
   if (loop.state === 'needs-you') {
     return 'needs-you'
   }
+  if (loop.unverifiableSince !== undefined) {
+    return 'unverifiable'
+  }
   return loop.detached ? 'detached' : loop.state
 }
 
@@ -38,6 +48,8 @@ function stateLabel(state: LoopGlyphState): string {
       return translate('fork.loops.status.glyph.state.running', 'Running')
     case 'needs-you':
       return translate('fork.loops.status.glyph.state.needsYou', 'Needs you')
+    case 'unverifiable':
+      return translate('fork.loops.status.glyph.state.unverifiable', 'Unverifiable')
     case 'paused':
       return translate('fork.loops.status.glyph.state.paused', 'Paused')
     case 'detached':

@@ -198,7 +198,8 @@
           "needsYou": "확인 필요",
           "paused": "일시 중지됨",
           "running": "실행 중",
-          "stopped": "중지됨"
+          "stopped": "중지됨",
+          "unverifiable": "확인 불가"
         },
         "steer": {
           "label": "방향 지정 메모",
@@ -214,7 +215,10 @@
           "label": "루프 상태",
           "sessionFresh": "새 세션",
           "sessionContinued": "이어서 진행하는 세션"
-        }
+        },
+        "unverifiableHint": "에이전트 호스트에 연결할 수 없어 루프가 진행되지 않습니다.",
+        "skippedTicks_one": "틱 {{count}}회 건너뜀",
+        "skippedTicks_other": "틱 {{count}}회 건너뜀"
       },
       "status": {
         "glyph": {
@@ -225,7 +229,8 @@
             "running": "실행 중",
             "needsYou": "확인 필요",
             "paused": "일시 중지됨",
-            "detached": "분리됨"
+            "detached": "분리됨",
+            "unverifiable": "확인 불가"
           }
         },
         "close": {
