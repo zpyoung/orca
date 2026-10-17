@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
-import type { LoopsApi } from '../../../shared/fork-loops/api'
+import type { IterationDetail, LoopsApi } from '../../../shared/fork-loops/api'
 import type { IterationSummary, LoopSnapshot } from '../../../shared/fork-loops/loop-types'
 import { getAgentLabel } from '@/lib/agent-catalog'
 import { LoopRail } from './LoopRail'
@@ -24,6 +24,34 @@ function iteration(overrides: Partial<IterationSummary> & { n: number }): Iterat
     added: 12,
     removed: 3,
     costUsd: null,
+    ...overrides
+  }
+}
+
+function iterationDetail(overrides: Partial<IterationDetail> & { n: number }): IterationDetail {
+  return {
+    attempt: 0,
+    startedAt: 1_000,
+    endedAt: 66_000,
+    endReason: 'settled',
+    check: {
+      ran: true,
+      pass: false,
+      exitCode: 1,
+      timedOut: false,
+      stdoutTail: 'running 12 tests',
+      stderrTail: 'FAIL parser.test.ts',
+      durationMs: 900
+    },
+    evaluator: { verdict: 'not-met', reason: 'The parser still drops trailing commas.' },
+    diff: { added: 12, removed: 3, files: ['parser.ts'] },
+    treeBefore: null,
+    treeAfter: null,
+    costUsd: null,
+    markers: [],
+    protectedPathHits: [],
+    checkpointCommit: null,
+    outputTail: 'agent edited parser.ts',
     ...overrides
   }
 }
@@ -220,6 +248,82 @@ describe('LoopRail', () => {
     expect(screen.getByText('3 removed')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('button', { name: /Iteration 4/ })).toBeInTheDocument()
+  })
+
+  it('fetches the loop iterations when a row opens and shows check output, verdict, and agent output', async () => {
+    const api = installApi()
+    api.iterations.mockResolvedValue([iterationDetail({ n: 3 }), iterationDetail({ n: 4 })])
+    seed(makeLoop({ recentIterations: [iteration({ n: 4, checkPass: false })] }))
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Iteration 4/ }))
+    })
+
+    expect(api.iterations).toHaveBeenCalledWith('loop-1')
+    expect(screen.getByText('running 12 tests')).toBeInTheDocument()
+    expect(screen.getByText('FAIL parser.test.ts')).toBeInTheDocument()
+    expect(screen.getByText('The parser still drops trailing commas.')).toBeInTheDocument()
+    expect(screen.getByText('agent edited parser.ts')).toBeInTheDocument()
+  })
+
+  it('shows the attempt that was opened, not another attempt of the same iteration', async () => {
+    const api = installApi()
+    api.iterations.mockResolvedValue([
+      iterationDetail({ n: 4, attempt: 0, outputTail: 'crashed attempt output' }),
+      iterationDetail({ n: 4, attempt: 1, outputTail: 'retry attempt output' })
+    ])
+    seed(
+      makeLoop({
+        recentIterations: [
+          iteration({ n: 4, attempt: 0, endReason: 'crashed' }),
+          iteration({ n: 4, attempt: 1 })
+        ]
+      })
+    )
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /Iteration 4/ })[0])
+    })
+
+    expect(screen.getByText('retry attempt output')).toBeInTheDocument()
+    expect(screen.queryByText('crashed attempt output')).not.toBeInTheDocument()
+  })
+
+  it('shows a loading state until the iterations arrive', async () => {
+    const api = installApi()
+    let resolve: (value: IterationDetail[]) => void = () => {}
+    api.iterations.mockReturnValue(new Promise<IterationDetail[]>((r) => (resolve = r)))
+    seed(makeLoop())
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Iteration 4/ }))
+    })
+    expect(screen.getByText('Loading output…')).toBeInTheDocument()
+
+    await act(async () => {
+      resolve([iterationDetail({ n: 4 })])
+    })
+    expect(screen.queryByText('Loading output…')).not.toBeInTheDocument()
+    expect(screen.getByText('agent edited parser.ts')).toBeInTheDocument()
+  })
+
+  it('shows an error state when the iterations fetch fails', async () => {
+    const api = installApi()
+    api.iterations.mockRejectedValue(new Error('boom'))
+    seed(makeLoop())
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Iteration 4/ }))
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Could not load the output for this iteration.'
+    )
+    expect(screen.queryByText('Loading output…')).not.toBeInTheDocument()
   })
 
   it('hides the cost meter when the loop has reported no cost', () => {
