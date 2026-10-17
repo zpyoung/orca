@@ -1,1 +1,21 @@
-{}
+{
+  "glyph": {
+    "tooltip": "Loop {{n}} · {{state}}",
+    "tooltipWithCap": "Loop {{n}}/{{max}} · {{state}}",
+    "open": "Open loop",
+    "state": {
+      "running": "Running",
+      "needsYou": "Needs you",
+      "paused": "Paused",
+      "detached": "Detached"
+    }
+  },
+  "close": {
+    "title": "Close a running loop?",
+    "description": "This tab runs the loop \"{{name}}\". Keep it running in the background, or stop it now.",
+    "cancel": "Cancel",
+    "stop": "Stop loop",
+    "keepRunning": "Keep running",
+    "failed": "Could not update the loop, so the tab stays open."
+  }
+}

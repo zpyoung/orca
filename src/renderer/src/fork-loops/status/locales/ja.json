@@ -1,1 +1,21 @@
-{}
+{
+  "glyph": {
+    "tooltip": "ループ {{n}} · {{state}}",
+    "tooltipWithCap": "ループ {{n}}/{{max}} · {{state}}",
+    "open": "ループを開く",
+    "state": {
+      "running": "実行中",
+      "needsYou": "対応が必要",
+      "paused": "一時停止中",
+      "detached": "切り離し済み"
+    }
+  },
+  "close": {
+    "title": "実行中のループを閉じますか？",
+    "description": "このタブはループ「{{name}}」を実行しています。バックグラウンドで実行を続けるか、今すぐ停止してください。",
+    "cancel": "キャンセル",
+    "stop": "ループを停止",
+    "keepRunning": "実行を続ける",
+    "failed": "ループを更新できなかったため、タブは開いたままです。"
+  }
+}

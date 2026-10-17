@@ -5,6 +5,7 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { getWorktreeStatusLabel, type WorktreeStatus } from '@/lib/worktree-status'
 import { useHeimdallGlyph, withHeimdallGlyph } from '@/fork-heimdall/heimdall-status-lane-glyph'
+import { useLoopGlyph, withLoopGlyph } from '@/fork-loops/loop-status-glyph'
 import { FilledBellIcon } from './WorktreeCardHelpers'
 import StatusIndicator from './StatusIndicator'
 import { useWorktreeActivityStatus } from './use-worktree-activity-status'
@@ -156,6 +157,7 @@ export function WorktreeCardStatusSlot({
   const reviewStatusIconClassName = compactReviewAndBranchStatusIconClassName
   const branchStatusIcon = <GitBranch className={branchStatusIconClassName} aria-hidden="true" />
   const heimdallGlyph = useHeimdallGlyph(worktreeId, status, passiveStatusAnnouncement, className)
+  const loopGlyph = useLoopGlyph(worktreeId, status, passiveStatusAnnouncement, className)
   const sleepingStatusIcon = <Moon className={sleepingStatusIconClassName} aria-hidden="true" />
   const passiveStatus = canShowSleepingStatus ? (
     <span className={cn('inline-flex size-5 items-center justify-center p-0.5', className)}>
@@ -205,7 +207,10 @@ export function WorktreeCardStatusSlot({
   }
 
   if (!unreadActionEnabled) {
-    return overlayNewCardUnreadStatus(heimdallGlyph ?? passiveStatus, showNewCardUnreadAlert)
+    return overlayNewCardUnreadStatus(
+      loopGlyph ?? heimdallGlyph ?? passiveStatus,
+      showNewCardUnreadAlert
+    )
   }
 
   const actionLabel = isUnread ? 'Mark as read' : 'Mark as unread'
@@ -252,7 +257,7 @@ export function WorktreeCardStatusSlot({
               <FilledBellIcon className="size-[13px] text-amber-500 drop-shadow-sm" />
             ) : showStatus ? (
               <>
-                {withHeimdallGlyph(heimdallGlyph, status)}
+                {withLoopGlyph(loopGlyph, withHeimdallGlyph(heimdallGlyph, status))}
                 <Bell className="absolute size-3 text-muted-foreground/40 opacity-0 transition-opacity group-hover/unread:opacity-100 group-focus-within/unread:opacity-100" />
               </>
             ) : (

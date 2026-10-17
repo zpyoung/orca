@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store'
+import { guardLoopTerminalClose } from '@/fork-loops/loop-close-guard'
 import {
   closeWebRuntimeSessionTab,
   isWebRuntimeSessionActive,
@@ -85,6 +86,13 @@ export function closeTerminalTab(
   const worktreeRoute = resolveTerminalWorktreeRoute(state, owningWorktreeId)
   if (!worktreeRoute) {
     options?.onCancel?.()
+    return
+  }
+  if (
+    guardLoopTerminalClose(terminalTabId, options, () =>
+      closeTerminalTab(tabId, { ...options, force: true })
+    )
+  ) {
     return
   }
 
