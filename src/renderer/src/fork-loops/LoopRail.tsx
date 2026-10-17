@@ -23,6 +23,7 @@ import {
   LoopIterationDetail,
   LoopResumeWithMoreIterations
 } from './LoopIterationDetail'
+import { LoopQueueEditor } from './LoopQueueEditor'
 import { selectLoopForPaneKey } from './loops-slice'
 
 export type LoopRailPlacement = 'side' | 'bottom'
@@ -587,6 +588,8 @@ function LoopRailPanel({
           {error}
         </p>
       ) : null}
+
+      <LoopQueueEditor loop={loop} />
 
       {detailIteration ? (
         <LoopIterationDetail iteration={detailIteration} onBack={() => setOpenIteration(null)} />
