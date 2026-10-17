@@ -1,6 +1,5 @@
 import { LOOPS_CHANNELS } from '../../../../../shared/fork-loops/api'
 import { isTuiAgent } from '../../../../../shared/tui-agent-config'
-import { requireLoopService } from '../../../../fork-loops/registration'
 import { LoopStoreError } from '../../../../fork-loops/loop-database'
 import { defineMethod, InvalidArgumentError } from '../../core'
 import {
@@ -16,6 +15,7 @@ import {
   LoopStopParamsSchema,
   LoopTargetParamsSchema
 } from './loops-schemas'
+import { requireLoopService } from './service-binding'
 
 /**
  * RPC surface of the loop service. Handlers rethrow the service's `LoopStoreError` untouched so

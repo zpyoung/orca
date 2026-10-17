@@ -10,11 +10,12 @@ import { RUNTIME_CAPABILITIES } from '../../../../../shared/protocol-version'
 import { LoopDatabase } from '../../../../fork-loops/loop-database'
 import { LoopService } from '../../../../fork-loops/loop-service'
 import { LoopStore } from '../../../../fork-loops/loop-store'
-import { bindLoopService } from '../../../../fork-loops/registration'
 import { OrcaRuntimeService } from '../../../orca-runtime'
-import type { RpcContext } from '../../core'
+import { eraseRpcMethods, type RpcContext } from '../../core'
+import { mapRuntimeError } from '../../errors'
 import { ALL_RPC_METHODS } from '../index'
 import { LOOPS_METHODS } from './loops'
+import { bindLoopService } from './service-binding'
 
 const CONFIG: LoopConfig = {
   promptSource: { kind: 'repeat', body: 'fix the failing tests' },
@@ -118,11 +119,11 @@ function createHarness() {
 }
 
 function findMethod(name: string) {
-  const method = LOOPS_METHODS.find((candidate) => candidate.name === name)
-  if (!method) {
+  const method = eraseRpcMethods(LOOPS_METHODS).find((candidate) => candidate.name === name)
+  if (!method?.params) {
     throw new Error(`Method not found: ${name}`)
   }
-  return method
+  return { handler: method.handler, params: method.params }
 }
 
 async function call(name: string, params: unknown, ctx: RpcContext): Promise<unknown> {
@@ -250,6 +251,17 @@ describe('loops RPC handlers', () => {
     await expect(call(LOOPS_CHANNELS.iterations, { loopId: 'missing' }, ctx)).rejects.toMatchObject(
       { code: 'loop_not_found' }
     )
+  })
+
+  it('maps a thrown loop error to its own code over the wire', async () => {
+    const { ctx } = createHarness()
+    const error = await call(LOOPS_CHANNELS.get, { loopId: 'missing' }, ctx).catch(
+      (thrown: unknown) => thrown
+    )
+
+    const failure = mapRuntimeError('req-1', { runtimeId: 'rt-1' }, error)
+
+    expect(failure.error.code).toBe('loop_not_found')
   })
 
   it('keeps the loop error code for an invalid transition', async () => {
