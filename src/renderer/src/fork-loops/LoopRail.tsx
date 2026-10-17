@@ -405,7 +405,10 @@ function LoopRailPanel({
   const applyLoopSnapshot = useAppStore((state) => state.applyLoopSnapshot)
   const [mode, setMode] = useState<PanelMode>(null)
   const [steerText, setSteerText] = useState('')
-  const [openIteration, setOpenIteration] = useState<number | null>(null)
+  const [openIteration, setOpenIteration] = useState<Pick<
+    IterationSummary,
+    'n' | 'attempt'
+  > | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -427,12 +430,15 @@ function LoopRailPanel({
   }
 
   const ended = loop.state === 'completed' || loop.state === 'stopped'
-  const canResume = loop.state === 'paused' || loop.state === 'needs-you'
+  const canResume = loop.state === 'paused'
   const iterations = loop.recentIterations.toReversed()
   const detailIteration =
     openIteration === null
       ? undefined
-      : loop.recentIterations.find((iteration) => iteration.n === openIteration)
+      : loop.recentIterations.find(
+          (iteration) =>
+            iteration.n === openIteration.n && iteration.attempt === openIteration.attempt
+        )
   const resume =
     loop.state === 'paused' && loop.pauseReason === 'cap-iterations' ? (
       <LoopResumeWithMoreIterations
@@ -474,7 +480,7 @@ function LoopRailPanel({
               : translate('fork.loops.rail.question.blocked', 'Blocked')}
           </h3>
           <p className="text-xs break-words whitespace-pre-wrap">{loop.pendingQuestion.text}</p>
-          {resume}
+          {canResume ? resume : null}
         </section>
       ) : null}
 
@@ -599,7 +605,7 @@ function LoopRailPanel({
                 <li key={`${iteration.n}:${iteration.attempt}`}>
                   <IterationRow
                     iteration={iteration}
-                    onOpen={() => setOpenIteration(iteration.n)}
+                    onOpen={() => setOpenIteration({ n: iteration.n, attempt: iteration.attempt })}
                   />
                 </li>
               ))}
