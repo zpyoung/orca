@@ -16,6 +16,7 @@ export type LoopEvaluatorRequest = {
   /** The full prompt; sent on stdin so a large output tail cannot overflow argv. */
   input: string
   timeoutMs: number
+  signal?: AbortSignal
 }
 
 export type LoopEvaluatorCli = {
@@ -30,12 +31,14 @@ export type LoopEvaluationArgs = {
   checkOutcome: CheckOutcome | null
   outputTail: string
   lastAssistantMessage?: string
+  signal?: AbortSignal
 }
 
 const EVALUATOR_TIMEOUT_MS = 120_000
 const EVALUATOR_MAX_OUTPUT_BYTES = 256 * 1024
 const EVIDENCE_TAIL_CHARS = 4000
 const REASON_MAX_CHARS = 300
+const EVALUATOR_ABORTED = 'evaluator-aborted'
 
 export function evaluatorCliForAgent(agent: TuiAgent): LoopEvaluatorBinary {
   return agent === 'codex' ? 'codex' : 'claude'
@@ -144,8 +147,12 @@ export function createLocalEvaluatorCli(): LoopEvaluatorCli {
         cwd: tmpdir(),
         env: withCliRuntimeOnPath(program, process.env),
         timeoutMs: request.timeoutMs,
-        maxOutputBytes: EVALUATOR_MAX_OUTPUT_BYTES
+        maxOutputBytes: EVALUATOR_MAX_OUTPUT_BYTES,
+        ...(request.signal ? { signal: request.signal } : {})
       })
+      if (request.signal?.aborted) {
+        return { ok: false, error: `${request.binary} aborted` }
+      }
       if (result.timedOut) {
         return { ok: false, error: `${request.binary} timed out` }
       }
@@ -166,13 +173,20 @@ export async function evaluateIteration(
   cli: LoopEvaluatorCli = createLocalEvaluatorCli()
 ): Promise<EvaluatorVerdict> {
   const binary = evaluatorCliForAgent(args.agent)
+  if (args.signal?.aborted) {
+    return { verdict: 'not-met', reason: EVALUATOR_ABORTED }
+  }
   try {
     const result = await cli.run({
       binary,
       args: evaluatorArgs(binary),
       input: buildPrompt(args),
-      timeoutMs: EVALUATOR_TIMEOUT_MS
+      timeoutMs: EVALUATOR_TIMEOUT_MS,
+      ...(args.signal ? { signal: args.signal } : {})
     })
+    if (args.signal?.aborted) {
+      return { verdict: 'not-met', reason: EVALUATOR_ABORTED }
+    }
     if (!result.ok) {
       return { verdict: 'not-met', reason: 'evaluator-failed' }
     }

@@ -163,9 +163,9 @@ describe('working tree snapshots', () => {
     const after = await snapshotWorkingTree(target())
     const diff = await diffSnapshots(before!, after!, target())
 
-    expect(diff.added).toBe(4)
-    expect(diff.removed).toBe(1)
-    expect([...diff.files].sort()).toEqual(['sub/new file.txt', 'tracked.txt'])
+    expect(diff?.added).toBe(4)
+    expect(diff?.removed).toBe(1)
+    expect([...(diff?.files ?? [])].sort()).toEqual(['sub/new file.txt', 'tracked.txt'])
   })
 
   it('treats binary changes as zero counted lines but still lists the file', async () => {
@@ -177,6 +177,23 @@ describe('working tree snapshots', () => {
     const diff = await diffSnapshots(before!, after!, target())
 
     expect(diff).toEqual({ added: 0, removed: 0, files: ['blob.bin'] })
+  })
+
+  it('returns null, not an empty diff, when git cannot compute the diff', async () => {
+    const failing: LoopGitTarget = {
+      ...target(),
+      runGit: async () => {
+        throw new Error('git diff failed')
+      }
+    }
+
+    expect(
+      await diffSnapshots(
+        { treeId: 'before', headSha: null },
+        { treeId: 'after', headSha: null },
+        failing
+      )
+    ).toBeNull()
   })
 
   it('returns a zero diff for a folder workspace', async () => {

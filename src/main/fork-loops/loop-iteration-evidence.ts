@@ -16,6 +16,8 @@ import { usageDelta } from './loop-usage'
 
 export const MS_PER_MINUTE = 60_000
 const OUTPUT_TAIL_LINES = 300
+// staged by pathspec, not by the repo's exclude file, which loop creation can fail to write
+const LOOP_FILES_EXCLUDE_PATHSPEC = ':(exclude).orca/loops'
 
 const NOT_RUN_CHECK: CheckOutcome = {
   ran: false,
@@ -115,7 +117,7 @@ async function checkpointCommit(
     return { sha: null }
   }
   try {
-    await ws.runGit(['add', '-A'])
+    await ws.runGit(['add', '-A', '--', '.', LOOP_FILES_EXCLUDE_PATHSPEC])
     await ws.runGit(['commit', '-m', `loop(${ctx.loop.name}): iteration ${ctx.n}`])
     const head = await ws.runGit(['rev-parse', 'HEAD'])
     return { sha: head.stdout.trim() || null }
@@ -130,6 +132,7 @@ export type GatherArgs = {
   runtime: LoopDriverRuntime
   paneHandle: string | undefined
   settlement: Extract<IterationSettlement, { kind: 'settled' }>
+  signal: AbortSignal
   onPhase(phase: IterationPhase): void
 }
 
@@ -139,10 +142,11 @@ export const PROTECTED_PATHS_UNVERIFIED =
 /**
  * Collects the evidence of a settled iteration: markers, tree diff, protected-path hits, the
  * check, the evaluator, an optional checkpoint commit and the usage delta. Protected-path hits
- * are decided first, so a touched protected path is never committed.
+ * are decided first, so a touched protected path is never committed. An unmeasured diff or an
+ * aborted signal also blocks the commit.
  */
 export async function gatherIterationEvidence(args: GatherArgs): Promise<GatheredEvidence> {
-  const { ctx, tools, runtime, settlement } = args
+  const { ctx, tools, runtime, settlement, signal } = args
   const { config, agent } = ctx.loop
   const ws = ctx.targets?.workspace ?? null
   args.onPhase('checking')
@@ -166,7 +170,9 @@ export async function gatherIterationEvidence(args: GatherArgs): Promise<Gathere
   const claimed = markers.some((marker) => marker.kind === 'done')
   let checkOutcome: CheckOutcome | null = null
   if (check && (check.runWhen === 'every-iteration' || claimed)) {
-    checkOutcome = ctx.targets ? await tools.runCheck(config, ctx.targets.check) : NOT_RUN_CHECK
+    checkOutcome = ctx.targets
+      ? await tools.runCheck(config, ctx.targets.check, signal)
+      : NOT_RUN_CHECK
   }
   let evaluator: EvaluatorVerdict | null = null
   if (config.done.evaluator) {
@@ -176,6 +182,7 @@ export async function gatherIterationEvidence(args: GatherArgs): Promise<Gathere
       agent,
       checkOutcome,
       outputTail,
+      signal,
       ...(settlement.lastAssistantMessage
         ? { lastAssistantMessage: settlement.lastAssistantMessage }
         : {})
@@ -184,7 +191,8 @@ export async function gatherIterationEvidence(args: GatherArgs): Promise<Gathere
   let commitSha: string | null = null
   let error = ctx.error
   const changed = ctx.before !== null && after !== null && ctx.before.treeId !== after.treeId
-  if (config.checkpointCommits && ws?.kind === 'git' && changed && hits.length === 0) {
+  const checkpointable = diff !== null && hits.length === 0 && !signal.aborted
+  if (config.checkpointCommits && ws?.kind === 'git' && changed && checkpointable) {
     const committed = await checkpointCommit(ws, ctx)
     commitSha = committed.sha
     error = committed.error ?? error

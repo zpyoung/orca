@@ -46,6 +46,24 @@ function clampTimeoutSeconds(value: number): number {
   return Math.min(Math.floor(value), LOOP_CHECK_MAX_TIMEOUT_SECONDS)
 }
 
+const ABORTED = Symbol('aborted')
+export const CHECK_ABORTED = 'aborted'
+
+// the precheck runner has no cancel hook, so an aborted check stops being awaited and its process runs out its own timeout
+function raceAbort<T>(
+  work: Promise<T>,
+  signal: AbortSignal | undefined
+): Promise<T | typeof ABORTED> {
+  if (!signal) {
+    return work
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => resolve(ABORTED)
+    signal.addEventListener('abort', onAbort, { once: true })
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort))
+  })
+}
+
 function notRun(error: string): CheckOutcome {
   return {
     ran: false,
@@ -66,7 +84,8 @@ function notRun(error: string): CheckOutcome {
 export async function runLoopCheck(
   loop: { config: Pick<LoopConfig, 'done'> },
   target: LoopCheckTarget,
-  deps: LoopCheckDeps = defaultDeps
+  deps: LoopCheckDeps = defaultDeps,
+  signal?: AbortSignal
 ): Promise<CheckOutcome> {
   const check = loop.config.done.check
   if (!check) {
@@ -76,18 +95,27 @@ export async function runLoopCheck(
   if (!hostVerdict.ok) {
     return notRun(hostVerdict.message)
   }
+  if (signal?.aborted) {
+    return notRun(CHECK_ABORTED)
+  }
   try {
     const executionTarget =
       target.type === 'ssh'
         ? { type: 'ssh' as const, cwd: target.cwd, connectionId: target.connectionId }
         : target
-    const result = await deps.runPrecheck({
-      precheck: {
-        command: check.command,
-        timeoutSeconds: clampTimeoutSeconds(check.timeoutSeconds)
-      },
-      target: executionTarget
-    })
+    const result = await raceAbort(
+      deps.runPrecheck({
+        precheck: {
+          command: check.command,
+          timeoutSeconds: clampTimeoutSeconds(check.timeoutSeconds)
+        },
+        target: executionTarget
+      }),
+      signal
+    )
+    if (result === ABORTED) {
+      return notRun(CHECK_ABORTED)
+    }
     const started = result.timedOut || result.exitCode !== null || result.error === null
     return {
       ran: started,

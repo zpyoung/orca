@@ -193,7 +193,7 @@ function createEvidenceTools(store: Store): LoopEvidenceTools {
   return {
     snapshotTree: snapshotWorkingTree,
     diffTrees: diffSnapshots,
-    runCheck: (config, target) => runLoopCheck({ config }, target),
+    runCheck: (config, target, signal) => runLoopCheck({ config }, target, undefined, signal),
     evaluate: evaluateIteration,
     readUsage: (paneKey, worktreeId, agent) => readUsageTotals(paneKey, worktreeId, agent, usage),
     readUsageLimit: (agent) =>

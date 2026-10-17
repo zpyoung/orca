@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { execFile } from 'node:child_process'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CheckOutcome, LoopConfig } from '../../shared/fork-loops/loop-types'
 import type { StoredLoop } from './loop-database'
 import type { IterationContext, LoopEvidenceTools } from './loop-driver-types'
+import { diffSnapshots, snapshotWorkingTree } from './loop-diff'
 import { PROTECTED_PATHS_UNVERIFIED, gatherIterationEvidence } from './loop-iteration-evidence'
+import { createLocalLoopFilesystem, type LoopGitRunner } from './loop-notes-file'
+
+const execFileAsync = promisify(execFile)
 
 const FAILED_CHECK: CheckOutcome = {
   ran: true,
@@ -110,6 +119,7 @@ async function gather(
     runtime: {},
     paneHandle: undefined,
     settlement: { kind: 'settled', settledAt: 1 },
+    signal: new AbortController().signal,
     onPhase: () => undefined
   })
 }
@@ -152,5 +162,163 @@ describe('gatherIterationEvidence protected paths', () => {
   it('reports no hits for a git loop without protected paths when a snapshot is unavailable', async () => {
     const evidence = await gather(configWith({}), toolsWith(PASSED_CHECK), 'git')
     expect(evidence.protectedPathHits).toEqual([])
+  })
+})
+
+describe('gatherIterationEvidence checkpoint commits', () => {
+  const checkpointing = (): LoopConfig => ({ ...configWith({}), checkpointCommits: true })
+  const BEFORE = { treeId: 'tree-before', headSha: null }
+  const AFTER = { treeId: 'tree-after', headSha: null }
+
+  function gitContext(config: LoopConfig, runGit: LoopGitRunner): IterationContext {
+    const ctx = contextWith(config, 'git')
+    if (!ctx.targets) {
+      throw new Error('context has no targets')
+    }
+    return {
+      ...ctx,
+      before: BEFORE,
+      targets: { ...ctx.targets, workspace: { ...ctx.targets.workspace, runGit } }
+    }
+  }
+
+  function commitTools(diff: Awaited<ReturnType<LoopEvidenceTools['diffTrees']>>) {
+    return {
+      ...toolsWith({ ...FAILED_CHECK, pass: true }),
+      snapshotTree: async () => AFTER,
+      diffTrees: async () => diff
+    }
+  }
+
+  async function gatherWith(
+    ctx: IterationContext,
+    tools: LoopEvidenceTools,
+    signal = new AbortController().signal
+  ) {
+    return gatherIterationEvidence({
+      ctx,
+      tools,
+      runtime: {},
+      paneHandle: undefined,
+      settlement: { kind: 'settled', settledAt: 1 },
+      signal,
+      onPhase: () => undefined
+    })
+  }
+
+  it('never stages the loop directory, so a failed exclude-file write cannot leak notes', async () => {
+    const calls: string[][] = []
+    const runGit: LoopGitRunner = async (args) => {
+      calls.push(args)
+      return { stdout: 'abc123\n', stderr: '' }
+    }
+
+    await gatherWith(
+      gitContext(checkpointing(), runGit),
+      commitTools({ added: 1, removed: 0, files: ['a.ts'] })
+    )
+
+    expect(calls[0]).toEqual(['add', '-A', '--', '.', ':(exclude).orca/loops'])
+  })
+
+  it('does not commit when the diff could not be measured', async () => {
+    const runGit = vi.fn<LoopGitRunner>(async () => ({ stdout: '', stderr: '' }))
+
+    const evidence = await gatherWith(gitContext(checkpointing(), runGit), commitTools(null))
+
+    expect(runGit).not.toHaveBeenCalled()
+    expect(evidence.checkpointCommit).toBeNull()
+  })
+
+  it('pauses on protected paths when the diff could not be measured', async () => {
+    const config = { ...checkpointing(), protectedPaths: ['src/**'] }
+    const runGit = vi.fn<LoopGitRunner>(async () => ({ stdout: '', stderr: '' }))
+
+    const evidence = await gatherWith(gitContext(config, runGit), commitTools(null))
+
+    expect(evidence.protectedPathHits).toEqual([PROTECTED_PATHS_UNVERIFIED])
+    expect(runGit).not.toHaveBeenCalled()
+  })
+
+  it('threads the signal into the check and evaluator and skips the commit once aborted', async () => {
+    const controller = new AbortController()
+    const config: LoopConfig = {
+      ...checkpointing(),
+      done: {
+        check: { command: 'true', timeoutSeconds: 1, runWhen: 'every-iteration' },
+        evaluator: { condition: 'done' }
+      }
+    }
+    const seen: (AbortSignal | undefined)[] = []
+    const runGit = vi.fn<LoopGitRunner>(async () => ({ stdout: '', stderr: '' }))
+    const tools: LoopEvidenceTools = {
+      ...commitTools({ added: 1, removed: 0, files: ['a.ts'] }),
+      runCheck: async (_config, _target, signal) => {
+        seen.push(signal)
+        controller.abort()
+        return { ...FAILED_CHECK, ran: false }
+      },
+      evaluate: async (args) => {
+        seen.push(args.signal)
+        return { verdict: 'not-met', reason: 'evaluator-aborted' }
+      }
+    }
+
+    const evidence = await gatherWith(gitContext(config, runGit), tools, controller.signal)
+
+    expect(seen).toEqual([controller.signal, controller.signal])
+    expect(runGit).not.toHaveBeenCalled()
+    expect(evidence.checkpointCommit).toBeNull()
+  })
+
+  describe('against a real repository', () => {
+    let root = ''
+
+    afterEach(async () => {
+      await rm(root, { recursive: true, force: true })
+    })
+
+    it('commits the change but leaves untracked loop files out of the commit', async () => {
+      root = await mkdtemp(join(tmpdir(), 'orca-loop-evidence-'))
+      const env: NodeJS.ProcessEnv = {}
+      for (const [key, value] of Object.entries(process.env)) {
+        if (!key.startsWith('GIT_')) {
+          env[key] = value
+        }
+      }
+      const runGit: LoopGitRunner = (args, options) =>
+        execFileAsync('git', args, { cwd: root, env: { ...env, ...options?.env } })
+      await runGit(['init', '-q'])
+      await runGit(['config', 'user.email', 'loop@example.com'])
+      await runGit(['config', 'user.name', 'Loop'])
+      await writeFile(join(root, 'tracked.txt'), 'one\n')
+      await runGit(['add', '-A'])
+      await runGit(['commit', '-q', '-m', 'initial'])
+      const ctx = gitContext(checkpointing(), runGit)
+      const workspace = {
+        kind: 'git' as const,
+        workspacePath: root,
+        pathFlavor: 'posix' as const,
+        fs: createLocalLoopFilesystem(),
+        runGit
+      }
+      const before = await snapshotWorkingTree(workspace)
+      await writeFile(join(root, 'tracked.txt'), 'one\ntwo\n')
+      await mkdir(join(root, '.orca', 'loops', 'loop'), { recursive: true })
+      await writeFile(join(root, '.orca', 'loops', 'loop', 'notes.md'), 'notes\n')
+
+      const evidence = await gatherWith(
+        { ...ctx, before, targets: ctx.targets && { ...ctx.targets, workspace } },
+        {
+          ...toolsWith({ ...FAILED_CHECK, pass: true }),
+          snapshotTree: snapshotWorkingTree,
+          diffTrees: diffSnapshots
+        }
+      )
+
+      const committed = await runGit(['show', '--name-only', '--format=', 'HEAD'])
+      expect(evidence.checkpointCommit).not.toBeNull()
+      expect(committed.stdout.trim().split('\n')).toEqual(['tracked.txt'])
+    })
   })
 })

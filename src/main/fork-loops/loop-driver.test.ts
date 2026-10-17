@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CheckOutcome, LoopConfig, NeedsYouReason } from '../../shared/fork-loops/loop-types'
+import type {
+  CheckOutcome,
+  EvaluatorVerdict,
+  LoopConfig,
+  NeedsYouReason
+} from '../../shared/fork-loops/loop-types'
 import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-contracts'
 import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
 import { LoopDatabase, type LoopInsert, type StoredLoop } from './loop-database'
@@ -10,6 +15,7 @@ import {
   type LoopEvidenceTools
 } from './loop-driver'
 import type { IterationSettlement, ObserveIterationArgs } from './iteration-observer'
+import type { LoopEvaluationArgs } from './loop-evaluator'
 import { buildLoopNotification } from './loop-notify'
 import { LoopStore } from './loop-store'
 
@@ -167,8 +173,13 @@ function createHarness(options: {
       removed: 1,
       files: options.diffFiles ?? ['src/app.ts']
     })),
-    runCheck: vi.fn(async () => checks.shift() ?? PASS),
-    evaluate: vi.fn(async () => ({ verdict: 'met' as const, reason: 'ok' })),
+    runCheck: vi.fn(
+      async (_config: LoopConfig, _target: unknown, _signal?: AbortSignal) => checks.shift() ?? PASS
+    ),
+    evaluate: vi.fn(async (_args: LoopEvaluationArgs): Promise<EvaluatorVerdict> => ({
+      verdict: 'met',
+      reason: 'ok'
+    })),
     readUsage: vi.fn(async () => null),
     readUsageLimit: vi.fn(() => null)
   } satisfies LoopEvidenceTools
@@ -382,6 +393,51 @@ describe('LoopDriver holds and stops', () => {
     expect(h.changes.some((change) => change.startsWith('paused'))).toBe(false)
   })
 
+  it('aborts a running check on stop now and ends stopped without counting a pass', async () => {
+    const h = createHarness({})
+    let checkSignal: AbortSignal | undefined
+    h.tools.runCheck.mockImplementationOnce(
+      (_config, _target, signal) =>
+        new Promise<CheckOutcome>((resolve) => {
+          checkSignal = signal
+          signal?.addEventListener('abort', () =>
+            resolve({ ...FAIL, ran: false, error: 'aborted' })
+          )
+          h.driver.requestStop('now')
+        })
+    )
+
+    await h.run()
+
+    const [iteration] = h.store.listIterations('loop-1')
+    expect(checkSignal?.aborted).toBe(true)
+    expect(iteration?.endReason).toBe('stopped')
+    expect(iteration?.check?.pass).toBe(false)
+    expect(h.row().state).toBe('stopped')
+    expect(h.row().iterationsCompleted).toBe(0)
+  })
+
+  it('aborts a running evaluator on stop now', async () => {
+    const h = createHarness({ config: { done: { evaluator: { condition: 'good' } } } })
+    let evaluatorSignal: AbortSignal | undefined
+    h.tools.evaluate.mockImplementationOnce(
+      (args) =>
+        new Promise((resolve) => {
+          evaluatorSignal = args.signal
+          args.signal?.addEventListener('abort', () =>
+            resolve({ verdict: 'not-met', reason: 'evaluator-aborted' })
+          )
+          h.driver.requestStop('now')
+        })
+    )
+
+    await h.run()
+
+    expect(evaluatorSignal?.aborted).toBe(true)
+    expect(h.store.listIterations('loop-1')[0]?.endReason).toBe('stopped')
+    expect(h.row().state).toBe('stopped')
+  })
+
   it('ends stopped after the iteration for a stop after iteration', async () => {
     const h = createHarness({})
     h.steps.push(async () => {
@@ -532,7 +588,54 @@ describe('LoopDriver detached and relaunch', () => {
   })
 })
 
+describe('LoopDriver resume after repeated crashes', () => {
+  it('keeps both crash records and numbers the resumed attempt after them', async () => {
+    const h = createHarness({})
+    h.steps.push({ kind: 'crashed', exitCode: 1 }, { kind: 'crashed', exitCode: 1 })
+
+    await h.run()
+    expect(h.row().pauseReason).toBe('crashed')
+    h.store.updateLoop('loop-1', { state: 'running', pauseReason: null })
+    h.driver.resume()
+    await h.driver.whenIdle()
+
+    const rows = h.store.listIterations('loop-1')
+    expect(rows.map((it) => [it.n, it.attempt, it.endReason])).toEqual([
+      [1, 0, 'crashed'],
+      [1, 1, 'crashed'],
+      [1, 2, 'settled']
+    ])
+  })
+})
+
 describe('LoopDriver unverifiable hosts', () => {
+  it('holds a launch that cannot be confirmed instead of spending the crash retry', async () => {
+    const h = createHarness({ config: { sessionPolicy: 'continue' } })
+    h.runtime.getTerminalHandleForPaneKey = () => null
+    let waits = 0
+    h.runtime.waitForTerminal = async (handle: string) => {
+      waits += 1
+      if (waits === 1) {
+        throw new Error('ssh connection lost')
+      }
+      return {
+        handle,
+        condition: 'tui-idle' as const,
+        satisfied: true,
+        status: 'running' as const,
+        exitCode: null
+      }
+    }
+    h.liveness.push({ status: 'unverifiable', reason: 'ssh down' })
+
+    await h.run()
+
+    const rows = h.store.listIterations('loop-1')
+    expect(rows.map((it) => [it.attempt, it.endReason])).toEqual([[0, 'settled']])
+    expect(h.runtime.launchAgentTerminal).toHaveBeenCalledTimes(1)
+    expect(h.row().state).toBe('completed')
+  })
+
   it('holds without counting a crash and continues the same iteration when the pty is live', async () => {
     const h = createHarness({})
     h.steps.push({ kind: 'unverifiable' }, { kind: 'unverifiable' })
@@ -572,7 +675,7 @@ describe('LoopDriver checkpoint commits', () => {
     await h.run()
 
     expect(h.gitCalls).toEqual([
-      ['add', '-A'],
+      ['add', '-A', '--', '.', ':(exclude).orca/loops'],
       ['commit', '-m', 'loop(Fix tests): iteration 1'],
       ['rev-parse', 'HEAD']
     ])
