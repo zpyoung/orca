@@ -128,6 +128,7 @@ export async function relaunchLoopAgent(
 export type AgentReadyArgs = {
   runtime: LoopDriverRuntime
   handle: string
+  ptyId?: string
   signal: AbortSignal
   pollMs?: number
   now(): number
@@ -135,10 +136,22 @@ export type AgentReadyArgs = {
   onUnblocked(): void
 }
 
-/** Waits for a just-launched agent's composer; a blocking dialog hands control to the user. */
-export async function awaitAgentReady(
-  args: AgentReadyArgs
-): Promise<'ready' | 'crashed' | 'aborted'> {
+export type AgentReadiness = 'ready' | 'crashed' | 'aborted' | 'unverifiable'
+
+/** `crashed` only when the host positively reports the PTY exited; lost contact stays `unverifiable`. */
+function readinessFailure(args: AgentReadyArgs): 'crashed' | 'unverifiable' {
+  const read = args.runtime.getPtyLivenessVerdict
+  if (!args.ptyId || typeof read !== 'function') {
+    return 'crashed'
+  }
+  return read.call(args.runtime, args.ptyId)?.status === 'unverifiable' ? 'unverifiable' : 'crashed'
+}
+
+/**
+ * Waits for a just-launched agent's composer; a blocking dialog hands control to the user. A
+ * failure is `unverifiable` when the PTY's host cannot confirm the agent is gone.
+ */
+export async function awaitAgentReady(args: AgentReadyArgs): Promise<AgentReadiness> {
   const { runtime, signal } = args
   if (typeof runtime.waitForTerminal !== 'function') {
     return 'ready'
@@ -159,7 +172,7 @@ export async function awaitAgentReady(
       })
     } catch (error) {
       if (errorMessage(error) !== 'timeout') {
-        return signal.aborted ? 'aborted' : 'crashed'
+        return signal.aborted ? 'aborted' : readinessFailure(args)
       }
       continue
     }
@@ -177,7 +190,38 @@ export async function awaitAgentReady(
       args.onBlocked(wait.blockedReason)
     }
   }
-  return 'crashed'
+  return readinessFailure(args)
+}
+
+export type LaunchedAgentArgs = Omit<AgentReadyArgs, 'handle' | 'ptyId'> & {
+  pane: PaneRef
+  sleep?(ms: number, signal: AbortSignal): Promise<void>
+  onPhase(phase: IterationPhase): void
+}
+
+/** Awaits readiness and holds, like an unverifiable settlement, while a launch cannot be confirmed. */
+export async function awaitLaunchedAgent(
+  args: LaunchedAgentArgs
+): Promise<Exclude<AgentReadiness, 'unverifiable'>> {
+  const { pane, sleep, onPhase, ...ready } = args
+  for (;;) {
+    const readiness = await awaitAgentReady({ ...ready, handle: pane.handle, ptyId: pane.ptyId })
+    if (readiness !== 'unverifiable') {
+      return readiness
+    }
+    onPhase('waiting')
+    const held = await holdUntilPaneLive({
+      runtime: args.runtime,
+      pane,
+      signal: args.signal,
+      pollMs: args.pollMs,
+      sleep
+    })
+    if (held !== 'live') {
+      return held === 'exited' ? 'crashed' : 'aborted'
+    }
+    onPhase('sending')
+  }
 }
 
 /** Delivers one iteration prompt, recording the write window so the user's typing stays distinct. */
@@ -222,10 +266,35 @@ export type ObserveArgs = {
   onPhase(phase: IterationPhase): void
 }
 
+export type HoldArgs = {
+  runtime: LoopDriverRuntime
+  pane: PaneRef
+  signal: AbortSignal
+  pollMs?: number
+  sleep?(ms: number, signal: AbortSignal): Promise<void>
+}
+
+/** Polls PTY liveness until the pane is `live`, positively `exited`, or the signal aborts. */
+export async function holdUntilPaneLive(args: HoldArgs): Promise<'live' | 'exited' | 'aborted'> {
+  const { runtime, pane, signal } = args
+  const sleep = args.sleep ?? abortableSleep
+  let verdict: PtyLivenessVerdict | null = null
+  while (!signal.aborted && verdict?.status !== 'live') {
+    await sleep(args.pollMs ?? DEFAULT_POLL_MS, signal)
+    verdict =
+      typeof runtime.getPtyLivenessVerdict === 'function'
+        ? runtime.getPtyLivenessVerdict(pane.ptyId)
+        : { status: 'live', ptyIds: [pane.ptyId] }
+    if (verdict?.status === 'exited') {
+      return 'exited'
+    }
+  }
+  return signal.aborted ? 'aborted' : 'live'
+}
+
 /** Observes until settled, holding through a lost connection instead of counting a crash. */
 export async function observeUntilSettled(args: ObserveArgs): Promise<IterationSettlement> {
   const { runtime, observer, pane, signal } = args
-  const sleep = args.sleep ?? abortableSleep
   for (;;) {
     const settlement = await observer.observeIteration({
       handle: pane.handle,
@@ -240,18 +309,17 @@ export async function observeUntilSettled(args: ObserveArgs): Promise<IterationS
       return settlement
     }
     args.onPhase('waiting')
-    let verdict: PtyLivenessVerdict | null = null
-    while (!signal.aborted && verdict?.status !== 'live') {
-      await sleep(args.pollMs ?? DEFAULT_POLL_MS, signal)
-      verdict =
-        typeof runtime.getPtyLivenessVerdict === 'function'
-          ? runtime.getPtyLivenessVerdict(pane.ptyId)
-          : { status: 'live', ptyIds: [pane.ptyId] }
-      if (verdict?.status === 'exited') {
-        return { kind: 'crashed', exitCode: null }
-      }
+    const held = await holdUntilPaneLive({
+      runtime,
+      pane,
+      signal,
+      pollMs: args.pollMs,
+      sleep: args.sleep
+    })
+    if (held === 'exited') {
+      return { kind: 'crashed', exitCode: null }
     }
-    if (signal.aborted) {
+    if (held === 'aborted') {
       return { kind: 'aborted' }
     }
     args.onPhase('working')

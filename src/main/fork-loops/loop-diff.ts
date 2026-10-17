@@ -84,15 +84,15 @@ function parseNumstat(output: string): DiffStats {
 }
 
 /**
- * Line and file differences between two snapshots. Equal tree ids short-circuit to an empty diff.
- * A git failure also yields an empty diff, because no-progress detection keys on the tree ids and
- * never on these counts.
+ * Line and file differences between two snapshots. Equal tree ids, or a workspace without git,
+ * short-circuit to an empty diff. A git failure returns null: the change is unmeasured, which
+ * protected-path enforcement must not read as "nothing changed".
  */
 export async function diffSnapshots(
   before: TreeSnapshot,
   after: TreeSnapshot,
   target: LoopGitTarget
-): Promise<DiffStats> {
+): Promise<DiffStats | null> {
   const runGit = target.kind === 'git' ? target.runGit : null
   if (!runGit || before.treeId === after.treeId) {
     return emptyDiff()
@@ -109,6 +109,6 @@ export async function diffSnapshots(
     ])
     return parseNumstat(stdout)
   } catch {
-    return emptyDiff()
+    return null
   }
 }

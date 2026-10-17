@@ -11,7 +11,7 @@ import { LOOP_USER_IDLE_MS } from './input-attribution'
 import type { IterationSettlement } from './iteration-observer'
 import {
   abortableSleep,
-  awaitAgentReady,
+  awaitLaunchedAgent,
   errorMessage,
   observeUntilSettled,
   relaunchLoopAgent,
@@ -316,12 +316,15 @@ export class LoopDriver {
   ): Promise<void> {
     const { store, tools } = this.deps
     let loop = this.row()
-    const rows = store.listIterations(this.loopId, { limit: 1 })
-    const lastRow = rows.at(-1) ?? null
+    const lastRow = store.listIterations(this.loopId, { limit: 1 }).at(-1) ?? null
     const reRun = lastRow?.endReason === 'interrupted'
     const n =
       isRetry || reRun ? (lastRow?.n ?? loop.iterationsCompleted + 1) : loop.iterationsCompleted + 1
-    const attempt = isRetry || reRun ? (lastRow?.attempt ?? -1) + 1 : 0
+    // a resumed loop re-enters an iteration number whose crashed attempts must stay on record
+    const attempt = store
+      .listIterations(this.loopId)
+      .filter((row) => row.n === n)
+      .reduce((next, row) => Math.max(next, row.attempt + 1), 0)
     const startedAt = this.now()
     store.insertIteration(this.loopId, { n, attempt, promptSent: '', startedAt })
     this.abort = new AbortController()
@@ -362,14 +365,16 @@ export class LoopDriver {
       } catch (error) {
         return this.endIteration(ctx, { kind: 'crashed', exitCode: null }, errorMessage(error))
       }
-      const ready = await awaitAgentReady({
+      const ready = await awaitLaunchedAgent({
         runtime: this.deps.runtime,
-        handle: pane.handle,
+        pane,
         signal: this.abort.signal,
         pollMs: this.deps.pollMs,
+        sleep: this.deps.sleep,
         now: () => this.now(),
         onBlocked: (reason) => this.enterNeedsYou(reason),
-        onUnblocked: () => this.leaveNeedsYou('sending')
+        onUnblocked: () => this.leaveNeedsYou('sending'),
+        onPhase: (phase) => this.commit({}, phase)
       })
       if (ready !== 'ready') {
         return this.endIteration(ctx, {
@@ -461,7 +466,6 @@ export class LoopDriver {
       return
     }
     const { store, tools } = this.deps
-    const stopped = settlement.kind === 'aborted'
     const gathered =
       settlement.kind === 'settled'
         ? await gatherIterationEvidence({
@@ -470,9 +474,15 @@ export class LoopDriver {
             runtime: this.deps.runtime,
             paneHandle,
             settlement,
+            signal: this.abort.signal,
             onPhase: (phase) => this.commit({}, phase)
           })
         : null
+    if (this.disposed) {
+      return
+    }
+    const stopped =
+      settlement.kind === 'aborted' || (gathered !== null && this.abort.signal.aborted)
     const endedAt = this.now()
     const evidence = {
       check: gathered?.check ?? null,
@@ -494,7 +504,7 @@ export class LoopDriver {
       ...(gathered ? { outputTail: gathered.outputTail } : {}),
       error
     })
-    const usageLimit = settlement.kind === 'aborted' ? null : tools.readUsageLimit(ctx.loop.agent)
+    const usageLimit = stopped ? null : tools.readUsageLimit(ctx.loop.agent)
     this.latest = {
       n: ctx.n,
       attempt: ctx.attempt,
@@ -502,7 +512,7 @@ export class LoopDriver {
       endedAt,
       endReason,
       ...evidence,
-      settlement: settlement.kind,
+      settlement: stopped ? 'aborted' : settlement.kind,
       usageLimit
     }
     const row = this.row()

@@ -89,6 +89,30 @@ describe('evaluateIteration', () => {
     })
   })
 
+  it('hands the signal to the CLI and reads an abort as not-met, never met', async () => {
+    const controller = new AbortController()
+    const run = vi.fn(async (request: { signal?: AbortSignal }) => {
+      controller.abort()
+      expect(request.signal).toBe(controller.signal)
+      return { ok: true as const, stdout: 'VERDICT: met\nREASON: raced the abort' }
+    })
+
+    const verdict = await evaluateIteration({ ...baseArgs, signal: controller.signal }, { run })
+
+    expect(verdict).toEqual({ verdict: 'not-met', reason: 'evaluator-aborted' })
+  })
+
+  it('does not start the CLI when the signal is already aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const cli = cliReturning('VERDICT: met\nREASON: ok')
+
+    const verdict = await evaluateIteration({ ...baseArgs, signal: controller.signal }, cli)
+
+    expect(verdict).toEqual({ verdict: 'not-met', reason: 'evaluator-aborted' })
+    expect(cli.run).not.toHaveBeenCalled()
+  })
+
   it('runs claude headlessly on haiku with the prompt on stdin', async () => {
     const cli = cliReturning('VERDICT: met\nREASON: ok')
     await evaluateIteration(

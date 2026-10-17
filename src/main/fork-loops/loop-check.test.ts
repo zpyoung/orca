@@ -142,6 +142,50 @@ describe('runLoopCheck', () => {
   })
 })
 
+describe('runLoopCheck abort', () => {
+  const check = { command: 'pnpm test', timeoutSeconds: 120, runWhen: 'every-iteration' } as const
+
+  it('does not start a check when the signal is already aborted', async () => {
+    const runPrecheck = vi.fn()
+    const controller = new AbortController()
+    controller.abort()
+
+    const outcome = await runLoopCheck(
+      loopWithCheck(check),
+      LOCAL,
+      { runPrecheck },
+      controller.signal
+    )
+
+    expect(outcome).toMatchObject({ ran: false, pass: false, error: 'aborted' })
+    expect(runPrecheck).not.toHaveBeenCalled()
+  })
+
+  it('stops waiting for a running check on abort and reports it as not run', async () => {
+    const controller = new AbortController()
+    const runPrecheck = vi.fn(() => new Promise<AutomationPrecheckResult>(() => undefined))
+
+    const pending = runLoopCheck(loopWithCheck(check), LOCAL, { runPrecheck }, controller.signal)
+    controller.abort()
+
+    expect(await pending).toMatchObject({ ran: false, pass: false, error: 'aborted' })
+  })
+
+  it('reports a finished check normally when the signal never aborts', async () => {
+    const runPrecheck = vi.fn(async () => precheckResult({}))
+    const controller = new AbortController()
+
+    const outcome = await runLoopCheck(
+      loopWithCheck(check),
+      LOCAL,
+      { runPrecheck },
+      controller.signal
+    )
+
+    expect(outcome).toMatchObject({ ran: true, pass: true })
+  })
+})
+
 describe('validateLoopCheckHost', () => {
   it('rejects a Windows SSH host with loop_check_unsupported_host', () => {
     expect(

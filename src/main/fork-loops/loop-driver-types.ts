@@ -68,15 +68,18 @@ export type LoopDriverRuntime = AgentRelaunchRuntime & {
   getAgentStatusRowsForPane?(paneKey: string): readonly { state: string }[]
 }
 
-/** Evidence gatherers; each reports failure as data so the driver's decision stays total. */
+/**
+ * Evidence gatherers; each reports failure as data so the driver's decision stays total. A null
+ * diff means the change could not be measured.
+ */
 export type LoopEvidenceTools = {
   snapshotTree(target: LoopWorkspaceTarget): Promise<TreeSnapshot | null>
   diffTrees(
     before: TreeSnapshot,
     after: TreeSnapshot,
     target: LoopWorkspaceTarget
-  ): Promise<DiffStats>
-  runCheck(config: LoopConfig, target: LoopCheckTarget): Promise<CheckOutcome>
+  ): Promise<DiffStats | null>
+  runCheck(config: LoopConfig, target: LoopCheckTarget, signal?: AbortSignal): Promise<CheckOutcome>
   evaluate(args: LoopEvaluationArgs): Promise<EvaluatorVerdict>
   readUsage(paneKey: string, worktreeId: string, agent: TuiAgent): Promise<UsageTotals | null>
   readUsageLimit(agent: TuiAgent): { provider: 'claude' | 'codex'; resetsAt: number | null } | null
