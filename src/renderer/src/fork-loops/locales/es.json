@@ -138,6 +138,7 @@
         },
         "meter": {
           "cost": "Coste",
+          "costUnavailable": "Costo no disponible",
           "ofCap": "{{spent}} de {{cap}}",
           "time": "Tiempo"
         },

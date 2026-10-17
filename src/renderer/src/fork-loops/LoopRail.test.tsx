@@ -355,22 +355,42 @@ describe('LoopRail', () => {
     expect(screen.queryByText('Loading output…')).not.toBeInTheDocument()
   })
 
-  it('hides the cost meter when the loop has reported no cost', () => {
+  it('shows a configured cost cap before any cost is measured, then the spend against it', () => {
     installApi()
-    seed(makeLoop({ config: { ...makeLoop().config, caps: { maxIterations: 10, maxCostUsd: 5 } } }))
+    const config = { ...makeLoop().config, caps: { maxIterations: 10, maxCostUsd: 5 } }
+    seed(makeLoop({ config }))
 
     const { rerender } = render(<LoopRail paneKey={PANE_KEY} />)
-    expect(screen.queryByText('Cost')).not.toBeInTheDocument()
+    expect(screen.getByText('Cost')).toBeInTheDocument()
+    expect(screen.getByText('\u2014 of $5.00')).toBeInTheDocument()
 
+    seed(makeLoop({ costUsd: 1.5, config }))
+    rerender(<LoopRail paneKey={PANE_KEY} />)
+    expect(screen.getByText('$1.50 of $5.00')).toBeInTheDocument()
+  })
+
+  it('omits the cost meter when no cost cap is set and no cost was reported', () => {
+    installApi()
+    seed(makeLoop())
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    expect(screen.queryByText('Cost')).not.toBeInTheDocument()
+  })
+
+  it('says cost is unavailable when the loop paused for lack of usage data', () => {
+    installApi()
     seed(
       makeLoop({
-        costUsd: 1.5,
+        state: 'paused',
+        pauseReason: 'cap-cost',
+        pauseDetail: 'usage-unavailable',
+        currentIteration: undefined,
         config: { ...makeLoop().config, caps: { maxIterations: 10, maxCostUsd: 5 } }
       })
     )
-    rerender(<LoopRail paneKey={PANE_KEY} />)
-    expect(screen.getByText('Cost')).toBeInTheDocument()
-    expect(screen.getByText('$1.50 of $5.00')).toBeInTheDocument()
+
+    render(<LoopRail paneKey={PANE_KEY} />)
+    expect(screen.getByText('Cost unavailable')).toBeInTheDocument()
   })
 
   it('resumes a loop paused at its iteration cap with the chosen number of extra iterations', async () => {

@@ -25,9 +25,19 @@ const CREATE_FLAGS = [
   'resume-at-reset'
 ]
 
-const EDIT_FLAGS = CREATE_FLAGS.filter(
-  (flag) => !['worktree', 'agent', 'preset', 'queue-item'].includes(flag)
-)
+const EDIT_CLEAR_FLAGS = [
+  'no-check',
+  'no-evaluator',
+  'no-max-iterations',
+  'no-max-minutes',
+  'no-max-cost',
+  'no-protected-paths'
+]
+
+const EDIT_FLAGS = [
+  ...CREATE_FLAGS.filter((flag) => !['worktree', 'agent', 'preset', 'queue-item'].includes(flag)),
+  ...EDIT_CLEAR_FLAGS
+]
 
 export const LOOP_COMMAND_SPECS: CommandSpec[] = [
   {
@@ -109,13 +119,14 @@ export const LOOP_COMMAND_SPECS: CommandSpec[] = [
     path: ['loop', 'edit'],
     summary: 'Change a loop prompt, done signal, caps, or options',
     usage:
-      'orca loop edit <loopId> [--name <name>] [--prompt <text>] [--repeat-queue] [--every <minutes>] [--anchor from-end|wall-clock] [--session fresh|continue] [--check <command>] [--check-timeout <seconds>] [--check-when every-iteration|on-claim] [--evaluator <condition>] [--max-iterations <n>] [--max-minutes <n>] [--max-cost <usd>] [--no-progress] [--protected-path <glob>]... [--checkpoint-commits] [--ask-before-next] [--resume-at-reset] [--json]',
+      'orca loop edit <loopId> [--name <name>] [--prompt <text>] [--repeat-queue] [--every <minutes>] [--anchor from-end|wall-clock] [--session fresh|continue] [--check <command>] [--check-timeout <seconds>] [--check-when every-iteration|on-claim] [--evaluator <condition>] [--max-iterations <n>] [--max-minutes <n>] [--max-cost <usd>] [--no-progress] [--protected-path <glob>]... [--no-check] [--no-evaluator] [--no-max-iterations] [--no-max-minutes] [--no-max-cost] [--no-protected-paths] [--checkpoint-commits] [--ask-before-next] [--resume-at-reset] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'loop-id', ...EDIT_FLAGS],
     positionalArgs: ['loop-id'],
     repeatableFlags: ['protected-path'],
     notes: [
       'Only the flags you pass change; everything else keeps its current value. Changes apply from the next iteration.',
-      'Put the loop id before any boolean flag so the id is not read as the flag value.'
+      'Put the loop id before any boolean flag so the id is not read as the flag value.',
+      'The --no-check, --no-evaluator, --no-max-*, and --no-protected-paths flags remove that setting; combining one with its setting flag is an error.'
     ],
     examples: [
       'orca loop edit loop_01J000000000000000000000 --max-iterations 20 --check "pnpm test"'

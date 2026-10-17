@@ -138,6 +138,7 @@
         },
         "meter": {
           "cost": "コスト",
+          "costUnavailable": "コストを取得できません",
           "ofCap": "{{spent}} / {{cap}}",
           "time": "時間"
         },

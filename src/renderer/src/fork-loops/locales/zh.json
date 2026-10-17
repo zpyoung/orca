@@ -138,6 +138,7 @@
         },
         "meter": {
           "cost": "费用",
+          "costUnavailable": "费用不可用",
           "ofCap": "{{spent}} / {{cap}}",
           "time": "时间"
         },

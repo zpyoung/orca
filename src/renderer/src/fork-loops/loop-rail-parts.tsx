@@ -159,6 +159,41 @@ function Meter({
   )
 }
 
+function CostMeter({
+  loop,
+  ofCap
+}: {
+  loop: LoopSnapshot
+  ofCap: (spent: string, cap: string) => string
+}): React.JSX.Element | null {
+  const { maxCostUsd } = loop.config.caps
+  const label = translate('fork.loops.rail.meter.cost', 'Cost')
+  if (maxCostUsd === undefined) {
+    return loop.costUsd === undefined ? null : (
+      <Meter label={label} text={formatUsd(loop.costUsd)} percent={null} />
+    )
+  }
+  if (loop.pauseReason === 'cap-cost' && loop.pauseDetail === 'usage-unavailable') {
+    return (
+      <Meter
+        label={label}
+        text={translate('fork.loops.rail.meter.costUnavailable', 'Cost unavailable')}
+        percent={null}
+      />
+    )
+  }
+  if (loop.costUsd === undefined) {
+    return <Meter label={label} text={ofCap('—', formatUsd(maxCostUsd))} percent={null} />
+  }
+  return (
+    <Meter
+      label={label}
+      text={ofCap(formatUsd(loop.costUsd), formatUsd(maxCostUsd))}
+      percent={percentOf(loop.costUsd, maxCostUsd)}
+    />
+  )
+}
+
 export function LoopMeters({ loop }: { loop: LoopSnapshot }): React.JSX.Element {
   const caps: LoopCaps = loop.config.caps
   const ofCap = (spent: string, cap: string): string =>
@@ -181,17 +216,7 @@ export function LoopMeters({ loop }: { loop: LoopSnapshot }): React.JSX.Element 
           percent={percentOf(loop.activeMs, caps.maxActiveMinutes * 60_000)}
         />
       )}
-      {loop.costUsd === undefined ? null : (
-        <Meter
-          label={translate('fork.loops.rail.meter.cost', 'Cost')}
-          text={
-            caps.maxCostUsd === undefined
-              ? formatUsd(loop.costUsd)
-              : ofCap(formatUsd(loop.costUsd), formatUsd(caps.maxCostUsd))
-          }
-          percent={caps.maxCostUsd === undefined ? null : percentOf(loop.costUsd, caps.maxCostUsd)}
-        />
-      )}
+      <CostMeter loop={loop} ofCap={ofCap} />
     </div>
   )
 }

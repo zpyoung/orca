@@ -121,6 +121,10 @@ ORCA loop edit <loopId> [setting flags] [--json]
 - `edit` takes the same setting flags as `create` (not `--worktree`, `--agent`, `--preset`, or
   `--queue-item`) and changes only the settings you pass. Changes apply from the next iteration.
   Quote values containing spaces.
+- `edit` can also remove optional settings: `--no-check`, `--no-evaluator`,
+  `--no-max-iterations`, `--no-max-minutes`, `--no-max-cost`, and `--no-protected-paths`. A
+  removed cap means no limit on that measure. Combining one with its setting flag (for example
+  `--no-check` with `--check`) is a usage error.
 
 ## Things to avoid
 

@@ -98,6 +98,24 @@ function readCapsFlags(flags: Flags): CapsFlags {
   }
 }
 
+type CapKey = keyof LoopConfig['caps']
+
+const CAP_CLEAR_FLAGS: { flag: string; cap: CapKey }[] = [
+  { flag: 'no-max-iterations', cap: 'maxIterations' },
+  { flag: 'no-max-minutes', cap: 'maxActiveMinutes' },
+  { flag: 'no-max-cost', cap: 'maxCostUsd' }
+]
+
+const CAP_SET_FLAG: Record<CapKey, string> = {
+  maxIterations: 'max-iterations',
+  maxActiveMinutes: 'max-minutes',
+  maxCostUsd: 'max-cost'
+}
+
+function isClearFlagSet(flags: Flags, name: string): boolean {
+  return getBooleanFlag(flags, name) === true
+}
+
 type CreateDraft = {
   input: Omit<LoopCreateInput, 'worktreeId'>
   queueItems: string[]
@@ -254,7 +272,20 @@ function buildEditPatch(flags: Flags, current: LoopConfig): LoopEditPatch {
   const checkTimeout = getCheckTimeoutFlag(flags)
   const checkWhen = getEnumFlag(flags, 'check-when', ['every-iteration', 'on-claim'] as const)
   const evaluator = getOptionalStringFlag(flags, 'evaluator')
+  const clearCheck = isClearFlagSet(flags, 'no-check')
+  const clearEvaluator = isClearFlagSet(flags, 'no-evaluator')
   if (
+    clearCheck &&
+    (checkCommand !== undefined || checkTimeout !== undefined || checkWhen !== undefined)
+  ) {
+    throw invalid('--no-check cannot be combined with --check, --check-timeout, or --check-when')
+  }
+  if (clearEvaluator && evaluator !== undefined) {
+    throw invalid('--no-evaluator cannot be combined with --evaluator')
+  }
+  if (
+    clearCheck ||
+    clearEvaluator ||
     checkCommand !== undefined ||
     checkTimeout !== undefined ||
     checkWhen !== undefined ||
@@ -267,30 +298,35 @@ function buildEditPatch(flags: Flags, current: LoopConfig): LoopEditPatch {
     if (touchesCheck && command === undefined) {
       throw invalid('--check-timeout and --check-when need a check; pass --check <command>')
     }
-    patch.done = {
-      ...(touchesCheck && command !== undefined
+    const nextCheck =
+      touchesCheck && command !== undefined
         ? {
-            check: {
-              command,
-              timeoutSeconds:
-                checkTimeout ?? check?.timeoutSeconds ?? DEFAULT_CHECK_TIMEOUT_SECONDS,
-              runWhen: checkWhen ?? check?.runWhen ?? 'every-iteration'
-            }
+            command,
+            timeoutSeconds: checkTimeout ?? check?.timeoutSeconds ?? DEFAULT_CHECK_TIMEOUT_SECONDS,
+            runWhen: checkWhen ?? check?.runWhen ?? 'every-iteration'
           }
-        : check === undefined
-          ? {}
-          : { check }),
-      ...(evaluator !== undefined
-        ? { evaluator: { condition: evaluator } }
-        : current.done.evaluator === undefined
-          ? {}
-          : { evaluator: current.done.evaluator })
+        : check
+    const nextEvaluator =
+      evaluator === undefined ? current.done.evaluator : { condition: evaluator }
+    patch.done = {
+      ...(clearCheck || nextCheck === undefined ? {} : { check: nextCheck }),
+      ...(clearEvaluator || nextEvaluator === undefined ? {} : { evaluator: nextEvaluator })
     }
   }
 
   const caps = readCapsFlags(flags)
-  if (Object.keys(caps).length > 0) {
-    patch.caps = { ...current.caps, ...caps }
+  const clearedCaps = CAP_CLEAR_FLAGS.filter(({ flag }) => isClearFlagSet(flags, flag))
+  for (const { flag, cap } of clearedCaps) {
+    if (caps[cap] !== undefined) {
+      throw invalid(`--${flag} cannot be combined with --${CAP_SET_FLAG[cap]}`)
+    }
+  }
+  if (Object.keys(caps).length > 0 || clearedCaps.length > 0) {
+    const nextCaps: LoopConfig['caps'] = { ...current.caps, ...caps }
+    for (const { cap } of clearedCaps) {
+      delete nextCaps[cap]
+    }
+    patch.caps = nextCaps
   }
 
   const noProgress = getBooleanFlag(flags, 'no-progress')
@@ -298,7 +334,12 @@ function buildEditPatch(flags: Flags, current: LoopConfig): LoopEditPatch {
     patch.noProgress = noProgress
   }
   const protectedPaths = getRepeatedStringFlag(flags, 'protected-path')
-  if (protectedPaths.length > 0) {
+  if (isClearFlagSet(flags, 'no-protected-paths')) {
+    if (protectedPaths.length > 0) {
+      throw invalid('--no-protected-paths cannot be combined with --protected-path')
+    }
+    patch.protectedPaths = []
+  } else if (protectedPaths.length > 0) {
     patch.protectedPaths = protectedPaths
   }
   const checkpointCommits = getBooleanFlag(flags, 'checkpoint-commits')
