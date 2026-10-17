@@ -22,6 +22,7 @@ const CANONICAL_GUIDE_NAMES = [
   'orca-heimdall',
   'orca-ledger',
   'orca-linear',
+  'orca-loop',
   'orca-per-workspace-env',
   'orchestration'
 ]
@@ -38,6 +39,7 @@ const GUIDE_ALIASES = {
   'orca-heimdall': [],
   'orca-ledger': [],
   'orca-linear': [],
+  'orca-loop': [],
   'orca-per-workspace-env': [],
   orchestration: []
 }
@@ -57,6 +59,7 @@ const STUB_TOPICS = [
   'orca-heimdall',
   'orca-ledger',
   'orca-linear',
+  'orca-loop',
   'orca-per-workspace-env',
   'orchestration'
 ]

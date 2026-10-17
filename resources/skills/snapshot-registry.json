@@ -614,6 +614,24 @@
           }
         ]
       }
+    ],
+    "orca-loop": [
+      {
+        "releaseRevision": 1,
+        "packageDigest": "1517eb518d724e778ecd651d2804ed5533fcb02fef0333b8e20556945fe1b63f",
+        "gitTreeSha": "b9b149cf5e7303710a5dfbd4c88cc6c679f122a5",
+        "files": [
+          {
+            "path": "SKILL.md",
+            "size": 2614,
+            "executable": false,
+            "classification": "text",
+            "exactSha256": "828c795c986afe86544672c31cfd4da17a134dc02749cca03412279b115113e7",
+            "textNormalizedSha256": "828c795c986afe86544672c31cfd4da17a134dc02749cca03412279b115113e7",
+            "identitySha256": "828c795c986afe86544672c31cfd4da17a134dc02749cca03412279b115113e7"
+          }
+        ]
+      }
     ]
   }
 }

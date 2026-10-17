@@ -45,6 +45,7 @@ export const CLI_COMMAND_NAMES = [
   'keypress',
   'ledger',
   'linear',
+  'loop',
   'mouse',
   'network',
   'open',
