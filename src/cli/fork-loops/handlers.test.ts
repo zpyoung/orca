@@ -315,6 +315,26 @@ describe('orca loop create', () => {
 
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual(created)
   })
+
+  it('prints the running-loop warning in human output', async () => {
+    primeCapabilities()
+    callMock
+      .mockResolvedValueOnce(response({ worktree: { id: WORKTREE_ID } }))
+      .mockResolvedValueOnce(response(snapshot({ warnings: ['worktree-has-running-loop'] })))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await LOOP_HANDLERS['loop create'](
+      context([
+        ['worktree', `id:${WORKTREE_ID}`],
+        ['agent', 'claude'],
+        ['prompt', 'go']
+      ])
+    )
+
+    expect(log.mock.calls.join('\n')).toContain(
+      'Warning: another loop is already running in this worktree'
+    )
+  })
 })
 
 describe('orca loop read commands', () => {

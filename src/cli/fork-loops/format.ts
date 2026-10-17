@@ -73,7 +73,7 @@ export function formatLoopDetail(loop: LoopSnapshot): string {
     lines.push('Tab: detached (no open tab)')
   }
   for (const warning of loop.warnings ?? []) {
-    lines.push(`Warning: ${warning}`)
+    lines.push(`Warning: ${describeLoopWarning(warning)}`)
   }
   for (const iteration of loop.recentIterations.slice(-5)) {
     const check =
@@ -87,6 +87,18 @@ export function formatLoopDetail(loop: LoopSnapshot): string {
   return lines.join('\n')
 }
 
+const LOOP_WARNING_TEXT: Record<string, string> = {
+  'worktree-has-running-loop': 'another loop is already running in this worktree'
+}
+
+function describeLoopWarning(warning: string): string {
+  return LOOP_WARNING_TEXT[warning] ?? warning
+}
+
 export function formatLoopChange(verb: string, loop: LoopSnapshot): string {
-  return `${verb} loop ${loop.id} (${loop.name}): ${formatLoopStatus(loop)}.`
+  const head = `${verb} loop ${loop.id} (${loop.name}): ${formatLoopStatus(loop)}.`
+  const warnings = (loop.warnings ?? []).map(
+    (warning) => `Warning: ${describeLoopWarning(warning)}`
+  )
+  return [head, ...warnings].join('\n')
 }
