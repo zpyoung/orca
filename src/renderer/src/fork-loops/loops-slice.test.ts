@@ -107,4 +107,35 @@ describe('loops slice', () => {
     store.getState().resolveLoopCloseConfirm()
     expect(onDone).toHaveBeenCalledTimes(1)
   })
+
+  it('keeps a snapshot pushed while the list call is in flight', async () => {
+    let resolveList: (loops: LoopSnapshot[]) => void = () => {}
+    const list = vi.fn().mockReturnValue(
+      new Promise<LoopSnapshot[]>((resolve) => {
+        resolveList = resolve
+      })
+    )
+    vi.stubGlobal('window', { api: { loops: { list } } })
+    try {
+      const store = createTestStore()
+      const hydration = store.getState().hydrateLoops()
+      store
+        .getState()
+        .applyLoopSnapshot(
+          makeLoop({ id: 'l1', state: 'paused', tab: { tabId: 't2', paneKey: 't2:1' } })
+        )
+      store.getState().applyLoopSnapshot(makeLoop({ id: 'l3' }))
+      resolveList([
+        makeLoop({ id: 'l1', state: 'running', tab: { tabId: 't1', paneKey: 't1:1' } }),
+        makeLoop({ id: 'l2' })
+      ])
+      await hydration
+
+      expect(store.getState().loopsById.l1.state).toBe('paused')
+      expect(Object.keys(store.getState().loopsById).sort()).toEqual(['l1', 'l2', 'l3'])
+      expect(store.getState().loopIdByPaneKey).toEqual({ 't2:1': 'l1' })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
