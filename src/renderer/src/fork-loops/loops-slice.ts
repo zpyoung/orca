@@ -69,51 +69,73 @@ export function selectLoopsForWorktree(
   return loops
 }
 
-export const createLoopsSlice: StateCreator<AppState, [], [], LoopsSlice> = (set, get) => ({
-  loopsById: {},
-  loopIdByPaneKey: {},
-  loopSetupDialog: { open: false },
-  loopCloseConfirm: null,
-  hydrateLoops: async () => {
-    const api = window.api?.loops
-    if (!api || typeof api.list !== 'function') {
-      return
-    }
-    try {
-      const loops = await api.list()
-      set({
-        loopsById: Object.fromEntries(loops.map((loop) => [loop.id, loop])),
-        loopIdByPaneKey: indexPaneKeys(loops)
+export const createLoopsSlice: StateCreator<AppState, [], [], LoopsSlice> = (set, get) => {
+  const pendingHydrations = new Set<Set<string>>()
+  return {
+    loopsById: {},
+    loopIdByPaneKey: {},
+    loopSetupDialog: { open: false },
+    loopCloseConfirm: null,
+    hydrateLoops: async () => {
+      const api = window.api?.loops
+      if (!api || typeof api.list !== 'function') {
+        return
+      }
+      const pushedDuringList = new Set<string>()
+      pendingHydrations.add(pushedDuringList)
+      try {
+        const listed = await api.list()
+        // a push that landed while list was in flight is newer than the list response
+        const current = get().loopsById
+        const loops = listed.map((loop) =>
+          pushedDuringList.has(loop.id) && current[loop.id] ? current[loop.id] : loop
+        )
+        const listedIds = new Set(listed.map((loop) => loop.id))
+        for (const id of pushedDuringList) {
+          if (!listedIds.has(id) && current[id]) {
+            loops.push(current[id])
+          }
+        }
+        set({
+          loopsById: Object.fromEntries(loops.map((loop) => [loop.id, loop])),
+          loopIdByPaneKey: indexPaneKeys(loops)
+        })
+      } catch {
+        // an older or unreachable runtime has no loops; the rail and glyph simply stay absent
+      } finally {
+        pendingHydrations.delete(pushedDuringList)
+      }
+    },
+    applyLoopSnapshot: (snapshot) => {
+      for (const pushed of pendingHydrations) {
+        pushed.add(snapshot.id)
+      }
+      set((state) => {
+        const loopIdByPaneKey = { ...state.loopIdByPaneKey }
+        const previousPaneKey = paneKeyForLoop(loopIdByPaneKey, snapshot.id)
+        if (previousPaneKey !== undefined) {
+          delete loopIdByPaneKey[previousPaneKey]
+        }
+        if (snapshot.tab) {
+          loopIdByPaneKey[snapshot.tab.paneKey] = snapshot.id
+        }
+        return {
+          loopsById: { ...state.loopsById, [snapshot.id]: snapshot },
+          loopIdByPaneKey
+        }
       })
-    } catch {
-      // an older or unreachable runtime has no loops; the rail and glyph simply stay absent
+    },
+    openLoopSetup: ({ worktreeId, groupId }) =>
+      set({ loopSetupDialog: { open: true, worktreeId, groupId } }),
+    closeLoopSetup: () => set({ loopSetupDialog: { open: false } }),
+    requestLoopCloseConfirm: (confirm) => set({ loopCloseConfirm: confirm }),
+    resolveLoopCloseConfirm: () => {
+      const pending = get().loopCloseConfirm
+      if (!pending) {
+        return
+      }
+      set({ loopCloseConfirm: null })
+      pending.onDone()
     }
-  },
-  applyLoopSnapshot: (snapshot) =>
-    set((state) => {
-      const loopIdByPaneKey = { ...state.loopIdByPaneKey }
-      const previousPaneKey = paneKeyForLoop(loopIdByPaneKey, snapshot.id)
-      if (previousPaneKey !== undefined) {
-        delete loopIdByPaneKey[previousPaneKey]
-      }
-      if (snapshot.tab) {
-        loopIdByPaneKey[snapshot.tab.paneKey] = snapshot.id
-      }
-      return {
-        loopsById: { ...state.loopsById, [snapshot.id]: snapshot },
-        loopIdByPaneKey
-      }
-    }),
-  openLoopSetup: ({ worktreeId, groupId }) =>
-    set({ loopSetupDialog: { open: true, worktreeId, groupId } }),
-  closeLoopSetup: () => set({ loopSetupDialog: { open: false } }),
-  requestLoopCloseConfirm: (confirm) => set({ loopCloseConfirm: confirm }),
-  resolveLoopCloseConfirm: () => {
-    const pending = get().loopCloseConfirm
-    if (!pending) {
-      return
-    }
-    set({ loopCloseConfirm: null })
-    pending.onDone()
   }
-})
+}
