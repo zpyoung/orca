@@ -105,10 +105,12 @@
           "title": "第 {{n}} 次迭代"
         },
         "edit": {
-          "maxCost": "最大费用（美元）",
-          "maxIterations": "最大迭代次数",
-          "maxMinutes": "最大运行分钟数",
+          "errorName": "请输入名称。",
+          "errorPrompt": "请输入提示词。",
           "name": "名称",
+          "pacing": "执行节奏",
+          "pacingInterval": "按固定间隔",
+          "pacingOnIdle": "智能体空闲后立即",
           "save": "保存"
         },
         "endReason": {

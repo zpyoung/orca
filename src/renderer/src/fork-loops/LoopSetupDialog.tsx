@@ -21,7 +21,6 @@ import {
   defaultSessionPolicyForPreset,
   LoopCreateInputSchema,
   LoopPresetSchema,
-  LoopSessionPolicySchema,
   type LoopConfig,
   type LoopCreateInput,
   type LoopPreset
@@ -32,15 +31,19 @@ import {
   DEFAULT_DISABLED_TUI_AGENTS,
   filterEnabledTuiAgents
 } from '../../../shared/tui-agent-selection'
-import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
-import { isFolderRepo } from '../../../shared/repo-kind'
+import {
+  IntervalFields,
+  MaxIterationsField,
+  PromptField,
+  SessionPolicyField,
+  useIsFolderWorkspace
+} from './loop-config-fields'
 import { selectLoopsForWorktree } from './loops-slice'
 import {
   CheckboxField,
   Field,
   SelectField,
   TextField,
-  wholeNumberError,
   LoopSetupAdvancedFields,
   LoopSetupQueueItems,
   type FieldError,
@@ -220,50 +223,17 @@ function PresetFields({ draft, errors, update }: SectionProps): React.JSX.Elemen
   }
   return (
     <>
-      <TextField
-        id="loop-setup-prompt"
-        rows={4}
-        label={translate('fork.loops.setup.prompt', 'Prompt')}
-        placeholder={translate(
-          'fork.loops.setup.promptPlaceholder',
-          'What should the agent do on every iteration?'
+      <PromptField
+        draft={draft}
+        errors={errors}
+        update={update}
+        errorMessage={translate(
+          'fork.loops.setup.errorPrompt',
+          'Enter a prompt to start the loop.'
         )}
-        value={draft.prompt}
-        error={
-          errors.has('prompt')
-            ? translate('fork.loops.setup.errorPrompt', 'Enter a prompt to start the loop.')
-            : undefined
-        }
-        onChange={(prompt) => update({ prompt })}
       />
       {draft.preset === 'interval' ? (
-        <div className="grid grid-cols-2 gap-3">
-          <TextField
-            inputMode="numeric"
-            id="loop-setup-interval"
-            label={translate('fork.loops.setup.intervalMinutes', 'Run every (minutes)')}
-            value={draft.intervalMinutes}
-            error={errors.has('interval') ? wholeNumberError() : undefined}
-            onChange={(intervalMinutes) => update({ intervalMinutes })}
-          />
-          <SelectField
-            label={translate('fork.loops.setup.intervalAnchor', 'Counted from')}
-            value={draft.anchor}
-            options={[
-              {
-                value: 'from-end',
-                label: translate('fork.loops.setup.anchorFromEnd', 'End of the last iteration')
-              },
-              {
-                value: 'wall-clock',
-                label: translate('fork.loops.setup.anchorWallClock', 'The clock')
-              }
-            ]}
-            onChange={(value) =>
-              update({ anchor: value === 'wall-clock' ? 'wall-clock' : 'from-end' })
-            }
-          />
-        </div>
+        <IntervalFields draft={draft} errors={errors} update={update} />
       ) : null}
     </>
   )
@@ -283,9 +253,7 @@ function LoopSetupForm({
   const applyLoopSnapshot = useAppStore((s) => s.applyLoopSnapshot)
   const hasRunningLoop = loops.some((loop) => loop.state === 'running')
 
-  const isFolderWorkspace = useAppStore((s) =>
-    s.repos.some((repo) => repo.id === getRepoIdFromWorktreeId(worktreeId) && isFolderRepo(repo))
-  )
+  const isFolderWorkspace = useIsFolderWorkspace(worktreeId)
 
   const agent = draft.agent ?? agents[0]?.id ?? null
   const showCost = agent !== null && COST_REPORTING_AGENTS.includes(agent) && isLocalHost
@@ -368,35 +336,8 @@ function LoopSetupForm({
         </ToggleGroup>
       </Field>
       <PresetFields draft={draft} errors={errors} update={update} />
-      <SelectField
-        label={translate('fork.loops.setup.session', 'Session')}
-        value={draft.sessionPolicy}
-        options={[
-          {
-            value: 'fresh',
-            label: translate('fork.loops.setup.sessionFresh', 'Fresh session each iteration')
-          },
-          {
-            value: 'continue',
-            label: translate('fork.loops.setup.sessionContinue', 'Continue the same session')
-          }
-        ]}
-        onChange={(value) => {
-          const policy = LoopSessionPolicySchema.safeParse(value)
-          if (policy.success) {
-            update({ sessionPolicy: policy.data })
-          }
-        }}
-      />
-      <TextField
-        inputMode="numeric"
-        id="loop-setup-max-iterations"
-        label={translate('fork.loops.setup.maxIterations', 'Maximum iterations')}
-        hint={translate('fork.loops.setup.maxIterationsHint', 'Clear to run with no limit.')}
-        value={draft.maxIterations}
-        error={errors.has('iterations') ? wholeNumberError() : undefined}
-        onChange={(maxIterations) => update({ maxIterations })}
-      />
+      <SessionPolicyField draft={draft} errors={errors} update={update} />
+      <MaxIterationsField draft={draft} errors={errors} update={update} />
       <Collapsible>
         <CollapsibleTrigger variant="row">
           {translate('fork.loops.setup.advanced', 'Advanced')}

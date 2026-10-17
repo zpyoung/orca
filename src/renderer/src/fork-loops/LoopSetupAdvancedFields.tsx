@@ -52,6 +52,7 @@ export type FieldError =
   | 'activeMinutes'
   | 'cost'
   | 'checkTimeout'
+  | 'name'
 
 export type FieldProps = { label: string; hint?: string; error?: string }
 
@@ -284,8 +285,13 @@ export function LoopSetupAdvancedFields({
   errors,
   update,
   showCost,
-  showCheckpointCommits
-}: SectionProps & { showCost: boolean; showCheckpointCommits: boolean }): React.JSX.Element {
+  showCheckpointCommits,
+  idPrefix = 'loop-setup'
+}: SectionProps & {
+  showCost: boolean
+  showCheckpointCommits: boolean
+  idPrefix?: string
+}): React.JSX.Element {
   const flags = [
     {
       field: 'noProgress',
@@ -314,7 +320,7 @@ export function LoopSetupAdvancedFields({
   return (
     <div className="space-y-4 pt-2">
       <TextField
-        id="loop-setup-check-command"
+        id={`${idPrefix}-check-command`}
         label={translate('fork.loops.setup.checkCommand', 'Done check command')}
         hint={translate(
           'fork.loops.setup.checkHint',
@@ -327,7 +333,7 @@ export function LoopSetupAdvancedFields({
         <div className="grid grid-cols-2 gap-3">
           <TextField
             inputMode="numeric"
-            id="loop-setup-check-timeout"
+            id={`${idPrefix}-check-timeout`}
             label={translate('fork.loops.setup.checkTimeout', 'Check timeout (seconds)')}
             value={draft.checkTimeoutSeconds}
             error={
@@ -357,7 +363,7 @@ export function LoopSetupAdvancedFields({
         </div>
       ) : null}
       <TextField
-        id="loop-setup-evaluator"
+        id={`${idPrefix}-evaluator`}
         rows={2}
         label={translate('fork.loops.setup.evaluator', 'Done condition')}
         hint={translate(
@@ -369,7 +375,7 @@ export function LoopSetupAdvancedFields({
       />
       <TextField
         inputMode="numeric"
-        id="loop-setup-max-active"
+        id={`${idPrefix}-max-active`}
         label={translate('fork.loops.setup.maxActiveMinutes', 'Maximum active minutes')}
         value={draft.maxActiveMinutes}
         error={errors.has('activeMinutes') ? wholeNumberError() : undefined}
@@ -378,7 +384,7 @@ export function LoopSetupAdvancedFields({
       {showCost ? (
         <TextField
           inputMode="decimal"
-          id="loop-setup-max-cost"
+          id={`${idPrefix}-max-cost`}
           label={translate('fork.loops.setup.maxCost', 'Maximum cost (USD)')}
           value={draft.maxCostUsd}
           error={
@@ -390,7 +396,7 @@ export function LoopSetupAdvancedFields({
         />
       ) : null}
       <TextField
-        id="loop-setup-protected"
+        id={`${idPrefix}-protected`}
         rows={2}
         label={translate('fork.loops.setup.protectedPaths', 'Protected paths')}
         hint={translate(
@@ -404,7 +410,7 @@ export function LoopSetupAdvancedFields({
         {flags.map(({ field, label }) => (
           <CheckboxField
             key={field}
-            id={`loop-setup-${field}`}
+            id={`${idPrefix}-${field}`}
             label={label}
             checked={draft[field]}
             onChange={(checked) => update({ [field]: checked })}
