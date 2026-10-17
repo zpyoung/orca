@@ -16,8 +16,8 @@ import { usageDelta } from './loop-usage'
 
 export const MS_PER_MINUTE = 60_000
 const OUTPUT_TAIL_LINES = 300
-// staged by pathspec, not by the repo's exclude file, which loop creation can fail to write
-const LOOP_FILES_EXCLUDE_PATHSPEC = ':(exclude).orca/loops'
+// filtered here rather than via the repo's exclude file, which loop creation can fail to write
+const LOOP_FILES_DIRECTORY = '.orca/loops'
 
 const NOT_RUN_CHECK: CheckOutcome = {
   ran: false,
@@ -109,16 +109,32 @@ export function buildRuntimeState(
   }
 }
 
+function isLoopFile(path: string): boolean {
+  return path === LOOP_FILES_DIRECTORY || path.startsWith(`${LOOP_FILES_DIRECTORY}/`)
+}
+
 async function checkpointCommit(
   ws: LoopWorkspaceTarget,
-  ctx: IterationContext
+  ctx: IterationContext,
+  changedFiles: string[]
 ): Promise<{ sha: string | null; error?: string }> {
-  if (!ws.runGit) {
+  const paths = changedFiles
+    .filter((file) => !isLoopFile(file))
+    .map((file) => `:(top,literal)${file}`)
+  if (!ws.runGit || paths.length === 0) {
     return { sha: null }
   }
   try {
-    await ws.runGit(['add', '-A', '--', '.', LOOP_FILES_EXCLUDE_PATHSPEC])
-    await ws.runGit(['commit', '-m', `loop(${ctx.loop.name}): iteration ${ctx.n}`])
+    // limited to the iteration's own paths so the user's other staged, modified and untracked work stays out
+    await ws.runGit(['add', '-A', '--', ...paths])
+    await ws.runGit([
+      'commit',
+      '--only',
+      '-m',
+      `loop(${ctx.loop.name}): iteration ${ctx.n}`,
+      '--',
+      ...paths
+    ])
     const head = await ws.runGit(['rev-parse', 'HEAD'])
     return { sha: head.stdout.trim() || null }
   } catch (error) {
@@ -210,7 +226,7 @@ export async function gatherIterationEvidence(args: GatherArgs): Promise<Gathere
   const changed = ctx.before !== null && after !== null && ctx.before.treeId !== after.treeId
   const checkpointable = diff !== null && hits.length === 0 && !signal.aborted
   if (config.checkpointCommits && ws?.kind === 'git' && changed && checkpointable) {
-    const committed = await checkpointCommit(ws, ctx)
+    const committed = await checkpointCommit(ws, ctx, diff.files)
     commitSha = committed.sha
     error = committed.error ?? error
   }
