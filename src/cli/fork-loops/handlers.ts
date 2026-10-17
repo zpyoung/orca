@@ -340,19 +340,10 @@ export const LOOP_HANDLERS: Record<string, CommandHandler> = {
     )
     const created = await context.client.call<LoopSnapshot>(LOOPS_CHANNELS.create, {
       worktreeId,
-      ...draft.input
+      ...draft.input,
+      ...(draft.queueItems.length === 0 ? {} : { queueItems: draft.queueItems })
     })
-    // Why: LoopCreateInput carries no queue items, so they follow the create as queue ops.
-    let latest = created
-    for (const body of draft.queueItems) {
-      latest = await context.client.call<LoopSnapshot>(LOOPS_CHANNELS.queue, {
-        loopId: created.result.id,
-        op: { op: 'add', body }
-      })
-    }
-    printResult(draft.queueItems.length === 0 ? created : latest, context.json, (loop) =>
-      formatLoopChange('Started', loop)
-    )
+    printResult(created, context.json, (loop) => formatLoopChange('Started', loop))
   },
   'loop list': async (context) => {
     await requireLoopsCapability(context)

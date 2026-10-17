@@ -547,6 +547,60 @@ describe('LoopService transitions', () => {
   })
 })
 
+describe('LoopService.listIterations', () => {
+  function seedIterations(h: ReturnType<typeof createHarness>): void {
+    h.seed()
+    for (const n of [1, 2, 3]) {
+      h.store.insertIteration('loop-seed', {
+        n,
+        attempt: 0,
+        promptSent: `prompt ${n}`,
+        startedAt: n * 1000,
+        endedAt: n * 1000 + 500,
+        endReason: 'settled',
+        check: { ...PASS, stdoutTail: `check out ${n}`, stderrTail: `check err ${n}` },
+        outputTail: `agent out ${n}`
+      })
+    }
+    h.store.insertIteration('loop-seed', { n: 4, attempt: 0, promptSent: 'open', startedAt: 4000 })
+  }
+
+  it('returns finished iterations oldest first with check tails and the agent output tail', () => {
+    const h = createHarness()
+    seedIterations(h)
+
+    const records = h.service.listIterations('loop-seed')
+
+    expect(records.map((record) => record.n)).toEqual([1, 2, 3])
+    expect(records[2]).toMatchObject({
+      n: 3,
+      attempt: 0,
+      endReason: 'settled',
+      outputTail: 'agent out 3',
+      check: { stdoutTail: 'check out 3', stderrTail: 'check err 3' },
+      markers: [],
+      protectedPathHits: []
+    })
+  })
+
+  it('keeps only the newest iterations when limited, still oldest first', () => {
+    const h = createHarness()
+    seedIterations(h)
+    h.store.updateIteration('loop-seed', 4, 0, { endedAt: 4500, endReason: 'settled' })
+
+    expect(h.service.listIterations('loop-seed', { limit: 2 }).map((r) => r.n)).toEqual([3, 4])
+  })
+
+  it('reports an unknown loop without publishing a change', () => {
+    const h = createHarness()
+
+    expect(() => h.service.listIterations('missing')).toThrowError(
+      expect.objectContaining({ code: 'loop_not_found' })
+    )
+    expect(h.snapshots).toHaveLength(0)
+  })
+})
+
 describe('LoopService tab binding', () => {
   it('detaches a loop so its snapshot carries no tab, then reopens it in a revealed tab', async () => {
     const h = createHarness()

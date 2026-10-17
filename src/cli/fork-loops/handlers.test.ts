@@ -213,12 +213,11 @@ describe('orca loop create', () => {
     })
   })
 
-  it('creates a queue loop, then adds each queue item in order', async () => {
+  it('creates a queue loop with its items in the single create call', async () => {
     primeCapabilities()
     callMock
       .mockResolvedValueOnce(response({ worktree: { id: WORKTREE_ID } }))
       .mockResolvedValueOnce(response(snapshot({ preset: 'queue' })))
-      .mockResolvedValue(response(snapshot({ preset: 'queue' })))
 
     await LOOP_HANDLERS['loop create'](
       context([
@@ -231,19 +230,18 @@ describe('orca loop create', () => {
     )
 
     const calls = rpcCalls()
+    expect(calls).toHaveLength(1)
     expect(calls[0][0]).toBe(LOOPS_CHANNELS.create)
     expect(calls[0][1]).toMatchObject({
       preset: 'queue',
+      queueItems: ['first', 'second'],
       config: {
         promptSource: { kind: 'queue', repeatQueue: true },
         pacing: { kind: 'on-idle' },
         sessionPolicy: 'continue'
       }
     })
-    expect(calls.slice(1)).toEqual([
-      [LOOPS_CHANNELS.queue, { loopId: 'loop-1', op: { op: 'add', body: 'first' } }],
-      [LOOPS_CHANNELS.queue, { loopId: 'loop-1', op: { op: 'add', body: 'second' } }]
-    ])
+    expect(LoopCreateInputSchema.safeParse(calls[0][1]).success).toBe(true)
   })
 
   it.each<[string, [string, string][]]>([
