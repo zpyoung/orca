@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
 import type { Worktree } from './workspace-list-sections'
+import type { LoopWorktreeSummary } from '../../../src/shared/fork-loops/loop-types'
 import { areWorktreeListsEqual } from './worktree-list-snapshot'
 
 function agent(overrides: Partial<RuntimeWorktreeAgentRow> = {}): RuntimeWorktreeAgentRow {
@@ -228,5 +229,51 @@ describe('areWorktreeListsEqual', () => {
     const second = [worktree({ agents: [] })]
 
     expect(areWorktreeListsEqual(first, second)).toBe(true)
+  })
+
+  describe('loop summaries', () => {
+    function loopSummary(
+      primary: Partial<LoopWorktreeSummary['primary']> = {},
+      loopCount = 1
+    ): LoopWorktreeSummary {
+      return {
+        loopCount,
+        primary: { id: 'l1', name: 'l1', state: 'running', iterationsCompleted: 1, ...primary }
+      }
+    }
+
+    it('treats equal rendered loop fields as equal', () => {
+      expect(
+        areWorktreeListsEqual(
+          [{ ...worktree(), loop: loopSummary({ maxIterations: 5 }) }],
+          [{ ...worktree(), loop: loopSummary({ maxIterations: 5 }) }]
+        )
+      ).toBe(true)
+    })
+
+    it('detects a loop appearing or disappearing', () => {
+      expect(areWorktreeListsEqual([worktree()], [{ ...worktree(), loop: loopSummary() }])).toBe(
+        false
+      )
+      expect(areWorktreeListsEqual([{ ...worktree(), loop: loopSummary() }], [worktree()])).toBe(
+        false
+      )
+    })
+
+    it.each([
+      ['loopCount', loopSummary({}, 2)],
+      ['id', loopSummary({ id: 'l2' })],
+      ['state', loopSummary({ state: 'needs-you' })],
+      ['pauseReason', loopSummary({ state: 'paused', pauseReason: 'user' })],
+      ['iterationsCompleted', loopSummary({ iterationsCompleted: 2 })],
+      ['maxIterations', loopSummary({ maxIterations: 9 })]
+    ])('detects a %s change', (_field, changed) => {
+      expect(
+        areWorktreeListsEqual(
+          [{ ...worktree(), loop: loopSummary() }],
+          [{ ...worktree(), loop: changed }]
+        )
+      ).toBe(false)
+    })
   })
 })
