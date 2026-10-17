@@ -415,7 +415,8 @@ describe('LoopService.create', () => {
     await vi.waitFor(() => expect(h.service.get(created.id)?.state).toBe('completed'))
 
     expect(observed.length).toBeGreaterThan(0)
-    expect(observed.every((since) => typeof since === 'number')).toBe(true)
+    // later calls come from the between-iterations probe, which runs outside the hold
+    expect(observed[0]).toEqual(expect.any(Number))
     expect(h.snapshots.some((snapshot) => snapshot.unverifiableSince !== undefined)).toBe(true)
     expect(h.service.get(created.id)?.unverifiableSince).toBeUndefined()
   })
