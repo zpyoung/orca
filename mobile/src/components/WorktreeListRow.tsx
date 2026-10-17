@@ -12,8 +12,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../src/shared/execution-host'
 import type { AgentWorkingMode } from '../../../src/shared/agent-status-types'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
+import type { LoopWorktreeSummary } from '../../../src/shared/fork-loops/loop-types'
 import type { MobileRenderableRepoIcon } from '../host-screen/host-screen-reply-schema'
 import { triggerMediumImpact } from '../platform/haptics'
+import { LoopWorktreeLabel } from '../worktree/fork-loops/loop-worktree-label'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import { AgentSpinner } from './AgentSpinner'
 import { MobileRepoIcon } from './MobileRepoIcon'
@@ -55,6 +57,7 @@ export type WorktreeListRowItem = {
   lineageCollapsed?: boolean
   agents?: RuntimeWorktreeAgentRow[]
   workingMode?: AgentWorkingMode
+  loop?: LoopWorktreeSummary
 }
 
 type WorktreeRollupStatus = 'working' | 'active' | 'permission' | 'done' | 'inactive'
@@ -198,6 +201,7 @@ function WorktreeListRowComponent<T extends WorktreeListRowItem>({
         {item.agents && item.agents.length > 0 ? (
           <WorktreeAgentList agents={item.agents} now={now} unvisited={item.unread} />
         ) : null}
+        <LoopWorktreeLabel loop={item.loop} />
         {lineageChildCount > 0 && onToggleLineage ? (
           <Pressable
             style={styles.lineageToggle}

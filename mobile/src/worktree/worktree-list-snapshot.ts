@@ -1,5 +1,8 @@
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
+import type { LoopWorktreeSummary } from '../../../src/shared/fork-loops/loop-types'
 import type { Worktree } from './workspace-list-sections'
+
+type WorktreeWithLoop = Worktree & { loop?: LoopWorktreeSummary }
 
 export function areWorktreeListsEqual(
   left: readonly Worktree[],
@@ -19,7 +22,7 @@ export function areWorktreeListsEqual(
   return true
 }
 
-function areWorktreesEqual(left: Worktree, right: Worktree): boolean {
+function areWorktreesEqual(left: WorktreeWithLoop, right: WorktreeWithLoop): boolean {
   return (
     left.worktreeId === right.worktreeId &&
     left.repoId === right.repoId &&
@@ -57,7 +60,25 @@ function areWorktreesEqual(left: Worktree, right: Worktree): boolean {
     (left.status ?? null) === (right.status ?? null) &&
     (left.workingMode ?? null) === (right.workingMode ?? null) &&
     arePullRequestsEqual(left.linkedPR, right.linkedPR) &&
-    areAgentRowsEqual(left.agents ?? [], right.agents ?? [])
+    areAgentRowsEqual(left.agents ?? [], right.agents ?? []) &&
+    areLoopSummariesEqual(left.loop, right.loop)
+  )
+}
+
+function areLoopSummariesEqual(
+  left: LoopWorktreeSummary | undefined,
+  right: LoopWorktreeSummary | undefined
+): boolean {
+  if (!left || !right) {
+    return left === right
+  }
+  return (
+    left.loopCount === right.loopCount &&
+    left.primary.id === right.primary.id &&
+    left.primary.state === right.primary.state &&
+    left.primary.pauseReason === right.primary.pauseReason &&
+    left.primary.iterationsCompleted === right.primary.iterationsCompleted &&
+    left.primary.maxIterations === right.primary.maxIterations
   )
 }
 
