@@ -32,6 +32,8 @@ import {
   DEFAULT_DISABLED_TUI_AGENTS,
   filterEnabledTuiAgents
 } from '../../../shared/tui-agent-selection'
+import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
+import { isFolderRepo } from '../../../shared/repo-kind'
 import { selectLoopsForWorktree } from './loops-slice'
 import {
   CheckboxField,
@@ -40,6 +42,7 @@ import {
   TextField,
   wholeNumberError,
   LoopSetupAdvancedFields,
+  LoopSetupQueueItems,
   type FieldError,
   type LoopSetupDraft,
   type SectionProps
@@ -56,6 +59,7 @@ const INITIAL_DRAFT: LoopSetupDraft = {
   preset: 'until-done',
   prompt: '',
   repeatQueue: false,
+  queueItems: [],
   intervalMinutes: '30',
   anchor: 'from-end',
   sessionPolicy: defaultSessionPolicyForPreset('until-done'),
@@ -106,7 +110,8 @@ function buildLoopCreateInput(
   draft: LoopSetupDraft,
   worktreeId: string,
   agent: TuiAgent,
-  showCost: boolean
+  showCost: boolean,
+  allowCheckpointCommits: boolean
 ): { input: LoopCreateInput } | { errors: Set<FieldError> } {
   const checkCommand = draft.checkCommand.trim()
   const evaluatorCondition = draft.evaluatorCondition.trim()
@@ -147,7 +152,7 @@ function buildLoopCreateInput(
     },
     noProgress: draft.noProgress,
     protectedPaths: protectedPaths.length > 0 ? protectedPaths : undefined,
-    checkpointCommits: draft.checkpointCommits,
+    checkpointCommits: allowCheckpointCommits && draft.checkpointCommits,
     askBeforeNext: draft.askBeforeNext,
     resumeAtLimitReset: draft.resumeAtLimitReset
   }
@@ -156,11 +161,21 @@ function buildLoopCreateInput(
     name: autoName(draft),
     agent,
     preset: draft.preset,
-    config
+    config,
+    ...(draft.preset === 'queue'
+      ? { queueItems: draft.queueItems.map((item) => item.body.trim()) }
+      : {})
   }
   const errors = new Set<FieldError>()
   if (draft.preset !== 'queue' && draft.prompt.trim() === '') {
     errors.add('prompt')
+  }
+  if (draft.preset === 'queue') {
+    if (draft.queueItems.length === 0) {
+      errors.add('queue')
+    } else if (draft.queueItems.some((item) => item.body.trim() === '')) {
+      errors.add('queueItem')
+    }
   }
   for (const issue of LoopCreateInputSchema.safeParse(input).error?.issues ?? []) {
     const field = FIELD_ERROR_BY_PATH[issue.path.join('.')]
@@ -192,13 +207,8 @@ function useSelectableAgents(worktreeId: string): {
 function PresetFields({ draft, errors, update }: SectionProps): React.JSX.Element {
   if (draft.preset === 'queue') {
     return (
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">
-          {translate(
-            'fork.loops.setup.queueHelp',
-            'Prompts are added to the queue from the loop rail after it starts. Each iteration sends the next one.'
-          )}
-        </p>
+      <div className="space-y-4">
+        <LoopSetupQueueItems draft={draft} errors={errors} update={update} />
         <CheckboxField
           id="loop-setup-repeat-queue"
           label={translate('fork.loops.setup.repeatQueue', 'Start over when the queue is empty')}
@@ -273,9 +283,15 @@ function LoopSetupForm({
   const applyLoopSnapshot = useAppStore((s) => s.applyLoopSnapshot)
   const hasRunningLoop = loops.some((loop) => loop.state === 'running')
 
+  const isFolderWorkspace = useAppStore((s) =>
+    s.repos.some((repo) => repo.id === getRepoIdFromWorktreeId(worktreeId) && isFolderRepo(repo))
+  )
+
   const agent = draft.agent ?? agents[0]?.id ?? null
   const showCost = agent !== null && COST_REPORTING_AGENTS.includes(agent) && isLocalHost
-  const built = agent ? buildLoopCreateInput(draft, worktreeId, agent, showCost) : null
+  const built = agent
+    ? buildLoopCreateInput(draft, worktreeId, agent, showCost, !isFolderWorkspace)
+    : null
   const errors = built && 'errors' in built ? built.errors : new Set<FieldError>()
   const update = (patch: Partial<LoopSetupDraft>): void => setDraft((d) => ({ ...d, ...patch }))
 
@@ -392,6 +408,7 @@ function LoopSetupForm({
             errors={errors}
             update={update}
             showCost={showCost}
+            showCheckpointCommits={!isFolderWorkspace}
           />
         </CollapsibleContent>
       </Collapsible>

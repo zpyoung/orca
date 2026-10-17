@@ -9,6 +9,7 @@ import { LoopSetupDialog } from './LoopSetupDialog'
 type MockState = {
   settings: { defaultTuiAgent: string; disabledTuiAgents: string[] }
   loopsById: Record<string, unknown>
+  repos: { id: string; kind?: 'git' | 'folder' }[]
   applyLoopSnapshot: ReturnType<typeof vi.fn>
 }
 
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => {
   const state: MockState = {
     settings: { defaultTuiAgent: 'claude', disabledTuiAgents: [] },
     loopsById: {},
+    repos: [{ id: 'wt-1', kind: 'git' }],
     applyLoopSnapshot: vi.fn()
   }
   const detectedIds: string[] = ['claude', 'gemini']
@@ -98,12 +100,28 @@ function enterCheckCommand(): void {
   fireEvent.change(screen.getByLabelText('Done check command'), { target: { value: 'pnpm test' } })
 }
 
+function chooseQueuePreset(): void {
+  fireEvent.click(screen.getByRole('radio', { name: 'Queue' }))
+}
+
+function addQueueItem(body: string): void {
+  fireEvent.change(screen.getByLabelText('New queue item'), { target: { value: body } })
+  fireEvent.click(screen.getByRole('button', { name: 'Add to queue' }))
+}
+
+function queueBodies(): string[] {
+  return screen
+    .queryAllByLabelText(/^Queue item \d+$/)
+    .map((element) => (element instanceof HTMLTextAreaElement ? element.value : ''))
+}
+
 function openAdvanced(): void {
   fireEvent.click(screen.getByRole('button', { name: 'Advanced' }))
 }
 
 beforeEach(() => {
   mocks.state.loopsById = {}
+  mocks.state.repos = [{ id: 'wt-1', kind: 'git' }]
   mocks.state.applyLoopSnapshot.mockReset()
   mocks.detectedIds = ['claude', 'gemini']
   mocks.target = { kind: 'local' }
@@ -286,5 +304,94 @@ describe('LoopSetupDialog', () => {
     fireEvent.change(minutes, { target: { value: '90' } })
     const input = await submittedInput()
     expect(input.config.caps).toEqual({ maxIterations: 10, maxActiveMinutes: 90 })
+  })
+
+  describe('queue preset', () => {
+    it('disables Start until the queue has an item and explains why', () => {
+      renderDialog()
+      chooseQueuePreset()
+      expect(screen.getByRole('button', { name: 'Start loop' })).toBeDisabled()
+      expect(screen.getByText('Add at least one prompt to the queue.')).toBeInTheDocument()
+      addQueueItem('first')
+      expect(screen.getByRole('button', { name: 'Start loop' })).toBeEnabled()
+      expect(screen.queryByText('Add at least one prompt to the queue.')).not.toBeInTheDocument()
+    })
+
+    it('no longer tells the user to add prompts from the rail', () => {
+      renderDialog()
+      chooseQueuePreset()
+      expect(screen.queryByText(/loop rail/)).not.toBeInTheDocument()
+    })
+
+    it('sends the queue items in order', async () => {
+      renderDialog()
+      chooseQueuePreset()
+      addQueueItem('first')
+      addQueueItem('second')
+      addQueueItem('third')
+      const input = await submittedInput()
+      expect(input.preset).toBe('queue')
+      expect(input.queueItems).toEqual(['first', 'second', 'third'])
+      expect(input.config.promptSource).toEqual({ kind: 'queue', repeatQueue: false })
+    })
+
+    it('reorders items and sends the new order', async () => {
+      renderDialog()
+      chooseQueuePreset()
+      addQueueItem('first')
+      addQueueItem('second')
+      addQueueItem('third')
+      fireEvent.click(screen.getByRole('button', { name: 'Move queue item 3 up' }))
+      expect(queueBodies()).toEqual(['first', 'third', 'second'])
+      fireEvent.click(screen.getByRole('button', { name: 'Move queue item 1 down' }))
+      const input = await submittedInput()
+      expect(input.queueItems).toEqual(['third', 'first', 'second'])
+    })
+
+    it('edits and removes items', async () => {
+      renderDialog()
+      chooseQueuePreset()
+      addQueueItem('first')
+      addQueueItem('second')
+      fireEvent.change(screen.getByLabelText('Queue item 2'), { target: { value: 'second v2' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Remove queue item 1' }))
+      const input = await submittedInput()
+      expect(input.queueItems).toEqual(['second v2'])
+    })
+
+    it('blocks Start while an item is blank', () => {
+      renderDialog()
+      chooseQueuePreset()
+      addQueueItem('first')
+      fireEvent.change(screen.getByLabelText('Queue item 1'), { target: { value: '  ' } })
+      expect(screen.getByRole('button', { name: 'Start loop' })).toBeDisabled()
+    })
+
+    it('keeps items out of other presets', async () => {
+      renderDialog()
+      chooseQueuePreset()
+      addQueueItem('first')
+      fireEvent.click(screen.getByRole('radio', { name: 'Until done' }))
+      fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'go' } })
+      const input = await submittedInput()
+      expect(input).not.toHaveProperty('queueItems')
+    })
+  })
+
+  describe('checkpoint commits', () => {
+    it('offers the option for a git worktree', () => {
+      renderDialog()
+      openAdvanced()
+      expect(screen.getByLabelText('Commit a checkpoint after each iteration')).toBeInTheDocument()
+    })
+
+    it('hides the option for a folder workspace', () => {
+      mocks.state.repos = [{ id: 'wt-1', kind: 'folder' }]
+      renderDialog()
+      openAdvanced()
+      expect(
+        screen.queryByLabelText('Commit a checkpoint after each iteration')
+      ).not.toBeInTheDocument()
+    })
   })
 })

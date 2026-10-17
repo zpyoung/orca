@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,8 +13,11 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { translate } from '@/i18n/i18n'
+import { createBrowserUuid } from '@/lib/browser-uuid'
 import type { LoopPreset, LoopSessionPolicy } from '../../../shared/fork-loops/loop-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+
+export type QueueDraftItem = { key: string; body: string }
 
 export type LoopSetupDraft = {
   name: string
@@ -19,6 +25,7 @@ export type LoopSetupDraft = {
   preset: LoopPreset
   prompt: string
   repeatQueue: boolean
+  queueItems: QueueDraftItem[]
   intervalMinutes: string
   anchor: 'from-end' | 'wall-clock'
   sessionPolicy: LoopSessionPolicy
@@ -38,6 +45,8 @@ export type LoopSetupDraft = {
 
 export type FieldError =
   | 'prompt'
+  | 'queue'
+  | 'queueItem'
   | 'interval'
   | 'iterations'
   | 'activeMinutes'
@@ -152,24 +161,147 @@ export function wholeNumberError(): string {
   return translate('fork.loops.setup.errorWholeNumber', 'Enter a whole number of at least 1.')
 }
 
+/** Ordered, editable list of prompts a queue loop sends one per iteration. */
+export function LoopSetupQueueItems({ draft, errors, update }: SectionProps): React.JSX.Element {
+  const [pending, setPending] = useState('')
+  const items = draft.queueItems
+  const setItems = (queueItems: QueueDraftItem[]): void => update({ queueItems })
+  const add = (): void => {
+    if (pending.trim() === '') {
+      return
+    }
+    setItems([...items, { key: createBrowserUuid(), body: pending }])
+    setPending('')
+  }
+  const move = (index: number, offset: -1 | 1): void => {
+    const next = [...items]
+    const [moved] = next.splice(index, 1)
+    next.splice(index + offset, 0, moved)
+    setItems(next)
+  }
+  const error = errors.has('queue')
+    ? translate('fork.loops.setup.errorQueueEmpty', 'Add at least one prompt to the queue.')
+    : errors.has('queueItem')
+      ? translate('fork.loops.setup.errorQueueBlankItem', 'Queue prompts cannot be blank.')
+      : undefined
+  return (
+    <Field label={translate('fork.loops.setup.queueItems', 'Queue')} error={error}>
+      <ol className="space-y-2">
+        {items.map((item, index) => {
+          const position = index + 1
+          return (
+            <li key={item.key} className="flex items-start gap-2">
+              <Textarea
+                rows={2}
+                value={item.body}
+                aria-label={translate('fork.loops.setup.queueItem', 'Queue item {{n}}', {
+                  n: position
+                })}
+                aria-invalid={item.body.trim() === ''}
+                onChange={(event) =>
+                  setItems(
+                    items.map((entry) =>
+                      entry.key === item.key ? { ...entry, body: event.target.value } : entry
+                    )
+                  )
+                }
+              />
+              <div className="flex shrink-0 flex-col gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={index === 0}
+                  aria-label={translate(
+                    'fork.loops.setup.queueMoveUp',
+                    'Move queue item {{n}} up',
+                    {
+                      n: position
+                    }
+                  )}
+                  onClick={() => move(index, -1)}
+                >
+                  <ArrowUp />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={index === items.length - 1}
+                  aria-label={translate(
+                    'fork.loops.setup.queueMoveDown',
+                    'Move queue item {{n}} down',
+                    { n: position }
+                  )}
+                  onClick={() => move(index, 1)}
+                >
+                  <ArrowDown />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={translate('fork.loops.setup.queueRemove', 'Remove queue item {{n}}', {
+                    n: position
+                  })}
+                  onClick={() => setItems(items.filter((entry) => entry.key !== item.key))}
+                >
+                  <Trash2 />
+                </Button>
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+      <div className="flex items-start gap-2">
+        <Textarea
+          rows={2}
+          value={pending}
+          placeholder={translate(
+            'fork.loops.setup.queueNewPlaceholder',
+            'A prompt for one iteration'
+          )}
+          aria-label={translate('fork.loops.setup.queueNew', 'New queue item')}
+          onChange={(event) => setPending(event.target.value)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={pending.trim() === ''}
+          onClick={add}
+        >
+          <Plus />
+          {translate('fork.loops.setup.queueAdd', 'Add to queue')}
+        </Button>
+      </div>
+    </Field>
+  )
+}
+
 export function LoopSetupAdvancedFields({
   draft,
   errors,
   update,
-  showCost
-}: SectionProps & { showCost: boolean }): React.JSX.Element {
+  showCost,
+  showCheckpointCommits
+}: SectionProps & { showCost: boolean; showCheckpointCommits: boolean }): React.JSX.Element {
   const flags = [
     {
       field: 'noProgress',
       label: translate('fork.loops.setup.noProgress', 'Pause after 3 iterations with no changes')
     },
-    {
-      field: 'checkpointCommits',
-      label: translate(
-        'fork.loops.setup.checkpointCommits',
-        'Commit a checkpoint after each iteration'
-      )
-    },
+    ...(showCheckpointCommits
+      ? [
+          {
+            field: 'checkpointCommits',
+            label: translate(
+              'fork.loops.setup.checkpointCommits',
+              'Commit a checkpoint after each iteration'
+            )
+          } as const
+        ]
+      : []),
     {
       field: 'askBeforeNext',
       label: translate('fork.loops.setup.askBeforeNext', 'Ask before each new iteration')
