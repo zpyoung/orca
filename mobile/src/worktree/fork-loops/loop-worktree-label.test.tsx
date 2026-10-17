@@ -11,7 +11,7 @@ vi.mock('react-native', async () => {
   }
 })
 
-import type { LoopWorktreeSummary } from '../../../../src/shared/fork-loops/loop-types'
+import type { LoopWorktreeSummary, PauseReason } from '../../../../src/shared/fork-loops/loop-types'
 import { LoopWorktreeLabel, formatLoopWorktreeLabel } from './loop-worktree-label'
 
 function summary(primary: Partial<LoopWorktreeSummary['primary']>): LoopWorktreeSummary {
@@ -39,7 +39,44 @@ describe('formatLoopWorktreeLabel', () => {
   it('names the pause reason', () => {
     expect(
       formatLoopWorktreeLabel(summary({ state: 'paused', pauseReason: 'cap-iterations' }))
-    ).toBe('Loop 0 · paused: cap-iterations')
+    ).toBe('Loop 0 · paused: iteration cap reached')
+  })
+
+  it('writes hyphenated pause reasons as plain words', () => {
+    expect(formatLoopWorktreeLabel(summary({ state: 'paused', pauseReason: 'no-progress' }))).toBe(
+      'Loop 0 · paused: no progress'
+    )
+  })
+
+  it('maps every pause reason to text without hyphens', () => {
+    const reasons: PauseReason[] = [
+      'user',
+      'cap-iterations',
+      'cap-time',
+      'cap-cost',
+      'no-progress',
+      'protected-path',
+      'agent-blocked',
+      'agent-decide',
+      'crashed',
+      'usage-limit',
+      'interrupted-by-restart',
+      'unverifiable',
+      'ask-before-next',
+      'queue-exhausted'
+    ]
+    for (const reason of reasons) {
+      const label = formatLoopWorktreeLabel(summary({ state: 'paused', pauseReason: reason }))
+      expect(label.startsWith('Loop 0 · paused: ')).toBe(true)
+      expect(label.slice('Loop 0 · paused: '.length)).not.toMatch(/-/)
+    }
+  })
+
+  it('unhyphenates a reason this client does not know', () => {
+    const unknown = JSON.parse('"cap-future-thing"')
+    expect(formatLoopWorktreeLabel(summary({ state: 'paused', pauseReason: unknown }))).toBe(
+      'Loop 0 · paused: cap future thing'
+    )
   })
 
   it('falls back to bare paused without a reason', () => {
