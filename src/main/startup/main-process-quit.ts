@@ -6,6 +6,7 @@ import { killAllPty } from '../ipc/pty'
 import { disconnectDaemon, shutdownDaemon } from '../daemon/daemon-init'
 import { beginSshShutdown } from '../ipc/ssh-shutdown-drain'
 import { beginHeimdallShutdown } from '../fork-heimdall/kernel-shutdown'
+import { beginLoopsShutdown } from '../fork-loops/registration'
 import { agentHookServer } from '../agent-hooks/server'
 import { wslHookRelayManager } from '../agent-hooks/wsl-hook-relay-manager'
 import { removeManagedAgentHooksAsync } from '../agent-hooks/managed-agent-hook-controls'
@@ -268,6 +269,7 @@ function installWillQuitHandler(): void {
       { name: 'local-ssh-browser-routes', promise: localSshRouteShutdown },
       { name: 'ssh', promise: sshShutdown },
       heimdallShutdown,
+      { name: 'loops', promise: beginLoopsShutdown(state.loops) },
       { name: 'plugin-hosts', promise: pluginHostShutdown },
       { name: 'skill-uploads', promise: skillUploadShutdown },
       { name: 'grok-hooks', promise: grokHookCleanup },

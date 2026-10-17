@@ -28,6 +28,7 @@ import { mainProcessState as state } from './main-process-state'
 import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'
 import { startHeimdall } from '../fork-heimdall/registration'
 import { wireHeimdallFleetWindows } from '../fork-heimdall/fleet-ipc-forward'
+import { startLoops } from '../fork-loops/registration'
 import { startClaudeSuppressionVerdictPublisher } from '../fork-ask-question-tool/claude-suppression-verdict-publisher'
 import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'
 import {
@@ -190,6 +191,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
   )
   state.heimdall = startHeimdall(runtime, store, state.isServeMode)
   wireHeimdallFleetWindows(runtime, () => state.mainWindow)
+  state.loops = startLoops(runtime, store, state.isServeMode)
   startClaudeSuppressionVerdictPublisher({
     store,
     ipcMain,

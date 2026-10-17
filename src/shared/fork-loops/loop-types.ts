@@ -195,7 +195,8 @@ export const LoopCreateInputSchema = z
     agent: z.string().refine(isTuiAgent),
     preset: LoopPresetSchema,
     config: LoopConfigSchema,
-    launchOverrides: LoopLaunchOverridesSchema.optional()
+    launchOverrides: LoopLaunchOverridesSchema.optional(),
+    queueItems: z.array(z.string().min(1)).optional()
   })
   .strict()
 export type LoopCreateInput = Omit<z.infer<typeof LoopCreateInputSchema>, 'agent'> & {
