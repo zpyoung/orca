@@ -3,6 +3,7 @@ import {
   defaultSessionPolicyForPreset,
   LOOP_NO_PROGRESS_ITERATIONS,
   LoopConfigSchema,
+  LoopCreateInputSchema,
   PauseReasonSchema
 } from './loop-types'
 
@@ -86,5 +87,28 @@ describe('PauseReasonSchema', () => {
 describe('LOOP_NO_PROGRESS_ITERATIONS', () => {
   it('is fixed at three', () => {
     expect(LOOP_NO_PROGRESS_ITERATIONS).toBe(3)
+  })
+})
+
+describe('LoopCreateInputSchema', () => {
+  const input = {
+    worktreeId: 'wt-1',
+    name: 'Queue run',
+    agent: 'claude',
+    preset: 'queue',
+    config: { ...minimalConfig, promptSource: { kind: 'queue', repeatQueue: false } }
+  }
+
+  it('accepts initial queue items', () => {
+    const result = LoopCreateInputSchema.safeParse({ ...input, queueItems: ['one', 'two'] })
+    expect(result.success).toBe(true)
+  })
+
+  it('treats queue items as optional', () => {
+    expect(LoopCreateInputSchema.safeParse(input).success).toBe(true)
+  })
+
+  it('rejects an empty queue item', () => {
+    expect(LoopCreateInputSchema.safeParse({ ...input, queueItems: [''] }).success).toBe(false)
   })
 })
