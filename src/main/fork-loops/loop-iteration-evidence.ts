@@ -1,4 +1,4 @@
-import { parseLoopMarkers } from '../../shared/fork-loops/loop-markers'
+import { parseAgentTailMarkers, parseLoopMarkers } from '../../shared/fork-loops/loop-markers'
 import { protectedPathHits } from '../../shared/fork-loops/loop-progress'
 import type {
   CheckOutcome,
@@ -126,6 +126,21 @@ async function checkpointCommit(
   }
 }
 
+/** The persisted evidence of an attempt; a missing gather (aborted or crashed) leaves it empty. */
+export function iterationEvidenceOf(gathered: GatheredEvidence | null, ctx: IterationContext) {
+  return {
+    check: gathered?.check ?? null,
+    evaluator: gathered?.evaluator ?? null,
+    diff: gathered?.diff ?? null,
+    treeBefore: gathered?.treeBefore ?? ctx.before?.treeId ?? null,
+    treeAfter: gathered?.treeAfter ?? null,
+    costUsd: gathered?.costUsd ?? null,
+    markers: gathered?.markers ?? [],
+    protectedPathHits: gathered?.protectedPathHits ?? [],
+    checkpointCommit: gathered?.checkpointCommit ?? null
+  }
+}
+
 export type GatherArgs = {
   ctx: IterationContext
   tools: LoopEvidenceTools
@@ -157,13 +172,15 @@ export async function gatherIterationEvidence(args: GatherArgs): Promise<Gathere
       .then((read) => read.tail.join('\n'))
       .catch(() => '')
   }
-  const markers = parseLoopMarkers(settlement.lastAssistantMessage ?? outputTail)
+  const markers = settlement.lastAssistantMessage
+    ? parseLoopMarkers(settlement.lastAssistantMessage)
+    : parseAgentTailMarkers(outputTail, ctx.promptSent)
   const after = ws ? await tools.snapshotTree(ws) : null
   const diff = ctx.before && after && ws ? await tools.diffTrees(ctx.before, after, ws) : null
   const protectedPaths = config.protectedPaths ?? []
-  // an unmeasurable diff must not read as "nothing protected was touched"
+  // keyed off the loop row so a failed target resolution cannot read as "nothing protected was touched"
   const hits =
-    ws?.kind === 'git' && protectedPaths.length > 0 && diff === null
+    ctx.loop.workspaceKind === 'git' && protectedPaths.length > 0 && diff === null
       ? [PROTECTED_PATHS_UNVERIFIED]
       : protectedPathHits(diff?.files ?? [], protectedPaths)
   const check = config.done.check

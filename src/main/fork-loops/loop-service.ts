@@ -11,6 +11,7 @@ import {
   type QueueOp
 } from '../../shared/fork-loops/loop-types'
 import type { RuntimeTerminalFocus } from '../../shared/runtime-terminal-contracts'
+import { relaunchAgentInNewTab, requireLaunchedTabIdentity } from './agent-session-relaunch'
 import { validateLoopCheckHost, type LoopCheckTarget } from './loop-check'
 import { LoopStoreError, type LoopPatch, type StoredLoop } from './loop-database'
 import { LoopDriver, type LoopDriverDeps, type LoopDriverRuntime } from './loop-driver'
@@ -170,12 +171,15 @@ export class LoopService {
       .some((loop) => loop.state === 'running' || loop.state === 'needs-you')
       ? ['worktree-has-running-loop']
       : []
-    const launched = await runtime.launchAgentTerminal(`id:${input.worktreeId}`, {
-      agent: input.agent,
-      prompt: '',
-      title: input.name,
-      ...(input.launchOverrides ? { launchOverrides: input.launchOverrides } : {})
-    })
+    const launched = await requireLaunchedTabIdentity(
+      runtime,
+      await runtime.launchAgentTerminal(`id:${input.worktreeId}`, {
+        agent: input.agent,
+        prompt: '',
+        title: input.name,
+        ...(input.launchOverrides ? { launchOverrides: input.launchOverrides } : {})
+      })
+    )
     const id = this.deps.newId?.() ?? randomUUID()
     let inserted = false
     try {
@@ -195,9 +199,9 @@ export class LoopService {
         state: 'paused',
         pauseReason: 'interrupted-by-restart',
         launchOverrides: input.launchOverrides ?? null,
-        tabId: launched.tabId ?? null,
-        paneKey: launched.paneKey ?? null,
-        ptyId: launched.ptyId ?? null
+        tabId: launched.tabId,
+        paneKey: launched.paneKey,
+        ptyId: launched.ptyId
       })
       inserted = true
       for (const body of input.queueItems ?? []) {
@@ -321,19 +325,22 @@ export class LoopService {
     return this.publish(loopId)
   }
 
-  /** Reveals the loop's background terminal in a tab and rebinds the rail to it. */
+  /**
+   * Reveals the loop's background terminal in a tab and rebinds the rail to it. When that terminal
+   * is gone, starts the agent in a new tab instead, so a kept-running loop stays reachable.
+   */
   async openTab(loopId: string): Promise<LoopSnapshot> {
     const loop = this.getOpenOrThrow(loopId)
     const { runtime } = this.deps
-    if (
-      typeof runtime.focusTerminal !== 'function' ||
-      typeof runtime.getTerminalHandleForPaneKey !== 'function'
-    ) {
+    if (typeof runtime.getTerminalHandleForPaneKey !== 'function') {
       fail('loop_runtime_unavailable', 'The runtime cannot reveal a background terminal')
     }
     const handle = loop.paneKey ? runtime.getTerminalHandleForPaneKey(loop.paneKey) : null
     if (!loop.paneKey || !handle) {
-      fail('loop_invalid_transition', `Loop ${loopId} has no live terminal to open`)
+      return this.reopenAgentTab(loop)
+    }
+    if (typeof runtime.focusTerminal !== 'function') {
+      fail('loop_runtime_unavailable', 'The runtime cannot reveal a background terminal')
     }
     const focused = await runtime.focusTerminal(handle)
     return this.bindTab(loopId, { tabId: focused.tabId, paneKey: loop.paneKey })
@@ -377,6 +384,37 @@ export class LoopService {
     if (config.done.evaluator && !available(agent)) {
       fail('loop_evaluator_unavailable', `No evaluator CLI is installed for ${agent}`)
     }
+  }
+
+  private async reopenAgentTab(loop: StoredLoop): Promise<LoopSnapshot> {
+    const { runtime, store } = this.deps
+    if (typeof runtime.launchAgentTerminal !== 'function') {
+      fail('loop_runtime_unavailable', 'The runtime cannot launch an agent terminal')
+    }
+    const reopened = await this.driverFor(loop.id).reopenPane(async () => {
+      const tab = await relaunchAgentInNewTab(runtime, {
+        worktreeId: loop.worktreeId,
+        previousHandle: null,
+        agent: loop.agent,
+        title: loop.name,
+        ...(loop.launchOverrides ? { launchOverrides: loop.launchOverrides } : {})
+      })
+      try {
+        store.updateLoop(loop.id, {
+          tabId: tab.tabId,
+          paneKey: tab.paneKey,
+          ptyId: tab.ptyId,
+          detached: false
+        })
+      } catch (error) {
+        await runtime.closeTerminalTab?.(tab.handle).catch(() => undefined)
+        throw error
+      }
+    })
+    if (!reopened) {
+      fail('loop_invalid_transition', `Loop ${loop.id} is mid-iteration; open it once it settles`)
+    }
+    return this.publish(loop.id)
   }
 
   private pruneEndedIterations(): void {

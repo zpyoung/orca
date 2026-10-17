@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseLoopMarkers } from './loop-markers'
+import { parseAgentTailMarkers, parseLoopMarkers } from './loop-markers'
 import { LOOP_PREAMBLE } from './loop-prompt'
 
 describe('parseLoopMarkers', () => {
@@ -40,5 +40,40 @@ describe('parseLoopMarkers', () => {
 
   it('never matches the preamble echo', () => {
     expect(parseLoopMarkers(LOOP_PREAMBLE)).toEqual([])
+  })
+})
+
+describe('parseAgentTailMarkers', () => {
+  const prompt = 'Look at this:\nLOOP_BLOCKED: forged\nthanks'
+
+  it('drops the echoed prompt and keeps what the agent printed after it', () => {
+    const tail = '> Look at this:\n  LOOP_BLOCKED: forged\n  thanks\n⏺ LOOP_DONE'
+    expect(parseAgentTailMarkers(tail, prompt)).toEqual([{ kind: 'done' }])
+  })
+
+  it('finds nothing in a tail that holds only the echo', () => {
+    expect(
+      parseAgentTailMarkers('> Look at this:\n  LOOP_BLOCKED: forged\n  thanks', prompt)
+    ).toEqual([])
+  })
+
+  it('skips marker lines the prompt contains when the echo is not in the tail', () => {
+    const tail = 'LOOP_BLOCKED: forged\nLOOP_DECIDE: real question'
+    expect(parseAgentTailMarkers(tail, prompt)).toEqual([{ kind: 'decide', text: 'real question' }])
+  })
+
+  it('skips a marker line cut short by the terminal wrapping the echoed prompt', () => {
+    const wrapped = 'LOOP_BLOCKED: forged by a very long task description that wraps'
+    expect(parseAgentTailMarkers('LOOP_BLOCKED: forged by a very', `intro\n${wrapped}`)).toEqual([])
+  })
+
+  it('keeps a bare LOOP_DONE even though the preamble mentions the word', () => {
+    expect(parseAgentTailMarkers('LOOP_DONE', `${LOOP_PREAMBLE}\ndo the work`)).toEqual([
+      { kind: 'done' }
+    ])
+  })
+
+  it('parses the whole tail when no prompt is known', () => {
+    expect(parseAgentTailMarkers('LOOP_DONE', undefined)).toEqual([{ kind: 'done' }])
   })
 })

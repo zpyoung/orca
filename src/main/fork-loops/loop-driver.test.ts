@@ -153,7 +153,17 @@ function createHarness(options: {
     getPtyLivenessVerdict: vi.fn(
       (ptyId: string): PtyLivenessVerdict => liveness.shift() ?? { status: 'live', ptyIds: [ptyId] }
     ),
-    readTerminal: async () => ({ tail: ['agent output'] }),
+    readTerminal: vi.fn(async () => ({ tail: ['agent output'] })),
+    sendTerminal: vi.fn(
+      async (
+        _handle: string,
+        _action: { interrupt: true },
+        sendOptions: { beforeWrite?: (ptyId: string) => void | Promise<void> }
+      ) => {
+        await sendOptions.beforeWrite?.('pty')
+        return {}
+      }
+    ),
     waitForTerminal: async (handle: string) => ({
       handle,
       condition: 'tui-idle' as const,
@@ -203,12 +213,13 @@ function createHarness(options: {
   const changes: string[] = []
   const notifications: { event: string; detail?: string }[] = []
   const typing = { busy: 0 }
+  const noteLoopWrite = vi.fn()
   const deps: LoopDriverDeps = {
     store,
     runtime,
     observer: { observeIteration },
     inputAttribution: {
-      noteLoopWrite: vi.fn(),
+      noteLoopWrite,
       userIdleFor: () => {
         if (typing.busy > 0) {
           typing.busy -= 1
@@ -264,6 +275,7 @@ function createHarness(options: {
     notifications,
     steps,
     typing,
+    noteLoopWrite,
     liveness,
     row: (): StoredLoop => {
       const row = store.getLoop('loop-1')
@@ -438,6 +450,79 @@ describe('LoopDriver holds and stops', () => {
     expect(h.row().state).toBe('stopped')
   })
 
+  it('interrupts the agent turn before persisting stopped on stop now', async () => {
+    const h = createHarness({})
+    let stateAtInterrupt: string | undefined
+    h.runtime.sendTerminal.mockImplementationOnce(async () => {
+      stateAtInterrupt = h.row().state
+      return {}
+    })
+    h.steps.push(
+      (args) =>
+        new Promise((resolve) => {
+          args.signal.addEventListener('abort', () => resolve({ kind: 'aborted' }))
+          h.driver.requestStop('now')
+        })
+    )
+
+    await h.run()
+
+    expect(h.runtime.sendTerminal).toHaveBeenCalledTimes(1)
+    expect(h.runtime.sendTerminal).toHaveBeenCalledWith(
+      'term-0',
+      { interrupt: true },
+      expect.objectContaining({ inputKind: 'driving' })
+    )
+    expect(stateAtInterrupt).toBe('running')
+    expect(h.row().state).toBe('stopped')
+  })
+
+  it('records the interrupt write so it is not read as user input', async () => {
+    const h = createHarness({})
+    h.steps.push(
+      (args) =>
+        new Promise((resolve) => {
+          args.signal.addEventListener('abort', () => resolve({ kind: 'aborted' }))
+          h.driver.requestStop('now')
+        })
+    )
+
+    await h.run()
+
+    expect(h.noteLoopWrite).toHaveBeenCalledWith('pty', expect.any(Number))
+  })
+
+  it('stops anyway and records the error when the interrupt fails', async () => {
+    const h = createHarness({})
+    h.runtime.sendTerminal.mockRejectedValueOnce(new Error('terminal_not_writable'))
+    h.steps.push(
+      (args) =>
+        new Promise((resolve) => {
+          args.signal.addEventListener('abort', () => resolve({ kind: 'aborted' }))
+          h.driver.requestStop('now')
+        })
+    )
+
+    await h.run()
+
+    const [iteration] = h.store.listIterations('loop-1')
+    expect(h.row().state).toBe('stopped')
+    expect(iteration?.endReason).toBe('stopped')
+    expect(iteration?.error).toContain('terminal_not_writable')
+  })
+
+  it('does not interrupt the agent for a stop after iteration', async () => {
+    const h = createHarness({})
+    h.steps.push(async () => {
+      h.driver.requestStop('after-iteration')
+      return settled(h)
+    })
+
+    await h.run()
+
+    expect(h.runtime.sendTerminal).not.toHaveBeenCalled()
+  })
+
   it('ends stopped after the iteration for a stop after iteration', async () => {
     const h = createHarness({})
     h.steps.push(async () => {
@@ -460,6 +545,51 @@ describe('LoopDriver holds and stops', () => {
 
     expect(h.prompts).toHaveLength(1)
     expect(h.state.clock).toBeGreaterThanOrEqual(1_000_000 + 30)
+  })
+
+  it('waits for typing that starts after the decision and re-snapshots before sending', async () => {
+    const h = createHarness({})
+    h.tools.snapshotTree.mockImplementationOnce(async () => {
+      h.typing.busy = 2
+      return { treeId: 'tree-stale', headSha: 'head' }
+    })
+
+    await h.run()
+
+    expect(h.prompts).toHaveLength(1)
+    expect(h.tools.snapshotTree).toHaveBeenCalledTimes(3)
+    expect(h.store.listIterations('loop-1')[0]?.treeBefore).not.toBe('tree-stale')
+  })
+
+  it('does not send over an agent that became busy after the decision', async () => {
+    const h = createHarness({})
+    let reads = 0
+    Object.assign(h.runtime, {
+      getAgentStatusRowsForPane: () => {
+        reads += 1
+        return reads === 2 ? [{ state: 'working' }] : []
+      }
+    })
+
+    await h.run()
+
+    expect(h.prompts).toHaveLength(1)
+    expect(h.tools.snapshotTree).toHaveBeenCalledTimes(3)
+  })
+
+  it('ends stopped without sending when stop now arrives while waiting for the user', async () => {
+    const h = createHarness({})
+    h.tools.snapshotTree.mockImplementationOnce(async () => {
+      h.typing.busy = 1_000_000
+      h.driver.requestStop('now')
+      return { treeId: 'tree-1', headSha: 'head' }
+    })
+
+    await h.run()
+
+    expect(h.prompts).toHaveLength(0)
+    expect(h.row().state).toBe('stopped')
+    expect(h.store.listIterations('loop-1')[0]?.endReason).toBe('stopped')
   })
 
   it('clears the pause when resumed and judges the next iteration afresh', async () => {
@@ -540,6 +670,53 @@ describe('LoopDriver detached and relaunch', () => {
     expect(h.prompts[0]?.prompt).toContain('LOOP_DONE')
     expect(h.row().detached).toBe(true)
     expect(h.row().paneKey).toBe('tab-1:leaf-1')
+  })
+
+  it('waits for a reopen in flight and then uses its pane instead of relaunching', async () => {
+    const h = createHarness({
+      config: { sessionPolicy: 'fresh' },
+      loop: { detached: true }
+    })
+    h.runtime.getTerminalHandleForPaneKey = (paneKey) =>
+      paneKey === 'tab-a:leaf-a' ? 'term-adopted' : null
+    h.runtime.getTerminalPtyIdForHandle = (handle) => (handle === 'term-adopted' ? 'pty-a' : null)
+    let release: () => void = () => undefined
+    const adopted = h.driver.reopenPane(
+      () =>
+        new Promise<void>((resolve) => {
+          release = () => {
+            h.store.updateLoop('loop-1', {
+              tabId: 'tab-a',
+              paneKey: 'tab-a:leaf-a',
+              ptyId: 'pty-a'
+            })
+            resolve()
+          }
+        })
+    )
+    expect(await h.driver.reopenPane(async () => undefined)).toBe(false)
+
+    h.driver.start()
+    release()
+    await adopted
+    await h.driver.whenIdle()
+
+    expect(h.runtime.createTerminal).not.toHaveBeenCalled()
+    expect(h.prompts.map((p) => p.handle)).toEqual(['term-adopted'])
+    expect(h.prompts[0]?.prompt).toContain('LOOP_DONE')
+  })
+
+  it('refuses reopenPane while an iteration is running', async () => {
+    const h = createHarness({})
+    let refused: boolean | undefined
+    h.steps.push(async () => {
+      refused = await h.driver.reopenPane(async () => undefined)
+      return settled(h)
+    })
+
+    await h.run()
+
+    expect(refused).toBe(false)
   })
 
   it('binds the new tab and records the close error when the old tab will not close', async () => {

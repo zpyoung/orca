@@ -86,13 +86,27 @@ export async function relaunchAgentInNewTab(
     title: args.title,
     ...(args.launchOverrides ? { launchOverrides: args.launchOverrides } : {})
   })
+  const tab = await requireLaunchedTabIdentity(runtime, launched)
+  if (args.previousHandle) {
+    await closeTab(runtime, args.previousHandle)
+  }
+  return tab
+}
+
+/**
+ * Narrows a launched terminal to one the loop can bind to. A launch missing its tab, pane or PTY
+ * identity is closed so it never lingers unowned.
+ *
+ * @throws Error when the launch did not report its identity.
+ */
+export async function requireLaunchedTabIdentity(
+  runtime: AgentRelaunchRuntime,
+  launched: RuntimeTerminalCreate
+): Promise<RelaunchedAgentTab> {
   const { tabId, paneKey, ptyId } = launched
   if (!tabId || !paneKey || !ptyId) {
     await closeTab(runtime, launched.handle).catch(() => {})
     throw new Error('agent launch did not report its tab identity')
-  }
-  if (args.previousHandle) {
-    await closeTab(runtime, args.previousHandle)
   }
   return { handle: launched.handle, tabId, paneKey, ptyId }
 }

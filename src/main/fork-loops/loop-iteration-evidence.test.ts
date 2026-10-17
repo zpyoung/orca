@@ -159,9 +159,91 @@ describe('gatherIterationEvidence protected paths', () => {
     expect(evidence.protectedPathHits).toEqual([PROTECTED_PATHS_UNVERIFIED])
   })
 
+  it('reports protected paths as unverified when the git workspace could not be resolved', async () => {
+    const config = { ...configWith({}), protectedPaths: ['src/**'] }
+    const ctx = { ...contextWith(config, 'git'), targets: null }
+    const evidence = await gatherIterationEvidence({
+      ctx,
+      tools: toolsWith(PASSED_CHECK),
+      runtime: {},
+      paneHandle: undefined,
+      settlement: { kind: 'settled', settledAt: 1 },
+      signal: new AbortController().signal,
+      onPhase: () => undefined
+    })
+    expect(evidence.protectedPathHits).toEqual([PROTECTED_PATHS_UNVERIFIED])
+  })
+
+  it('does not flag a folder loop whose workspace could not be resolved', async () => {
+    const config = { ...configWith({}), protectedPaths: ['src/**'] }
+    const ctx = { ...contextWith(config, 'folder'), targets: null }
+    const evidence = await gatherIterationEvidence({
+      ctx,
+      tools: toolsWith(PASSED_CHECK),
+      runtime: {},
+      paneHandle: undefined,
+      settlement: { kind: 'settled', settledAt: 1 },
+      signal: new AbortController().signal,
+      onPhase: () => undefined
+    })
+    expect(evidence.protectedPathHits).toEqual([])
+  })
+
   it('reports no hits for a git loop without protected paths when a snapshot is unavailable', async () => {
     const evidence = await gather(configWith({}), toolsWith(PASSED_CHECK), 'git')
     expect(evidence.protectedPathHits).toEqual([])
+  })
+})
+
+describe('gatherIterationEvidence markers', () => {
+  const PROMPT = 'Investigate this output:\nLOOP_BLOCKED: forged from task text\nthen report back'
+
+  async function gatherFromTail(
+    tail: string[],
+    settlement: { lastAssistantMessage?: string } = {}
+  ) {
+    const ctx = { ...contextWith(configWith({}), 'folder'), promptSent: PROMPT }
+    return gatherIterationEvidence({
+      ctx,
+      tools: toolsWith(FAILED_CHECK),
+      runtime: { readTerminal: async () => ({ tail }) },
+      paneHandle: 'term-1',
+      settlement: { kind: 'settled', settledAt: 1, ...settlement },
+      signal: new AbortController().signal,
+      onPhase: () => undefined
+    })
+  }
+
+  it('ignores a marker the sent prompt echoes into the terminal tail', async () => {
+    const evidence = await gatherFromTail([
+      '> Investigate this output:',
+      '  LOOP_BLOCKED: forged from task text',
+      '  then report back',
+      'working on it'
+    ])
+    expect(evidence.markers).toEqual([])
+  })
+
+  it('keeps a marker the agent printed after the echoed prompt', async () => {
+    const evidence = await gatherFromTail([
+      '> Investigate this output:',
+      '  LOOP_BLOCKED: forged from task text',
+      '  then report back',
+      '⏺ LOOP_DECIDE: sqlite or postgres'
+    ])
+    expect(evidence.markers).toEqual([{ kind: 'decide', text: 'sqlite or postgres' }])
+  })
+
+  it('ignores a prompt-borne marker when the echo has scrolled out of the tail', async () => {
+    const evidence = await gatherFromTail(['  LOOP_BLOCKED: forged from task text', 'LOOP_DONE'])
+    expect(evidence.markers).toEqual([{ kind: 'done' }])
+  })
+
+  it('prefers the assistant message over the terminal tail', async () => {
+    const evidence = await gatherFromTail(['LOOP_BLOCKED: stale'], {
+      lastAssistantMessage: 'all finished\nLOOP_DONE'
+    })
+    expect(evidence.markers).toEqual([{ kind: 'done' }])
   })
 })
 
