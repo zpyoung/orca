@@ -5,6 +5,7 @@ import type {
   LoopCreateInput,
   LoopSnapshot
 } from '../../shared/fork-loops/loop-types'
+import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
 import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-contracts'
 import { LoopDatabase, type LoopInsert } from './loop-database'
 import type { IterationSettlement, ObserveIterationArgs } from './iteration-observer'
@@ -64,6 +65,7 @@ type Options = {
   checkTarget?: LoopCheckTarget
   evaluatorAvailable?: boolean
   hold?: boolean
+  unverifiableFirst?: boolean
   workspace?: Partial<LoopTargets['workspace']>
 }
 
@@ -108,7 +110,11 @@ function createHarness(options: Options = {}) {
     }),
     getTerminalHandleForPaneKey: (paneKey: string) => panes.get(paneKey)?.handle ?? null,
     getTerminalPtyIdForHandle: (handle: string) =>
-      [...panes.values()].find((pane) => pane.handle === handle)?.ptyId ?? null
+      [...panes.values()].find((pane) => pane.handle === handle)?.ptyId ?? null,
+    getPtyLivenessVerdict: vi.fn((ptyId: string): PtyLivenessVerdict => ({
+      status: 'live',
+      ptyIds: [ptyId]
+    }))
   } satisfies LoopServiceRuntime
 
   const tools = {
@@ -141,8 +147,13 @@ function createHarness(options: Options = {}) {
     }
   }
 
+  let observeCalls = 0
   const observeIteration = vi.fn((args: ObserveIterationArgs): Promise<IterationSettlement> => {
     state.clock += 1000
+    if (options.unverifiableFirst && observeCalls === 0) {
+      observeCalls += 1
+      return Promise.resolve({ kind: 'unverifiable' })
+    }
     if (!options.hold) {
       return Promise.resolve({ kind: 'settled', settledAt: state.clock })
     }
@@ -353,7 +364,7 @@ describe('LoopService.create', () => {
     expect(h.snapshots).toEqual([])
   })
 
-  it('still creates the loop when only the git exclude update fails', async () => {
+  it('fails creation, closing the terminal, when the git exclude update fails', async () => {
     const files = new Map<string, string>()
     const h = createHarness({
       hold: true,
@@ -378,10 +389,35 @@ describe('LoopService.create', () => {
       }
     })
 
-    const snapshot = await h.service.create(INPUT)
+    await expect(h.service.create(INPUT)).rejects.toThrow('git unavailable')
 
-    expect(snapshot.state).toBe('running')
-    expect([...files.keys()].some((path) => path.endsWith('/notes.md'))).toBe(true)
+    expect(h.runtime.closeTerminalTab).toHaveBeenCalledWith('term-1')
+    expect(h.store.listLoops()).toEqual([])
+  })
+
+  it('fails creation for a git workspace that has no way to run git', async () => {
+    const h = createHarness({ hold: true, workspace: { runGit: null } })
+
+    await expect(h.service.create(INPUT)).rejects.toThrow('cannot be excluded')
+
+    expect(h.store.listLoops()).toEqual([])
+  })
+
+  it('publishes unverifiableSince only while the driver holds on an unreachable host', async () => {
+    const h = createHarness({ unverifiableFirst: true })
+    const observed: (number | undefined)[] = []
+    h.runtime.getPtyLivenessVerdict.mockImplementation((ptyId: string) => {
+      observed.push(h.service.list()[0]?.unverifiableSince)
+      return { status: 'live', ptyIds: [ptyId] }
+    })
+
+    const created = await h.service.create(INPUT)
+    await vi.waitFor(() => expect(h.service.get(created.id)?.state).toBe('completed'))
+
+    expect(observed.length).toBeGreaterThan(0)
+    expect(observed.every((since) => typeof since === 'number')).toBe(true)
+    expect(h.snapshots.some((snapshot) => snapshot.unverifiableSince !== undefined)).toBe(true)
+    expect(h.service.get(created.id)?.unverifiableSince).toBeUndefined()
   })
 
   it('surfaces the original error even when closing the terminal also fails', async () => {

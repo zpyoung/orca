@@ -6,17 +6,17 @@ import type {
   NeedsYouReason,
   PauseReason
 } from '../../shared/fork-loops/loop-types'
-import { LOOP_USER_IDLE_MS } from './input-attribution'
 import type { IterationSettlement } from './iteration-observer'
 import {
   abortableSleep,
   awaitLaunchedAgent,
   errorMessage,
   interruptForStop,
+  isAgentBusy,
+  isUserTyping,
   observeUntilSettled,
   relaunchLoopAgent,
-  resolvePane,
-  sendAgentPrompt
+  resolvePane
 } from './loop-agent-session'
 import type { StoredLoop, LoopPatch } from './loop-database'
 import type { IterationContext, LoopDriverDeps } from './loop-driver-types'
@@ -28,7 +28,7 @@ import {
   toRecord
 } from './loop-iteration-evidence'
 import { appendLoopLogLine } from './loop-notes-file'
-import { composeLoopPrompt } from './loop-iteration-prompt'
+import { deliverIterationPrompt } from './loop-iteration-prompt'
 import { claimQueueItem } from './loop-queue-claim'
 
 export type {
@@ -55,6 +55,7 @@ export class LoopDriver {
   private preambleSent = false
   private iteration: { n: number; startedAt: number; phase: IterationPhase } | null = null
   private runningSince: number | null = null
+  private unverifiableSinceMs: number | null = null
   private abort = new AbortController()
   private wake = new AbortController()
   private finished: Promise<void> = Promise.resolve()
@@ -67,6 +68,11 @@ export class LoopDriver {
 
   current(): { n: number; startedAt: number; phase: IterationPhase } | null {
     return this.iteration
+  }
+
+  /** Epoch ms since which the loop's host could not be reached, or null while it can. */
+  unverifiableSince(): number | null {
+    return this.unverifiableSinceMs
   }
 
   /** Starts the decide-act loop if it is not already running. */
@@ -207,37 +213,12 @@ export class LoopDriver {
       hold: {
         userPaused: this.userPaused,
         stopRequested: this.stopRequested,
-        awaitingApproval: this.agentBusy(loop),
+        awaitingApproval: isAgentBusy(this.deps.runtime, loop.paneKey),
         connection: 'live',
-        userTyping: this.userTyping(loop)
+        userTyping: isUserTyping(this.deps, loop.paneKey)
       },
       ...(promptSource.kind === 'queue' ? { queue: this.deps.store.listQueue(this.loopId) } : {})
     })
-  }
-
-  private userTyping(loop: StoredLoop): boolean {
-    const pane = resolvePane(this.deps.runtime, loop.paneKey)
-    return pane !== null && !this.deps.inputAttribution.userIdleFor(pane.ptyId, LOOP_USER_IDLE_MS)
-  }
-
-  private inputActive(loop: StoredLoop): boolean {
-    return this.userTyping(loop) || this.agentBusy(loop)
-  }
-
-  /** Polls until neither the user nor the agent is active; false when stop-now or shutdown aborts. */
-  private async waitForInputIdle(loop: StoredLoop): Promise<boolean> {
-    const { signal } = this.abort
-    while (this.inputActive(loop) && !signal.aborted && !this.disposed) {
-      await (this.deps.sleep ?? abortableSleep)(this.deps.pollMs ?? 1000, signal)
-    }
-    return !signal.aborted && !this.disposed
-  }
-
-  private agentBusy(loop: StoredLoop): boolean {
-    const read = this.deps.runtime.getAgentStatusRowsForPane
-    return loop.paneKey !== null && typeof read === 'function'
-      ? read.call(this.deps.runtime, loop.paneKey).some((row) => row.state === 'working')
-      : false
   }
 
   private async waitFor(action: Extract<LoopAction, { kind: 'wait' }>): Promise<void> {
@@ -251,6 +232,20 @@ export class LoopDriver {
       Math.max(0, Math.min(ms, MAX_WAIT_SLICE_MS)),
       this.wake.signal
     )
+  }
+
+  private startHold(): void {
+    this.accrue()
+    this.runningSince = null
+    this.unverifiableSinceMs = this.now()
+    this.commit({}, 'waiting')
+  }
+
+  private endHold(): void {
+    this.unverifiableSinceMs = null
+    if (!this.disposed && this.row().state === 'running') {
+      this.runningSince = this.now()
+    }
   }
 
   private accrue(): void {
@@ -328,8 +323,7 @@ export class LoopDriver {
     source: 'repeat' | { queueItemId: string },
     isRetry: boolean
   ): Promise<void> {
-    const { store, tools } = this.deps
-    await this.reopening
+    const { store } = this.deps
     let loop = this.row()
     const lastRow = store.listIterations(this.loopId, { limit: 1 }).at(-1) ?? null
     const reRun = lastRow?.endReason === 'interrupted'
@@ -340,6 +334,14 @@ export class LoopDriver {
       .listIterations(this.loopId)
       .filter((row) => row.n === n)
       .reduce((next, row) => Math.max(next, row.attempt + 1), 0)
+    // claimed before the first await so a queue edit cannot land between the decision and the claim
+    const item = claimQueueItem(store, this.loopId, source, isRetry || reRun)
+    if (loop.config.promptSource.kind === 'queue' && item === null) {
+      await (this.deps.sleep ?? abortableSleep)(this.deps.pollMs ?? 1000, this.wake.signal)
+      return
+    }
+    await this.reopening
+    loop = this.row()
     const startedAt = this.now()
     store.insertIteration(this.loopId, { n, attempt, promptSent: '', startedAt })
     this.abort = new AbortController()
@@ -360,7 +362,6 @@ export class LoopDriver {
       usageBefore: null,
       error: null
     }
-    const item = claimQueueItem(store, this.loopId, source, isRetry || reRun)
 
     let pane = resolvePane(this.deps.runtime, loop.paneKey)
     if (!pane || isRetry || (freshSession && this.sessionUsed)) {
@@ -389,7 +390,9 @@ export class LoopDriver {
         now: () => this.now(),
         onBlocked: (reason) => this.enterNeedsYou(reason),
         onUnblocked: () => this.leaveNeedsYou('sending'),
-        onPhase: (phase) => this.commit({}, phase)
+        onPhase: (phase) => this.commit({}, phase),
+        onHoldStart: () => this.startHold(),
+        onHoldEnd: () => this.endHold()
       })
       if (ready !== 'ready') {
         return this.endIteration(ctx, {
@@ -399,43 +402,26 @@ export class LoopDriver {
       }
     }
 
-    for (;;) {
-      ctx.before = targets ? await tools.snapshotTree(targets.workspace) : null
-      ctx.usageBefore = loop.paneKey
-        ? await tools.readUsage(loop.paneKey, loop.worktreeId, loop.agent)
-        : null
-      if (!this.inputActive(loop)) {
-        break
-      }
-      this.commit({}, 'waiting')
-      if (!(await this.waitForInputIdle(loop))) {
-        return this.endIteration(ctx, { kind: 'aborted' })
-      }
-      this.commit({}, 'sending')
-    }
-    const notes = store.takePendingSteerNotes(this.loopId, n).map((note) => note.body)
-    const prompt = composeLoopPrompt({
-      loop,
+    const freshForUsage = !this.sessionUsed
+    const delivery = await deliverIterationPrompt({
+      deps: this.deps,
       ctx,
       item,
-      notes,
-      history: this.history(),
-      includePreamble: !this.preambleSent
+      pane,
+      includePreamble: !this.preambleSent,
+      history: () => this.history(),
+      signal: this.abort.signal,
+      stopped: () => this.disposed,
+      onPhase: (phase) => this.commit({}, phase)
     })
-    ctx.promptSent = prompt
-    const sentAt = this.now()
-    store.updateIteration(this.loopId, n, attempt, { promptSent: prompt })
-    const freshForUsage = !this.sessionUsed
-    try {
-      await sendAgentPrompt(this.deps.runtime, this.deps.inputAttribution, pane, prompt, () =>
-        this.now()
+    if (delivery.kind !== 'sent') {
+      return this.endIteration(
+        ctx,
+        delivery.kind === 'aborted' ? { kind: 'aborted' } : { kind: 'crashed', exitCode: null },
+        delivery.kind === 'failed' ? delivery.message : undefined
       )
-    } catch (error) {
-      for (const body of notes) {
-        store.addSteerNote(this.loopId, body)
-      }
-      return this.endIteration(ctx, { kind: 'crashed', exitCode: null }, errorMessage(error))
     }
+    const { sentAt } = delivery
     this.sessionUsed = true
     this.preambleSent = true
     this.commit({}, 'working')
@@ -451,7 +437,9 @@ export class LoopDriver {
       sleep: this.deps.sleep,
       onNeedsYou: (reason) => this.enterNeedsYou(reason),
       onResumed: () => this.leaveNeedsYou('working'),
-      onPhase: (phase) => this.commit({}, phase)
+      onPhase: (phase) => this.commit({}, phase),
+      onHoldStart: () => this.startHold(),
+      onHoldEnd: () => this.endHold()
     })
     if (this.disposed) {
       return
@@ -525,12 +513,13 @@ export class LoopDriver {
       usageLimit
     }
     const row = this.row()
+    const skippedTicks = skippedWallClockTicks(row, ctx.startedAt, endedAt)
     this.accrue()
     this.commit(
       {
         iterationsCompleted: endReason === 'settled' ? ctx.n : row.iterationsCompleted,
         costUsd: evidence.costUsd === null ? row.costUsd : (row.costUsd ?? 0) + evidence.costUsd,
-        skippedTicks: row.skippedTicks + skippedWallClockTicks(row, ctx.startedAt, endedAt),
+        skippedTicks: row.skippedTicks + skippedTicks,
         nextIterationAt: null
       },
       null
@@ -542,7 +531,8 @@ export class LoopDriver {
         checkPass: evidence.check ? evidence.check.pass : null,
         added: evidence.diff?.added ?? null,
         removed: evidence.diff?.removed ?? null,
-        costUsd: evidence.costUsd
+        costUsd: evidence.costUsd,
+        skippedTicks
       })
     }
   }

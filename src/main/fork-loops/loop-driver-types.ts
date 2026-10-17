@@ -98,7 +98,8 @@ export type LoopDriverDeps = {
   store: LoopStore
   runtime: LoopDriverRuntime
   observer: Pick<IterationObserver, 'observeIteration'>
-  inputAttribution: Pick<InputAttribution, 'noteLoopWrite' | 'userIdleFor'>
+  inputAttribution: Pick<InputAttribution, 'noteLoopWrite' | 'userIdleFor'> &
+    Partial<Pick<InputAttribution, 'userInputSince'>>
   tools: LoopEvidenceTools
   targets(worktreeId: string): Promise<LoopTargets>
   changed(loopId: string): void

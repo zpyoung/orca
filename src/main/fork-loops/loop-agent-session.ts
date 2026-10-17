@@ -9,10 +9,10 @@ import {
   type AgentRelaunchRuntime,
   type RelaunchedAgentTab
 } from './agent-session-relaunch'
-import type { InputAttribution } from './input-attribution'
+import { LOOP_USER_IDLE_MS, type InputAttribution } from './input-attribution'
 import type { IterationObserver, IterationSettlement } from './iteration-observer'
 import type { StoredLoop } from './loop-database'
-import type { LoopDriverRuntime, PaneRef } from './loop-driver-types'
+import type { LoopDriverDeps, LoopDriverRuntime, PaneRef } from './loop-driver-types'
 
 const AGENT_READY_TIMEOUT_MS = 120_000
 const DEFAULT_POLL_MS = 1000
@@ -58,6 +58,37 @@ export function resolvePane(runtime: LoopDriverRuntime, paneKey: string | null):
   } catch {
     return null
   }
+}
+
+/** Whether the user typed into the loop's pane within the idle window. */
+export function isUserTyping(
+  deps: Pick<LoopDriverDeps, 'runtime' | 'inputAttribution'>,
+  paneKey: string | null
+): boolean {
+  const pane = resolvePane(deps.runtime, paneKey)
+  return pane !== null && !deps.inputAttribution.userIdleFor(pane.ptyId, LOOP_USER_IDLE_MS)
+}
+
+/** Whether the agent in the loop's pane is mid-turn. */
+export function isAgentBusy(runtime: LoopDriverRuntime, paneKey: string | null): boolean {
+  const read = runtime.getAgentStatusRowsForPane
+  return paneKey !== null && typeof read === 'function'
+    ? read.call(runtime, paneKey).some((row) => row.state === 'working')
+    : false
+}
+
+/** Polls until neither the user nor the agent is active; false when the signal or `stopped` aborts. */
+export async function waitForInputIdle(
+  deps: Pick<LoopDriverDeps, 'runtime' | 'inputAttribution' | 'sleep' | 'pollMs'>,
+  paneKey: string | null,
+  signal: AbortSignal,
+  stopped: () => boolean
+): Promise<boolean> {
+  const active = (): boolean => isUserTyping(deps, paneKey) || isAgentBusy(deps.runtime, paneKey)
+  while (active() && !signal.aborted && !stopped()) {
+    await (deps.sleep ?? abortableSleep)(deps.pollMs ?? DEFAULT_POLL_MS, signal)
+  }
+  return !signal.aborted && !stopped()
 }
 
 /** Launches through `createTerminal` with no `rendererBacked`, which the runtime builds as a background terminal. */
@@ -197,19 +228,21 @@ export type LaunchedAgentArgs = Omit<AgentReadyArgs, 'handle' | 'ptyId'> & {
   pane: PaneRef
   sleep?(ms: number, signal: AbortSignal): Promise<void>
   onPhase(phase: IterationPhase): void
+  onHoldStart(): void
+  onHoldEnd(): void
 }
 
 /** Awaits readiness and holds, like an unverifiable settlement, while a launch cannot be confirmed. */
 export async function awaitLaunchedAgent(
   args: LaunchedAgentArgs
 ): Promise<Exclude<AgentReadiness, 'unverifiable'>> {
-  const { pane, sleep, onPhase, ...ready } = args
+  const { pane, sleep, onPhase, onHoldStart, onHoldEnd, ...ready } = args
   for (;;) {
     const readiness = await awaitAgentReady({ ...ready, handle: pane.handle, ptyId: pane.ptyId })
     if (readiness !== 'unverifiable') {
       return readiness
     }
-    onPhase('waiting')
+    onHoldStart()
     const held = await holdUntilPaneLive({
       runtime: args.runtime,
       pane,
@@ -217,6 +250,7 @@ export async function awaitLaunchedAgent(
       pollMs: args.pollMs,
       sleep
     })
+    onHoldEnd()
     if (held !== 'live') {
       return held === 'exited' ? 'crashed' : 'aborted'
     }
@@ -224,25 +258,48 @@ export async function awaitLaunchedAgent(
   }
 }
 
-/** Delivers one iteration prompt, recording the write window so the user's typing stays distinct. */
+/** The user typed into the pane after the idle check, so the prompt was not written. */
+export class LoopUserInputDuringSendError extends Error {
+  constructor() {
+    super('the user typed before the prompt could be written')
+    this.name = 'LoopUserInputDuringSendError'
+  }
+}
+
+/**
+ * Delivers one iteration prompt, recording the write window so the user's typing stays distinct.
+ * Throws `LoopUserInputDuringSendError`, before any byte is written, when the user typed at or
+ * after `userIdleAt`.
+ */
 export async function sendAgentPrompt(
   runtime: LoopDriverRuntime,
-  inputAttribution: Pick<InputAttribution, 'noteLoopWrite'>,
+  inputAttribution: Pick<InputAttribution, 'noteLoopWrite'> &
+    Partial<Pick<InputAttribution, 'userInputSince'>>,
   pane: PaneRef,
   prompt: string,
-  now: () => number
+  now: () => number,
+  userIdleAt: number
 ): Promise<void> {
   if (typeof runtime.sendTerminalAgentPrompt !== 'function') {
     throw new LoopRuntimeUnavailableError('the runtime cannot send an agent prompt')
   }
   const noteWrite = (ptyId: string): void => inputAttribution.noteLoopWrite(ptyId, now())
+  // the runtime calls beforeWrite again before the submit key; vetoing then would strand the paste
+  let pasteWritten = false
+  const guardedBeforeWrite = (ptyId: string): void => {
+    if (!pasteWritten && inputAttribution.userInputSince?.(ptyId, userIdleAt)) {
+      throw new LoopUserInputDuringSendError()
+    }
+    pasteWritten = true
+    noteWrite(ptyId)
+  }
   try {
     await runtime.sendTerminalAgentPrompt(pane.handle, prompt, {
       inputKind: 'driving',
       acceptQueued: true,
       requestId: randomUUID(),
       observationTimeoutMs: 0,
-      beforeWrite: noteWrite,
+      beforeWrite: guardedBeforeWrite,
       afterWrite: noteWrite
     })
   } catch (error) {
@@ -297,6 +354,8 @@ export type ObserveArgs = {
   onNeedsYou(reason: NeedsYouReason): void
   onResumed(): void
   onPhase(phase: IterationPhase): void
+  onHoldStart(): void
+  onHoldEnd(): void
 }
 
 export type HoldArgs = {
@@ -341,7 +400,7 @@ export async function observeUntilSettled(args: ObserveArgs): Promise<IterationS
     if (settlement.kind !== 'unverifiable') {
       return settlement
     }
-    args.onPhase('waiting')
+    args.onHoldStart()
     const held = await holdUntilPaneLive({
       runtime,
       pane,
@@ -349,6 +408,7 @@ export async function observeUntilSettled(args: ObserveArgs): Promise<IterationS
       pollMs: args.pollMs,
       sleep: args.sleep
     })
+    args.onHoldEnd()
     if (held === 'exited') {
       return { kind: 'crashed', exitCode: null }
     }

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
-import { awaitAgentReady, holdUntilPaneLive } from './loop-agent-session'
+import {
+  awaitAgentReady,
+  holdUntilPaneLive,
+  LoopUserInputDuringSendError,
+  observeUntilSettled,
+  sendAgentPrompt
+} from './loop-agent-session'
 import type { LoopDriverRuntime } from './loop-driver-types'
 
 function readyArgs(runtime: LoopDriverRuntime, ptyId: string | undefined = 'pty-1') {
@@ -131,5 +137,111 @@ describe('holdUntilPaneLive', () => {
 
     expect(exited).toBe('exited')
     expect(aborted).toBe('aborted')
+  })
+})
+
+describe('sendAgentPrompt user-input guard', () => {
+  const pane = { handle: 'term-1', ptyId: 'pty-1' }
+
+  function sendHarness(userInputSince: (ptyId: string, since: number) => boolean) {
+    const noteLoopWrite = vi.fn()
+    const writes: string[] = []
+    const runtime = {
+      sendTerminalAgentPrompt: vi.fn(
+        async (
+          _handle: string,
+          prompt: string,
+          options: { beforeWrite?: (ptyId: string) => void | Promise<void> }
+        ) => {
+          await options.beforeWrite?.('pty-1')
+          writes.push(prompt)
+          await options.beforeWrite?.('pty-1')
+          return {}
+        }
+      )
+    }
+    return { noteLoopWrite, writes, runtime, inputAttribution: { noteLoopWrite, userInputSince } }
+  }
+
+  it('vetoes the write before any byte when the user typed since the idle check', async () => {
+    const h = sendHarness(() => true)
+
+    await expect(
+      sendAgentPrompt(h.runtime, h.inputAttribution, pane, 'go', () => 7, 5)
+    ).rejects.toBeInstanceOf(LoopUserInputDuringSendError)
+
+    expect(h.writes).toEqual([])
+    expect(h.noteLoopWrite).not.toHaveBeenCalled()
+  })
+
+  it('writes and notes the window when the user has been silent since the idle check', async () => {
+    const since = vi.fn(() => false)
+    const h = sendHarness(since)
+
+    await sendAgentPrompt(h.runtime, h.inputAttribution, pane, 'go', () => 7, 5)
+
+    expect(since).toHaveBeenCalledWith('pty-1', 5)
+    expect(h.writes).toEqual(['go'])
+    expect(h.noteLoopWrite).toHaveBeenCalledWith('pty-1', 7)
+  })
+
+  it('does not veto the second beforeWrite once the paste is written', async () => {
+    const answers = [false, true]
+    const h = sendHarness(() => answers.shift() ?? true)
+
+    await sendAgentPrompt(h.runtime, h.inputAttribution, pane, 'go', () => 7, 5)
+
+    expect(h.writes).toEqual(['go'])
+    expect(answers).toEqual([true])
+  })
+})
+
+describe('observeUntilSettled hold callbacks', () => {
+  it('brackets an unreachable host with hold start and end and then keeps observing', async () => {
+    const events: string[] = []
+    const observeIteration = vi
+      .fn()
+      .mockResolvedValueOnce({ kind: 'unverifiable' })
+      .mockResolvedValueOnce({ kind: 'settled', settledAt: 1 })
+
+    const settlement = await observeUntilSettled({
+      runtime: { getPtyLivenessVerdict: () => ({ status: 'live', ptyIds: ['pty-1'] }) },
+      observer: { observeIteration },
+      pane: { handle: 'term-1', ptyId: 'pty-1' },
+      paneKey: () => 'pane',
+      sentAt: 0,
+      signal: new AbortController().signal,
+      sleep: async () => undefined,
+      onNeedsYou: vi.fn(),
+      onResumed: vi.fn(),
+      onPhase: (phase) => events.push(`phase:${phase}`),
+      onHoldStart: () => events.push('hold-start'),
+      onHoldEnd: () => events.push('hold-end')
+    })
+
+    expect(settlement.kind).toBe('settled')
+    expect(events).toEqual(['hold-start', 'hold-end', 'phase:working'])
+  })
+
+  it('ends the hold even when the pane is found exited', async () => {
+    const events: string[] = []
+
+    const settlement = await observeUntilSettled({
+      runtime: { getPtyLivenessVerdict: () => ({ status: 'exited' }) },
+      observer: { observeIteration: vi.fn().mockResolvedValue({ kind: 'unverifiable' }) },
+      pane: { handle: 'term-1', ptyId: 'pty-1' },
+      paneKey: () => 'pane',
+      sentAt: 0,
+      signal: new AbortController().signal,
+      sleep: async () => undefined,
+      onNeedsYou: vi.fn(),
+      onResumed: vi.fn(),
+      onPhase: vi.fn(),
+      onHoldStart: () => events.push('hold-start'),
+      onHoldEnd: () => events.push('hold-end')
+    })
+
+    expect(settlement.kind).toBe('crashed')
+    expect(events).toEqual(['hold-start', 'hold-end'])
   })
 })

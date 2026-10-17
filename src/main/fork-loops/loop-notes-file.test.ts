@@ -69,6 +69,20 @@ describe('loop notes file', () => {
     expect(status.stdout).toBe('')
   })
 
+  it('fails for a git workspace when the exclude entry cannot be installed', async () => {
+    const failing: LoopNotesTarget = {
+      ...gitTarget(),
+      runGit: async () => {
+        throw new Error('git unavailable')
+      }
+    }
+
+    await expect(ensureLoopNotesFile(failing, 'my-loop')).rejects.toThrow('git unavailable')
+    await expect(ensureLoopNotesFile({ ...failing, runGit: null }, 'my-loop')).rejects.toThrow(
+      'cannot be excluded'
+    )
+  })
+
   it('keeps existing notes content on a second ensure', async () => {
     await git(root, ['init', '-q'])
     const target = gitTarget()
@@ -148,6 +162,16 @@ describe('loop notes file', () => {
     expect(lines[0]).toContain('+4')
     expect(lines[0]).toContain('-1')
     expect(lines[0]).toContain('$0.42')
+  })
+
+  it('prints skipped ticks only when some were skipped', () => {
+    const base = { n: 3, endReason: 'settled', checkPass: null, added: null, removed: null }
+
+    expect(formatLoopLogLine({ ...base, costUsd: null, skippedTicks: 2 })).toMatch(
+      / \| skipped 2 ticks$/
+    )
+    expect(formatLoopLogLine({ ...base, costUsd: null, skippedTicks: 0 })).not.toContain('skipped')
+    expect(formatLoopLogLine({ ...base, costUsd: null })).not.toContain('skipped')
   })
 
   it('returns false instead of throwing when the log cannot be written', async () => {
