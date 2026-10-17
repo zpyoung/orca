@@ -161,14 +161,28 @@ describe('runLoopCheck abort', () => {
     expect(runPrecheck).not.toHaveBeenCalled()
   })
 
-  it('stops waiting for a running check on abort and reports it as not run', async () => {
+  it('hands the signal to the runner and reports not run only after the runner has stopped', async () => {
     const controller = new AbortController()
-    const runPrecheck = vi.fn(() => new Promise<AutomationPrecheckResult>(() => undefined))
+    let runnerStopped = false
+    const runPrecheck = vi.fn(
+      ({ signal }: { signal?: AbortSignal }) =>
+        new Promise<AutomationPrecheckResult>((resolve) => {
+          signal?.addEventListener('abort', () => {
+            setTimeout(() => {
+              runnerStopped = true
+              resolve(precheckResult({ exitCode: null, error: 'aborted' }))
+            }, 10)
+          })
+        })
+    )
 
     const pending = runLoopCheck(loopWithCheck(check), LOCAL, { runPrecheck }, controller.signal)
     controller.abort()
+    const outcome = await pending
 
-    expect(await pending).toMatchObject({ ran: false, pass: false, error: 'aborted' })
+    expect(runPrecheck.mock.calls[0][0].signal).toBe(controller.signal)
+    expect(runnerStopped).toBe(true)
+    expect(outcome).toMatchObject({ ran: false, pass: false, error: 'aborted' })
   })
 
   it('reports a finished check normally when the signal never aborts', async () => {
