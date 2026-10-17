@@ -10,6 +10,7 @@ import type {
 } from './loop-types'
 
 const MS_PER_MINUTE = 60_000
+const LIMIT_RESET_GRACE_MS = 60_000
 
 export type LoopQueueItemView = {
   id: string
@@ -96,10 +97,7 @@ function capPause(loop: LoopConfig, state: LoopRuntimeState): LoopAction | null 
   return null
 }
 
-function evidencePause(
-  input: DecideNextInput,
-  latest: IterationEvidence
-): LoopAction | null {
+function evidencePause(input: DecideNextInput, latest: IterationEvidence): LoopAction | null {
   const { loop, state, history, now } = input
   if (latest.protectedPathHits.length > 0) {
     return pause('protected-path', latest.protectedPathHits.join(', '))
@@ -122,11 +120,15 @@ function evidencePause(
   const { usageLimit } = latest
   if (usageLimit) {
     if (loop.resumeAtLimitReset && usageLimit.resetsAt !== null) {
-      return usageLimit.resetsAt > now
-        ? { kind: 'wait', until: usageLimit.resetsAt, reason: 'limit-reset' }
-        : null
+      const resumeAt = usageLimit.resetsAt + LIMIT_RESET_GRACE_MS
+      return resumeAt > now ? { kind: 'wait', until: resumeAt, reason: 'limit-reset' } : null
     }
-    return pause('usage-limit', usageLimit.provider)
+    return pause(
+      'usage-limit',
+      usageLimit.resetsAt === null
+        ? usageLimit.provider
+        : new Date(usageLimit.resetsAt).toISOString()
+    )
   }
   return null
 }
