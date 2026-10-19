@@ -194,8 +194,14 @@ const macUsageDescriptions = {
   NSBonjourServices: ['_http._tcp', '_https._tcp'],
   ...MACOS_FOLDER_USAGE_DESCRIPTIONS
 }
-// Developer ID team that signs every release-channel mac build.
-const ORCA_MAC_TEAM_ID = '6CX3WHS9HZ'
+/** The Developer ID team the fork's release credentials sign with; a release build must name one. */
+function readReleaseMacTeamId() {
+  const teamId = process.env.APPLE_TEAM_ID?.trim()
+  if (!teamId) {
+    throw new Error('APPLE_TEAM_ID is required for a macOS release build.')
+  }
+  return teamId
+}
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
@@ -836,7 +842,7 @@ async function packageMacTerminalHost(appPath, context) {
     appPath,
     arch,
     usageDescriptions: macUsageDescriptions,
-    expectedTeamId: isMacRelease ? ORCA_MAC_TEAM_ID : null
+    expectedTeamId: isMacRelease ? readReleaseMacTeamId() : null
   })
 }
 
