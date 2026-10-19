@@ -7,13 +7,14 @@ import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { StatsCollector } from '../../stats/collector'
 import { registerFilesystemHandlers } from '../filesystem'
 import type { CommitMessageAgentEnvironmentResolvers } from '../../text-generation/commit-message-agent-environment'
-import { registerFilesystemWatcherHandlers } from '../filesystem-watcher'
+import { registerFilesystemWatcherHandlers } from '../filesystem-watcher-handlers'
 import { registerUsageProviderHandlers } from '../usage-provider-handlers'
 import { registerGitHubHandlers } from '../github'
 import { registerGitLabHandlers } from '../gitlab'
 import { registerHostedReviewHandlers } from '../hosted-review'
 import { registerLinearHandlers } from '../linear'
 import { registerJiraHandlers } from '../jira'
+import { registerJiraIssueSummaryGenerationHandlers } from '../jira-issue-summary-generation'
 import { registerBitbucketHandlers } from '../bitbucket'
 import { registerFeedbackHandlers } from '../feedback'
 import { registerCrashReportingHandlers } from '../crash-reporting'
@@ -32,6 +33,7 @@ import { registerNotificationHandlers } from '../notifications'
 import { registerNotebookHandlers } from '../notebook'
 import { registerOnboardingHandlers } from '../onboarding'
 import { registerDashboardPopoutHandlers } from '../dashboard-popout'
+import { registerWorkspaceSpaceWindowHandlers } from '../workspace-space-window'
 import { registerTerminalPreviewHandlers } from '../terminal-preview'
 import { registerDeveloperPermissionHandlers } from '../developer-permissions'
 import { registerComputerUsePermissionHandlers } from '../computer-use-permissions'
@@ -62,7 +64,7 @@ import { registerOrcaProfileHandlers } from '../orca-profiles'
 import { registerCodexAccountHandlers } from '../codex-accounts'
 import { registerAgentHookHandlers } from '../agent-hooks'
 import { registerCodexConfigSyncHandlers } from '../codex-config-sync'
-import { getPtyIdForPaneKey } from '../pty'
+import { getPtyIdForPaneKey } from '../pty/pane/key-state'
 import { registerClaudeAccountHandlers } from '../claude-accounts'
 import { registerOpenCodeGoCredentialsHandlers } from '../opencode-go-credentials'
 import { registerMiniMaxCredentialsHandlers } from '../minimax-credentials'
@@ -185,6 +187,7 @@ export function registerCoreHandlers(
   registerHostedReviewHandlers(store, stats)
   registerLinearHandlers()
   registerJiraHandlers()
+  registerJiraIssueSummaryGenerationHandlers(store, commitMessageAgentEnv)
   registerBitbucketHandlers()
   registerFeedbackHandlers()
   if (crashReports) {
@@ -197,6 +200,7 @@ export function registerCoreHandlers(
   registerNotebookHandlers(store)
   registerOnboardingHandlers(store)
   registerDashboardPopoutHandlers(store, keybindings)
+  registerWorkspaceSpaceWindowHandlers(store)
   registerTerminalPreviewHandlers(runtime)
   registerDeveloperPermissionHandlers()
   // Why: diagnostics handlers are wired alongside telemetry but the two
@@ -247,6 +251,12 @@ export function registerCoreHandlers(
   registerRuntimeHandlers(runtime)
   registerLedgerHandlers(runtime, { userDataPath: app.getPath('userData') })
   registerRuntimeEnvironmentHandlers(store)
+  registerWslHostHandlers({
+    store,
+    getUserDataPath: () => app.getPath('userData'),
+    invalidateTransport: invalidateRuntimeEnvironmentTransport
+  })
+  registerWslMoveHandlers(() => app.getPath('userData'))
   registerEphemeralVmHandlers(store, pluginService)
   // Session history and terminal resume are not chats; a refused host leaves nothing to check.
   const ensureStructuredSessionOwnership = () =>

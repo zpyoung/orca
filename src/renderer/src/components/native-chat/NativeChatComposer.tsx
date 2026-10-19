@@ -136,6 +136,11 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       agent,
       structuredTransport
     )
+    // Why inputOwnedByCard: the hidden field can still hold keyboard focus for a frame.
+    const [hasPty, disabled] = structuredTransport
+      ? [true, !canSend || unavailableHint !== undefined]
+      : [targetPtyId !== null, targetPtyId === null || !canSend || inputOwnedByCard]
+
     const picker = useNativeChatPickerState({
       agent,
       terminalTabId,
@@ -210,6 +215,8 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       caret: core.caret,
       resolveAttachmentOwner,
       attachResolvedPaths,
+      attachCopiedFiles: attachExternalPaths,
+      captureCopiedFiles,
       beginPendingImageAttachment: attachments.beginPendingImageAttachment,
       // Settles into the scope cache, which outlives a composer a prompt card unmounted.
       resolvePendingImageAttachment: attachments.pendingChips.resolve,

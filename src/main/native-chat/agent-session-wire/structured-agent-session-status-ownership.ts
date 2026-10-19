@@ -12,6 +12,10 @@ import {
   serializeAgentStatusSubject,
   type AgentStatusStructuredSessionSubject
 } from '../../../shared/agent-status-subject'
+import {
+  StructuredAgentSessionOpenChildWork,
+  type ChildWorkLifetimeToken
+} from './structured-agent-session-open-child-work'
 
 export type StructuredAgentSessionStatusSink = {
   publish: (
@@ -92,12 +96,14 @@ export class StructuredAgentSessionStatusOwnership {
   }
 
   /** Children ride the address the parent landed under: without that proof the store would
-   *  refuse them anyway, and offering them earlier would race the parent row. */
+   *  refuse them anyway, and offering them earlier would race the parent row. The open set takes
+   *  every edge regardless, since that gate is the store's, not the provider's. */
   publishChildWork(
     sessionId: string,
     evidence: AgentChildWorkEvidence[],
     provider: AgentSessionRecord['provider']
   ): void {
+    this.open.observe(sessionId, evidence)
     const subject = this.subjects.get(sessionId)
     if (!subject || !this.landed.has(sessionId)) {
       return
@@ -143,6 +149,52 @@ export class StructuredAgentSessionStatusOwnership {
     } else {
       this.refused.delete(sessionId)
     }
+    this.sink()?.publishChildWork?.(subject, evidence, provider)
+  }
+
+  /** A Stop's callback closes only lifetimes captured before the provider call can await. */
+  captureChildWorkStops(
+    sessionId: string,
+    handleIds: readonly string[]
+  ): CapturedChildWorkStops {
+    const captured = new Map<string, ChildWorkLifetimeToken | undefined>()
+    for (const handleId of handleIds) {
+      captured.set(handleId, this.open.capture(sessionId, handleId))
+    }
+    return {
+      current: (handleId) =>
+        captured.has(handleId) && this.open.matches(sessionId, handleId, captured.get(handleId)),
+      acknowledge: (evidence) => {
+        for (const edge of evidence) {
+          if (edge.type === 'stop-acknowledged') {
+            const token = captured.get(edge.handleId)
+            if (token) {
+              this.open.stopped(sessionId, edge.handleId, token)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /** Whether the session's provider reported child work running that has not ended. */
+  childWorkOpen(sessionId: string): boolean {
+    return this.open.hasOpen(sessionId)
+  }
+
+  /** Whether some of that work has no record, whatever kept it out of the store. */
+  childWorkIncomplete(sessionId: string): boolean {
+    const open = this.open.handles(sessionId)
+    if (!open) {
+      return false
+    }
+    const read = this.sink()?.readChildWorkHandles
+    if (!read) {
+      return true
+    }
+    const subject = this.subjects.get(sessionId)
+    const recorded = subject && this.landed.has(sessionId) ? read(subject) : new Set<string>()
+    return [...open].some((handleId) => !recorded.has(handleId))
   }
 
   /** Undefined until the parent row has landed: a sink holds no children for a parent it lacks. */
@@ -159,6 +211,7 @@ export class StructuredAgentSessionStatusOwnership {
   }
 
   forget(sessionId: string): void {
+    this.open.forget(sessionId)
     const subject = this.subjects.get(sessionId)
     if (!subject) {
       return

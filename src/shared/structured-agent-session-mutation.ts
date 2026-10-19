@@ -44,7 +44,7 @@ export function structuredAgentSessionCreateFingerprint(input: {
   sessionId: string
   worktree: string
   agent: StructuredAgentId
-  resumeFrom?: { providerSessionId: string }
+  resumeFrom?: StructuredAgentSessionResumeSource
   tabId?: string
   firstMessage?: StructuredAgentSessionFirstMessage
   options?: Readonly<Record<string, string>>

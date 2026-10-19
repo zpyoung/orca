@@ -69,10 +69,13 @@ export type MobileNativeChatTailFollow<TItem> = {
  *  move intent; metrics only decide where a *released* gesture leaves us.
  */
 export function useMobileNativeChatTailFollow<TItem>(args: {
-  /** Guards `scrollToEnd` against an empty list. */
-  hasItems: boolean
+  /** The list's rows; an empty list is never scrolled. */
+  items: readonly TItem[]
+  /** The chat shown; another one opens following, whatever the reader did in this one. */
+  scopeKey: string
 }): MobileNativeChatTailFollow<TItem> {
-  const { hasItems } = args
+  const { scopeKey } = args
+  const hasItems = args.items.length > 0
   const listRef = useRef<FlatList<TItem> | null>(null)
   const [following, setFollowingFlag] = useState(true)
   const [atTail, setAtTailFlag] = useState(true)

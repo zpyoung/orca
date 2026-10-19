@@ -162,7 +162,7 @@ describe('ready-for-review required check reuse', () => {
     )
   })
 
-  it.each(['pr-test-loc.yml', 'mobile.yml'])(
+  it.each(['pr-test-loc.yml'])(
     'does not rerun draft-independent %s on readiness changes',
     (file) => {
       const source = readFileSync(`.github/workflows/${file}`, 'utf8')

@@ -1,27 +1,40 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store'
 import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../../../shared/constants'
 import {
-  computeClearFilterActions,
+  clearSidebarFilters,
+  selectSidebarFilterState,
   sidebarHasActiveFilters,
-  isAutomationGeneratedWorkspace,
-  isCliCreatedWorkspace,
-  isDetachedHeadWorkspace,
-  isSleepingSweepExemptWorkspace
-} from '../../visible-worktrees'
+  sidebarWorkspaceRowFilters
+} from '../../sidebar-filter-actions'
+import { useShallow } from 'zustand/react/shallow'
+import type { AppState } from '@/store/types'
+import type { Repo } from '../../../../../../shared/repo-types'
+import {
+  activeWorkspaceRowFilterKeys,
+  isSleepingSweepExempt,
+  type WorkspaceRowFilters
+} from '../../../../../../shared/workspace-view/workspace-row-filters'
+import { resolveVisibleWorkspaceHostIds } from '../../../../../../shared/workspace-view/workspace-host-visibility'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import {
   getWorktreeExecutionHostId,
-  getSettingsFocusedExecutionHostId
+  getSettingsFocusedExecutionHostId,
+  type ExecutionHostId
 } from '../../../../../../shared/execution-host'
-import { isDefaultBranchWorkspace } from '../../default-branch-workspace'
-import { getFolderWorkspaceExecutionHostIdForRows } from './host-filtering'
+import {
+  isAutomationGeneratedWorkspace,
+  isCliCreatedWorkspace,
+  isDefaultBranchWorkspace,
+  isDetachedHeadWorkspace
+} from '../../../../../../shared/worktree/workspace-kinds'
+import { getFolderWorkspaceExecutionHostIdForRows } from '../../../../../../shared/sidebar-list/host-filtering'
 import {
   getPairedDeviceIdsByEnvironment,
-  isWorkspaceFromOtherDevice
-} from '../../workspace-creator-visibility'
+  isWorkspaceOwnedBySomeoneElse
+} from '../../../../../../shared/workspace-creator-visibility'
 import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
 import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
 import {
@@ -33,6 +46,107 @@ import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/u
 import type { SidebarFilterState } from '../../visible-worktree-kinds'
 
 export type SidebarWorktreeFilters = ReturnType<typeof useSidebarWorktreeFilters>
+
+type RevealContext = {
+  state: AppState
+  worktree: Worktree
+  repo: Repo | undefined
+  targetHostId: ExecutionHostId
+}
+
+/**
+ * For each active filter, how to make one workspace visible again. Keyed on the shared filter
+ * keys, so a new filter fails to compile until it says how a hidden workspace is revealed.
+ */
+const REVEAL_WORKSPACE: Record<keyof WorkspaceRowFilters, (context: RevealContext) => void> = {
+  filterRepoIds: ({ state, worktree }) => {
+    if (!worktree.id.startsWith('folder:') && !state.filterRepoIds.includes(worktree.repoId)) {
+      state.setFilterRepoIds([...state.filterRepoIds, worktree.repoId])
+    }
+  },
+  visibleHostIds: ({ state, targetHostId }) => {
+    const shown = resolveVisibleWorkspaceHostIds(
+      state.visibleWorkspaceHostIds,
+      state.workspaceHostScope
+    )
+    if (shown && !shown.includes(targetHostId)) {
+      state.setVisibleWorkspaceHostIds([...shown, targetHostId])
+    }
+  },
+  hideDefaultBranchWorkspace: ({ state, worktree, repo }) => {
+    if (isDefaultBranchWorkspace(worktree, repo)) {
+      state.setHideDefaultBranchWorkspace(false)
+    }
+  },
+  hideAutomationGeneratedWorkspaces: ({ state, worktree }) => {
+    if (isAutomationGeneratedWorkspace(worktree)) {
+      state.setHideAutomationGeneratedWorkspaces(false)
+    }
+  },
+  hideCliCreatedWorkspaces: ({ state, worktree }) => {
+    if (isCliCreatedWorkspace(worktree)) {
+      state.setHideCliCreatedWorkspaces(false)
+    }
+  },
+  hideDetachedHeadWorkspaces: ({ state, worktree }) => {
+    if (isDetachedHeadWorkspace(worktree)) {
+      state.setHideDetachedHeadWorkspaces(false)
+    }
+  },
+  hideWorkspacesFromOtherDevices: ({ state, worktree }) => {
+    const pairedDeviceIds = getPairedDeviceIdsByEnvironment(
+      state.runtimeEnvironments,
+      state.runtimeStatusByEnvironmentId
+    )
+    if (isWorkspaceOwnedBySomeoneElse(worktree, pairedDeviceIds)) {
+      state.setHideWorkspacesFromOtherDevices(false)
+    }
+  },
+  hideSleepingWorkspaces: ({ state, worktree }) => {
+    const tabsByWorktree = getVisibleWorktreeTerminalActivityTabs(state.tabsByWorktree)
+    const browserTabsByWorktree = getVisibleWorktreeBrowserActivityTabs(state.browserTabsByWorktree)
+    const liveAgentWorktrees = getWorktreeIdsWithLiveAgent(
+      state.agentStatusByPaneKey,
+      tabsByWorktree,
+      getAgentStatusEpochNow(state.agentStatusEpoch)
+    )
+    if (
+      !isSleepingSweepExempt(worktree.isMainWorktree, state.alwaysShowDefaultBranchWorkspace) &&
+      isInactiveWorkspace(
+        worktree.id,
+        tabsByWorktree,
+        state.ptyIdsByTabId,
+        browserTabsByWorktree,
+        liveAgentWorktrees,
+        getWorktreeIdsWithStructuredChat(state.unifiedTabsByWorktree)
+      )
+    ) {
+      state.setShowSleepingWorkspaces(true)
+    }
+  },
+  // Turning the exemption off only narrows; "Hide sleeping" above is what reveals.
+  alwaysShowDefaultBranchWorkspace: () => {}
+}
+
+function getRevealTargetHostId(state: AppState, worktree: Worktree, repo: Repo | undefined) {
+  const defaultHostId = getSettingsFocusedExecutionHostId(state.settings)
+  const workspaceScope = parseWorkspaceKey(worktree.id)
+  if (workspaceScope?.type === 'folder') {
+    const folderWorkspace = state.folderWorkspaces.find(
+      (candidate) => candidate.id === workspaceScope.folderWorkspaceId
+    )
+    if (folderWorkspace) {
+      return getFolderWorkspaceExecutionHostIdForRows({
+        folderWorkspace,
+        projectGroup: state.projectGroups.find(
+          (candidate) => candidate.id === folderWorkspace.projectGroupId
+        ),
+        defaultHostId
+      })
+    }
+  }
+  return getWorktreeExecutionHostId(worktree, repo, defaultHostId)
+}
 
 // Every sidebar filter, plus the single escape hatch that resets all of them.
 export function useSidebarWorktreeFilters() {
@@ -64,85 +178,14 @@ export function useSidebarWorktreeFilters() {
   const revealWorkspaceFilters = useCallback((worktree: Worktree) => {
     const state = useAppStore.getState()
     const repo = state.repos.find((candidate) => candidate.id === worktree.repoId)
-    let targetHostId = getWorktreeExecutionHostId(
+    const context = {
+      state,
       worktree,
       repo,
-      getSettingsFocusedExecutionHostId(state.settings)
-    )
-    const workspaceScope = parseWorkspaceKey(worktree.id)
-    if (workspaceScope?.type === 'folder') {
-      const folderWorkspace = state.folderWorkspaces.find(
-        (candidate) => candidate.id === workspaceScope.folderWorkspaceId
-      )
-      const projectGroup = folderWorkspace
-        ? state.projectGroups.find((candidate) => candidate.id === folderWorkspace.projectGroupId)
-        : undefined
-      if (folderWorkspace) {
-        targetHostId = getFolderWorkspaceExecutionHostIdForRows({
-          folderWorkspace,
-          projectGroup,
-          defaultHostId: getSettingsFocusedExecutionHostId(state.settings)
-        })
-      }
+      targetHostId: getRevealTargetHostId(state, worktree, repo)
     }
-
-    if (
-      !worktree.id.startsWith('folder:') &&
-      state.filterRepoIds.length > 0 &&
-      !state.filterRepoIds.includes(worktree.repoId)
-    ) {
-      state.setFilterRepoIds([...state.filterRepoIds, worktree.repoId])
-    }
-    const visibleHostIds = state.visibleWorkspaceHostIds
-    const scopedHostIds =
-      visibleHostIds ?? (state.workspaceHostScope === 'all' ? null : [state.workspaceHostScope])
-    if (scopedHostIds && !scopedHostIds.includes(targetHostId)) {
-      state.setVisibleWorkspaceHostIds([...scopedHostIds, targetHostId])
-    }
-    if (state.hideDefaultBranchWorkspace && isDefaultBranchWorkspace(worktree, repo)) {
-      state.setHideDefaultBranchWorkspace(false)
-    }
-    if (state.hideAutomationGeneratedWorkspaces && isAutomationGeneratedWorkspace(worktree)) {
-      state.setHideAutomationGeneratedWorkspaces(false)
-    }
-    if (state.hideCliCreatedWorkspaces && isCliCreatedWorkspace(worktree)) {
-      state.setHideCliCreatedWorkspaces(false)
-    }
-    if (state.hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(worktree)) {
-      state.setHideDetachedHeadWorkspaces(false)
-    }
-    if (state.hideWorkspacesFromOtherDevices) {
-      const pairedDeviceIds = getPairedDeviceIdsByEnvironment(
-        state.runtimeEnvironments,
-        state.runtimeStatusByEnvironmentId
-      )
-      if (isWorkspaceFromOtherDevice(worktree, pairedDeviceIds)) {
-        state.setHideWorkspacesFromOtherDevices(false)
-      }
-    }
-    if (!state.showSleepingWorkspaces) {
-      const tabsByWorktree = getVisibleWorktreeTerminalActivityTabs(state.tabsByWorktree)
-      const browserTabsByWorktree = getVisibleWorktreeBrowserActivityTabs(
-        state.browserTabsByWorktree
-      )
-      const liveAgentWorktrees = getWorktreeIdsWithLiveAgent(
-        state.agentStatusByPaneKey,
-        tabsByWorktree,
-        getAgentStatusEpochNow(state.agentStatusEpoch)
-      )
-      if (
-        !isSleepingSweepExemptWorkspace(worktree, state.alwaysShowDefaultBranchWorkspace) &&
-        isInactiveWorkspace(
-          worktree.id,
-          tabsByWorktree,
-          state.ptyIdsByTabId,
-          browserTabsByWorktree,
-          liveAgentWorktrees,
-          getWorktreeIdsWithStructuredChat(state.unifiedTabsByWorktree)
-        )
-      ) {
-        state.setShowSleepingWorkspaces(true)
-      }
+    for (const key of activeWorkspaceRowFilterKeys(sidebarWorkspaceRowFilters(state))) {
+      REVEAL_WORKSPACE[key](context)
     }
   }, [])
 

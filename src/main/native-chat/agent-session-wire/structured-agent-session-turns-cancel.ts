@@ -23,7 +23,7 @@ import {
   structuredAgentSessionStopNamesTurnNotLive,
   structuredAgentSessionStoppedTurnId
 } from './structured-agent-session-turn-stop-notes'
-import { isStructuredAgentSessionMainAgentWorking } from '../../../shared/structured-agent-session-main-agent-working'
+import { contextStructuredAgentSessionCurrentWork } from './structured-agent-session-current-work'
 import type { StructuredAgentSessionStopWindDown } from './structured-agent-session-stop-wind-down'
 import type { JournalStopFailedOn } from '../agent-session-journal/queued-message-pause'
 import { structuredAgentSessionFailedStopMark } from './structured-agent-session-stopping'
@@ -35,16 +35,12 @@ import {
   type StructuredAgentSessionBackgroundStopInput
 } from './structured-agent-session-background-stop'
 
-/** Whether the fold reads working. Every write has landed by its call's return, so a Stop reads it
- *  without waiting on the write queue. */
+/** Whether the host's projection reads working (`structuredAgentSessionCurrentWork`). Every write
+ *  has landed by its call's return, so a Stop reads it without waiting on the write queue. */
 export function isMainAgentWorking(
-  ctx: Pick<AgentSessionTurnContext, 'journal' | 'fence'>
+  ctx: Pick<AgentSessionTurnContext, 'journal' | 'fence' | 'currentWork'>
 ): boolean {
-  return isStructuredAgentSessionMainAgentWorking(
-    ctx.journal.activeTurnId(),
-    ctx.journal.submissions(),
-    ctx.fence
-  )
+  return contextStructuredAgentSessionCurrentWork(ctx).working()
 }
 
 /**
@@ -53,14 +49,15 @@ export function isMainAgentWorking(
  * its exit ends its turn, and the host's own exit handling waits behind this step.
  */
 function stillRunsStoppedTurn(
-  ctx: Pick<AgentSessionTurnContext, 'journal' | 'fence'>,
+  ctx: Pick<AgentSessionTurnContext, 'journal' | 'fence' | 'currentWork'>,
   stoppedTurnId: string | null
 ): boolean {
-  if (!isMainAgentWorking(ctx)) {
+  const work = contextStructuredAgentSessionCurrentWork(ctx)
+  if (!work.working()) {
     return false
   }
   // Working with no turn open after the Stop's turn is a later send whose turn has not opened.
-  return stoppedTurnId === null || ctx.journal.activeTurnId() === stoppedTurnId
+  return stoppedTurnId === null || work.activeTurnId() === stoppedTurnId
 }
 
 /** Whether the Stop took back every send it found in flight, none of them having run
@@ -142,11 +139,12 @@ type PerformCancelInput = StructuredAgentSessionBackgroundStopInput & {
   /** Hands the child's end to the Stop's next serialized step, for a provider whose Stop ends
    *  its session. */
   endSession?: (windDown: StructuredAgentSessionStopWindDown) => void
-  /** Whether the host's withdrawal of queued messages for this Stop withdrew any; awaited only
-   *  after the interrupt. */
+  /** Whether this Stop withdrew any queued message; awaited only after the interrupt. */
   withdrewQueued?: Promise<boolean>
   /** The latest Stop event is this press's own, or the in-force one it repeats: its settle binds. */
   opensSettle?: true
+  /** The fence the note is written at: a child end this Stop caused moved it past `ctx.fence`. */
+  noteFence?: () => number
 }
 
 async function cancelAndNote(
@@ -160,17 +158,20 @@ async function cancelAndNote(
     kind: 'status',
     text: STOP_NOTE_CANCELLATION_REQUESTED
   }
+  // Every read of what runs goes through the host's projection: an ended generation's turn is no
+  // Stop's target, whether or not its cleanup landed.
+  const work = () => contextStructuredAgentSessionCurrentWork(ctx)
   // The turn the Stop names, read before the cancel settles it: the note reports on that turn.
   const turnScope =
-    (input.turnId !== undefined && !input.scope
+    (input.turnId !== undefined
       ? structuredAgentSessionNamedTurnScope(ctx.journal, input.turnId)
-      : null) ?? ctx.journal.liveTurnScope()
+      : null) ?? work().turnScope()
   // Only the provider's end or the child's ends a command. A command the provider has not opened a
   // turn for, would not interrupt, or was already asked to stop, ends with its child; that child's
   // dead-generation settlement writes the command's verdict.
-  const liveTurnId = ctx.journal.activeTurnId()
+  const liveTurnId = work().activeTurnId()
   // Read with the live turn, before the cancel settles it: the note is keyed by this turn.
-  const stoppedTurnId = structuredAgentSessionStoppedTurnId(ctx.journal, input.turnId)
+  const stoppedTurnId = structuredAgentSessionStoppedTurnId(work(), input.turnId)
   const namesTurnNotLive = structuredAgentSessionStopNamesTurnNotLive(input.turnId, liveTurnId)
   const runningCommand =
     input.stopChild !== undefined &&
@@ -329,9 +330,9 @@ async function cancelAndNote(
     binding.turnId = stoppedTurn ?? stoppedTurnId ?? undefined
   } else if (interruptFailed) {
     // A Stop that failed reads "Stopping…" through the turn it could not stop; its end stays its own.
-    binding.failedOn = structuredAgentSessionFailedStopMark(ctx.journal)
+    binding.failedOn = structuredAgentSessionFailedStopMark(work(), ctx.journal)
   }
-  if (taken === true && stoppedTurn !== undefined && !binding.closedByWindDown && !input.scope) {
+  if (taken === true && stoppedTurn !== undefined && !binding.closedByWindDown) {
     const opened = await settleTakenStop(ctx, stoppedTurn)
     // As after a child's end: the send's own row says it never started.
     if (!opened && stoppedTurnId === null && tookBackEverySend(ctx, sentBeforeStop)) {
@@ -339,7 +340,7 @@ async function cancelAndNote(
     }
   }
   const value = { ...(input.turnId !== undefined ? { turnId: input.turnId } : {}), cancelled }
-  if (input.scope || note === null) {
+  if (note === null) {
     return { ok: true, value }
   }
   // The turn the provider says the interrupt took, even one that opened while the cancel waited for
@@ -348,6 +349,16 @@ async function cancelAndNote(
     (stoppedTurn !== undefined
       ? structuredAgentSessionNamedTurnScope(ctx.journal, stoppedTurn)
       : null) ?? turnScope
-  await ctx.journal.appendItem(noteIdentity, note, { fence: ctx.fence, turnScope: noteScope })
+  // Bookkeeping: what the Stop did stands whether or not its note is written.
+  const fence = Math.max(ctx.fence, input.noteFence?.() ?? ctx.fence)
+  await ctx.journal
+    .appendItem(noteIdentity, note, { fence, turnScope: noteScope })
+    .catch((error: unknown) =>
+      ctx.logger.warn("writing a Stop's note failed", {
+        scope: 'stop-note',
+        sessionId: ctx.sessionId,
+        error
+      })
+    )
   return { ok: true, value }
 }

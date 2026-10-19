@@ -16,10 +16,10 @@ export function createSetActiveFolderWorkspace(
   set: WorktreeSliceSet,
   get: WorktreeSliceGet
 ): WorktreeSlice['setActiveFolderWorkspace'] {
+  const activateWorkspace = createSetActiveWorktree(set, get)
   return (folderWorkspaceId, executionHostId) => {
     const workspaceKey = folderWorkspaceKey(folderWorkspaceId)
-    const workspace = findKnownWorktreeById(get(), workspaceKey, executionHostId)
-    if (!workspace) {
+    if (!findKnownWorktreeById(get(), workspaceKey, executionHostId)) {
       return
     }
     const previousWorkspaceId = get().activeWorktreeId

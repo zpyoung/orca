@@ -1,17 +1,30 @@
-import type { RuntimeCapability } from '../../../shared/protocol-version'
-import type { TerminalStreamFrame } from '../../../shared/terminal-stream-protocol'
-import type { PairingRpcContext } from './core'
-import type { RpcCallerIdentity } from './rpc-caller-identity'
+import type { OrcaRuntimeService } from '../orca-runtime'
+import { captureStructuredAgentCliSource } from '../../native-chat/structured-agent-cli-source'
+import type { OrchestrationSessionCaller } from '../orchestration/orchestration-caller-identity'
+import { isRegistrationFencedUnsubscribe, type RpcContext, type RpcRequest } from './core'
+import { resolveRpcCallerIdentity } from './rpc-caller-identity'
 import type { RpcCallerScope } from './rpc-caller-scope'
 
-export type RpcDispatchStreamingOptions = {
-  authenticatedCallerFingerprint?: string
-  connectionId?: string
-  signal?: AbortSignal
-  clientId?: string
-  pairedDeviceId?: string
-  /** Set by a transport that knows its caller but carries no paired device (the desktop's IPC). */
-  caller?: RpcCallerIdentity
+export type RpcDispatchStreamingOptions = Pick<
+  RpcContext,
+  | 'authenticatedCallerFingerprint'
+  | 'connectionId'
+  | 'signal'
+  | 'clientId'
+  | 'pairedDeviceId'
+  | 'pairedDeviceParentId'
+  | 'caller'
+  | 'clientKind'
+  | 'clientCapabilities'
+  | 'updateClientCapabilities'
+  | 'pairing'
+  | 'deviceSelf'
+  | 'mobileRelayHosts'
+  | 'delegatedMobileDevices'
+  | 'sendBinary'
+  | 'registerBinaryStreamHandler'
+  | 'registerBinaryMessageHandler'
+> & {
   /** What the transport proved the caller may do; absent means this host's owner. */
   callerScope?: RpcCallerScope
   clientKind?: 'mobile' | 'runtime'

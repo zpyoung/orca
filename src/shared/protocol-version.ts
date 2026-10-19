@@ -13,6 +13,7 @@ import {
   HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
 } from './fork-heimdall/capability'
 import { WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES } from './workspace-attachment-capabilities'
+import { SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY } from './ssh-target-management'
 import {
   AUTOMATION_RUNTIME_CAPABILITIES,
   AUTOMATION_RUNTIME_CLIENT_CAPABILITIES
@@ -31,7 +32,8 @@ export {
   STRUCTURED_AGENT_SESSION_REVEAL_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY,
   PI_STRUCTURED_DIALOGS_RUNTIME_CAPABILITY,
-  STRUCTURED_AGENT_SESSION_RESUME_HISTORY_RUNTIME_CAPABILITY
+  STRUCTURED_AGENT_SESSION_RESUME_HISTORY_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_CLI_SOURCE_RUNTIME_CAPABILITY
 } from './structured-agent-session-surface-capabilities'
 import { AGENT_SESSION_ATTENTION_RUNTIME_CAPABILITIES } from './agent-session-attention-capabilities'
 export {
@@ -56,29 +58,92 @@ export {
 } from './orchestration-runtime-capabilities'
 import { AGENT_SESSION_RESUME_RUNTIME_CAPABILITIES } from './agent-session-resume-runtime-capabilities'
 import { QODER_OWNED_TERMINAL_CREATE_CAPABILITY } from './qoder-terminal-create-capability'
+import { SESSION_TABS_RUNTIME_CAPABILITIES } from './session-tabs-runtime-capabilities'
+export { SESSION_TABS_SPLIT_GROUP_PLACEMENT_RUNTIME_CAPABILITY } from './session-tabs-runtime-capabilities'
 import { AGENT_SESSION_CONTINUE_INTERRUPTED_RUNTIME_CAPABILITY } from './agent-session-continue-interrupted-capability'
+import { AGENT_SESSION_PERMISSION_MODES_RUNTIME_CAPABILITY } from './agent-session-permission-modes-capability'
 import { ORCAD_RUNTIME_CAPABILITIES } from './orcad-runtime-capabilities'
-export {
-  AGENT_SESSION_CURSOR_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_KIMI_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_OPENCODE2_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_MUSE_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_DSH_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_CODEBUDDY_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_QODER_CN_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_QWEN_CODE_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_QODER_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_ZCODE_RESUME_RUNTIME_CAPABILITY
-} from './agent-session-resume-runtime-capabilities'
+import { DEVICE_KEY_RUNTIME_CAPABILITIES } from './device-key-capability'
+import { TERMINAL_QUICK_COMMAND_RUNTIME_CAPABILITIES } from './terminal-quick-command-capabilities'
+// Why a star: every resume capability is part of the runtime contract this module re-exports.
+export * from './agent-session-resume-runtime-capabilities'
 import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from './agent-session-background-task-child-views-capability'
 import { AGENT_SESSION_STOP_RUNTIME_CAPABILITIES } from './agent-session-stop-capabilities'
 import { AGENT_SESSION_CREATE_RUNTIME_CAPABILITIES } from './agent-session-create-capabilities'
 import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 import { SKILL_RUNTIME_CAPABILITIES } from './skill-install-capability'
 import {
-  AGENT_LAUNCH_RUNTIME_CAPABILITIES,
-  AGENT_LAUNCH_RUNTIME_CAPABILITY
-} from './agent-launch-runtime-capability'
+  MANAGED_RUNTIME_INSTALL_RUNTIME_CAPABILITY,
+  MANAGED_RUNTIME_REMOVE_RUNTIME_CAPABILITY
+} from './managed-runtime-install'
+import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
+import { MOBILE_RELAY_RUNTIME_CAPABILITIES } from './mobile-desktop-relay-contract'
+import { SKILL_RUNTIME_CAPABILITIES } from './skill-install-capability'
+import { ACCOUNT_RUNTIME_CAPABILITIES } from './account-runtime-capabilities'
+import * as agentLaunchCapabilities from './agent-launch-runtime-capability'
+import {
+  AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY,
+  AGENT_SESSION_ATTACHMENTS_RUNTIME_CAPABILITY,
+  AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY,
+  AGENT_SESSION_BACKGROUND_TASK_STOP_CAPABILITY,
+  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
+  AGENT_SESSION_CONVERSATION_OUTLINE_RUNTIME_CAPABILITY,
+  AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY,
+  AGENT_SESSION_KEYBOARD_RUNTIME_CAPABILITY,
+  AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
+  AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY,
+  AGENT_SESSION_QUEUED_COMMANDS_RUNTIME_CAPABILITY,
+  AGENT_SESSION_QUEUED_MESSAGE_EDIT_RUNTIME_CAPABILITY,
+  AGENT_SESSION_QUESTION_ANSWERS_RUNTIME_CAPABILITY,
+  AGENT_SESSION_REWIND_RECOVERY_CAPABILITY,
+  AGENT_SESSION_REWIND_RUNTIME_CAPABILITY,
+  AGENT_SESSION_SEND_ANSWERS_PROOF_RUNTIME_CAPABILITY,
+  AGENT_SESSION_TURN_ITEM_CAPABILITY,
+  AI_VAULT_RUNTIME_CAPABILITY,
+  AI_VAULT_SESSION_TITLES_RUNTIME_CAPABILITY,
+  ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY,
+  BROWSER_CLIENT_AUTOMATION_RUNTIME_CAPABILITY,
+  BROWSER_CLIENT_FILE_CHANNEL_RUNTIME_CAPABILITY,
+  BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
+  BROWSER_CLIENT_PAGE_METADATA_RUNTIME_CAPABILITY,
+  BROWSER_NETWORK_EXECUTION_HOSTS_RUNTIME_CAPABILITY,
+  BROWSER_NETWORK_TUNNEL_RUNTIME_CAPABILITY,
+  BROWSER_SCREENCAST_RUNTIME_CAPABILITY,
+  BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY,
+  FILE_MUTATION_OWNERSHIP_RUNTIME_CAPABILITY,
+  FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY,
+  GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
+  GITLAB_READY_FOR_REVIEW_RUNTIME_CAPABILITY,
+  LINEAR_ISSUE_ATTRIBUTE_FILTER_RUNTIME_CAPABILITY,
+  NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY,
+  PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY,
+  PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY,
+  PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
+  REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,
+  REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
+  RUNTIME_AUTOMATIC_WORK_RUNTIME_CAPABILITY,
+  RUNTIME_SOURCE_FENCE_RUNTIME_CAPABILITY,
+  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+  SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
+  TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY,
+  TERMINAL_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
+  TERMINAL_CREATE_SHELL_SELECTION_RUNTIME_CAPABILITY,
+  TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY,
+  TERMINAL_PROMPT_DELIVERY_RUNTIME_CAPABILITY,
+  TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY,
+  TERMINAL_SPAWN_INTENT_RUNTIME_CAPABILITY,
+  WORKSPACE_PORTS_HOST_SCOPED_RUNTIME_CAPABILITY,
+  WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,
+  WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY,
+  WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
+  WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
+  WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY,
+  WORKTREE_PROVISIONED_ROOT_RUNTIME_CAPABILITY,
+  WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
+  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
+} from './runtime-capability-constants'
 
 // Why: declares the Orca runtime RPC compatibility contract. Desktop,
 // headless server, CLI, and mobile builds may drift in app version, but
@@ -211,129 +276,8 @@ export const AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY =
   'agent-session.session-boundary.v1' as const
 export { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 export * from './agent-session-stop-capabilities'
-export const AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY =
-  'agent-session.host-authority.v1' as const
-// Older launch schemas reject unknown fields; advertise before clients send keyboard support.
-export const AGENT_SESSION_KEYBOARD_RUNTIME_CAPABILITY = 'agent-session.keyboard.v1' as const
-export const AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY =
-  'agent-session.omp-resume-path.v1' as const
-// Why: structured sessions are journal-backed, not PTY-backed, so an incapable client must not
-// receive their journal or drive their lifecycle. Mobile may receive a metadata-only placeholder;
-// the host still refuses agentSession.* methods and destructive tab mutations without capability.
-export const STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY = 'agent-session.structured.v1' as const
-// Why: hosts before this gated `agentSession.*` on their own chat setting while still advertising
-// agent-session.structured.v1, so that capability alone cannot tell a client its chat will be
-// admitted. A host advertising this admits by client capability alone; a client advertising it
-// picks each launch's mode itself. A client without it asks `agentSession.createSupport` to pick
-// for it (released phones), so the host keeps answering that with its own setting.
-export const STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY =
-  'agent-session.structured.client-launch-mode.v1' as const
-// Why: older structured clients render durable pending replies as uncertain delivery. Capable
-// clients skip the host's bounded best-effort settlement observation.
-export const AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY =
-  'agent-session.pending-send-result.v1' as const
-// Why: a send is now answered once the host accepts it, before any agent has it. A client without
-// this cannot show a message rejected after that answer, so the host holds its reply until the
-// message is handed over or rejected. Transitional: drop the hold once no supported desktop or
-// mobile client lacks the capability; mobile must first show a rejected message in place.
-export const AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY =
-  'agent-session.accepted-send.v1' as const
-// Why: a host advertising this answers a resent send id from its record before anything else may
-// refuse it, so a refusal `agentSession.send` RETURNS is proof; a thrown error never is, a thrown
-// refusal included (host not installed, journal database won't open, host disabled). Reading a
-// returned `ok: false`: `agent_session_operation_unknown` with `outcomeUnknown` or `resultLost` —
-// the host cannot tell yet, resend the same id; with `rewindUnconfirmed` — settled, nothing was
-// written. `agent_session_operation_expired` — only the transcript can tell. An
-// `agent_session_operation_conflict` or `messageIdReused` — the id holds a different payload,
-// which proves nothing about this message; nor does `sessionNotAttached` (the chat's record is
-// gone or unreadable on this host). Any other — the chat holds no message under that id and none
-// is in flight, but a resend of that id may still run as a new send, so a client that hands the
-// text back must not resend the old id. An older host may refuse an id it recorded: none of this
-// holds there.
-export const AGENT_SESSION_SEND_ANSWERS_PROOF_RUNTIME_CAPABILITY =
-  'agent-session.send-answers-proof.v1' as const
-// Why: `agentSession.send`'s params are strict, so an older host rejects `delivery`; and only a
-// capable client can render the `queued` result arm. It gates `delivery: 'queue-if-active'` and
-// the client's queueing setting and chord, never the published draft list or its card actions: a
-// host without it still publishes a message it kept unsent across a restart or a close, and both
-// clients show that card and call its actions. DARK ON PURPOSE — not in RUNTIME_CAPABILITIES:
-// advertising still requires the integrated Codex steer matrix (#21062) in the shipped host.
-// v1 includes `submission.queuedMessageId` on every draft hand-off: a client reads that link and
-// never compares a draft id with a submission id. It also publishes the queue's pause once, as
-// `queuePause` beside the list, lifted by `agentSession.queuedMessagesResume` or any turn sent
-// after it starting; while it is set every waiting card waits. `nextQueuedMessageId` beside the list
-// names the card the queue sends next once nothing runs, null while anything holds it; absent (an
-// older host) reads as null. A card carries a hold of its own when its conversion failed
-// (`send_failed`) or the host kept it unsent (`kept`). The host mechanism lands first; the constant
-// gates the rollout.
-export const AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY =
-  'agent-session.queued-messages.v1' as const
-// Why: `agentSession.conversationCommand`'s params are strict, so an older host rejects
-// `delivery`. A host advertising this holds a /compact sent while the agent works as a queued
-// card instead of refusing it. Clients ask only when queued-messages.v1 is advertised too:
-// the card is the only place the waiting command shows.
-export const AGENT_SESSION_QUEUED_COMMANDS_RUNTIME_CAPABILITY =
-  'agent-session.queued-commands.v1' as const
-// Why: paired clients advertise Claude-structured support so the host can gate its agent-specific
-// journal and lifecycle surfaces independently from Codex support.
-export const CLAUDE_STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY =
-  'agent-session.structured.claude.v1' as const
-// Why: agentSession.conversationOutline is additive; a client probes this before calling so an
-// older host leaves the message rail on loaded messages instead of answering method_not_found.
-export const AGENT_SESSION_CONVERSATION_OUTLINE_RUNTIME_CAPABILITY =
-  'agent-session.conversation-outline.v1' as const
-// The RPC is registered unconditionally; per-session rewind support is a separate check.
-export const AGENT_SESSION_REWIND_RUNTIME_CAPABILITY = 'agent-session.rewind.v1' as const
-// Why: the rewind UI relies on the next send settling an in-doubt rewind, even with the agent up.
-export const AGENT_SESSION_REWIND_RECOVERY_CAPABILITY = 'agent-session.rewind-recovery.v1' as const
-// Readers must understand a monitoring roster with no available stop control.
-// Why: a `turn` journal item replaced the status row that used to carry a turn's lifecycle. A
-// client that predates it would render the unknown kind as text, so the host publishes the legacy
-// status form to clients that do not advertise this. Transitional: drop the downgrade once no
-// supported release lacks the capability.
-export const AGENT_SESSION_TURN_ITEM_CAPABILITY = 'agent-session.turn-item.v1' as const
-export const AGENT_SESSION_BACKGROUND_TASK_STOP_CAPABILITY =
-  'agent-session.background-task-stop.v1' as const
-// Why: agentSession.respondToQuestion has a strict schema, so clients must not send structured
-// `answers` to an older host; they fall back to the answer packed into `optionId`.
-export const AGENT_SESSION_QUESTION_ANSWERS_RUNTIME_CAPABILITY =
-  'agent-session.question-answers.v1' as const
-// Why: a structured chat on a paired server stores attached files on that server
-// (agentSessionAttachment.*); an older server has no store, so clients must refuse
-// the attach rather than hand the agent a path from this machine.
-export const AGENT_SESSION_ATTACHMENTS_RUNTIME_CAPABILITY = 'agent-session.attachments.v1' as const
-// Why: the host now publishes rows for work that is live inside a turn, and such
-// a row carries `stoppable: false` because no targeted stop can reach it. A
-// reader that predates the field draws a per-row Stop on every row it is given,
-// so it must be told apart from one that honours the field — and NOT by the
-// stop capability above, which a client can advertise while predating this.
-export const AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY =
-  'agent-session.background-task-row-stop.v1' as const
-// Why: older runtimes strip mutation owner fields, so clients must fence writes before RPC.
-export const FILE_MUTATION_OWNERSHIP_RUNTIME_CAPABILITY = 'files.mutation-ownership.v1' as const
-export const FILE_MUTATION_OWNERSHIP_UPDATE_REQUIRED_MESSAGE =
-  'Remote file changes require a newer Orca server. Update the HUB and try again.'
-export const GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY = 'github.markPRReadyForReview' as const
-export const GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE =
-  'Marking a pull request ready requires a newer Orca server. Update the server and try again.'
-export const GITLAB_READY_FOR_REVIEW_RUNTIME_CAPABILITY =
-  'gitlab.updateMR.readyForReview.v1' as const
-export const GITLAB_READY_FOR_REVIEW_UPDATE_REQUIRED_MESSAGE =
-  'Marking a merge request ready requires a newer Orca server. Update the server and try again.'
-export const WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY =
-  'worktree.visibility-defaults.v1' as const
-export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =
-  'worktree.visibility-source-defaults.v1' as const
-// Why: Git's checkout delete outlives worktree.rm's older client timeouts. A client with this waits
-// for the reply and shows `removing` rows as Deleting; one without it is answered on acceptance and
-// would re-show that row as a normal workspace, so the host leaves such rows out of its listings.
-export const WORKTREE_BACKGROUND_REMOVAL_RUNTIME_CAPABILITY =
-  'worktree.background-removal.v1' as const
-// Hosts without this capability have no notifications.registerPush RPC.
-export const NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY = 'notifications.remote-push.v1' as const
 
-// Generic native clients include the CLI and must not claim Electron-only page
-// placement support.
+// Native clients include the CLI, which cannot place Electron browser pages.
 export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
   SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
   AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
@@ -345,14 +289,19 @@ export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
   HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   ...AUTOMATION_RUNTIME_CLIENT_CAPABILITIES,
-  AGENT_LAUNCH_RUNTIME_CAPABILITY
+  agentLaunchCapabilities.AGENT_LAUNCH_RUNTIME_CAPABILITY
 ] as const
 
 export const ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY =
   'git.antigravity-configured-model.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
+  AI_VAULT_CHAT_FORK_SOURCE_CAPABILITY,
+  jiraDetailCapabilities.JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
+  JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY,
+  jiraDetailCapabilities.JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY,
   ...ORCAD_RUNTIME_CAPABILITIES,
+  ...DEVICE_KEY_RUNTIME_CAPABILITIES,
   QODER_OWNED_TERMINAL_CREATE_CAPABILITY,
   ...AGENT_SESSION_STOP_RUNTIME_CAPABILITIES,
   ...AGENT_SESSION_CREATE_RUNTIME_CAPABILITIES,
@@ -379,32 +328,40 @@ export const RUNTIME_CAPABILITIES = [
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,
+  WORKTREE_PROVISIONED_ROOT_RUNTIME_CAPABILITY,
   WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY,
   ...WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES,
   WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
   REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
   FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY,
   LINEAR_ISSUE_ATTRIBUTE_FILTER_RUNTIME_CAPABILITY,
-  JIRA_USER_FIELDS_RUNTIME_CAPABILITY,
+  ...jiraDetailCapabilities.JIRA_DETAIL_RUNTIME_CAPABILITIES,
+  JIRA_SAVED_FILTER_RUNTIME_CAPABILITY,
+  JIRA_STATUS_FILTER_RUNTIME_CAPABILITY,
   AI_VAULT_RUNTIME_CAPABILITY,
   AI_VAULT_SESSION_TITLES_RUNTIME_CAPABILITY,
   TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY,
   TERMINAL_PROMPT_DELIVERY_RUNTIME_CAPABILITY,
   TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY,
-  TERMINAL_QUICK_COMMANDS_RUNTIME_CAPABILITY,
+  TERMINAL_SPAWN_INTENT_RUNTIME_CAPABILITY,
+  RUNTIME_AUTOMATIC_WORK_RUNTIME_CAPABILITY,
+  ...TERMINAL_QUICK_COMMAND_RUNTIME_CAPABILITIES,
   WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
   WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY,
   TERMINAL_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
   TERMINAL_CREATE_SHELL_SELECTION_RUNTIME_CAPABILITY,
   SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
   SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
-  SESSION_TABS_SPLIT_GROUP_PLACEMENT_RUNTIME_CAPABILITY,
+  ...SESSION_TABS_RUNTIME_CAPABILITIES,
   AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
   REMOTE_SERVER_UPDATE_CAPABILITY,
+  MANAGED_RUNTIME_INSTALL_RUNTIME_CAPABILITY,
+  MANAGED_RUNTIME_REMOVE_RUNTIME_CAPABILITY,
   AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY,
   AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
   AGENT_SESSION_KEYBOARD_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
+  AGENT_SESSION_CURRENT_REQUESTS_CLIENT_CAPABILITY,
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
   AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY,
   // The host side: it accepts a send before any agent has it, and a Stop with no writer before a
@@ -412,7 +369,9 @@ export const RUNTIME_CAPABILITIES = [
   AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY,
   AGENT_SESSION_SEND_ANSWERS_PROOF_RUNTIME_CAPABILITY,
   AGENT_SESSION_QUEUED_COMMANDS_RUNTIME_CAPABILITY,
+  AGENT_SESSION_QUEUED_MESSAGE_EDIT_RUNTIME_CAPABILITY,
   AGENT_SESSION_CONTINUE_INTERRUPTED_RUNTIME_CAPABILITY,
+  AGENT_SESSION_PERMISSION_MODES_RUNTIME_CAPABILITY,
   ...STRUCTURED_AGENT_SESSION_SURFACE_RUNTIME_CAPABILITIES,
   ...AGENT_SESSION_ATTENTION_RUNTIME_CAPABILITIES,
   AGENT_SESSION_REWIND_RUNTIME_CAPABILITY,

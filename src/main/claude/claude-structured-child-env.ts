@@ -4,6 +4,7 @@
 import { withCliRuntimeOnPath } from '../../shared/node-cli-command-resolution'
 import { applyClaudeEnvPatch } from '../claude-accounts/environment'
 import { resolveClaudeCommand } from '../codex-cli/command'
+import { resolveAgainAfterRefreshOnMissingProgram } from '../native-chat/structured-agent-command-resolution'
 import { withoutInheritedClaudeConfigDir } from './claude-config-dir-pin'
 
 function cloneDefinedEnv(env: NodeJS.ProcessEnv | Record<string, string>): Record<string, string> {
@@ -33,14 +34,27 @@ export type ClaudeChildEnvSources = {
   inheritedEnv: Record<string, string>
 }
 
-export async function resolveClaudeChildEnvSources(
-  deps: ClaudeEnvDeps
-): Promise<ClaudeChildEnvSources> {
-  const command = (deps.resolveCommand ?? resolveClaudeCommand)()
+export function resolveClaudeChildEnvSources(deps: ClaudeEnvDeps): Promise<ClaudeChildEnvSources> {
+  return resolveAgainAfterRefreshOnMissingProgram(
+    () => readClaudeChildEnvSources(deps),
+    deps.refreshEnvironmentAfterMiss,
+    {
+      env: ({ inheritedEnv, overlay }) => ({ ...inheritedEnv, ...overlay }),
+      cwd: deps.resolveWorkingDirectory
+    }
+  )
+}
+
+async function readClaudeChildEnvSources(deps: ClaudeEnvDeps): Promise<ClaudeChildEnvSources> {
   const overlay = await deps.resolveEnv?.()
   const inheritedEnv = deps.resolveInheritedEnv
     ? await deps.resolveInheritedEnv()
     : cloneDefinedEnv(process.env)
+  const effectiveEnv = { ...inheritedEnv, ...overlay }
+  const command = (deps.resolveCommand ?? resolveClaudeCommand)({
+    pathEnv: effectiveEnv.PATH ?? effectiveEnv.Path ?? null,
+    homePath: effectiveEnv.HOME ?? effectiveEnv.USERPROFILE
+  })
   return { command, overlay: overlay ? cloneDefinedEnv(overlay) : undefined, inheritedEnv }
 }
 

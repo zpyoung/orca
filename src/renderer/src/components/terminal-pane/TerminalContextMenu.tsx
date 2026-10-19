@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import {
   Clipboard,
-  ClipboardCopy,
   Copy,
   Eraser,
   GitFork,
@@ -34,6 +33,8 @@ import type { KeybindingOverrides } from '../../../../shared/keybindings'
 import { translate } from '@/i18n/i18n'
 import { isMacPlatform, nativeChatToggleShortcutLabel } from '../native-chat/native-chat-shortcut'
 import { AgentSessionContinuationMenuItem } from './AgentSessionContinuationMenuItem'
+import { AgentSessionContextCopyMenuItem } from './AgentSessionContextCopyMenuItem'
+import { ClearPaneTitleMenuItem } from './ClearPaneTitleMenuItem'
 import type { TerminalQuickCommandMenuHost } from '@/hooks/use-terminal-quick-command-hosts'
 import { TerminalQuickCommandsSubmenu } from './TerminalQuickCommandsSubmenu'
 
@@ -330,16 +331,10 @@ function TerminalContextMenuItems({
         ) : null}
       </DropdownMenuItem>
       {canClearPaneTitle ? (
-        <DropdownMenuItem onSelect={onClearPaneTitle}>
-          <X />
-          {translate(
-            'auto.components.terminal.pane.TerminalContextMenu.clearPaneTitle',
-            'Clear Pane Title'
-          )}
-          {showClearPaneTitleShortcut ? (
-            <DropdownMenuShortcut>{shortcuts.clearPaneTitle}</DropdownMenuShortcut>
-          ) : null}
-        </DropdownMenuItem>
+        <ClearPaneTitleMenuItem
+          onSelect={onClearPaneTitle}
+          shortcut={showClearPaneTitleShortcut ? shortcuts.clearPaneTitle : undefined}
+        />
       ) : null}
       {canCopyAgentSessionId ? (
         <DropdownMenuItem onSelect={onCopyAgentSessionId}>

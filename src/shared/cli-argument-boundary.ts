@@ -50,6 +50,7 @@ export const CLI_BOOLEAN_FLAGS = new Set([
   'run-hooks',
   'show-profile',
   'staged',
+  'supervise',
   'tab',
   'tasks',
   'text-stdin',

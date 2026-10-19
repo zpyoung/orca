@@ -8,6 +8,9 @@ export type NativeChatOrcaStopView = {
   hostLabel: string | null
   remoteHost: boolean
   continueAvailable: boolean
+  /** The cut turn whose row carries Continue right now, if any. */
+  offeredTurnItemId: string | null
+  continueNow: () => void
 }
 
 export const NativeChatOrcaStopContext = createContext<NativeChatOrcaStopView>({

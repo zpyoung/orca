@@ -89,7 +89,6 @@ export function useNativeChatSessionOptionCommand(args: {
         if (detectClaudeConfirmation) {
           observer = createClaudeModelSwitchConfirmationObserver({
             ptyId: target.ptyId,
-            settings: target.settings,
             expectedModelLabel: options?.expectedChoiceLabel ?? null
           })
           activeObserversRef.current.add(observer)

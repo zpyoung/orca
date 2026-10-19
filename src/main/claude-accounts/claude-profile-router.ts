@@ -18,6 +18,7 @@ import {
   describeClaudeProfile,
   type ClaudeProfileDescriptor,
   readUserClaudeConfigDir,
+  readUserClaudeConfigDirAsSet,
   resolveClaudeDefaultHome
 } from './claude-profile-paths'
 import type { ClaudeProfileSetupReport } from './claude-profile-setup'
@@ -311,7 +312,7 @@ export class ClaudeProfileRouter {
         ? { ...env, [CLAUDE_USER_CONFIG_DIR_ENV]: userConfigDir }
         : env
     } catch {
-      return { [CLAUDE_PROFILE_POINTER_ENV]: this.pointerPath }
+      return base
     }
   }
 

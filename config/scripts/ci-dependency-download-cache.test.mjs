@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
+import { classifyPrJobs } from './pr-code-change-scope.mjs'
 
 const read = (path) => parse(readFileSync(path, 'utf8'))
 const workflow = (name) => read(`.github/workflows/${name}.yml`)
@@ -26,10 +27,24 @@ describe('CI dependency download caches', () => {
     const mobile = workflow('mobile').jobs.verify.steps.find((step) =>
       step.uses?.includes('install-node-dependencies')
     )
+    expect(mobile.with['cache-pnpm-store']).toBe('false')
     expect(mobile.with['cache-dependency-path'].trim().split('\n')).toEqual([
       'pnpm-lock.yaml',
       'mobile/pnpm-lock.yaml'
     ])
+  })
+
+  it('builds internal packages before native preparation after a script-free install', () => {
+    const steps = action.runs.steps
+    const buildIndex = steps.findIndex((step) => step.name === 'Build internal packages')
+    expect(buildIndex).toBeGreaterThan(
+      steps.findIndex((step) => step.name === 'Install dependencies')
+    )
+    expect(buildIndex).toBeLessThan(
+      steps.findIndex((step) => step.name === 'Prepare native runtime')
+    )
+    expect(steps[buildIndex].if).toBeUndefined()
+    expect(steps[buildIndex].run).toBe('pnpm run --if-present build:packages')
   })
 
   it('restores PR stores except measured Windows, Linux and macOS installs, without a post-job save', () => {
@@ -255,7 +270,7 @@ describe('CI dependency download caches', () => {
     }
   )
 
-  it('opts Windows server consumers out while preserving the main warmer store writer', () => {
+  it('opts Windows preparation out of download stores while retaining native caches', () => {
     const installer = './.github/actions/install-node-dependencies'
     const persistence = workflow('node-server-tests').jobs.persistence.steps.find(
       (step) => step.uses === installer
@@ -263,19 +278,18 @@ describe('CI dependency download caches', () => {
     const ssh = workflow('ssh-windows-hosts').jobs.hosts.steps.find(
       (step) => step.uses === installer
     )
-    const warmer = workflow('ci-cache-warmup').jobs['warm-windows'].steps.find(
-      (step) => step.uses === installer
-    )
+    const platformJobs = read(
+      workflow('ci-cache-warmup-platforms').jobs['warm-platforms'].uses
+    ).jobs
+    const warmer = platformJobs['warm-windows'].steps.find((step) => step.uses === installer)
     expect(action.inputs['cache-pnpm-store'].default).toBe('true')
     expect(persistence.with['cache-pnpm-store']).toBe("${{ runner.os != 'Windows' }}")
     expect(ssh.with['cache-pnpm-store']).toBe('false')
-    expect(warmer.with['cache-pnpm-store']).toBeUndefined()
-    expect(warmer.with['cache-pnpm-store-lookup-only']).toBe('true')
+    expect(warmer.with['cache-pnpm-store']).toBe('false')
+    expect(warmer.with['native-runtime']).toBe('node')
     expect(persistence.with['cache-pnpm-store-lookup-only']).toBe('true')
-    for (const name of ['warm', 'warm-linux-arm']) {
-      const install = workflow('ci-cache-warmup').jobs[name].steps.find((step) =>
-        step.uses?.includes('install-node-dependencies')
-      )
+    for (const job of [workflow('ci-cache-warmup').jobs.warm, platformJobs['warm-linux-runtime']]) {
+      const install = job.steps.find((step) => step.uses?.includes('install-node-dependencies'))
       expect(install.with['cache-pnpm-store-lookup-only']).toBe('true')
     }
   })

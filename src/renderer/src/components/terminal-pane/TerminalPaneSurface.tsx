@@ -18,6 +18,7 @@ import { SessionRestoredBannerPortals } from './SessionRestoredBannerPortals'
 import { handleInternalTerminalFileDrop } from './terminal-drop-handler'
 import { TerminalQuickCommandEditorDialog } from './TerminalQuickCommandEditorDialog'
 import { TerminalPaneNativeChatPortal } from './TerminalPaneNativeChatPortal'
+import { TerminalPaneSleepingPortals } from './TerminalPaneSleepingPortals'
 import {
   TerminalPaneCodexRestartPortals,
   TerminalPaneMobileDriverPortals,
@@ -134,7 +135,10 @@ export function TerminalPaneSurface({
         data-pane-title-surface={titleUsesLightSurface ? 'light' : 'dark'}
         style={terminalContainerStyle}
         onContextMenuCapture={contextMenu.onContextMenuCapture}
-        onMouseDownCapture={handlePrimarySelectionMiddleMouseDown}
+        onMouseDownCapture={(event) => {
+          contextMenu.onMouseDownCapture(event)
+          handlePrimarySelectionMiddleMouseDown(event)
+        }}
         onAuxClickCapture={handlePrimarySelectionAuxClick}
         onDragOver={(event) => {
           if (
@@ -369,6 +373,7 @@ export function TerminalPaneSurface({
         onRenameBlur={handleRenameBlur}
       />
       <TerminalPaneRecoveryPortals controller={controller} />
+      <TerminalPaneSleepingPortals controller={controller} />
       <TerminalPaneMobileDriverPortals controller={controller} />
       <CloseTerminalDialog
         open={pendingCloseConfirmation !== null}

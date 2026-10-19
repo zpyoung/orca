@@ -69,9 +69,6 @@ vi.mock('@/runtime/runtime-terminal-inspection', () => ({
   isRemoteRuntimePtyId: () => false,
   sendRuntimePtyInput: vi.fn()
 }))
-vi.mock('@/lib/agent-paste-draft', () => ({
-  getSettingsForAgentTabRuntimeOwner: () => ({})
-}))
 vi.mock('./native-chat-runtime-send', () => ({
   sendNativeChatMessage: (...args: unknown[]) => mocks.sendNativeChatMessage(...args),
   sendNativeChatTypedCommand: (...args: unknown[]) => mocks.sendNativeChatTypedCommand(...args),
@@ -760,7 +757,6 @@ describe('NativeChatComposer', () => {
     expect(onOptimisticSend).not.toHaveBeenCalled()
     expect(mocks.createClaudeModelSwitchConfirmationObserver).toHaveBeenCalledWith({
       ptyId: 'pty-1',
-      settings: {},
       expectedModelLabel: 'Opus'
     })
     expect(onSwitchToTerminal).not.toHaveBeenCalled()
@@ -790,7 +786,6 @@ describe('NativeChatComposer', () => {
     )
     expect(mocks.createClaudeModelSwitchConfirmationObserver).toHaveBeenCalledWith({
       ptyId: 'pty-1',
-      settings: {},
       expectedModelLabel: 'Fable'
     })
     expect(mocks.confirmationObserver?.arm).toHaveBeenCalledOnce()

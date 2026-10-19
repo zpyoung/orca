@@ -31,8 +31,8 @@ export async function structuredAgentSupportsLaunch(
   worktreeSelector: string,
   runtime: LaunchSupportRuntime
 ): Promise<boolean> {
-  const supportsLaunch = structuredAgentRuntimeRegistration(agent)?.supportsLaunch
-  if (!supportsLaunch) {
+  const check = structuredAgentRuntimeMetadata(agent)?.launchCheck
+  if (!check) {
     return true
   }
   const settings = runtime.requireStore().getSettings()
@@ -40,8 +40,28 @@ export async function structuredAgentSupportsLaunch(
     ...(await resolveHostAgentBaseEnvironment(settings)),
     ...(isTuiAgent(agent) ? resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv) : {})
   }
-  const cwd = (await runtime.resolveRuntimeFileTarget(worktreeSelector)).worktree.path
-  return supportsLaunch({ cwd, env, commandSettings: settings })
+}
+
+/** What a chat start of `agent` on this host launches from, for a child that serves no chat. */
+export async function structuredAgentHostLaunchSources(
+  agent: StructuredAgentId,
+  runtime: Pick<LaunchSupportRuntime, 'requireStore'> & {
+    resolveStructuredAgentAccountHome(agent: StructuredAgentId): Promise<AgentSessionAccountHome>
+  }
+): Promise<{
+  accountHome: AgentSessionAccountHome
+  env: Record<string, string>
+  commandSettings: StructuredAgentCommandSettings
+  dataDirectory: string
+}> {
+  const settings = runtime.requireStore().getSettings()
+  return {
+    accountHome: await runtime.resolveStructuredAgentAccountHome(agent),
+    env: await resolveHostStructuredAgentLaunchEnvironment(agent, settings),
+    commandSettings: settings,
+    // The chat host's own state root (ensureStructuredAgentSessionHost).
+    dataDirectory: getProfileUserDataPath()
+  }
 }
 
 /** `agentSession.createSupport` on this host: every refusal it can know before spawning. The
@@ -55,7 +75,7 @@ export async function resolveHostStructuredAgentCreateSupport(input: {
 }): Promise<StructuredAgentSessionCreateSupport> {
   const { agent, location } = input
   const supportsLocation =
-    structuredAgentRuntimeRegistration(agent)?.supportsLocation(location) ?? false
+    structuredAgentRuntimeMetadata(agent)?.supportsLocation(location) ?? false
   const supportsLaunch =
     supportsLocation &&
     (await structuredAgentSupportsLaunch(agent, input.worktreeSelector, input.runtime))

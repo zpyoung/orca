@@ -419,6 +419,21 @@ describe('findTabSessionHistoryRow', () => {
     })
     expect(findTabSessionHistoryRow([ownedRow], cliSubject)?.id).toBe('owned-row')
     expect(findTabSessionHistoryRow([row({ agent: 'codex' })], cliSubject)).toBeNull()
+    // An OpenCode 2.x pane reports `opencode`; Session History lists its conversation as `opencode2`.
+    const openCodeSubject = {
+      ...cliSubject,
+      agent: 'opencode' as const,
+      providerSessionId: 'ses_1'
+    }
+    expect(
+      findTabSessionHistoryRow(
+        [row({ id: 'oc2-row', agent: 'opencode2', sessionId: 'ses_1' })],
+        openCodeSubject
+      )?.id
+    ).toBe('oc2-row')
+    expect(
+      findTabSessionHistoryRow([row({ agent: 'grok', sessionId: 'ses_1' })], openCodeSubject)
+    ).toBeNull()
     expect(
       findTabSessionHistoryRow(
         [

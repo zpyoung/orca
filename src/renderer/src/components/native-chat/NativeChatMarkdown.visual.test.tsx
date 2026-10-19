@@ -53,7 +53,7 @@ beforeEach(() => {
   vi.stubGlobal('IntersectionObserver', InViewObserver)
   clearNativeChatVisualCacheForTests()
   callRuntimeRpc.mockReset()
-  callRuntimeRpc.mockResolvedValue({ ok: true, revision: 'r1', sizeBytes: 9, html: '<p>v</p>' })
+  callRuntimeRpc.mockResolvedValue({ ok: true, revision: 'r1', html: '<p>v</p>', path: '/v' })
 })
 
 afterEach(() => {

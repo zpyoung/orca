@@ -538,7 +538,6 @@ describe('sendNativeChatMessageVerified', () => {
       expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
     })
     expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      SETTINGS,
       PTY,
       buildNativeChatPasteBytes('/model sonnet'),
       'driving',
@@ -557,7 +556,7 @@ describe('sendNativeChatMessageVerified', () => {
     )
     expect(
       sendRuntimePtyInputVerified.mock.calls.some(
-        (call) => call[2] === NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
+        (call) => call[1] === NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
       )
     ).toBe(false)
   })
@@ -570,7 +569,7 @@ describe('sendNativeChatMessageVerified', () => {
 
     expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
     expect(
-      sendRuntimePtyInputVerified.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+      sendRuntimePtyInputVerified.mock.calls.some((call) => call[1] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
   })
 
@@ -609,7 +608,7 @@ describe('sendNativeChatMessageVerified', () => {
 
     expect(await result).toBe(false)
     expect(
-      sendRuntimePtyInputVerified.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+      sendRuntimePtyInputVerified.mock.calls.some((call) => call[1] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
   })
 
@@ -890,7 +889,7 @@ describe('empty prompt submit', () => {
   it('submits an empty prompt with a bare Enter', () => {
     submitNativeChatPrompt(TARGET)
     expect(sendRuntimePtyInput).toHaveBeenCalledOnce()
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT, 'driving')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(PTY, NATIVE_CHAT_SUBMIT, 'driving')
   })
 })
 

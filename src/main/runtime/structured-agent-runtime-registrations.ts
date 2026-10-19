@@ -30,18 +30,8 @@ import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent
 import { agentSessionAttachmentStoreRoot } from '../native-chat/agent-session-attachments/agent-session-attachment-references'
 import type { JournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database'
 import { replayJournal } from '../native-chat/agent-session-journal/journal-open'
-import type { AgentSessionRecordStore } from './agent-session-record-store'
-import type { createStructuredAgentSessionDispatchFollowUps } from './structured-agent-session-dispatch-followups'
-import type { StructuredAgentSessionRuntimeDeps } from './structured-agent-session-runtime'
-import type { createStructuredAgentEnvironmentResolvers } from './structured-agent-shell-environment'
 import { createStructuredClaudeRuntimeAdapter } from './structured-claude-runtime-adapter'
-import {
-  resolveStructuredClaudeAccountHomePath,
-  resolveStructuredCodexAccountHomePath,
-  type StructuredClaudeAccountHomeDeps,
-  type StructuredCodexAccountHomeDeps
-} from './structured-agent-account-home'
-import { ACP_LAUNCH_SPECS, type AcpLaunchSpec } from '../acp/acp-launch-specs'
+import type { AcpLaunchSpec } from '../acp/acp-launch-specs'
 import { acpStructuredAgentDefinition } from '../acp/acp-structured-agent-definitions'
 import { createAcpAgentConnection } from '../acp/acp-agent-connection'
 import {
@@ -51,7 +41,6 @@ import {
 } from '../acp/acp-structured-launch-resolution'
 import { AcpStructuredSessionAdapter } from '../acp/acp-structured-session-adapter'
 import { PI_RPC_RUNTIME_REGISTRATION } from '../pi/rpc-runtime-registration'
-import type { AgentModelCatalogDiscovery } from '../native-chat/agent-model-catalog/agent-model-catalog-discovery'
 import {
   acpModelCatalogDiscovery,
   claudeLaunchEnvOverlay,
@@ -106,8 +95,9 @@ export type StructuredAgentAccountHomeServices = {
 /** What a catalog probe is built from: the same runtime resolvers its sessions launch through. */
 export type StructuredAgentModelCatalogContext = Pick<
   StructuredAgentAdapterContext,
-  'deps' | 'environment'
->
+  StructuredAgentRuntimeAdapter,
+  StructuredAgentRuntimeRegistration
+} from './structured-agent-runtime-registration-types'
 
 export type StructuredAgentRuntimeRegistration = StructuredAgentCliConversations & {
   definition: StructuredAgentDefinition
@@ -149,10 +139,12 @@ function createCodexAdapter(context: StructuredAgentAdapterContext): StructuredA
     ...(deps.openCodexConnection ? { openConnection: deps.openCodexConnection } : {}),
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
     modelCatalog: agentModelCatalogStore,
-    onChildWorkEvidence: (sessionId, evidence) =>
-      host()?.publishChildWorkEvidence(sessionId, evidence),
+    onChildWorkEvidence: (sessionId, evidence, producer) =>
+      host()?.publishChildWorkEvidence(sessionId, evidence, producer),
     onDispatchSettledLate: followUps.onDispatchSettledLate,
-    onPrimaryThreadStoppedRunning: followUps.releaseUnansweredDispatches,
+    // After the frame being read: what the child holds is re-derived, never published mid-frame.
+    onHeldSendsChanged: ({ sessionId }) =>
+      queueMicrotask(() => host()?.publishWorkChanged(sessionId)),
     logger: deps.logger,
     onEvent: (event) => {
       // Every exit, expected or not: the host ends that child's record.
@@ -188,8 +180,8 @@ function createClaudeAdapter(
     resolveClaudeInheritedEnv: context.environment.resolveBaseEnvironment,
     onLifecycleEvent: context.deliverLifecycle,
     logger: deps.logger,
-    onChildWorkEvidence: (sessionId, evidence) =>
-      host()?.publishChildWorkEvidence(sessionId, evidence),
+    onChildWorkEvidence: (sessionId, evidence, producer) =>
+      host()?.publishChildWorkEvidence(sessionId, evidence, producer),
     onDispatchSettledLate: followUps.onDispatchSettledLate,
     onSessionIdle: followUps.releaseUnansweredDispatches,
     ...(deps.openClaudeConnection ? { openClaudeConnection: deps.openClaudeConnection } : {}),
@@ -197,26 +189,36 @@ function createClaudeAdapter(
   })
 }
 
-function acpRegistration(spec: AcpLaunchSpec): StructuredAgentRuntimeRegistration {
-  return {
-    definition: acpStructuredAgentDefinition(spec),
-    supportsLocation: (location) => supportsSupervisedProviderChildLocation(location),
-    ...(spec.supportsVersion
-      ? {
-          supportsLaunch: async ({ cwd, env, commandSettings }) => {
-            const launchEnv = { ...env, ...spec.env }
-            let command: string
-            try {
-              command = resolveAcpLaunchCommand(spec, launchEnv, { commandSettings })
-            } catch (error) {
-              // An unrunnable Command setting is the launch's refusal to state, not a terminal.
-              if (isAgentSessionPreSpawnError(error)) {
-                return true
-              }
-              throw error
-            }
-            return acpLaunchVersionSupported(spec, { command, cwd, env: launchEnv })
-          }
+function createAcpAdapter(
+  spec: AcpLaunchSpec
+): StructuredAgentRuntimeRegistration['createAdapter'] {
+  return (context) => {
+    const { deps, followUps } = context
+    const readJournal = (sessionId: string) => replayJournal(context.journalDatabase.db, sessionId)
+    const definition = acpStructuredAgentDefinition(spec)
+    const sources = structuredAgentLaunchSources(context)
+    const part = acpStructuredLaunchPart(spec, {
+      readJournal,
+      dataDirectory: deps.stateDirectory,
+      logger: deps.logger
+    })
+    return new AcpStructuredSessionAdapter({
+      spec,
+      readJournal,
+      resolveLaunch: composeStructuredLaunch(definition, sources, part),
+      readLaunch: composeStructuredLaunchRead(definition, sources, part),
+      dataDirectory: deps.stateDirectory,
+      resolveLaunchArgs: () => deps.resolveLaunchArgs(spec.agent),
+      connect: (launch, options) => createAcpAgentConnection(launch, options),
+      onChildWorkEvidence: (sessionId, evidence, producer) =>
+        context.host()?.publishChildWorkEvidence(sessionId, evidence, producer),
+      ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
+      onDispatchSettledLate: followUps.onDispatchSettledLate,
+      logger: deps.logger,
+      // Every exit, expected or not: the host ends that child's record.
+      onEvent: (event) => {
+        if (event.type === 'ended') {
+          context.deliverLifecycle(event)
         }
       : {}),
     resolveAccountHome: ({ launchEnv }) => spec.account.resolve({ launchEnv }),
@@ -256,23 +258,20 @@ function acpRegistration(spec: AcpLaunchSpec): StructuredAgentRuntimeRegistratio
   }
 }
 
-async function resolveCodexAccountHomePath(
-  request: StructuredAgentAccountHomeRequest,
-  services: StructuredAgentAccountHomeServices
-): Promise<string> {
-  const { launchEnv, purpose, workspacePath } = request
-  if (purpose === 'launch' && workspacePath) {
-    await applyStructuredCodexWorkspaceTrust({
-      workspacePath: await workspacePath(),
-      launchEnv,
-      settings: services.workspaceTrustSettings()
-    })
+function registrationWithAdapter(
+  entry: StructuredAgentRuntimeCatalogEntry
+): StructuredAgentRuntimeRegistration {
+  // Keep overrides visible through both the metadata and full-registration views.
+  switch (entry.kind) {
+    case 'pi':
+      return PI_RPC_RUNTIME_REGISTRATION
+    case 'codex':
+      return Object.assign(entry.metadata, { createAdapter: createCodexAdapter })
+    case 'claude':
+      return Object.assign(entry.metadata, { createAdapter: createClaudeAdapter })
+    case 'acp':
+      return Object.assign(entry.metadata, { createAdapter: createAcpAdapter(entry.spec) })
   }
-  return resolveStructuredCodexAccountHomePath({
-    launchEnv,
-    resolveLaunchHome:
-      purpose === 'launch' ? services.prepareCodexLaunchHome : services.readCodexLaunchHome
-  })
 }
 
 export const STRUCTURED_AGENT_RUNTIME_REGISTRATIONS: readonly StructuredAgentRuntimeRegistration[] =

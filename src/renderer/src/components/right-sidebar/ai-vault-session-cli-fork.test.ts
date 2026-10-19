@@ -1,3 +1,4 @@
+import { OpenCodeCopyServerRouteError } from '../../../../shared/opencode-launch-command'
 import { describe, expect, it } from 'vitest'
 import {
   aiVaultSessionCliForkWorktreeId,
@@ -79,6 +80,15 @@ describe('Resume in New CLI failure text', () => {
     "Error invoking remote method 'aiVault:prepareSessionResume': Error: agent_session_conflict"
   ])('asks for a host update when an older host refuses the fork: %s', (message) => {
     expect(describeAiVaultCliForkFailure(message)).toBe(UPDATE)
+  })
+
+  it('keeps server refusal feedback plain when Electron wraps the host error', () => {
+    const message = new OpenCodeCopyServerRouteError().message
+    expect(
+      describeAiVaultCliForkFailure(
+        `Error invoking remote method 'aiVault:prepareSessionResume': Error: ${message}`
+      )
+    ).toBe(message)
   })
 
   it('passes any other failure through unchanged', () => {

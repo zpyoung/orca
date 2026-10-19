@@ -1,6 +1,9 @@
 import type { HttpLinkSourceOwner } from '@/lib/http-link-routing'
+import type { CheckRunDetailsTabPatch } from '@/components/editor/check-run-details-tab'
 import type {
-  CheckRunDetailsTabPatch,
+  CombinedDiffAlternate,
+  ConflictReviewEntry,
+  ConflictReviewState,
   OpenCheckRunDetailsState
 } from '@/components/editor/check-run-details-tab'
 import type { OpenChatVisualTabState } from '@/components/native-chat/native-chat-visual-tab'
@@ -14,10 +17,7 @@ import type { WorkspaceVisibleTabType } from '../../../../../../shared/tab-types
 import type {
   BranchCompareLike,
   ClosedEditorTabSnapshot,
-  CombinedDiffAlternate,
   CommitCompareLike,
-  ConflictReviewEntry,
-  ConflictReviewState,
   EditorOpenTargetOptions,
   EditorTabSelection,
   OpenFile
@@ -75,7 +75,8 @@ export type EditorFilesSlice = {
   ) => void
   makePreviewFilePermanent: (fileId: string, tabId?: string) => void
   pinFile: (fileId: string, tabId?: string) => void
-  closeFile: (fileId: string) => void
+  /** captureRecentlyClosed false keeps a cleanup close out of the reopen stack. */
+  closeFile: (fileId: string, opts?: { captureRecentlyClosed?: boolean }) => void
   closeAllFiles: () => void
   /** Most recently closed editor tabs per worktree (for Cmd/Ctrl+Shift+T). */
   recentlyClosedEditorTabsByWorktree: Record<string, ClosedEditorTabSnapshot[]>
@@ -83,7 +84,6 @@ export type EditorFilesSlice = {
   /** Activation uses the file's workspace unless a target is supplied; global selection
    *  moves only when that workspace is active. */
   setActiveFile: (fileId: string, targetWorktreeId?: string) => void
-  reorderFiles: (fileIds: string[]) => void
   markFileDirty: (fileId: string, dirty: boolean) => void
   setExternalMutation: (fileId: string, mutation: 'deleted' | 'renamed' | 'changed' | null) => void
   setLastKnownDiskSignature: (fileId: string, signature: string) => void

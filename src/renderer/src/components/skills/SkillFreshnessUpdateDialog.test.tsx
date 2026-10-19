@@ -109,12 +109,8 @@ function placement(
     physicalIdentity: `physical-${name}`,
     topology: 'canonical-copy',
     status: 'outdated',
-    installedReleaseRevision: 1,
-    installedAppVersion: '1.0.0',
-    currentReleaseRevision: 2,
     currentPackageDigest: 'current',
-    currentAppVersion: '2.0.0',
-    observedPackageDigest: 'old',
+    lockSource: 'stablyai/orca',
     errorCategory: null,
     ...overrides
   }
@@ -282,7 +278,7 @@ describe('SkillFreshnessUpdateDialog', () => {
       failedNames: ['orchestration'],
       finishedAt: 3,
       output: '✗ Failed to update orchestration',
-      message: 'skills update exited with code 1'
+      message: 'skills add exited with code 1'
     })
 
     expect(container?.textContent).toContain('Updated 1 of 2 skills')
@@ -292,7 +288,7 @@ describe('SkillFreshnessUpdateDialog', () => {
     expect(
       container?.querySelector('[data-skill-row="orchestration"]')?.getAttribute('data-state-label')
     ).toBe('failed')
-    expect(container?.textContent).toContain('skills update exited with code 1')
+    expect(container?.textContent).toContain('skills add exited with code 1')
     expect(findButton('Retry')).toBeDefined()
   })
 
@@ -311,7 +307,7 @@ describe('SkillFreshnessUpdateDialog', () => {
     // the group list and blank the row out mid-transition.
     mocks.inventory = {
       schemaVersion: 1,
-      installations: [placement('orca-cli', { status: 'current', installedReleaseRevision: 2 })],
+      installations: [placement('orca-cli', { status: 'current' })],
       eligibleUpdateNames: [],
       scanIssues: [],
       scannedAt: 5
@@ -420,7 +416,7 @@ describe('SkillFreshnessUpdateDialog', () => {
   it('shows the up-to-date state once every installation is current', async () => {
     mocks.inventory = {
       schemaVersion: 1,
-      installations: [placement('orca-cli', { status: 'current', installedReleaseRevision: 2 })],
+      installations: [placement('orca-cli', { status: 'current' })],
       eligibleUpdateNames: [],
       scanIssues: [],
       scannedAt: 2
@@ -472,7 +468,7 @@ describe('SkillFreshnessUpdateDialog', () => {
           rootId: 'repo-work',
           sourceKind: 'repo',
           topology: 'repo-scope',
-          status: 'unrecognized',
+          status: 'outdated',
           unresolvedPath: '/home/projects/work/.agents/skills/computer-use',
           resolvedPath: '/home/projects/work/.agents/skills/computer-use',
           physicalIdentity: 'physical-repo-computer-use'
@@ -501,7 +497,7 @@ describe('SkillFreshnessUpdateDialog', () => {
           rootId: 'repo-work',
           sourceKind: 'repo',
           topology: 'repo-scope',
-          status: 'unrecognized',
+          status: 'outdated',
           unresolvedPath: '/home/projects/work/.agents/skills/computer-use',
           resolvedPath: '/home/projects/work/.agents/skills/computer-use',
           physicalIdentity: 'physical-repo-computer-use'
@@ -545,20 +541,14 @@ describe('SkillFreshnessUpdateDialog', () => {
     mocks.inventory = {
       schemaVersion: 1,
       installations: [
-        placement('orchestration'),
-        placement('orchestration', {
-          rootId: 'repo-work',
-          sourceKind: 'repo',
-          topology: 'repo-scope',
-          status: 'unrecognized',
-          unresolvedPath: '/home/projects/work/.agents/skills/orchestration',
-          resolvedPath: '/home/projects/work/.agents/skills/orchestration',
-          physicalIdentity: 'physical-repo-orchestration'
-        })
+        placement('computer-use', { lockSource: 'acme/agent-skills' }),
+        placement('linear-tickets', { lockSource: null }),
+        placement('orca-cli'),
+        placement('orchestration', { lockSource: 'https://github.com/stablyai/orca.git' })
       ],
-      eligibleUpdateNames: [],
+      eligibleUpdateNames: ['computer-use', 'linear-tickets', 'orca-cli', 'orchestration'],
       scanIssues: [],
-      scannedAt: 6
+      scannedAt: 7
     }
     await renderDialog()
     await openViaRequest()
@@ -567,9 +557,108 @@ describe('SkillFreshnessUpdateDialog', () => {
     expect(row?.textContent).toContain(
       `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
     )
-    expect(row?.textContent).not.toContain('This is a project skill, not a global one')
-    // Still listed, though — ownership silences the explanation, never the location.
-    expect(row?.textContent).toContain('/home/projects/work/.agents/skills/orchestration')
+    expect(container?.querySelector('[data-skill-row="orca-cli"]')?.textContent).toContain(
+      'Update available'
+    )
+    expect(container?.textContent).toContain('2 updates available')
+    expect(container?.textContent).toContain('2 skills not installed by Orca are unselected.')
+
+    await clickButton('Update 2 skills')
+    expect(skillsApi.startUpdateRun).toHaveBeenLastCalledWith(['orca-cli', 'orchestration'])
+  })
+
+  it('counts the selection in the button once the user ticks a foreign copy', async () => {
+    mocks.inventory = {
+      schemaVersion: 1,
+      installations: [
+        placement('computer-use', { lockSource: 'acme/agent-skills' }),
+        placement('orca-cli')
+      ],
+      eligibleUpdateNames: ['computer-use', 'orca-cli'],
+      scanIssues: [],
+      scannedAt: 8
+    }
+    await renderDialog()
+    await openViaRequest()
+    const foreign = container?.querySelector('[aria-label="Include computer-use"]')
+    await act(async () => {
+      foreign?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(foreign?.getAttribute('aria-checked')).toBe('true')
+    expect(container?.textContent).not.toContain('not installed by Orca')
+    await clickButton('Update 2 skills')
+    // Display order, Orca's first; the runner canonicalizes.
+    expect(skillsApi.startUpdateRun).toHaveBeenLastCalledWith(['orca-cli', 'computer-use'])
+  })
+
+  it('disables the update once nothing is selected', async () => {
+    await renderDialog()
+    await openViaRequest()
+    await act(async () => {
+      container
+        ?.querySelector('[aria-label="Include orca-cli"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(findButton('Update 0 skills')).toBeUndefined()
+    expect(findButton('Update skills')?.disabled).toBe(true)
+  })
+
+  it('drops a choice when a re-check finds a different install source', async () => {
+    mocks.inventory = {
+      schemaVersion: 1,
+      installations: [
+        placement('computer-use', { lockSource: 'acme/agent-skills' }),
+        placement('orca-cli')
+      ],
+      eligibleUpdateNames: ['computer-use', 'orca-cli'],
+      scanIssues: [],
+      scannedAt: 10
+    }
+    await renderDialog()
+    await openViaRequest()
+    await act(async () => {
+      container
+        ?.querySelector('[aria-label="Include computer-use"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // The re-check now attributes orca-cli to someone else: its preselection was Orca's,
+    // not the user's, so it must not be replaced without a fresh tick.
+    mocks.inventory = {
+      ...mocks.inventory,
+      installations: [
+        placement('computer-use', { lockSource: 'acme/agent-skills' }),
+        placement('orca-cli', { lockSource: 'acme/agent-skills' })
+      ],
+      scannedAt: 11
+    }
+    await rerender()
+
+    expect(
+      container?.querySelector('[aria-label="Include orca-cli"]')?.getAttribute('aria-checked')
+    ).toBe('false')
+    await clickButton('Update 1 skill')
+    expect(skillsApi.startUpdateRun).toHaveBeenLastCalledWith(['computer-use'])
+  })
+
+  it('reads Orca’s skills as current when only a foreign copy is outdated', async () => {
+    mocks.inventory = {
+      schemaVersion: 1,
+      installations: [
+        placement('computer-use', { lockSource: null }),
+        placement('orca-cli', { status: 'current' })
+      ],
+      eligibleUpdateNames: ['computer-use'],
+      scanIssues: [],
+      scannedAt: 9
+    }
+    await renderDialog()
+    await openViaRequest()
+
+    expect(container?.textContent).toContain('All installed Orca skills are up to date.')
+    expect(container?.textContent).toContain('1 skill not installed by Orca is unselected.')
+    expect(findButton('Update skills')?.disabled).toBe(true)
   })
 
   it('stays coherent while an idle re-scan is in flight', async () => {
@@ -665,7 +754,7 @@ describe('SkillFreshnessUpdateDialog', () => {
       failedNames: ['orca-cli'],
       finishedAt: 3,
       output: '',
-      message: 'skills update exited with code 1'
+      message: 'skills add exited with code 1'
     })
     // The settling re-scan has emptied `eligibleUpdateNames` by the time Retry
     // is on screen; retrying that list would spawn nothing at all.
@@ -722,9 +811,7 @@ describe('SkillFreshnessUpdateDialog', () => {
   it('shows incomplete plugin coverage without presenting a fabricated skill copy', async () => {
     mocks.inventory = {
       schemaVersion: 1,
-      installations: [
-        placement('orca-cli', { status: 'current', observedPackageDigest: 'current' })
-      ],
+      installations: [placement('orca-cli', { status: 'current' })],
       eligibleUpdateNames: [],
       scanIssues: [
         {
@@ -760,9 +847,7 @@ describe('SkillFreshnessUpdateDialog', () => {
     async (reason) => {
       mocks.inventory = {
         schemaVersion: 1,
-        installations: [
-          placement('orca-cli', { status: 'current', observedPackageDigest: 'current' })
-        ],
+        installations: [placement('orca-cli', { status: 'current' })],
         eligibleUpdateNames: [],
         scanIssues: [
           {
@@ -794,9 +879,7 @@ describe('SkillFreshnessUpdateDialog', () => {
   it('lists a traversal bound without headlining it', async () => {
     mocks.inventory = {
       schemaVersion: 1,
-      installations: [
-        placement('orca-cli', { status: 'current', observedPackageDigest: 'current' })
-      ],
+      installations: [placement('orca-cli', { status: 'current' })],
       eligibleUpdateNames: [],
       scanIssues: [
         {

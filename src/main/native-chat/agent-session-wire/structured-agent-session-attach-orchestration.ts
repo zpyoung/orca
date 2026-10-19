@@ -210,9 +210,7 @@ async function runAttachUnderAbort(
         (await structuredAgentSessionLaunchPermission(context.deps, record)) ?? undefined,
       ...(options.onAcquisitionFailed ? { onAcquisitionFailed: options.onAcquisitionFailed } : {}),
       openConversation: async (record) => {
-        const conversation = await context.openConversation(record.sessionId, {
-          acquisition: true
-        })
+        const conversation = await context.openConversation(record.sessionId, { acquisition: true })
         if (!conversation) {
           throw new Error('agent_session_identity_required')
         }
@@ -221,7 +219,7 @@ async function runAttachUnderAbort(
       // The cleanup released the acquisition, which for a re-attach is the live child itself.
       onAcquisitionReleased: (cause, verdict) =>
         endStructuredAgentSessionReleasedChild(context, sessionId, cause, verdict),
-      onAttached: async (attached, acquisitionGeneration, acquiredOwner, providerChildPhase) => {
+      onAttached: async (attached, acquisitionGeneration, owner, providerChildPhase) => {
         const fence = structuredAgentSessionConversationFence(context.deps.store, sessionId)
         const current = context.sessions.get(sessionId)?.child ?? null
         const startedFor = acquiredOwner ? options.startedFor : current?.startedFor
@@ -230,10 +228,11 @@ async function runAttachUnderAbort(
           ? attempt.startup?.permissionMode
           : current?.permissionMode
         // A re-attach to a live child keeps the sink that child already writes through.
-        const eventSink = acquiredOwner
-          ? attemptSink
-          : (context.runtimeState.currentEventSink(sessionId) ?? attemptSink)
-        if (acquiredOwner) {
+        const eventSink =
+          owner === 'acquired'
+            ? attemptSink
+            : (context.runtimeState.currentEventSink(sessionId) ?? attemptSink)
+        if (owner === 'acquired') {
           // Before the drain: the buffered events are the new child's, never a stale row's.
           await settleStaleStructuredAgentSessionState({
             journal: attached.journal,
@@ -259,14 +258,18 @@ async function runAttachUnderAbort(
             ...(permissionMode === undefined ? {} : { permissionMode })
           }
         }
-        await recoverStructuredRewind(
-          context.deps,
-          sessionId,
-          attached.journal,
-          fence,
-          context.deps.adapter,
-          context.now
-        )
+        // Only a proven child has the protocol session recovery asks; a starting one recovers in
+        // its `started` step, before it is handed anything.
+        if (attempt.candidate?.child.phase === 'ready') {
+          await recoverStructuredRewind(
+            context.deps,
+            sessionId,
+            attached.journal,
+            fence,
+            context.deps.adapter,
+            context.now
+          )
+        }
         if (fenceBefore !== null && fence !== fenceBefore) {
           context.subscribers.snapshot(sessionId, attached.journal, fence)
         } else {
@@ -282,9 +285,10 @@ async function runAttachUnderAbort(
       indexProviderChild(conversation, candidate.child)
       if (attempt.startup) {
         startupAttempts.published(sessionId, attempt.startup.attemptId, candidate.child)
-        // Only an acquire proves a start; a re-attach to a live child proved nothing.
         if (candidate.child.phase === 'ready') {
           noteStructuredAgentSessionProviderStarted(context.deps, sessionId)
+        } else {
+          context.openProviderChild?.(sessionId, candidate.child)
         }
       }
       context.publishStatus?.(sessionId)

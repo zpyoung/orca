@@ -90,23 +90,14 @@ function panelTargets(state: AppState, session: AiVaultSession) {
   const { result: worktreeMap } = renderHook(() =>
     useAiVaultSessionWorktreeMap({ sessions: [session], repos: state.repos, worktrees })
   )
-  const worktreeInfo = withAiVaultCurrentWorktreeStatus(
-    worktreeMap.current.get(session.id) ?? null,
-    WORKTREE_ID
-  )
-  const rowArgs = {
+  return resolveAiVaultSessionRowChatActions({
     session,
-    worktreeInfo,
-    activeWorktreeId: WORKTREE_ID,
-    worktrees,
-    repos: state.repos,
-    targetState: state
-  }
-  return resolveAiVaultSessionSurfaceSwitchTargets(
-    session,
-    resolveAiVaultHistorySessionResumeState(rowArgs),
-    resolveAiVaultHistoryRowResume({ ...rowArgs, settings: state.settings }).resumeInChat
-  )
+    originalPaneTarget: null,
+    structuredSessionOpen: false,
+    resumeState: result.current.getSessionResumeState(session),
+    resumeInChat: result.current.getSessionResumeInChat(session),
+    searchHit: undefined
+  })
 }
 
 const request = { scopePaths: [], executionHostScope: 'local', sessionLimit: 250 } as const

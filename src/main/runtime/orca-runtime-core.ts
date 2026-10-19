@@ -1,4 +1,3 @@
-// @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
 import type { RuntimeWorktreeScanResult } from './repo-worktree-resolution-scan'
 import type { TerminalWorkspaceLaunchScope } from './runtime-legacy-worker-terminal-recovery-types'
 import type { ResolvedWorktree } from './runtime-worktree-path-identity'
@@ -17,7 +16,7 @@ import type { RuntimeGitCommandSurface } from './runtime-git-command-surface'
 import type { RuntimeRepositoryCommandSurface } from './runtime-repository-command-surface'
 import type { RuntimeReviewCommandSurface } from './runtime-review-command-surface'
 import type { RuntimeServiceCommandSurface } from './runtime-service-command-surface'
-import type { RuntimeSkillCommandSurface } from './runtime-skill-command-surface'
+import type { RuntimeSkillCommandSurface } from './runtime-skill-command-contract'
 
 export type PtyIncarnationHandleRecord = {
   handle: string

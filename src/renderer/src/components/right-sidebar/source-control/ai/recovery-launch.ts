@@ -5,6 +5,10 @@ import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { getConnectionId } from '@/lib/connection-context'
+import {
+  ensureDetectedAgentsForWorktree,
+  type WorktreeAgentInventoryState
+} from '@/lib/agent-detection-target-inventory'
 import { planAgentCliArgsSuffix } from '@/lib/tui-agent-startup'
 import {
   pickSourceControlLaunchAgent,
@@ -18,10 +22,7 @@ import type {
 import { buildSourceControlRecoveryAgentCommandInput } from '../../../../../../shared/source-control-recovery-agent-command'
 import { translate } from '@/i18n/i18n'
 
-type SourceControlAiLaunchStoreSnapshot = Pick<
-  AppState,
-  'settings' | 'ensureDetectedAgents' | 'ensureRemoteDetectedAgents'
->
+type SourceControlAiLaunchStoreSnapshot = Pick<AppState, 'settings'> & WorktreeAgentInventoryState
 
 export type SourceControlRecoveryLaunchCopy = {
   promptUnavailable: string
@@ -90,7 +91,7 @@ export async function launchSourceControlRecoveryAgentWithDefault({
 }: {
   activeWorktreeId: string
   activeGroupId: string | null | undefined
-  activeSourceControlLaunchPlatform: NodeJS.Platform
+  activeSourceControlLaunchPlatform: NodeJS.Platform | undefined
   sourceRepoConnectionId?: string | null
   actionId: SourceControlLaunchActionId
   basePrompt: string | null
@@ -134,10 +135,7 @@ export async function launchSourceControlRecoveryAgentWithDefault({
     return false
   }
 
-  const detectedAgents =
-    typeof connectionId === 'string'
-      ? await store.ensureRemoteDetectedAgents(connectionId)
-      : await store.ensureDetectedAgents()
+  const detectedAgents = await ensureDetectedAgentsForWorktree(store, activeWorktreeId)
   const savedAgent = readSourceControlLaunchRecipeAgentId(savedRecipe)
   if (
     savedAgent &&

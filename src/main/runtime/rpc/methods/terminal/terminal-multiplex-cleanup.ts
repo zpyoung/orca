@@ -26,7 +26,6 @@ export function installMultiplexCleanup(
     }
     stream.outputBatcher.flush()
     stream.outputBatcher.dispose()
-    state.detachSourceRangeConsumer(stream, 'stream-detached')
     state.ackTotalInFlightBytes = Math.max(0, state.ackTotalInFlightBytes - stream.ackInFlightBytes)
     stream.ackInFlightBytes = 0
     stream.ackPendingOutput = []

@@ -14,7 +14,7 @@ import {
   isTuiAgent,
   TUI_AGENT_CONFIG
 } from '../../shared/tui-agent-config'
-import { buildHeadlessAutomationWorktreeCreateArgs } from './headless-workspace-create'
+import { launchHeadlessAutomationAgent } from './headless-automation-agent-launch'
 import { createRuntimeAutomationRunTerminalObserver } from './runtime-terminal-run-observer'
 import { automationRunLaunchSettingsFor } from './fork-automation-launch-settings/run-launch-settings-for-dispatch'
 

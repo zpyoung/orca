@@ -14,6 +14,7 @@ import { localProvider } from './registry'
 import { clearProviderPtyState } from './state-cleanup'
 import { providerSnapshotRequiredPtys } from '../delivery/visibility-state'
 import type { PtyIpcSession } from '../session'
+import { publishPtyEndpointLoss } from '../../../runtime/terminal/pty-endpoint-loss-signal'
 
 export function bindProviderListeners(session: PtyIpcSession): void {
   localDataUnsub?.()
@@ -26,6 +27,8 @@ export function bindProviderListeners(session: PtyIpcSession): void {
   // just the pane whose write happened to detect the dead endpoint (STA-2373).
   setLocalWriteUnavailableUnsub(
     localProvider.onWriteUnavailable?.((payload) => {
+      // Before the window check: a headless host has no window, only remote streams.
+      publishPtyEndpointLoss(payload.id)
       if (
         !session.mainWindow ||
         session.mainWindow.isDestroyed() ||
@@ -94,22 +97,20 @@ export function bindProviderListeners(session: PtyIpcSession): void {
         if (syntheticExit) {
           session.runtime?.markPtyStopRequested(payload.id)
         }
-        session.runtime?.onPtyExit(payload.id, payload.code, payload.incarnationId, {
-          providerExitObserved: true,
-          ...(payload.cause ? { cause: payload.cause } : {})
+        // The control reply can overtake stream data; the physical exit must retire that late output.
+        if (syntheticExit) {
+          return
+        }
+        // Why not the whole payload: the exit cause is a main-process fact for the
+        // runtime's records; the renderer's pty:exit contract stays as it was.
+        session.sendPtyExitToRenderer({
+          id: payload.id,
+          code: payload.code,
+          ...(payload.incarnationId ? { incarnationId: payload.incarnationId } : {})
         })
+      } finally {
+        settleRestartStop?.(true)
       }
-      // The control reply can overtake stream data; the physical exit must retire that late output.
-      if (syntheticExit) {
-        return
-      }
-      // Why not the whole payload: the exit cause is a main-process fact for the
-      // runtime's records; the renderer's pty:exit contract stays as it was.
-      session.sendPtyExitToRenderer({
-        id: payload.id,
-        code: payload.code,
-        ...(payload.incarnationId ? { incarnationId: payload.incarnationId } : {})
-      })
     })
   )
 }

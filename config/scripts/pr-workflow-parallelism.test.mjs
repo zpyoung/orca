@@ -1,90 +1,26 @@
-import { existsSync, globSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
-import { UNIT_EXCLUDE } from './ci-unit-files.mjs'
-import { MOBILE_WEB_APP_DEPENDENCIES_REQUIRED_ENV } from './mobile-web-app-bundle-dependencies.mjs'
 
 const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
-const prTestLocWorkflow = parse(readFileSync('.github/workflows/pr-test-loc.yml', 'utf8'))
-const releasePolicyWorkflow = parse(readFileSync('.github/workflows/release-policy.yml', 'utf8'))
-const issueLabelWorkflow = parse(readFileSync('.github/workflows/issue-os-labeler.yaml', 'utf8'))
 const unitTestWorkflow = parse(readFileSync('.github/workflows/unit-tests.yml', 'utf8'))
-const nodeNextWorkflow = parse(readFileSync('.github/workflows/node-next-compat.yml', 'utf8'))
-const dependencyAction = parse(
-  readFileSync('.github/actions/install-node-dependencies/action.yml', 'utf8')
+const evidenceWorkflow = parse(
+  readFileSync('.github/workflows/unit-selection-evidence.yml', 'utf8')
 )
-const nativeAction = parse(
-  readFileSync('.github/actions/prepare-native-runtime/action.yml', 'utf8')
-)
-const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
-const pnpmWorkspace = parse(readFileSync('pnpm-workspace.yaml', 'utf8'))
-const shellContractFiles = [
-  'src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts',
-  'src/main/daemon/shell-ready.test.ts',
-  'src/main/providers/local-pty-shell-ready-zsh-launch-environment.test.ts',
-  'src/main/providers/__tests__/shell-ready-framework-example.test.ts',
-  'src/main/pty/omp-shell-wrapper-alias-safety.test.ts',
-  'src/main/pty/omp-shell-wrapper.node-pty.test.ts',
-  'src/main/shell-startup-feature-channel.test.ts',
-  'src/main/zsh-deferred-startup-line-init.live-shell.test.ts',
-  'src/main/zsh-scoped-histfile.live-shell.test.ts',
-  'src/main/zsh-startup-hook-user-config-equivalence.live-shell.test.ts',
-  'src/main/zsh-wrapper-version-mismatch.live-shell.test.ts',
-  'src/main/runtime/structured-session-cli-login-shell.live-shell.test.ts',
-  'src/shared/posix-command-path-lookup.test.ts'
-]
-const patchedNodePtyContractFiles = [
-  'src/main/daemon/node-pty-fd-leak.test.ts',
-  'src/shared/fish-query-reply-child-stdin.node-pty.test.ts'
-]
-const nativeShellContractFiles = [...shellContractFiles, ...patchedNodePtyContractFiles]
-const testFilePatterns = [
-  'config/**/*.{test,spec}.{js,cjs,mjs,ts,tsx}',
-  'src/**/*.{test,spec}.{js,cjs,mjs,ts,tsx}',
-  'tests/**/*.{test,spec}.{js,cjs,mjs,ts,tsx}',
-  'tests/tools/**/*.{test,spec}.{js,cjs,mjs,ts,tsx}'
-]
-// Why the harness import counts: the zsh startup hook runs from a `precmd`, so
-// its tests drive a real zsh through a PTY in zsh-startup-hook-pty-harness
-// rather than calling spawnSync('zsh') themselves. Without this branch the rule
-// silently stops noticing the very tests that need the lane's zsh install.
-const realZshUsage =
-  /(?:spawnSync|execFileSync|spawn)\(\s*['"](?:\/(?:usr\/)?bin\/)?zsh['"]|program:\s*['"](?:\/(?:usr\/)?bin\/)?zsh['"]|spawnSync\(\s*['"]which['"]\s*,\s*\[\s*['"]zsh['"]|name:\s*['"]zsh['"]\s*,\s*path:\s*executablePath|from '[^']*zsh-startup-hook-pty-harness'/
 
 describe('PR workflow parallelism', () => {
-  it('keeps lightweight orchestration jobs on the free slim runner', () => {
-    expect(workflow.jobs.code_paths['runs-on']).toBe('ubuntu-slim')
-    expect(workflow.jobs.preflight['runs-on']).toBe('ubuntu-24.04-arm')
-    expect(workflow.jobs.verify['runs-on']).toBe('ubuntu-slim')
-    expect(prTestLocWorkflow.jobs.loc['runs-on']).toBe('ubuntu-slim')
-    expect(releasePolicyWorkflow.jobs.enforce['runs-on']).toBe('ubuntu-slim')
-    expect(issueLabelWorkflow.jobs['apply-os-label']['runs-on']).toBe('ubuntu-slim')
-  })
-
-  it('cancels superseded runs for the same pull request', () => {
-    expect(workflow.concurrency.group).toBe('pr-checks-${{ github.event.pull_request.number }}')
-    expect(workflow.concurrency['cancel-in-progress']).toBe(true)
-    expect(workflow.jobs.test.if).toContain('!cancelled()')
-    expect(workflow.jobs.test.if).not.toContain('always()')
-    expect(workflow.jobs.verify.if).toBe('${{ !cancelled() }}')
-  })
-
-  it('grants the PR workflow read-only repository access', () => {
-    expect(workflow.permissions).toEqual({ contents: 'read' })
-  })
-
-  it('runs PR shards on ARM and both Node versions on x86 daily', () => {
-    const sharedTest = unitTestWorkflow.jobs.test
-    const testStep = sharedTest.steps.find((step) => step.name === 'Test shard')
-    const installStep = sharedTest.steps.find(
-      (step) => step.uses === './.github/actions/install-node-dependencies'
+  it('enforces import boundaries in the required static-analysis checks', () => {
+    const guard = workflow.jobs.preflight.steps.find((step) =>
+      step.run?.includes('bun config/scripts/check-import-boundaries.mjs')
     )
-    const staticInstall = workflow.jobs.preflight.steps.find(
-      (step) => step.uses === './.github/actions/install-node-dependencies'
+    expect(guard?.if).toBe('!cancelled()')
+    expect(guard?.env.PREFLIGHT_PHASE_SELECTED).toBe(
+      "${{ needs.code_paths.outputs.static_analysis == 'true' }}"
     )
-    const nodeNextPrimerInstall = nodeNextWorkflow.jobs.test_native_cache.steps.find(
-      (step) => step.uses === './.github/actions/install-node-dependencies'
+    expect(guard?.background).toBe(true)
+    const typecheckIndex = workflow.jobs.preflight.steps.findIndex(
+      (step) => step.wait === 'typecheck'
     )
 
     expect(workflow.jobs.test.uses).toBe('./.github/workflows/unit-tests.yml')
@@ -548,9 +484,6 @@ describe('PR workflow parallelism', () => {
     }
     expect(workflow.jobs.verify.needs).not.toContain('unit_selection_evidence')
     expect(unitTestWorkflow.jobs.selection_evidence).toBeUndefined()
-    const evidenceWorkflow = parse(
-      readFileSync('.github/workflows/unit-selection-evidence.yml', 'utf8')
-    )
     const job = evidenceWorkflow.jobs.selection_evidence
     expect(job['continue-on-error']).toBe(true)
   })

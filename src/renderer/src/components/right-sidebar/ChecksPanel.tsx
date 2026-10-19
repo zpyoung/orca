@@ -1,21 +1,4 @@
 import React from 'react'
-import { Ellipsis, GitMerge, Link, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
-import { cn } from '@/lib/utils'
-import {
-  getTerminalUrlOrcaBrowserHint,
-  getTerminalUrlSystemBrowserHint
-} from '../terminal-pane/terminal-link-open-hints'
-import type { ChecksPanelReview } from './checks-panel-review'
-import type { ChecksPanelHostedReviewModifierDestination } from './checks-panel-hosted-review-click-routing'
-import { translate } from '@/i18n/i18n'
-import { PullRequestIcon, prStateColor } from './checks-panel/check-presentation'
 import { useChecksPanelControllerState } from './checks-panel/use-checks-panel-controller-state'
 import { useChecksPanelContextState } from './checks-panel/use-checks-panel-context-state'
 import { useChecksPanelReviewState } from './checks-panel/use-checks-panel-review-state'

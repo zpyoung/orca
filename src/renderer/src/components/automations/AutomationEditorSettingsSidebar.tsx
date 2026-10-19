@@ -1,9 +1,6 @@
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
-import {
-  isValidAutomationCronSchedule,
-  isValidAutomationSchedule
-} from '../../../../shared/automation-schedule-parsing'
+import { isValidAutomationSchedule } from '../../../../shared/automation-schedule-parsing'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrcaHooks } from '../../../../shared/orca-yaml-hook-types'
 import type { ProjectHostSetup } from '../../../../shared/project-types'
@@ -28,8 +25,6 @@ import type { AutomationDraft } from './AutomationEditorDialog'
 type AutomationEditorSettingsSidebarProps = {
   /** The host picker: where a create lands, or the host an edit can move the record to. */
   destination?: AutomationCreateDestinationControl
-  isHermesTarget: boolean
-  isHermesCreate: boolean
   repos: readonly Repo[]
   projectHostSetups: readonly ProjectHostSetup[]
   automationYamlHooksByRepoKey: Record<string, OrcaHooks | null>
@@ -52,8 +47,6 @@ type AutomationEditorSettingsSidebarProps = {
 
 export function AutomationEditorSettingsSidebar({
   destination,
-  isHermesTarget,
-  isHermesCreate,
   repos,
   projectHostSetups,
   automationYamlHooksByRepoKey,
@@ -107,7 +100,7 @@ export function AutomationEditorSettingsSidebar({
             </div>
           </div>
         </div>
-        {destination && !isHermesTarget ? (
+        {destination ? (
           <div className="mb-4">
             <AutomationDestinationField
               control={destination}
@@ -139,7 +132,6 @@ export function AutomationEditorSettingsSidebar({
         <div className="mb-4">
           <AutomationWorkspaceField
             draft={draft}
-            isHermesTarget={isHermesTarget}
             worktrees={worktrees}
             repoMap={repoMap}
             pickerTriggerClassName={pickerTriggerClassName}
@@ -148,22 +140,13 @@ export function AutomationEditorSettingsSidebar({
             onDraftChange={onDraftChange}
           />
         </div>
-        <div
-          className={cn(
-            'grid overflow-hidden transition-[grid-template-rows,margin] duration-200 ease-out',
-            isHermesTarget ? 'mb-0 grid-rows-[0fr]' : 'mb-4 grid-rows-[1fr]'
-          )}
-          aria-hidden={isHermesTarget}
-          inert={isHermesTarget}
-        >
-          <div className="min-h-0">
-            <AutomationSessionField
-              draft={draft}
-              toggleGroupClassName={segmentedGroupClassName}
-              toggleItemClassName={segmentedItemClassName}
-              onDraftChange={onDraftChange}
-            />
-          </div>
+        <div className="mb-4">
+          <AutomationSessionField
+            draft={draft}
+            toggleGroupClassName={segmentedGroupClassName}
+            toggleItemClassName={segmentedItemClassName}
+            onDraftChange={onDraftChange}
+          />
         </div>
         <Field
           className="mb-4"
@@ -175,50 +158,29 @@ export function AutomationEditorSettingsSidebar({
         >
           <AutomationSchedulePicker
             draft={draft}
-            validateAdvancedSchedule={
-              isHermesTarget ? isValidAutomationCronSchedule : isValidAutomationSchedule
-            }
+            validateAdvancedSchedule={isValidAutomationSchedule}
             onDraftChange={onDraftChange}
           />
         </Field>
-        <div
-          className={cn(
-            'grid overflow-hidden transition-[grid-template-rows,margin] duration-200 ease-out',
-            isHermesTarget ? 'mb-0 grid-rows-[0fr]' : 'mb-4 grid-rows-[1fr]'
-          )}
-          aria-hidden={isHermesTarget}
-          inert={isHermesTarget}
-        >
-          <div className="min-h-0">
-            <AutomationMissedRunGraceField
+        <div className="mb-4">
+          <AutomationMissedRunGraceField
+            disabled={false}
+            draft={draft}
+            pickerTriggerClassName={pickerTriggerClassName}
+            onDraftChange={onDraftChange}
+          />
+        </div>
+        <div className="mb-4">
+          <div className="flex flex-col gap-5">
+            <AutomationPrecheckFields
+              disabled={false}
               draft={draft}
-              disabled={isHermesTarget}
               pickerTriggerClassName={pickerTriggerClassName}
               onDraftChange={onDraftChange}
             />
           </div>
         </div>
-        <div
-          className={cn(
-            'grid overflow-hidden transition-[grid-template-rows,margin] duration-200 ease-out',
-            isHermesCreate ? 'mb-0 grid-rows-[0fr]' : 'mb-4 grid-rows-[1fr]'
-          )}
-          aria-hidden={isHermesCreate}
-          inert={isHermesCreate}
-        >
-          <div className="min-h-0">
-            <div className="flex flex-col gap-5">
-              <AutomationPrecheckFields
-                draft={draft}
-                disabled={isHermesCreate}
-                pickerTriggerClassName={pickerTriggerClassName}
-                onDraftChange={onDraftChange}
-              />
-            </div>
-          </div>
-        </div>
         <AutomationSetupDecisionField
-          createTarget={isHermesTarget ? 'hermes' : 'orca'}
           draft={draft}
           repos={repos}
           projectHostSetups={projectHostSetups}

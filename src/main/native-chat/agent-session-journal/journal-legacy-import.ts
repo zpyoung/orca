@@ -1,8 +1,8 @@
 // Hydrating a journal from a bridge-era transcript.
 //
-// This reuses the existing per-agent transcript decoders verbatim — a second
-// parser would drift from the one the live view already uses. The decoders
-// return a render model with no identity, so the import wraps them: the wrapper
+// Ordinary messages reuse the existing per-agent transcript decoders; Pi also
+// projects its saved branch and summaries. The decoders return a render model
+// with no identity, so the import wraps them: the wrapper
 // reads an identity anchor off the SAME raw line, then delegates the content.
 //
 // Import always opens a fresh epoch. The imported timeline is a best-effort
@@ -10,6 +10,7 @@
 // never be spliced into a sequence space that a structured session is also
 // writing; a later structured resume rolls the epoch again and rebuilds.
 
+import { adoptedTranscriptSourceObserver, validateAdoptedOpenCodeSource, type AdoptedTranscriptSource } from './adopted-transcript-source'
 import { createReadStream } from 'node:fs'
 import type { AgentType } from '../../../shared/agent-status-types'
 import type {
@@ -27,12 +28,14 @@ import {
   decodeOmpTranscriptLine
 } from '../transcript-line-decoders'
 import { decodeTranscriptStream } from '../transcript-stream-lines'
+import { readOpenCodeNativeChatTranscriptFull } from '../transcript-opencode'
 import { boundSubagentEntryId } from '../subagent-entry-id-bounds'
 import { createLegacyIdentityTracker } from './journal-legacy-identity'
+import { createPiTranscriptCollector } from './journal-pi-active-branch'
+import { createNewestItemWindow } from './journal-newest-item-window'
 import type { JournalReplacementItem } from './journal-epoch-replacement'
 import {
   boundInlineText,
-  boundPayload,
   boundToolInput,
   DEFAULT_JOURNAL_PAYLOAD_LIMITS,
   type JournalPayloadLimits
@@ -42,6 +45,7 @@ import type { AgentSessionJournal } from './journal-store'
 export type LegacyImportOptions = ResolveSessionFileOptions & {
   /** Resolve directly to this file, skipping path discovery. */
   filePath?: string
+  source?: AdoptedTranscriptSource
   limits?: JournalPayloadLimits
   decodedMessageIdentities?: true
 }
@@ -63,6 +67,10 @@ export type LegacyImportResult =
       /** False when the transcript held no messages and the epoch was left as it stood. */
       replaced: boolean
     }
+  | { ok: false; error: string }
+
+type PreparedLegacyImport =
+  | { ok: true; items: JournalReplacementItem[]; sourceEmpty: boolean }
   | { ok: false; error: string }
 
 export async function importLegacyTranscriptIntoJournal(input: {
@@ -89,12 +97,17 @@ export async function prepareLegacyTranscriptImport(input: {
   agent: AgentType
   sessionId: string
   options?: LegacyImportOptions
-}): Promise<{ ok: true; items: JournalReplacementItem[] } | { ok: false; error: string }> {
+}): Promise<PreparedLegacyImport> {
   const options = input.options ?? {}
   const limits = options.limits ?? DEFAULT_JOURNAL_PAYLOAD_LIMITS
-  const transcriptAgent = resolveNativeChatTranscriptAgent(input.agent)
-  if (!transcriptAgent || transcriptAgent === 'opencode') {
+  // OMP is a Pi fork that kept Pi's session format, so OMP's decoder reads Pi's sessions too.
+  const transcriptAgent =
+    input.agent === 'pi' ? 'omp' : resolveNativeChatTranscriptAgent(input.agent)
+  if (!transcriptAgent) {
     return { ok: false, error: `Unsupported agent for journal import: ${input.agent}` }
+  }
+  if (transcriptAgent === 'opencode') {
+    return prepareOpenCodeImport({ ...input, limits })
   }
   const filePath =
     options.filePath ?? (await resolveSessionFilePath(input.agent, input.sessionId, options))
@@ -235,16 +248,8 @@ function legacyItemBody(
       kind: 'tool-call',
       name: only.name,
       input: boundToolInput(only.input, limits),
+      ...(only.callId !== undefined ? { callId: only.callId } : {}),
       state: 'completed'
-    }
-  }
-  if (only?.type === 'tool-result') {
-    return {
-      kind: 'tool-call',
-      name: 'tool-result',
-      input: null,
-      state: only.isError ? 'failed' : 'completed',
-      output: boundPayload(only.output, limits)
     }
   }
   return {

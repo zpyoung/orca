@@ -101,6 +101,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     gl: createGitLabApi(),
     hostedReview: createRuntimeNamespaceApi('hostedReview'),
     linear: createRuntimeNamespaceApi('linear'),
+    jira: createWebJiraApi(),
     hooks: createHooksApi(),
     stats: {
       getSummary: async () =>
@@ -141,6 +142,11 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     wsl: {
       isAvailable: () => callRuntimeResult<boolean>('host.wsl.isAvailable').catch(() => false),
       listDistros: () => callRuntimeResult<string[]>('host.wsl.listDistros').catch(() => [])
+    },
+    // Desktop-only: a web client never owns a WSL move's desktop stores.
+    wslMove: {
+      listPendingRendererRewrites: () => Promise.resolve([]),
+      recordStoreRewritten: () => Promise.resolve({ recorded: false, reason: 'gated-off' })
     },
     pwsh: {
       isAvailable: () => callRuntimeResult<boolean>('host.pwsh.isAvailable').catch(() => false)

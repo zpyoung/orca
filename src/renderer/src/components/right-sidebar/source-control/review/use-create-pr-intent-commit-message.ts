@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
-import { generateRuntimeCommitMessage } from '@/runtime/runtime-git-client'
+import { operationGitContext } from '../listing/operation-target'
+import { generateRuntimeCommitMessage } from '@/runtime/runtime-git-generation-client'
 import { useAppStore } from '@/store'
 import { isCustomAgentId } from '../../../../../../shared/commit-message-agent-spec'
 import { materializeSourceControlTextGenerationParams } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'

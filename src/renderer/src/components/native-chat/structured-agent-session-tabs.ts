@@ -1,4 +1,4 @@
-import { isStructuredAgentId } from '../../../../shared/agent-session-provider-handle'
+import { isStructuredTab } from '../../../../shared/structured-agent-session-tab'
 import type { Tab } from '../../../../shared/tab-types'
 
 export type StructuredTab = Tab & { contentType: 'agent-session' }

@@ -1,3 +1,5 @@
+import type { JiraQuickFilterState } from './jira-quick-filters'
+import type { JiraSavedFilterState } from './jira-saved-filters'
 import type { ReleaseChannel } from './release-channel'
 import type { WorkspaceCleanupUIState } from './workspace-cleanup'
 import type { FeatureTipId } from './feature-tips'
@@ -29,6 +31,8 @@ import type { PersistedWorkspaceActivityWindowState } from './fork-workspace-act
 import type { PersistedWorkspaceReviewFilterState } from './fork-workspace-review-filters/workspace-review-filters'
 
 export type PersistedUIState = {
+  jiraSavedFilterState?: JiraSavedFilterState
+  jiraQuickFilterState?: JiraQuickFilterState
   lastActiveRepoId: string | null
   lastActiveWorktreeId: string | null
   /** Active top-level view at save time, restored on relaunch; sanitized to 'terminal' if unknown or now-gated. */

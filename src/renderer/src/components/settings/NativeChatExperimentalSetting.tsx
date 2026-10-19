@@ -39,7 +39,6 @@ export function NativeChatExperimentalSetting({
               'Supported new agents open in structured chat. Other agents open in the terminal; existing chats stay available.'
             )}
           </p>
-          <NativeChatSupportedAgents />
         </div>
         <SettingsSwitch
           checked={nativeChatEnabled}

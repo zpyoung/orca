@@ -19,6 +19,7 @@ import { NativeChatToolIcon } from './NativeChatToolIcon'
 import { nativeChatToolCategoryTextClass } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
 import { NativeChatToolFileTarget } from './NativeChatToolFileTarget'
 import { NativeChatDiffView } from './NativeChatDiffView'
+import { NativeChatHighlightedCode } from './NativeChatHighlightedCode'
 import { nativeChatToolLineLabel } from './native-chat-tool-line-label'
 import { diffFromText, diffFromToolCall } from './native-chat-diff'
 import { NativeChatExpandable } from './NativeChatExpandable'
@@ -34,12 +35,14 @@ function ToolLineDetail({
   block,
   body,
   fullCommand,
+  commandLanguage,
   results,
   onLinkClick
 }: {
   block: NativeChatBlock
   body: NativeChatToolResultBlock | undefined
   fullCommand: string | null
+  commandLanguage: string | null
   results: NonNullable<NativeChatToolCallBlock['webSearchResults']>
   onLinkClick?: CommentMarkdownLinkClickHandler
 }): React.JSX.Element {
@@ -57,16 +60,20 @@ function ToolLineDetail({
       {!diff && fullCommand ? (
         <pre
           data-native-chat-code-content
-          className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-chat-code-border bg-chat-code-surface p-2 font-mono text-xs text-chat-foreground scrollbar-sleek"
+          className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-chat-code-border bg-chat-code-surface p-2 font-mono text-chat-code text-chat-foreground scrollbar-sleek"
         >
-          {fullCommand}
+          {commandLanguage ? (
+            <NativeChatHighlightedCode code={fullCommand} language={commandLanguage} />
+          ) : (
+            fullCommand
+          )}
         </pre>
       ) : null}
       {body ? (
         <pre
           data-native-chat-code-content
           className={cn(
-            'max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-chat-code-border bg-chat-code-surface p-2 font-mono text-xs scrollbar-sleek',
+            'max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-chat-code-border bg-chat-code-surface p-2 font-mono text-chat-code scrollbar-sleek',
             body.isError ? 'text-destructive' : 'text-chat-foreground'
           )}
         >
@@ -129,7 +136,7 @@ export function NativeChatToolLine({
         type="button"
         onClick={() => hasDetail && setExpanded(!expanded)}
         className={cn(
-          'group/tool-line flex min-h-[26px] w-full items-center gap-2 text-left font-sans text-[13px]',
+          'group/tool-line flex min-h-6.5 w-full items-center gap-2 rounded-md text-left font-sans text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
           hasDetail ? 'cursor-pointer' : 'cursor-default'
         )}
         aria-expanded={hasDetail ? expanded : undefined}
@@ -182,7 +189,7 @@ export function NativeChatToolLine({
           {hasDetail ? (
             <ChevronRight
               className={cn(
-                'size-3.5 shrink-0 text-chat-foreground-faint transition-transform',
+                'size-3.5 shrink-0 text-chat-foreground-faint transition-transform motion-reduce:transition-none',
                 expanded && 'rotate-90'
               )}
             />
@@ -195,6 +202,7 @@ export function NativeChatToolLine({
             block={block}
             body={body}
             fullCommand={fullCommand}
+            commandLanguage={label?.commandLanguage ?? null}
             results={results}
             onLinkClick={onLinkClick}
           />

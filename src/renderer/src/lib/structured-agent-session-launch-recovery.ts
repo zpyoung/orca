@@ -88,7 +88,7 @@ async function retrySameIntent(
 ): Promise<StructuredAgentLaunchReceipt> {
   throwIfLaunchCancelled(state)
   try {
-    const receipt = await launchStructuredAgentSession(state.intent, state.onHostSeed)
+    const receipt = await launchStructuredAgentSession(state.intent, state.onHostSeed, true)
     throwIfLaunchCancelled(state)
     if (state.intent.createMessageSupport !== true) {
       await verifyPublishedSession(state)

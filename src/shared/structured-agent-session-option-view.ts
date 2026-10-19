@@ -1,7 +1,9 @@
 import {
   commitStructuredAgentSessionOptionValues,
+  structuredAgentSessionOptionSnapshot,
   type StructuredAgentSessionOptionState
 } from './structured-agent-session-options'
+import type { SessionOptionDescriptor } from './native-chat-session-options'
 import { cloneNativeChatSessionOptionRecord } from './native-chat-session-option-state'
 import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from './agent-chat-permission-mode'
 
@@ -65,4 +67,21 @@ function modelOptionView(
     view = commitStructuredAgentSessionOptionValues(view, seed)
   }
   return { ...commitStructuredAgentSessionOptionValues(view, held), pendingId: state.pendingId }
+}
+
+/** The Claude model and effort the composer shows (`snapshot`), which every send carries. */
+export function structuredAgentSessionSendSelection(
+  agent: string,
+  snapshot: readonly SessionOptionDescriptor[]
+): Record<string, string> | undefined {
+  if (agent !== 'claude') {
+    return undefined
+  }
+  const shown = (id: string): string | undefined => {
+    const kind = snapshot.find((descriptor) => descriptor.id === id)?.kind
+    return kind?.type === 'select' ? kind.currentValue : undefined
+  }
+  const model = shown('model')
+  const effort = shown('effort')
+  return model ? { model, ...(effort ? { effort } : {}) } : undefined
 }

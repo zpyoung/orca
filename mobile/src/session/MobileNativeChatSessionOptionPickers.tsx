@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ChevronLeft, X } from 'lucide-react-native'
 import { BottomDrawer } from '../components/BottomDrawer'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import {
+  isReadOnlySessionOptionValue,
   sessionOptionDispatchUnconfirmed,
   type SessionOptionDescriptor,
   type SessionOptionValue
@@ -24,6 +24,8 @@ import { sortNativeChatSessionOptions } from '../../../src/shared/native-chat-se
 import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from '../../../src/shared/agent-chat-permission-mode'
 import type { MobileNativeChatSessionOptionsController } from './use-mobile-native-chat-session-options'
 
+export type MobileNativeChatPickerPresentation = { page: string | null; refocus: boolean }
+
 export type MobileNativeChatSessionOptionPickersProps = {
   controller: MobileNativeChatSessionOptionsController
   /** Pickers lock while the agent works — a mid-turn `/model` interleaves with
@@ -34,6 +36,8 @@ export type MobileNativeChatSessionOptionPickersProps = {
    *  window would be submitted as part of the user's prompt. The composer blocks
    *  the reverse direction on `pendingId`; this is the same guard mirrored. */
   sendInFlight?: boolean
+  /** The collapsed composer hides the pills but keeps the drawer mounted. */
+  pillsHidden?: boolean
 }
 
 /** Full access reads in the warning colour wherever it is shown. */
@@ -45,14 +49,13 @@ function permissionChoiceColor(value: string | undefined): string | undefined {
 export function MobileNativeChatSessionOptionPickers({
   controller,
   isWorking,
-  sendInFlight = false
-}: MobileNativeChatSessionOptionPickersProps): React.JSX.Element | null {
-  const [openDescriptorId, setOpenDescriptorId] = useState<string | null>(null)
-  const [lastRequest, setLastRequest] = useState(controller.optionPickerRequest)
-  if (controller.optionPickerRequest && lastRequest !== controller.optionPickerRequest) {
-    setLastRequest(controller.optionPickerRequest)
-    setOpenDescriptorId(controller.optionPickerRequest.id)
-  }
+  sendInFlight = false,
+  pillsHidden = false,
+  presentation,
+  onNavigate,
+  onDrawerOpen,
+  onDrawerAfterClose
+}: MobileNativeChatSessionOptionPickersProps & PresentationProps): React.JSX.Element | null {
   const { snapshot, pendingId } = controller
   const model = snapshot.find((descriptor) => descriptor.category === 'model')
   const permission = snapshot.find(
@@ -72,8 +75,9 @@ export function MobileNativeChatSessionOptionPickers({
   const pillLabel = optionsLabel ? `${modelLabel} ${optionsLabel}` : modelLabel
   const reason = mobileSessionOptionDisabledReason(activeDescriptor?.disabledReason)
 
-  const closePicker = (): void => setOpenDescriptorId(null)
-  const openPicker = (): void => {
+  const closePicker = (): void => onNavigate(null)
+  const openPicker = (page: string): void => {
+    onDrawerOpen(page)
     Keyboard.dismiss()
     setOpenDescriptorId(model?.id ?? null)
   }
@@ -183,7 +187,11 @@ export function MobileNativeChatSessionOptionPickers({
                     value={mobileSessionOptionSummaryValue(descriptor)}
                     disabled={disabled}
                     divided={index < options.length - 1}
-                    onPress={() => setOpenDescriptorId(descriptor.id)}
+                    onPress={
+                      isReadOnlySessionOptionValue(descriptor)
+                        ? undefined
+                        : () => onNavigate(descriptor.id)
+                    }
                   />
                 ))}
               </View>

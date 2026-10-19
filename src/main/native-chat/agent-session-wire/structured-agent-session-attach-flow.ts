@@ -37,6 +37,8 @@ import type { StructuredAgentRegistry } from './structured-agent-registry'
 import type { StructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
 import { resolveAgentSessionReplayOutcome } from './structured-agent-session-replay-outcome'
 import { readAgentSessionHydrationPage } from './agent-session-history-page'
+import { withPublishedWork } from './agent-session-published-work'
+import { heldStructuredAgentSessionCurrentWork } from './structured-agent-session-host-current-work'
 import { acquireOwner } from './structured-agent-session-acquisition'
 import {
   importAdoptedTranscript,
@@ -86,7 +88,7 @@ export type AttachFlowInput = {
   onAttached: (
     attached: AttachedJournal,
     acquisitionGeneration: string | null,
-    acquiredOwner: boolean,
+    owner: AttachedOwner,
     providerChildPhase: StructuredAgentSessionProviderChildPhase
   ) => Promise<void> | void
   /** Host-owned provider sink, bound to the journal inside `onAttached`. */
@@ -136,7 +138,7 @@ export async function performAttach(
 
   let record: AgentSessionRecord
   let acquisitionGeneration: string | null = null
-  let acquiredOwner = false
+  let owner: AttachedOwner = 'kept'
   let providerChildPhase: StructuredAgentSessionProviderChildPhase = 'ready'
   let reservedRecord: AgentSessionRecord | null = null
   let unsupportedReservationSettlementAttempted = false
@@ -208,7 +210,7 @@ export async function performAttach(
       record = acquired.record
       acquisitionGeneration = acquired.acquisitionGeneration
       providerChildPhase = acquired.providerChildPhase
-      acquiredOwner = true
+      owner = 'acquired'
     }
   } catch (error) {
     const wording = {
@@ -269,7 +271,7 @@ export async function performAttach(
       providerHistoryWindow
     })
     await importAdoptedTranscript(params, attached, record, preparedTranscript.items)
-    await input.onAttached(attached, acquisitionGeneration, acquiredOwner, providerChildPhase)
+    await input.onAttached(attached, acquisitionGeneration, owner, providerChildPhase)
     await store.recordOperationOutcome({
       callerKey: input.callerKey,
       operationId: params.envelope.clientOperationId,
@@ -289,7 +291,11 @@ export async function performAttach(
     value: {
       sessionId,
       fence,
-      page: readAgentSessionHydrationPage(attached.journal, fence),
+      // The lease this attach just took is the live generation.
+      page: withPublishedWork(
+        readAgentSessionHydrationPage(attached.journal, fence),
+        heldStructuredAgentSessionCurrentWork(store, sessionId, attached.journal, undefined)
+      ),
       unconfirmedClientMessageIds: attached.unconfirmedClientMessageIds,
       ...(tabId ? { tabId } : {})
     }

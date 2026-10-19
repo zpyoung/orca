@@ -1,11 +1,12 @@
 import { useCallback, useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { getConnectionId } from '@/lib/connection-context'
 import { useAppStore, type AppState } from '@/store'
 import {
   cancelRuntimeGeneratePullRequestFields,
-  generateRuntimePullRequestFields,
-  type RuntimeGeneratePullRequestFieldsOverrides
-} from '@/runtime/runtime-git-client'
+  generateRuntimePullRequestFields
+} from '@/runtime/runtime-git-generation-client'
+import type { RuntimeGeneratePullRequestFieldsOverrides } from '@/runtime/runtime-git-client-context'
 import type { HostedReviewCreationEligibility } from '../../../../shared/hosted-review'
 import type { ResolveSourceControlAiResult } from '../../../../shared/source-control-ai'
 import type { SourceControlAiPrCreationDefaults } from '../../../../shared/source-control-ai-types'
@@ -31,6 +32,7 @@ type CreatePullRequestFieldGenerationOptions = {
   worktreeId: string | null
   worktreePath: string
   settings: AppState['settings']
+  target: RuntimeClientTarget | null
   eligibility: HostedReviewCreationEligibility | null
   resolvedPrDefaults: Required<SourceControlAiPrCreationDefaults>
   generation: UseCreatePullRequestDialogFieldsOptions['generation']
@@ -74,6 +76,7 @@ export function useCreatePullRequestFieldGeneration({
   worktreeId,
   worktreePath,
   settings,
+  target,
   eligibility,
   resolvedPrDefaults,
   generation,
@@ -131,13 +134,18 @@ export function useCreatePullRequestFieldGeneration({
           options
         )
       }
+      if (!target) {
+        setGenerateError('The workspace host is unresolved. Refresh the workspace and retry.')
+        return
+      }
       const requestId = generationRequestIdRef.current + 1
       generationRequestIdRef.current = requestId
       const connectionId = getConnectionId(worktreeId) ?? undefined
       const requestContext = {
         // Why: PR generation belongs to the visible worktree owner. Global
         // focused-host changes must not retarget an in-flight generation.
-        settings,
+        target,
+        prefs: settings,
         worktreeId,
         worktreePath,
         connectionId
@@ -223,6 +231,7 @@ export function useCreatePullRequestFieldGeneration({
       setGenerateError,
       setGenerating,
       settings,
+      target,
       title,
       worktreeId,
       worktreePath

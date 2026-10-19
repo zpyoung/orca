@@ -58,6 +58,7 @@ const structuredQuestion = {
   optionTokens: ['choice-a', 'choice-b']
 }
 const structuredActivity = { isWorking: false, turnId: null as string | null }
+let harnessHostSupport: ReturnType<typeof structuredAgentSessionHostSupport> | null = null
 const structuredSessionState = {
   messages: [] as unknown[],
   status: 'ready',
@@ -80,6 +81,7 @@ const promptsState = {
 vi.mock('./use-mobile-session-view-mode', () => ({
   useMobileSessionViewMode: () => ({
     isTabChatView: (tabId: string) => viewMode.isTabChatView(tabId),
+    setTabView: vi.fn(),
     toggleTabChatView: vi.fn()
   })
 }))
@@ -162,6 +164,7 @@ import {
 } from './use-mobile-native-chat-controller'
 import type { MobileNativeChatStatus } from './use-mobile-native-chat-session'
 import { mobileNativeChatPromptDismissals } from './mobile-native-chat-prompt-dismissals'
+import { structuredAgentSessionHostSupport } from './mobile-structured-agent-session-host-support'
 
 const sendWithOutcome = vi.mocked(sendMobileNativeChatMessageWithOutcome)
 
@@ -172,7 +175,21 @@ const ORIGIN = {
   normalizedText: 'look',
   baselineOccurrences: 0,
   baselineTailMessageId: null,
-  baselineResolved: true
+  baselineResolved: true,
+  sentAt: 0
+}
+
+/** Harness props for a structured chat tab running `agent`. */
+function structuredTab(agent: string) {
+  const tab = {
+    type: 'agent-session',
+    id: 'agent-tab-1',
+    title: 'Chat',
+    sessionId: 'session-structured',
+    agent,
+    isActive: true
+  }
+  return { tab, activeHandle: null, inputLeaseReady: false }
 }
 
 /** Harness props for a structured chat tab running `agent`. */
@@ -219,6 +236,7 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
       deviceTokenRef: { current: null },
       nativeChatTranscriptIsLocalReadable: true,
       nativeChatInputLeaseReady: inputLeaseReady,
+      agentSessionHostSupport: harnessHostSupport,
       onSendError,
       onSendResolved
     })
@@ -384,6 +402,7 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
       expect(controller?.nativeChatCanStop).toBe(true)
       expect(controller?.handleNativeChatCancelPrompt).toEqual(expect.any(Function))
     } finally {
+      harnessHostSupport = null
       structuredActivity.isWorking = false
       structuredActivity.turnId = null
     }

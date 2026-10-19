@@ -104,15 +104,9 @@ describe('prompt delivery through production IPC, provider and paired host', () 
         }
         return reply.result
       })
-      const pending = sendRuntimePtyInputVerified(
-        null,
-        'remote:owner@@terminal',
-        '\x1b',
-        'driving',
-        {
-          requireWriteSettlement: true
-        }
-      )
+      const pending = sendRuntimePtyInputVerified('remote:owner@@terminal', '\x1b', 'driving', {
+        requireWriteSettlement: true
+      })
       await (mode === 'accepted'
         ? expect(pending).resolves.toBe(true)
         : expect(pending).rejects.toThrow('acknowledgment unavailable'))
@@ -146,10 +140,13 @@ describe('prompt delivery through production IPC, provider and paired host', () 
       return reply.result
     })
     await expect(
-      sendRuntimePtyInputVerified(null, 'remote:owner@@terminal', 'answer', 'driving', {
+      sendRuntimePtyInputVerified('remote:owner@@terminal', 'answer', 'driving', {
         requireWriteSettlement: true
       })
     ).resolves.toBe(true)
+    await expect(sendNativeChatMessageVerified('remote:owner@@terminal', 'body')).resolves.toBe(
+      true
+    )
     await expect(
       sendNativeChatMessageVerified(chatTarget('remote:owner@@terminal'), 'body')
     ).resolves.toBe(true)
@@ -180,7 +177,7 @@ describe('prompt delivery through production IPC, provider and paired host', () 
   it('sends ordinary paired input without asking the host for provider settlement', async () => {
     io.rpc.mockResolvedValue({ send: { handle: 'terminal', accepted: true, bytesWritten: 4 } })
     await expect(
-      sendRuntimePtyInputVerified(null, 'remote:owner@@terminal', 'body', 'driving')
+      sendRuntimePtyInputVerified('remote:owner@@terminal', 'body', 'driving')
     ).resolves.toBe(true)
     expect(io.rpc).toHaveBeenCalledWith(
       expect.anything(),

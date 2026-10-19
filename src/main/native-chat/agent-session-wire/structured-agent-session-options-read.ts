@@ -12,6 +12,10 @@ import {
   type AgentSessionOptionsResult
 } from '../../../shared/agent-session-wire'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import type {
+  AgentJournalCursor,
+  AgentJournalThreadGoal
+} from '../../../shared/agent-session-journal-types'
 import { decodeStructuredAgentSessionOptionValue } from '../../../shared/structured-agent-session-option-codec'
 import {
   AGENT_CHAT_PERMISSION_MODE_OPTION_ID,
@@ -22,13 +26,58 @@ import { journalOpenReadRefusal } from '../agent-session-journal/journal-open-fa
 import type { StructuredAgentDefinition } from './structured-agent-definition'
 import type { StructuredAgentRegistry } from './structured-agent-registry'
 import type { StructuredAgentSessionLiveOptions } from './structured-agent-session-adapter'
+import { retainedAgentModelCatalogModels } from '../agent-model-catalog/agent-model-catalog-entry'
+import { saveStructuredAgentSessionListing } from './structured-agent-session-start-listing'
 import type { StructuredAgentSessionHostDeps } from './structured-agent-session-host-types'
 import { structuredAgentSessionOptionModels } from './structured-agent-session-option-models'
 import { structuredAgentSessionLaunchPermission } from './structured-agent-session-launch-permission'
 import type { AgentSessionTurnContext, TurnOutcome } from './structured-agent-session-turns'
 import type { StructuredAgentSessionMutationContext } from './structured-agent-session-host-mutations'
 
-type RestingOptions = Pick<AgentSessionOptionsResult, 'models' | 'fastModeSupport' | 'current'>
+type RestingOptions = Pick<
+  AgentSessionOptionsResult,
+  'models' | 'listedModelIds' | 'fastModeSupport' | 'current'
+>
+
+/** What the asking client takes: whether it reads an answer that names no model. */
+export type StructuredAgentSessionOptionsReader = { readsWithoutModel: boolean }
+
+/** A same-build caller in this process reads as the RPC gate treats one: it takes no model. */
+export const IN_PROCESS_OPTIONS_READER: StructuredAgentSessionOptionsReader = {
+  readsWithoutModel: true
+}
+
+/** Whether the agent takes this pick: a permission mode it offers, or an option key it names. */
+function acceptsOptionPick(
+  agents: Pick<StructuredAgentRegistry, 'definition'>,
+  provider: string,
+  key: string,
+  value: string
+): boolean {
+  const definition = agents.definition(provider)
+  return key === AGENT_CHAT_PERMISSION_MODE_OPTION_ID
+    ? definition !== null &&
+        agentChatPermissionModes(provider)?.modes.some((mode) => mode === value) === true
+    : definition?.restingOptions.acceptsKey(key) === true
+}
+
+/** Initial explicit picks follow the same rules as a pick made while the chat is at rest. */
+export function structuredAgentSessionOptionOverridesRefusal(
+  agents: Pick<StructuredAgentRegistry, 'definition'>,
+  provider: string,
+  options: Readonly<Record<string, string>>
+) {
+  const key = Object.keys(options).find(
+    (key) => !acceptsOptionPick(agents, provider, key, options[key] ?? '')
+  )
+  return key === undefined
+    ? null
+    : refuse(
+        'agent_session_operation_invalid',
+        { reason: 'optionRejected' },
+        `${provider} has no session option named ${key}`
+      )
+}
 
 /** What the asking client takes: whether it reads an answer that names no model. */
 export type StructuredAgentSessionOptionsReader = { readsWithoutModel: boolean }
@@ -132,6 +181,7 @@ async function readStructuredAgentSessionOptionsAtRest(
       : undefined)
   return {
     models: listed ? structuredAgentSessionOptionModels(listed, model, (row) => row) : [],
+    ...(listedModelIds ? { listedModelIds } : {}),
     ...(catalog.origin !== 'unknown' && catalog.fastModeSupport
       ? { fastModeSupport: catalog.fastModeSupport }
       : {}),
@@ -193,7 +243,8 @@ export async function readStructuredAgentSessionOptions(
       throw journalOpenReadRefusal(error, context.deps.logger, sessionId)
     })
     const child = session?.child
-    if (!child) {
+    // A starting child is asked nothing: the answer is the saved intent and the catalog.
+    if (!child || child.phase === 'starting') {
       return { kind: 'rest' as const }
     }
     const prepared = adapter.prepareReadOptions?.({ sessionId, fence: child.fence })
@@ -219,14 +270,27 @@ export async function readStructuredAgentSessionOptions(
             })
           )
         : null
+  let rested: RestingOptions | undefined
+  const atRest = async (): Promise<RestingOptions> =>
+    (rested ??= await readStructuredAgentSessionOptionsAtRest(context.deps, sessionId, reader))
   let options: Omit<AgentSessionOptionsResult, 'rewind'>
   if (live) {
     const { catalogListing, ...answer } = live
-    if (catalogListing) {
-      // What a running child listed is its account's catalog too, so the next chat opens warm.
-      context.deps.modelCatalog?.recordLiveListing(sessionId, catalogListing)
-    }
     options = answer
+    // A child with no listing of its own reads the saved one, as at rest, so a row reads the same.
+    // With no record there is nothing saved to read, and the answer stays the child's own.
+    if (!catalogListing && !answer.listedModelIds && store.getRecord(sessionId)) {
+      const { listedModelIds } = await atRest()
+      options = listedModelIds ? { ...answer, listedModelIds } : answer
+    }
+    if (catalogListing) {
+      // Check prior membership before saving: a launch-added row cannot verify itself.
+      const listedModelIds = context.deps.modelCatalog
+        ? context.deps.modelCatalog.retainedLiveModelIds(sessionId, catalogListing)
+        : retainedAgentModelCatalogModels(undefined, catalogListing).map((model) => model.id)
+      saveStructuredAgentSessionListing(context, sessionId, catalogListing)
+      options = { ...answer, listedModelIds }
+    }
   } else {
     options = await readStructuredAgentSessionOptionsAtRest(context.deps, sessionId, reader)
   }
@@ -262,4 +326,16 @@ export async function readStructuredAgentSessionOptions(
       ? { contextUsage: { current: session.journal.contextUsage(), ...contextFloor } }
       : {})
   }
+}
+
+/** A goal the host can change, or one only the agent's own `/goal` changes, reported apart. */
+function structuredAgentSessionThreadGoalReport(
+  hostChangesGoal: boolean,
+  current: AgentJournalThreadGoal | null,
+  contextFloor: { contextFloor?: AgentJournalCursor }
+): Pick<AgentSessionOptionsResult, 'threadGoal' | 'reportedThreadGoal'> {
+  if (hostChangesGoal) {
+    return { threadGoal: { current, ...contextFloor } }
+  }
+  return current ? { reportedThreadGoal: { current, ...contextFloor } } : {}
 }

@@ -11,12 +11,36 @@ import type { JournalWriteBody } from './journal-write-queue'
  *  nothing can interleave inside the transaction. */
 export type JournalRowTransactionHook = (db: Database.Database, row: JournalRow) => void
 
-/** An operation's ledger answer, committed with the journal write that makes it true: `write` runs
+/** An operation's receipt, committed with the journal write that makes it true: `write` runs
  *  inside that transaction on the same connection, `committed` synchronously right after its
  *  COMMIT and never after a rollback. */
 export type JournalOperationReceipt = {
-  write: (db: Database.Database) => void
+  write: (db: Database.Database, row?: JournalRow) => void
   committed: () => void
+}
+
+export function composeJournalOperationReceipts(
+  ...receipts: JournalOperationReceipt[]
+): JournalOperationReceipt {
+  return {
+    write: (db, row) => receipts.forEach((receipt) => receipt.write(db, row)),
+    committed: () => receipts.forEach((receipt) => receipt.committed())
+  }
+}
+
+/** `run`, with `receipt` written in its transaction only when `changed` says it wrote something. */
+export function writeReceiptIfChanged<T>(
+  run: (db: Database.Database) => T,
+  changed: (result: T) => boolean,
+  receipt?: JournalOperationReceipt
+): (db: Database.Database) => T {
+  return (db) => {
+    const result = run(db)
+    if (receipt && changed(result)) {
+      receipt.write(db)
+    }
+    return result
+  }
 }
 
 export type JournalRowWriterDeps = {
@@ -34,6 +58,9 @@ export type JournalRowWriterDeps = {
   inTransaction?: JournalRowTransactionHook
   /** After any rollback, so a cache filled inside the transaction cannot outlive it. */
   rolledBack?: () => void
+  /** Rows an OS crash may lose without losing anything but streamed text; they commit without
+   *  the per-commit fsync (`isJournalStreamedTextRevision`). */
+  streamedTextRevision?: (row: JournalRow) => boolean
 }
 
 const BOOKKEEPING_SAVEPOINT = 'journal_row_bookkeeping'
@@ -73,18 +100,21 @@ export class JournalRowWriter {
   }
 
   /** Several rows in ONE transaction, in order, planned once the lane is this append's: none is
-   *  durable unless all are, so no reader ever meets some without the rest. */
+   *  durable unless all are, so no reader ever meets some without the rest. `receiptRow` picks the
+   *  row `receipt` names. */
   enqueueRows(
     plan: () => readonly ((seq: number, ts: number) => JournalRow)[],
-    receipt?: JournalOperationReceipt
+    receipt?: JournalOperationReceipt,
+    receiptRow?: (rows: readonly JournalRow[]) => JournalRow | undefined
   ): Promise<JournalRow[]> {
-    return this.deps.serialize(() => this.writeRows(plan, receipt))
+    return this.deps.serialize(() => this.writeRows(plan, receipt, receiptRow))
   }
 
   /** `enqueueRows`' write, for a caller already running at its own turn in the queue. */
   writeRows(
     plan: () => readonly ((seq: number, ts: number) => JournalRow)[],
-    receipt?: JournalOperationReceipt
+    receipt?: JournalOperationReceipt,
+    receiptRow?: (rows: readonly JournalRow[]) => JournalRow | undefined
   ): JournalRow[] {
     assertJournalWritable(this.deps.readOnly(), this.deps.sessionId)
     const first = this.deps.nextSequence()
@@ -124,6 +154,11 @@ export class JournalRowWriter {
       epoch: row.epoch,
       sequence: row.seq
     }))
+  }
+
+  private streamed(rows: readonly JournalRow[]): boolean {
+    const { streamedTextRevision } = this.deps
+    return streamedTextRevision !== undefined && rows.every((row) => streamedTextRevision(row))
   }
 
   private runBookkeeping(db: Database.Database, row: JournalRow): void {

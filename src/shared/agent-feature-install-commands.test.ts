@@ -2,20 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAgentFeatureSkillInstallArgs,
   buildAgentFeatureSkillInstallCommand,
-  ORCA_CLI_SKILL_INSTALL_COMMAND,
-  buildAgentFeatureSkillUpdateArgs,
-  buildAgentFeatureSkillUpdateCommand,
-  COMPUTER_USE_SKILL_UPDATE_COMMAND,
-  EPHEMERAL_VMS_SKILL_UPDATE_COMMAND,
-  LINEAR_TICKETS_SKILL_UPDATE_COMMAND,
-  ORCA_LINEAR_SKILL_UPDATE_COMMAND,
-  ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND,
-  ORCA_CLI_SKILL_UPDATE_COMMAND,
-  ORCHESTRATION_SKILL_UPDATE_COMMAND
+  SKILLS_CLI_VERSION
 } from './agent-feature-install-commands'
 import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'
 
+const sourceCommit = '0123456789abcdef0123456789abcdef01234567'
+const source = `https://github.com/stablyai/orca/tree/${sourceCommit}`
+
 describe('agent feature skill commands', () => {
+  it('pins the skills CLI and the source to the build commit', () => {
+    expect(buildAgentFeatureSkillInstallArgs(['orca-cli'], { sourceCommit }).slice(0, 3)).toEqual([
+      `skills@${SKILLS_CLI_VERSION}`,
+      'add',
+      source
+    ])
+  })
+
   it('builds a global install command by default', () => {
     expect(buildAgentFeatureSkillInstallCommand(['orca-cli'])).toBe(
       `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orca-cli --global`
@@ -32,8 +34,10 @@ describe('agent feature skill commands', () => {
     expect(buildAgentFeatureSkillInstallCommand(['orca-cli', 'orchestration'])).toBe(
       `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orca-cli --skill orchestration --global`
     )
-    expect(buildAgentFeatureSkillInstallArgs(['orca-cli', 'orchestration'])).toEqual([
-      'skills',
+    expect(
+      buildAgentFeatureSkillInstallArgs(['orca-cli', 'orchestration'], { sourceCommit })
+    ).toEqual([
+      `skills@${SKILLS_CLI_VERSION}`,
       'add',
       ORCA_SKILLS_REPOSITORY_URL,
       '--skill',
@@ -44,21 +48,24 @@ describe('agent feature skill commands', () => {
     ])
   })
 
+  it('rejects an empty skill list', () => {
+    expect(() => buildAgentFeatureSkillInstallArgs([], { sourceCommit })).toThrow(
+      'At least one skill name is required.'
+    )
+  })
+
   it('keeps the copyable Settings commands interactive by default', () => {
     // Why: -y skips the agent picker. A human pasting from Settings should still
     // get it; only an unattended spawn opts in.
-    expect(buildAgentFeatureSkillInstallCommand(['orca-cli'])).not.toContain('-y')
-    expect(buildAgentFeatureSkillUpdateCommand('orca-cli')).not.toContain('-y')
-    expect(ORCA_CLI_SKILL_INSTALL_COMMAND).not.toContain('-y')
-    expect(ORCA_CLI_SKILL_UPDATE_COMMAND).not.toContain('-y')
+    expect(buildAgentFeatureSkillInstallCommand(['orca-cli'], { sourceCommit })).not.toContain('-y')
   })
 
   it('refuses to skip prompts without an install target', () => {
     // Why: -y with no --agent is the one combination that makes `skills add`
     // install into every agent it knows (~75). No caller may express it.
-    expect(() => buildAgentFeatureSkillInstallCommand(['orca-cli'], { yes: true })).toThrow(
-      'An install target is required when skipping prompts.'
-    )
+    expect(() =>
+      buildAgentFeatureSkillInstallCommand(['orca-cli'], { sourceCommit, yes: true })
+    ).toThrow('An install target is required when skipping prompts.')
   })
 
   it('refuses a target the skills CLI would drop', () => {
@@ -66,16 +73,28 @@ describe('agent feature skill commands', () => {
     // drops a `-`-leading --agent value, which empties its target list and
     // installs into every agent it knows.
     expect(() =>
-      buildAgentFeatureSkillInstallCommand(['orca-cli'], { yes: true, agents: ['-y'] })
+      buildAgentFeatureSkillInstallCommand(['orca-cli'], {
+        sourceCommit,
+        yes: true,
+        agents: ['-y']
+      })
     ).toThrow('"-y" is not a usable install target.')
     expect(() =>
-      buildAgentFeatureSkillInstallArgs(['orca-cli'], { yes: true, agents: ['universal', 'a b'] })
+      buildAgentFeatureSkillInstallArgs(['orca-cli'], {
+        sourceCommit,
+        yes: true,
+        agents: ['universal', 'a b']
+      })
     ).toThrow('"a b" is not a usable install target.')
   })
 
   it('appends -y and the targets for an unattended run', () => {
     expect(
-      buildAgentFeatureSkillInstallCommand(['orca-cli'], { yes: true, agents: ['universal'] })
+      buildAgentFeatureSkillInstallCommand(['orca-cli'], {
+        sourceCommit,
+        yes: true,
+        agents: ['universal']
+      })
     ).toBe(
       `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orca-cli --global --agent universal -y`
     )

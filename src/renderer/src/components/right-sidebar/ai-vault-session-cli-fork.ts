@@ -1,5 +1,6 @@
-import { translate } from '@/i18n/i18n'
 import { compactIpcErrorMessage } from '@/lib/ipc-error'
+import { isAiVaultOwnershipRefusal } from '@/lib/ai-vault-resume-refusal'
+import { aiVaultCliForkHostTooOldMessage } from '@/lib/ai-vault-session-resume-preparation'
 import type { AiVaultSession } from '../../../../shared/ai-vault-types'
 import { getAgentForkArgv, isResumableTuiAgent } from '../../../../shared/agent-session-resume'
 import { getAiVaultAgentProviderSession } from '@/lib/ai-vault-resume-command'
@@ -30,10 +31,5 @@ export function aiVaultSessionCliForkWorktreeId(
 export function describeAiVaultCliForkFailure(message: string): string {
   // The desktop preparation's refusal arrives inside Electron's IPC wrapper.
   const code = compactIpcErrorMessage(message)
-  return code === 'agent_session_conflict' || code === 'agent_session_ownership_unknown'
-    ? translate(
-        'auto.components.right.sidebar.AiVaultPanel.resumeInNewCliHostTooOld',
-        'Update Orca on the host that runs this chat to resume it in a new CLI.'
-      )
-    : message
+  return isAiVaultOwnershipRefusal(message) ? aiVaultCliForkHostTooOldMessage() : (code ?? message)
 }

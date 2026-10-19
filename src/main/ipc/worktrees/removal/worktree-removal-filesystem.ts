@@ -1,4 +1,3 @@
-import type { Repo } from '../../../../shared/repo-types'
 import {
   getLocalWorktreePathAccess,
   toLocalWorktreeRuntimePath
@@ -7,7 +6,6 @@ import { getSshFilesystemProvider } from '../../../providers/ssh-filesystem-disp
 import { isWorktreePathMissing } from '../../../worktree-removal-safety'
 
 export async function isAlreadyRemovedWorktreePath(
-  repo: Repo,
   worktreePath: string,
   localWorktreeGitOptions: { wslDistro?: string } = {}
 ): Promise<boolean> {

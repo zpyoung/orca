@@ -113,13 +113,11 @@ export function createSupportFollowsHostSetting(
   )
 }
 
-/** An unreadable settings store reads as off, the default. */
-export function isStructuredNativeChatEnabled(
-  runtime: Pick<OrcaRuntimeService, 'getClientSettings'>
+/** This host's resolved preference; session audience remains independent of new launches. */
+export function isStructuredNativeChatDefaultFor(
+  runtime: Parameters<typeof readAgentLaunchModeSettings>[0],
+  agent: string
 ): boolean {
-  try {
-    return isNativeChatEnabled(runtime.getClientSettings())
-  } catch {
-    return false
-  }
+  const settings = readAgentLaunchModeSettings(runtime)
+  return isTuiAgent(agent) ? isNativeChatDefaultFor(settings, agent) : isNativeChatEnabled(settings)
 }

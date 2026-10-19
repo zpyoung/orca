@@ -37,7 +37,11 @@ describe('classifyClaudeOAuthUsageError', () => {
   })
 
   it('allows CLI fallback for network-shaped failures', () => {
-    expect(classifyClaudeOAuthUsageError(new Error('fetch failed: ENOTFOUND'))).toMatchObject({
+    expect(
+      classifyClaudeOAuthUsageError(
+        new ClaudeUsageRequestError(new Error('fetch failed: ENOTFOUND'))
+      )
+    ).toMatchObject({
       failureKind: 'network',
       shouldAttemptCliFallback: true,
       shouldAttemptDelegatedRefresh: false

@@ -1,14 +1,26 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { prepareAdoptedTranscript } from '../native-chat/agent-session-wire/structured-agent-session-adopted-import'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const applyAgentWorkspaceTrust = vi.hoisted(() => vi.fn(async () => ({})))
 vi.mock('../agent-workspace-trust', () => ({ applyAgentWorkspaceTrust }))
 
 import { OrcaRuntimeService } from './orca-runtime'
+import { setStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
+import type { StructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-host'
+import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
 import { attachFingerprintFields } from '../native-chat/agent-session-wire/structured-agent-session-attach'
 
 beforeEach(() => {
   applyAgentWorkspaceTrust.mockClear()
+})
+
+afterEach(() => {
+  setStructuredAgentSessionHost(null)
+  vi.unstubAllEnvs()
 })
 
 function createCodexIntentRuntime(
@@ -92,6 +104,42 @@ describe('structured Codex folder trust', () => {
 })
 
 describe('structured agent-session create intent', () => {
+  it('returns the recorded owner before CLI source lookup, new-launch support or account preparation', async () => {
+    const record = agentSessionRecordFixture()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: early ownership admission only reads the host's record list.
+    setStructuredAgentSessionHost({
+      deps: { store: { listRecords: () => [record] } }
+    } as unknown as StructuredAgentSessionHost)
+    const runtime = new OrcaRuntimeService()
+    const support = vi
+      .spyOn(runtime, 'getStructuredAgentSessionCreateSupport')
+      .mockRejectedValue(new Error('fresh launch is unavailable'))
+    const sourceRows = vi.spyOn(runtime, 'getAgentProviderSessionRows').mockImplementation(() => {
+      throw new Error('source is unavailable')
+    })
+    await expect(
+      runtime.resolveStructuredAgentSessionCreateIntent({
+        envelope: { sessionId: 'new-chat', clientOperationId: 'operation-1' },
+        worktree: 'id:another-workspace',
+        agent: 'claude',
+        resumeFrom: {
+          providerSessionId: 'provider-session-alpha-1',
+          cliSource: { workspaceId: 'another-workspace', paneKey: 'missing-pane' }
+        }
+      })
+    ).rejects.toMatchObject({
+      refusal: {
+        code: 'agent_session_conflict',
+        details: {
+          reason: 'conversationHeldElsewhere',
+          owner: { sessionId: record.sessionId, workspaceId: record.location.workspaceId }
+        }
+      }
+    })
+    expect(support).not.toHaveBeenCalled()
+    expect(sourceRows).not.toHaveBeenCalled()
+  })
+
   it('pins the selected Codex launch home after normal launch preparation', async () => {
     const prepareCodexStructuredLaunch = vi.fn(() => '/accounts/selected/home')
     const runtime = new OrcaRuntimeService(

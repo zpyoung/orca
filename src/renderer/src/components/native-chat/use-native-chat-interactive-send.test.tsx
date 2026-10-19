@@ -40,10 +40,6 @@ vi.mock('@/runtime/runtime-terminal-verified-input', () => ({
   sendRuntimePtyInputVerified: (...args: unknown[]) => mocks.sendRuntimePtyInputVerified(...args)
 }))
 
-vi.mock('@/lib/agent-paste-draft', () => ({
-  getSettingsForAgentTabRuntimeOwner: (terminalTabId: string) => ({ terminalTabId })
-}))
-
 vi.mock('./native-chat-runtime-send', () => ({
   sendNativeChatAskAnswer: (...args: unknown[]) => mocks.sendNativeChatAskAnswer(...args),
   sendNativeChatMessage: (...args: unknown[]) => mocks.sendNativeChatMessage(...args)
@@ -70,9 +66,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('routes a non-selector answer through the pasted-text send path', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'grok')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'grok'))
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
 
@@ -124,9 +118,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('routes a Codex answer through the option-number keystroke path', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'codex')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'codex'))
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
 
@@ -145,9 +137,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('routes a Claude answer through the option-number keystroke path', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
 
@@ -166,7 +156,7 @@ describe('useNativeChatInteractiveSend', () => {
 
   it('infers OpenClaude answers through its Claude-compatible selector path', () => {
     const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'openclaude')
+      useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'openclaude')
     )
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
@@ -178,9 +168,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('does nothing when no option is answered', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
 
     let resultValue: ReturnType<typeof result.current.sendAnswer> | undefined
     act(() => {
@@ -194,7 +182,7 @@ describe('useNativeChatInteractiveSend', () => {
 
   it('cancels delayed answer writes when the PTY target changes', () => {
     const { result, rerender } = renderHook(
-      ({ targetPtyId }) => useNativeChatInteractiveSend('tab-1', PANE_KEY, targetPtyId, 'codex'),
+      ({ targetPtyId }) => useNativeChatInteractiveSend(PANE_KEY, targetPtyId, 'codex'),
       { initialProps: { targetPtyId: 'pty-1' as string | null } }
     )
 
@@ -206,7 +194,7 @@ describe('useNativeChatInteractiveSend', () => {
 
   it('cancels delayed answer writes when the pane identity changes', () => {
     const { result, rerender } = renderHook(
-      ({ paneKey }) => useNativeChatInteractiveSend('tab-1', paneKey, 'pty-1', 'claude'),
+      ({ paneKey }) => useNativeChatInteractiveSend(paneKey, 'pty-1', 'claude'),
       { initialProps: { paneKey: PANE_KEY } }
     )
 
@@ -217,27 +205,20 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('cancels delayed answer writes before interrupting the active PTY', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
     act(() => result.current.cancel())
 
     expect(mocks.cancel).toHaveBeenCalledOnce()
-    expect(mocks.sendRuntimePtyInput).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1' },
-      'pty-1',
-      '\x1b',
-      'driving'
-    )
+    expect(mocks.sendRuntimePtyInput).toHaveBeenCalledWith('pty-1', '\x1b', 'driving')
   })
 
   it.each(['opencode', 'opencode2'] as const)(
     'paces two Escape writes for %s Stop and cancels them on rebind',
     (agent) => {
       const { result, rerender } = renderHook(
-        ({ ptyId }) => useNativeChatInteractiveSend('tab-1', PANE_KEY, ptyId, agent),
+        ({ ptyId }) => useNativeChatInteractiveSend(PANE_KEY, ptyId, agent),
         { initialProps: { ptyId: 'pty-1' } }
       )
       act(() => result.current.cancel())
@@ -257,12 +238,9 @@ describe('useNativeChatInteractiveSend', () => {
   it.each(['opencode', 'opencode2'] as const)(
     'rejects a %s question with one acknowledged Escape and no delayed Stop',
     async (agent) => {
-      const { result } = renderHook(() =>
-        useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', agent)
-      )
+      const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', agent))
       await expect(result.current.cancelAsk()).resolves.toBe(true)
       expect(mocks.sendRuntimePtyInputVerified).toHaveBeenCalledExactlyOnceWith(
-        { terminalTabId: 'tab-1' },
         'pty-1',
         '\x1b',
         'driving',
@@ -275,18 +253,14 @@ describe('useNativeChatInteractiveSend', () => {
 
   it('reports an Escape whose delivery is unknown as not delivered', async () => {
     mocks.sendRuntimePtyInputVerified.mockRejectedValueOnce(new Error('timeout'))
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
     await expect(result.current.cancelAsk()).resolves.toBe(false)
   })
 
   it.each(['opencode', 'opencode2'] as const)(
     'delivers a non-default %s answer through selector keys',
     (agent) => {
-      const { result } = renderHook(() =>
-        useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', agent)
-      )
+      const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', agent))
       act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
       expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
         {
@@ -302,9 +276,7 @@ describe('useNativeChatInteractiveSend', () => {
   )
 
   it('can cancel delayed writes without interrupting the replacement prompt', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
     act(() => result.current.cancelPending())
@@ -314,9 +286,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('infers a Claude question answer only after every runtime write was delivered', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
     expect(mocks.inferQuestionAnswered).not.toHaveBeenCalled()
@@ -337,9 +307,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('infers the answered question baseline, not a replacement that became current mid-send', () => {
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
 
     // Answer question A while it is the current waiting question.
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
@@ -372,9 +340,7 @@ describe('useNativeChatInteractiveSend', () => {
 
   it('reports verified delivery settlement to the question card', () => {
     const onDeliverySettled = vi.fn()
-    const { result } = renderHook(() =>
-      useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
-    )
+    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'claude'))
 
     let sendResult: ReturnType<typeof result.current.sendAnswer> | undefined
     act(() => {

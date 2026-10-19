@@ -144,7 +144,9 @@ describe('LinearAgentSkillInstallCta', () => {
 
     expect(rendered.textContent).toContain('Installed')
     expect(rendered.textContent).toContain('Agent skill installed. To update it, run:')
-    expect(rendered.textContent).toContain('npx skills update orca-linear --global')
+    expect(rendered.textContent).toContain(
+      `npx skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${ORCA_BUILD_COMMIT} --skill orca-linear --global`
+    )
     expect(rendered.textContent).not.toContain('Not installed')
   })
 
@@ -160,7 +162,9 @@ describe('LinearAgentSkillInstallCta', () => {
 
     const rendered = await renderCta()
 
-    expect(rendered.textContent).toContain('npx skills update linear-tickets --global')
+    expect(rendered.textContent).toContain(
+      `npx skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${ORCA_BUILD_COMMIT} --skill linear-tickets --global`
+    )
   })
 
   it('notes that remote agent environments need their own setup', async () => {

@@ -1,20 +1,11 @@
 import type { OpenFile } from '@/store/slices/editor'
-import {
-  editorSelectionCache,
-  diffViewStateCache,
-  pdfViewPositionCache,
-  scrollTopCache
-} from '@/lib/scroll-cache'
+import { scrollTopCache } from '@/lib/scroll-cache'
 import {
   disposeUnattachedMonacoModelsByPathPrefixes,
   getDiffViewerMonacoModelPathPrefixes,
   type MonacoModelRegistry,
   type DisposableMonacoModel
 } from './diff-monaco-model-disposal'
-import {
-  deletePaneScopedCacheEntries,
-  sweepClosedPdfViewPositions
-} from './closed-editor-tab-cache-sweep'
 import { toEditorModelUri } from './editor-model-uri'
 
 export type ClosedEditorTab = Pick<OpenFile, 'id' | 'mode' | 'filePath'> & {
@@ -69,28 +60,12 @@ export function disposeClosedEditorModels(
     }
   )
 }
-
-export function disposeClosedEditorTabs(
-  monacoRegistry: MonacoModelRegistry,
-  closedFiles: readonly ClosedEditorTab[],
-  onAttachedModel?: (model: DisposableMonacoModel, file: ClosedEditorTab) => void,
-  isStillClosed: (file: ClosedEditorTab) => boolean = () => true
-): void {
-  disposeClosedEditorModels(monacoRegistry, closedFiles, onAttachedModel, isStillClosed)
-  disposeClosedEditorTabCaches(closedFiles, isStillClosed)
-}
-
-export function disposeClosedEditorTabCaches(
+export function disposeClosedCheckDetailsReadingCache(
   closedFiles: readonly ClosedEditorTab[],
   isStillClosed: (file: ClosedEditorTab) => boolean = () => true
 ): void {
-  const scrollTopOwners: string[] = []
-  const editorSelectionOwners: string[] = []
-  const diffViewStateOwners: string[] = []
-  const closedPdfFilePaths: string[] = []
-
   for (const closedFile of closedFiles) {
-    if (!isStillClosed(closedFile)) {
+    if (closedFile.mode !== 'check-details' || !isStillClosed(closedFile)) {
       continue
     }
     switch (closedFile.mode) {
@@ -121,8 +96,4 @@ export function disposeClosedEditorTabCaches(
         break
     }
   }
-  deletePaneScopedCacheEntries(scrollTopCache, scrollTopOwners)
-  deletePaneScopedCacheEntries(editorSelectionCache, editorSelectionOwners)
-  deletePaneScopedCacheEntries(diffViewStateCache, diffViewStateOwners)
-  sweepClosedPdfViewPositions(pdfViewPositionCache, closedPdfFilePaths)
 }

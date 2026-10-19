@@ -103,6 +103,8 @@ export function createBrowserRouteGuestPopupController(input: {
       contents.setWindowOpenHandler(buildWindowOpenHandler(contents, gesture))
       contents.on('will-navigate', onPopupNavigate)
       contents.on('will-redirect', onPopupNavigate)
+      // Why here: route popups skip attachGuestPolicies, so the browsing guests' unload rule never reaches them.
+      contents.on('will-prevent-unload', allowPageUnload)
       // Ownership before first load: a download can start on the popup's very first navigation, and
       // an unowned route popup fails closed instead of routing to the opener's remote workspace.
       // Descendants register against the root opener, so a chain never needs walking.

@@ -1,3 +1,4 @@
+import { settledDaemonRestart } from '../../daemon/daemon-restart-state'
 import { getAppEnvironment } from '../../../shared/app-environment'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { Store } from '../../persistence'
@@ -8,7 +9,7 @@ import {
   getHiddenRendererPtyDeliveryDebug,
   resetRendererScopedHiddenPtyDeliveryState
 } from '../pty-hidden-delivery-gate'
-import { localProvider } from './provider/registry'
+import { localProvider, type ResolvedPtyHost } from './provider/registry'
 import { finishPtyShutdown } from './provider/liveness'
 import type { GetSelectedCodexHomePath, PrepareClaudeAuth } from './host-env/types'
 import { installPtyInspectIpcHandlers } from './ipc/inspect'
@@ -25,7 +26,7 @@ import { installPtyLeafMoveIpcHandler } from './ipc/leaf-move'
 import { installPtyRuntimeController } from './runtime/controller'
 import { installPtySnapshotIpcHandlers } from './ipc/snapshot'
 import {
-  assertFolderWorkspacePtyPathUsable as assertFolderWorkspacePtyPathUsableImpl,
+  assertWorkspaceAcceptsNewPty as assertWorkspaceAcceptsNewPtyImpl,
   localStartupCwdDirectoryExists,
   resolvePtySpawnStartupCwd as resolvePtySpawnStartupCwdImpl
 } from './host-env/spawn-cwd'
@@ -53,7 +54,6 @@ import { createPtyIpcSession, type PtyIpcSessionOptions, type PtyRendererDeliver
 import { wirePtyIpcSession } from './delivery/wire-session'
 import { configureLocalPtyProvider } from './provider/local-configure'
 import { bindProviderListeners } from './provider/bind-listeners'
-import { installSessionSshOutputIntake } from './delivery/ssh-intake'
 import { installPtySerializeBufferIpc } from './ipc/serialize-buffer'
 import { installPtyResizeVisibilityIpc } from './ipc/resize-visibility'
 import { adoptStablePane } from './pane/adopt-stable'
@@ -66,6 +66,7 @@ import {
   stripSequencedStartupResumeArgv
 } from './host-env/codex-resume'
 import { ensureLinuxTerminalOrcaCliShimDir } from '../../cli/linux-terminal-orca-cli-shim'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 
 export function registerPtyHandlers(
   mainWindow?: PtyRendererDelivery,
@@ -95,18 +96,26 @@ export function registerPtyHandlers(
   setRebindProviderListeners(() => {})
   registerRendererLifecycleResetHandlers(mainWindow?.webContents)
 
-  const getLocalPtyStartupPromise = (connectionId?: string | null): Promise<void> | undefined => {
-    if (connectionId) {
+  // Why only `local`: the daemon swap re-owns this machine's PTYs; no other host waits on it.
+  const getLocalPtyStartupPromise = (
+    hostId: ResolvedPtyHost = LOCAL_EXECUTION_HOST_ID
+  ): Promise<void> | undefined => {
+    if (hostId !== LOCAL_EXECUTION_HOST_ID) {
       return undefined
     }
     // Why: during cold start the daemon provider swap overlaps first paint, so local spawns must wait; SSH/headless don't use the desktop daemon.
-    return options?.awaitLocalPtyStartup?.()
+    const startup = options?.awaitLocalPtyStartup?.()
+    // A pane replaced by a restart spawns while it runs; it must reach the new daemon, not the old.
+    const restart = settledDaemonRestart()
+    return startup && restart
+      ? Promise.all([startup, restart]).then(() => undefined)
+      : (startup ?? restart)
   }
 
   const getLocalPtyProviderStartupPromise = (
-    connectionId?: string | null
+    hostId: ResolvedPtyHost = LOCAL_EXECUTION_HOST_ID
   ): Promise<void> | undefined => {
-    if (connectionId) {
+    if (hostId !== LOCAL_EXECUTION_HOST_ID) {
       return undefined
     }
     return options?.awaitLocalPtyProviderStartup?.() ?? options?.awaitLocalPtyStartup?.()
@@ -142,6 +151,7 @@ export function registerPtyHandlers(
   ipcMain.removeHandler('pty:writeInputAccepted')
   ipcMain.removeAllListeners('pty:write')
   ipcMain.removeAllListeners('pty:ackColdRestore')
+  ipcMain.removeAllListeners('pty:hiddenOutputRestoreApplied')
   ipcMain.removeAllListeners('pty:ackData')
   ipcMain.removeAllListeners('pty:deliveryResyncResponse')
   ipcMain.removeAllListeners('pty:serializeBuffer:response')
@@ -160,7 +170,6 @@ export function registerPtyHandlers(
     getSelectedCodexHomePath,
     trustedTerminalHandleEnv: session.trustedTerminalHandleEnv
   })
-  installSessionSshOutputIntake(session)
   bindProviderListeners(session)
   setRebindProviderListeners(() => bindProviderListeners(session))
   installPtySerializeBufferIpc(session)
@@ -203,9 +212,10 @@ export function registerPtyHandlers(
     mainWindow.webContents.on('did-finish-load', finishLoadHandler)
   }
 
-  const assertFolderWorkspacePtyPathUsable = (
-    worktreeId: string | undefined
-  ): Promise<void> | void => assertFolderWorkspacePtyPathUsableImpl(store, worktreeId)
+  const assertWorkspaceAcceptsNewPty = (
+    worktreeId: string | undefined,
+    sessionId?: string
+  ): Promise<void> | void => assertWorkspaceAcceptsNewPtyImpl(store, worktreeId, sessionId)
   const resolvePtySpawnStartupCwd = (
     worktreeId: string | undefined,
     cwd: string | undefined,
@@ -230,7 +240,7 @@ export function registerPtyHandlers(
     noCodexResumeLaunch,
     reconcileSharedRuntimeResumeHome,
     stripSequencedStartupResumeArgv,
-    assertFolderWorkspacePtyPathUsable,
+    assertWorkspaceAcceptsNewPty,
     resolvePtySpawnStartupCwd,
     requestSerializedBuffer: session.requestSerializedBuffer,
     shutdownProviderAndDetectExit: session.shutdownProviderAndDetectExit,
@@ -270,7 +280,7 @@ export function registerPtyHandlers(
     options,
     getLocalPtyStartupPromise,
     adoptStablePane: adoptStablePaneBound,
-    assertFolderWorkspacePtyPathUsable,
+    assertWorkspaceAcceptsNewPty,
     resolvePtySpawnStartupCwd,
     localStartupCwdDirectoryExists,
     prepareCodexResumeHome: prepareCodexResumeHomeBound,

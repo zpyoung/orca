@@ -118,7 +118,7 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
   it('preserves the body-to-Enter gap when the renderer stalls past both nominal deadlines', async () => {
     vi.useRealTimers()
     const writeTimes = new Map<string, number>()
-    sendRuntimePtyInput.mockImplementation((_settings, _pty, bytes: string) => {
+    sendRuntimePtyInput.mockImplementation((_pty, bytes: string) => {
       writeTimes.set(bytes, performance.now())
       return true
     })

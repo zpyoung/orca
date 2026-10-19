@@ -2,7 +2,6 @@ import { useCallback, useLayoutEffect, useRef } from 'react'
 import { useAppStore } from '../../store'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-verified-input'
-import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { AgentType } from '../../../../shared/native-chat-types'
 import {
   resolveNativeChatTranscriptAgent,
@@ -62,7 +61,6 @@ export type NativeChatInteractiveSend = {
  * `sendNativeChatMessage`. Control strings (option digits, ESC) are written raw.
  */
 export function useNativeChatInteractiveSend(
-  terminalTabId: string,
   paneKey: string,
   targetPtyId: string | null,
   agent: AgentType
@@ -100,14 +98,9 @@ export function useNativeChatInteractiveSend(
       if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
         return
       }
-      sendRuntimePtyInput(
-        getSettingsForAgentTabRuntimeOwner(terminalTabId),
-        targetPtyId,
-        raw,
-        'driving'
-      )
+      sendRuntimePtyInput(targetPtyId, raw, 'driving')
     },
-    [terminalTabId, targetPtyId]
+    [targetPtyId]
   )
 
   const sendRawVerified = useCallback(
@@ -121,7 +114,7 @@ export function useNativeChatInteractiveSend(
             { requireWriteSettlement: true }
           ).catch(() => false)
         : Promise.resolve(false),
-    [terminalTabId, targetPtyId]
+    [targetPtyId]
   )
 
   const sendAnswer = useCallback(
@@ -196,7 +189,7 @@ export function useNativeChatInteractiveSend(
         settleAfterMs: handle.settleAfterMs
       }
     },
-    [terminalTabId, paneKey, targetPtyId, agent, cancelInFlight]
+    [paneKey, targetPtyId, agent, cancelInFlight]
   )
 
   const cancelAsk = useCallback(() => {
@@ -222,7 +215,7 @@ export function useNativeChatInteractiveSend(
       return
     }
     sendRaw(ESC)
-  }, [agent, cancelInFlight, sendRaw, targetPtyId, terminalTabId])
+  }, [agent, cancelInFlight, sendRaw, targetPtyId])
 
   return { sendAnswer, sendRaw, sendRawVerified, cancelPending: cancelInFlight, cancelAsk, cancel }
 }

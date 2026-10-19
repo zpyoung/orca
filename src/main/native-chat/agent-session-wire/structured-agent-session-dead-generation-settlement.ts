@@ -3,7 +3,6 @@ import {
   MAX_PROVIDER_DIAGNOSTIC_CHARS,
   type SubmissionRejectionFact
 } from '../../../shared/agent-session-failure'
-import { STALE_SESSION_ROW_PREFIX } from '../../../shared/agent-session-stop-row-identity'
 import { isQueuedAgentJournalSubmission } from '../../../shared/agent-session-queued-submission'
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
@@ -20,7 +19,8 @@ import {
   runningCallEnd,
   terminalAgentJournalBody
 } from '../agent-session-journal/journal-terminal-settlement'
-import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
+import type { ResolveDispatchInput } from '../agent-session-journal/journal-store-contracts'
+import { lostLiveWorkJournalBody } from '../agent-session-journal/journal-subagent-liveness'
 import {
   agentSessionFailureWords,
   type AgentSessionFailureWordsContext
@@ -30,11 +30,7 @@ import {
   hasStructuredAgentSessionStartFailureRow,
   structuredAgentSessionStartFailureRow
 } from './structured-agent-session-start-failure-row'
-import type { AgentSessionDeathEvidence } from '../../../shared/agent-session-record'
 import {
-  endedByPersonsStop,
-  provenUnverifiableTurnRevisions,
-  provenUnverifiedToolCallRevisions,
   runningTurnLifecycleRevisions,
   lastProvenTurnLiveAt,
   turnVerdictFromDeathEvidence,
@@ -49,7 +45,6 @@ import {
 } from './structured-agent-session-exit-turn-scope'
 import {
   hasUnfinishedStructuredAgentSessionWork,
-  isInProgressStructuredAgentSessionItem,
   type DeadGenerationJournal
 } from './structured-agent-session-unfinished-work'
 import { codexUnopenedSendResolutions } from './structured-agent-session-unopened-send-withdrawal'
@@ -60,18 +55,16 @@ import {
   type StaleCut
 } from './structured-agent-session-stale-stop-row'
 
+export { settleStaleStructuredAgentSessionState } from './structured-agent-session-stale-state-settlement'
+
 /** Bounds the exit reason the lease keeps as log evidence; a provider diagnostic is held to the
  *  same cap. */
 export const MAX_UNEXPECTED_EXIT_REASON_CHARS = MAX_PROVIDER_DIAGNOSTIC_CHARS
 
-/** Whether the settlement was written, and what stopped it when it was not. */
-export type StructuredAgentSessionDeadGenerationSettlement =
-  | { ok: true }
-  | { ok: false; error: unknown }
-
-export async function settleStructuredAgentSessionDeadGeneration(input: {
+export type StructuredAgentSessionDeadGenerationInput = {
   journal: DeadGenerationJournal
   sessionId: string
+  /** The fence the rows are written at: the lease's current one once the exit released it. */
   fence: number
   settlementId: string
   verdict: StructuredAgentSessionTurnVerdict
@@ -89,96 +82,6 @@ export async function settleStructuredAgentSessionDeadGeneration(input: {
   exit?: StructuredAgentSessionWatchedExit
   /** A person's Stop ended a starting child before what it was handed could run: each is rejected so. */
   unrunRejection?: SubmissionRejectionFact
-}): Promise<StructuredAgentSessionDeadGenerationSettlement> {
-  try {
-    const hasUnfinishedWork = hasUnfinishedStructuredAgentSessionWork(input.journal, input.exit)
-    const showUnexpectedExitOutcome = input.showUnexpectedExitOutcome ?? hasUnfinishedWork
-    if (!showUnexpectedExitOutcome && !hasUnfinishedWork) {
-      return { ok: true }
-    }
-    // A queued message is the delivery loop's to settle: it was never handed to this child. A send
-    // a child still starting was handed and never echoed did not run, and its root is gone: it is
-    // rejected, with the child's own diagnostic or as the Stop that ended it. A proven child's
-    // handed-over sends stay in doubt.
-    const startupFailure = input.exitedDuringStartup
-      ? structuredAgentSessionStartFailure({ exit: input.exitFailure }, input.failureTextContext)
-      : null
-    const closed = input.unrunRejection
-    const unrun =
-      startupFailure ?? (closed && agentSessionFailureWords(closed, { surface: 'rejection' }))
-    const withdrawn = unrun ? [] : codexUnopenedSendResolutions(input.journal, input.fence)
-    const withdrawnIds = new Set(withdrawn.map((entry) => entry.clientMessageId))
-    const dispatches = [
-      ...withdrawn,
-      ...journalPendingSubmissionResolutions(
-        (input.journal.submissions?.() ?? input.journal.pendingSubmissions?.() ?? []).filter(
-          (entry) => !withdrawnIds.has(entry.clientMessageId)
-        ),
-        input.fence,
-        unrun ? { rejection: unrun } : { reason: input.pendingSubmissionReason }
-      )
-    ]
-    const items = input.journal.snapshot().items
-    const proven = watchedExitRevisions(items, input.exit, input.journal)
-    const mutations: JournalLifecycleMutationInput[] = []
-    if (showUnexpectedExitOutcome && input.exitedDuringStartup && startupFailure) {
-      const startKey = input.exitedDuringStartup.generation ?? input.settlementId
-      // A start a message waited on is the delivery loop's to record, before or after this exit,
-      // in the words it rejected the message with; this row is for a command, goal or rewind start.
-      // A row already written stays: rejected is terminal, so its words are not reworded.
-      const recordedByDeliveryLoop =
-        input.journal.submissions?.().some(isQueuedAgentJournalSubmission) ||
-        hasStructuredAgentSessionStartFailureRow(items, startKey)
-      if (!recordedByDeliveryLoop) {
-        mutations.push(structuredAgentSessionStartFailureRow(startKey, startupFailure))
-      }
-    } else if (showUnexpectedExitOutcome) {
-      // The turn the exit ended, and an error so no fold ever hides why it stopped.
-      mutations.push({
-        kind: 'item',
-        identity: { provider: 'orca', clientMessageId: input.settlementId },
-        body: {
-          kind: 'status',
-          ...agentSessionFailureWords(
-            input.exitFailure ?? agentSessionFailureFact('providerExited'),
-            {
-              ...input.failureTextContext,
-              surface: 'row'
-            }
-          ),
-          tone: 'error'
-        },
-        turnScope: exitedRootTurnScope(withRevisions(items, proven), input.verdict)
-      })
-    }
-    const bodies = new Map(items.map((item) => [item.itemId, item.body]))
-    for (const item of items) {
-      // Ended as its turn is: a proven death cuts a running call short. An open reasoning row is
-      // ended too, but is not unfinished work: its running turn already says so.
-      const end = runningCallEnd(item.turnScope, (id) => bodies.get(id), input.verdict.state)
-      const body = endedUnseenMessageBody(item.body) ?? terminalAgentJournalBody(item.body, end)
-      if (body) {
-        mutations.push({
-          kind: 'item',
-          itemId: item.itemId,
-          body,
-          turnScope: item.turnScope ?? AGENT_JOURNAL_THREAD_SCOPE
-        })
-      }
-    }
-    mutations.push(...runningTurnLifecycleRevisions(items, input.verdict), ...proven)
-    await input.journal.appendLifecycleBatch({
-      settlementId: `dead-generation:${input.settlementId}`,
-      fence: input.fence,
-      recovered: true,
-      mutations,
-      dispatches
-    })
-    return { ok: true }
-  } catch (error) {
-    // Returned rather than logged: each caller logs it under its own scope.
-    return { ok: false, error }
-  }
 }
 
 /**
@@ -225,10 +128,12 @@ export async function settleStaleStructuredAgentSessionState(input: {
   // Calls an earlier settle closed with no proof, revised once a proof names their owner.
   const mutations = provenUnverifiedToolCallRevisions(items, input.deathEvidence, journal, replaced)
   for (const item of items) {
-    // A turn already settled (a person's Stop) ends its calls as it ended; only a turn still running
-    // leaves them to the evidence.
-    const end = runningCallEnd(item.turnScope, (id) => journal.itemBody(id), verdictFor(item).state)
-    const body = endedUnseenMessageBody(item.body) ?? terminalAgentJournalBody(item.body, end)
+    // Ended as its turn is: a proven death cuts a running call short. An open reasoning row is
+    // ended too, but is not unfinished work: its running turn already says so.
+    const end = runningCallEnd(item.turnScope, (id) => bodies.get(id), input.verdict.state)
+    const terminal = endedUnseenMessageBody(item.body) ?? terminalAgentJournalBody(item.body, end)
+    // One revision per item: its live subagents and background tasks end with it.
+    const body = lostLiveWorkJournalBody(terminal ?? item.body) ?? terminal
     if (body) {
       mutations.push({
         kind: 'item',

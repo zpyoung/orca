@@ -50,7 +50,7 @@ export type TabSessionHistorySubject = {
   | { kind: 'chat'; sessionId: string }
   | {
       kind: 'cli'
-      agent: AgentSessionHandleProvider
+      agent: CliConversationRowAgent
       providerSessionId: string
     }
 )
@@ -149,8 +149,8 @@ export function resolveTabSessionHistorySubject(
     ? {
         ...target,
         kind: 'cli',
-        agent: titleRequest.agent,
-        providerSessionId: titleRequest.providerSession.id
+        agent: conversation.agent,
+        providerSessionId: conversation.providerSession.id
       }
     : null
 }

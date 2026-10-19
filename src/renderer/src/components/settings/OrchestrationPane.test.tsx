@@ -68,7 +68,7 @@ vi.mock('@/hooks/useInstalledAgentSkills', () => ({
         description: null,
         providers: ['claude'],
         sourceKind: 'home',
-        sourceLabel: 'Claude home',
+        sourceLabel: 'Claude Code home',
         rootPath: '/Users/test/.claude/skills',
         directoryPath: '/Users/test/.claude/skills/orchestration',
         skillFilePath: '/Users/test/.claude/skills/orchestration/SKILL.md',
@@ -79,7 +79,7 @@ vi.mock('@/hooks/useInstalledAgentSkills', () => ({
     sources: [
       {
         id: 'home-claude',
-        label: 'Claude home',
+        label: 'Claude Code home',
         path: '/Users/test/.claude/skills',
         sourceKind: 'home',
         providers: ['claude'],
@@ -254,15 +254,13 @@ describe('OrchestrationPane', () => {
     ).toBe(false)
   })
 
-  it('passes update commands to the main panel without an installed manual-copy path', async () => {
+  it('passes the install command, which also updates, without a manual-copy path', async () => {
     const rendered = await renderPane()
 
     expect(mocks.panelProps.at(-1)).toEqual(
-      expect.objectContaining({
-        command: WINDOWS_INSTALL_COMMAND,
-        installedCommand: WINDOWS_INSTALL_COMMAND
-      })
+      expect.objectContaining({ command: WINDOWS_INSTALL_COMMAND })
     )
+    expect(mocks.panelProps.at(-1)?.installedCommand).toBeUndefined()
 
     expect(rendered.textContent).not.toContain('Prefer your own terminal?')
     expect(rendered.textContent).not.toContain('Copy update command')
@@ -270,7 +268,7 @@ describe('OrchestrationPane', () => {
     expect(mocks.dialogProps).not.toContainEqual(expect.objectContaining({ mode: 'update' }))
     expect(mocks.dialogProps).not.toContainEqual(
       expect.objectContaining({
-        command: UPDATE_COMMAND,
+        command: INSTALL_COMMAND,
         open: true
       })
     )

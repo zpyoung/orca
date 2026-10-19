@@ -1,18 +1,23 @@
 import { useMemo } from 'react'
+import type { WorktreeOccurrencePlan } from '../../../../../../shared/worktree-occurrence-plan'
 import { getWorktreeRevealCollapsedGroupKeys } from '../navigation/worktree-reveal-group-keys'
 import type { AppState } from '@/store/types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
-import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
-import type { ProjectGroupingModel } from '../grouping/project-grouping'
+import type {
+  PinnedWorktreeDisplayPolicy,
+  WorktreeGroupBy
+} from '../../../../../../shared/sidebar-list/row-types'
+import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
 import { getFolderWorkspaceRevealGroupKeys } from '../navigation/folder-reveal'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 
 // While the agent send picker targets a workspace, force open every section that hides it.
 export function useEffectiveCollapsedGroups(args: {
+  occurrencePlan?: WorktreeOccurrencePlan<Worktree>
   hostScopedGroups?: boolean
   collapsedGroups: Set<string>
   agentSendTargetWorktreeId: string | null
@@ -20,12 +25,12 @@ export function useEffectiveCollapsedGroups(args: {
   pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy
   worktrees: readonly Worktree[]
   visibleWorktrees: readonly Worktree[]
+  filterRepoIds?: readonly string[]
   repoMap: Map<string, Repo>
   worktreeMap: Map<string, Worktree>
   worktreeLineageById: Record<string, WorktreeLineage>
   prCache: AppState['prCache'] | null
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
-  settings: AppState['settings']
   projectGroups: readonly ProjectGroup[]
   // Why: must be the host-filtered set buildRows uses, or the agent send picker
   // force-opens a group key the rendered tree never built.
@@ -35,6 +40,7 @@ export function useEffectiveCollapsedGroups(args: {
   defaultHostId: ExecutionHostId
 }): Set<string> {
   const {
+    occurrencePlan,
     collapsedGroups,
     hostScopedGroups = false,
     agentSendTargetWorktreeId,
@@ -42,12 +48,12 @@ export function useEffectiveCollapsedGroups(args: {
     pinnedDisplayPolicy,
     worktrees,
     visibleWorktrees,
+    filterRepoIds,
     repoMap,
     worktreeMap,
     worktreeLineageById,
     prCache,
     workspaceStatuses,
-    settings,
     projectGroups,
     visibleProjectGroupsForRows = projectGroups,
     projectGrouping,
@@ -79,9 +85,11 @@ export function useEffectiveCollapsedGroups(args: {
     }
     const next = new Set(collapsedGroups)
     for (const groupKey of getWorktreeRevealCollapsedGroupKeys({
+      occurrencePlan,
       worktree: targetWorktree,
       worktrees,
       visibleWorktrees,
+      filterRepoIds,
       worktreeLineageById,
       repoMap,
       defaultHostId,
@@ -100,17 +108,18 @@ export function useEffectiveCollapsedGroups(args: {
     return next
   }, [
     agentSendTargetWorktreeId,
+    occurrencePlan,
     collapsedGroups,
     hostScopedGroups,
     groupBy,
     pinnedDisplayPolicy,
     worktrees,
     visibleWorktrees,
+    filterRepoIds,
     prCache,
     visibleProjectGroupsForRows,
     projectGrouping,
     repoMap,
-    settings,
     workspaceStatuses,
     worktreeLineageById,
     worktreeMap,

@@ -48,7 +48,12 @@ export async function subscribeNativeChatTranscript(
 ): Promise<NativeChatTranscriptSubscription> {
   setupSignal?.throwIfAborted()
   if (resolveNativeChatTranscriptAgent(args.agent) === 'opencode') {
-    return subscribeOpenCodeNativeChatTranscript(args, setupSignal)
+    return subscribeOpenCodeNativeChatTranscript(
+      args,
+      setupSignal,
+      {},
+      args.agent === 'zcode' ? 'zcode' : undefined
+    )
   }
   const decode: ((line: string, fallbackId: string) => NativeChatMessage | null) | null =
     nativeChatLineDecoderForAgent(args.agent)

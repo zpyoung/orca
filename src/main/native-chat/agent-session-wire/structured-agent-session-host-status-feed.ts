@@ -1,4 +1,4 @@
-import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import {
   deferredStructuredAgentSessionLogger,
   type StructuredAgentSessionLogger
@@ -18,8 +18,9 @@ import { structuredAgentSessionConversationFence } from './structured-agent-sess
 export function createStructuredAgentSessionHostStatusFeed(args: {
   sessions: StructuredAgentSessionStatusFeedDeps['sessions']
   now: () => number
+  currentWork: StructuredAgentSessionSubagentRowsDeps['currentWork']
   deps: () => {
-    store: { getRecord: (sessionId: string) => AgentSessionRecord | null }
+    store: Pick<AgentSessionRecordStore, 'getRecord' | 'replacedRuntime'>
     logger: StructuredAgentSessionLogger
     onSessionStatusChanged?: StructuredAgentSessionStatusFeedDeps['onStatusChanged']
     statusSink?: StructuredAgentSessionStatusSink
@@ -54,6 +55,7 @@ export function createStructuredAgentSessionHostStatusFeed(args: {
   const feed = new StructuredAgentSessionStatusFeed({
     sessions: args.sessions,
     getRecord: (sessionId) => args.deps().store.getRecord(sessionId),
+    replacedRuntime: (sessionId) => args.deps().store.replacedRuntime(sessionId),
     now: args.now,
     logger: deferredStructuredAgentSessionLogger(() => args.deps().logger),
     onStatusChanged: (summary, options) => args.deps().onSessionStatusChanged?.(summary, options),

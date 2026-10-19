@@ -13,6 +13,8 @@ type ClaudeLoginSessionDependencies = {
     options?: ClaudeCommandOptions
   ) => Promise<string>
   setCancel: (cancel: (() => boolean) | null) => void
+  /** Opens a WSL login's sign-in link on this computer; absent where Orca cannot open one. */
+  openWslSignInLink?: ((signInLink: string) => void) | null
 }
 
 /** Runs a hidden `claude auth login` that writes its login straight into the account's folder.

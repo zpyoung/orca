@@ -10,12 +10,14 @@ import type { AgentSessionJournal } from '../agent-session-journal/journal-store
 import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { performCancel, type AgentSessionTurnContext } from './structured-agent-session-turns'
+import { runTargetedCancel } from './structured-agent-session-targeted-cancel'
 import { createDeferredStructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
 import { agentJournalItemKey } from '../../../shared/agent-session-journal-item-key'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { testEventSinkLogging } from './structured-agent-session-logger-test-support'
 import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
+import { StructuredAgentSessionStatusOwnership } from './structured-agent-session-status-ownership'
 
 const IDENTITY: AgentSessionJournalIdentity = {
   sessionId: 'session-1',
@@ -209,7 +211,7 @@ describe('performCancel', () => {
       now: () => 1
     }
 
-    const result = await performCancel(ctx, {
+    const result = await runTargetedCancel(acceptedStop(ctx), {
       clientOperationId: 'cancel-background-tasks',
       turnId: 'background-tasks',
       scope: 'background-tasks',
@@ -250,7 +252,7 @@ describe('performCancel', () => {
       now: () => 1
     }
 
-    const result = await performCancel(ctx, {
+    const result = await runTargetedCancel(acceptedStop(ctx), {
       clientOperationId: 'cancel-background-task-2',
       turnId: 'background-tasks',
       scope: 'background-tasks',
@@ -431,6 +433,19 @@ describe('performCancel', () => {
     ])
   })
 })
+
+/** A Stop whose receipt is already saved, as the receipt runner hands a background Stop. */
+function acceptedStop(ctx: AgentSessionTurnContext): AgentSessionTurnContext {
+  return {
+    ...ctx,
+    operationReceipt: {
+      write: () => {},
+      committed: () => {},
+      isCommitted: () => true,
+      commitAlone: async () => {}
+    }
+  }
+}
 
 /** A live child record the strip would offer a stop, named by the provider as `providerId`. */
 function liveTask(

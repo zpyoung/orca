@@ -31,8 +31,8 @@ import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window
 import { WorkspaceReviewFilterRows } from './fork-workspace-review-filters/WorkspaceReviewFilterRows'
 import { useWorkspaceFilterChrome } from './fork-workspace-activity-window/use-workspace-filter-chrome'
 import { searchRepos } from '@/lib/repo-search'
-import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
-import { isSleepingSweepExemptionNarrowingList } from './visible-worktrees'
+import { clearSidebarFilters, selectSidebarFilterState } from './sidebar-filter-actions'
+import { useWorkspaceOptionsFilterBadge } from './workspace-options-menu-items'
 import { translate } from '@/i18n/i18n'
 
 type SidebarFilterProps = {

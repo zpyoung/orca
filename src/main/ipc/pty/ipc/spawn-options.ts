@@ -116,6 +116,9 @@ export async function buildPtyIpcSpawnOptions(
   if (args.worktreeId !== undefined) {
     ctx.spawnOptions.worktreeId = args.worktreeId
   }
+  if (isRestoreSpawnIntent(args.spawnIntent)) {
+    ctx.spawnOptions.spawnIntent = args.spawnIntent
+  }
   const trustWrite = applyAgentWorkspaceTrustToSpawn({
     launchAgent: args.launchAgent,
     worktreeId: args.worktreeId,

@@ -217,4 +217,13 @@ describe('Claude OAuth usage extra usage', () => {
       expect(result.extraUsage ?? null).toBeNull()
     }
   )
+
+  it('classifies only the request: a dead proxy is network, a null 200 body stays unknown', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('net::ERR_PROXY_CONNECTION_FAILED'))
+    const transport = await fetchClaudeOAuthUsage('oauth-token').catch((error: unknown) => error)
+    expect(classifyClaudeOAuthUsageError(transport).failureKind).toBe('network')
+
+    const nullBody = await fetchUsageResponse('null').catch((error: unknown) => error)
+    expect(classifyClaudeOAuthUsageError(nullBody).failureKind).toBe('unknown')
+  })
 })

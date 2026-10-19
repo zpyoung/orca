@@ -1,3 +1,4 @@
+import { createFakePipedChild } from '../../shared/__fixtures__/fake-spawned-child'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -40,15 +41,13 @@ const timestamp = z.object({ _meta: z.object({ agentTimestampMs: z.number() }) }
 async function stoppingChild(reportsOutcome: boolean) {
   const agent = new AcpScriptedAgent()
   const stderr = new PassThrough()
-  const child = Object.assign(createFakeSpawnedChild(9_999_999), {
+  const child = Object.assign(createFakePipedChild(9_999_999), {
     stdin: agent.stdin,
     stdout: agent.stdout,
     stderr,
-    stdio: [agent.stdin, agent.stdout, stderr, null, null] satisfies ReturnType<
-      typeof spawnProcess
-    >['stdio']
+    stdio: [agent.stdin, agent.stdout, stderr, null, null] satisfies PipedChildProcess['stdio']
   })
-  const spawn = vi.fn<typeof spawnProcess>(() => child)
+  const spawn = vi.fn<PipedProcessSpawner>(() => child)
   // Teardown is simulated: no signal or process-table operation can reach the machine.
   teardown.mockImplementation(async () => {
     child.emit('exit', 0, null)

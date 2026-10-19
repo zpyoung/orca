@@ -8,8 +8,9 @@ import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import type { AppState } from '@/store/types'
 
-export type AiVaultTitleRequest = {
-  agent: AiVaultSessionTitle['agent']
+/** The conversation a tab's pane runs, for an agent `isAgent` accepts. */
+export type AgentPaneConversation<Agent extends AgentType> = {
+  agent: Agent
   executionHostId: ExecutionHostId
   providerSession: AgentProviderSessionMetadata
   refresh: boolean
@@ -17,7 +18,11 @@ export type AiVaultTitleRequest = {
   worktreeId: string
 }
 
-type RequestCandidate = AiVaultTitleRequest & { priority: number }
+export type AiVaultTitleRequest = AgentPaneConversation<AiVaultSessionTitle['agent']>
+
+type RequestCandidate<Agent extends AgentType> = AgentPaneConversation<Agent> & {
+  priority: number
+}
 
 function tabIdFromPaneKey(paneKey: string, tabId?: string): string | null {
   return tabId?.trim() || parsePaneKey(paneKey)?.tabId || null
@@ -28,10 +33,11 @@ function activePaneKey(state: AppState, tabId: string): string | null {
   return activeLeafId ? `${tabId}:${activeLeafId}` : null
 }
 
-function registerCandidate(
+function registerCandidate<Agent extends AgentType>(
   state: AppState,
   tabsById: ReadonlyMap<string, TerminalTab>,
-  candidates: Map<string, RequestCandidate>,
+  candidates: Map<string, RequestCandidate<Agent>>,
+  isAgent: (agent: AgentType | null | undefined) => agent is Agent,
   args: {
     agent: AgentType | null | undefined
     paneKey: string
@@ -42,7 +48,7 @@ function registerCandidate(
     worktreeId?: string
   }
 ): void {
-  if (!isAiVaultTitleAgent(args.agent) || !args.providerSession?.id) {
+  if (!isAgent(args.agent) || !args.providerSession?.id) {
     return
   }
   const tabId = tabIdFromPaneKey(args.paneKey, args.tabId)

@@ -1,6 +1,11 @@
 import { resolveLoginShellEnvironment } from '../startup/login-shell-environment'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import {
+  mergePersistedWindowsPathAsync,
+  readPersistedWindowsPathSegmentsAsync
+} from '../pty/windows-environment-path'
+import type { GlobalSettings } from '../../shared/global-settings-types'
+import {
   nativeChatShellEnvironmentPolicy,
   type NativeChatShellEnvironmentPolicy
 } from '../../shared/native-chat-shell-environment'
@@ -99,6 +104,54 @@ export type StructuredAgentEnvironmentSources = {
  * The policy and overlays are re-read per acquisition, so a settings change reaches
  * the next chat without a restart.
  */
+async function hostShellEnvironment(): Promise<NodeJS.ProcessEnv> {
+  const windows = process.platform === 'win32'
+  const env = await resolveLoginShellEnvironment({
+    refreshAfterMs: SHELL_ENVIRONMENT_TTL_MS,
+    keepCaptured: windows
+  })
+  if (!windows) {
+    return env
+  }
+  const withSavedPath = { ...env }
+  await mergePersistedWindowsPathAsync(withSavedPath)
+  return withSavedPath
+}
+
+/** For a lookup that started at `askedAt` and found no program: waits for a shell run that started
+ *  no earlier (on Windows, a saved PATH reread), so an agent installed before the lookup counts.
+ *  The run's own shell timeout bounds the wait. */
+export async function refreshHostAgentBaseEnvironmentAfterMiss(askedAt: number): Promise<void> {
+  await (
+    process.platform === 'win32'
+      ? readPersistedWindowsPathSegmentsAsync({ forceRefresh: true, startedAfter: askedAt })
+      : resolveLoginShellEnvironment({ startedAfter: askedAt })
+  ).catch(() => {})
+}
+
+/** The base env every local agent launch on this host starts from, read from current settings. */
+export async function resolveHostAgentBaseEnvironment(
+  settings: Pick<
+    GlobalSettings,
+    'nativeChatInheritShellEnvironment' | 'nativeChatShellEnvironmentVariables'
+  >
+): Promise<Record<string, string>> {
+  return structuredAgentBaseEnvironment({
+    shellEnv: await hostShellEnvironment(),
+    policy: nativeChatShellEnvironmentPolicy(settings)
+  })
+}
+
+export type StructuredAgentEnvironmentSources = {
+  /** Replaces the host's shell env, read once when the resolvers are made; never reread. */
+  resolveEnvironment?: () => Promise<NodeJS.ProcessEnv>
+  resolveShellEnvironmentPolicy?: () => NativeChatShellEnvironmentPolicy
+  /** The user's per-agent environment overlay from settings. */
+  resolveAgentLaunchEnv?: (agent: string) => Record<string, string>
+}
+
+/** Every agent's child env over the host's shell env. Policy and overlays are re-read per
+ *  acquisition, so a settings change reaches the next chat without a restart. */
 export function createStructuredAgentEnvironmentResolvers(
   sources: StructuredAgentEnvironmentSources
 ): {
@@ -107,10 +160,15 @@ export function createStructuredAgentEnvironmentResolvers(
   /** The base with the user's overlay for `agent` laid over it. */
   resolveAgentEnvironment: (agent: string) => Promise<Record<string, string>>
 } {
-  const shellEnvironment = (sources.resolveEnvironment ?? resolveLoginShellEnvironment)()
+  // Why: start as soon as the runtime exists so the first chat rarely waits for the profile.
+  const injected = sources.resolveEnvironment?.()
+  const shellEnvironment = injected ? () => injected : hostShellEnvironment
+  if (!injected) {
+    void hostShellEnvironment().catch(() => {})
+  }
   const resolveBase = async (): Promise<Record<string, string>> =>
     structuredAgentBaseEnvironment({
-      shellEnv: await shellEnvironment,
+      shellEnv: await shellEnvironment(),
       policy: sources.resolveShellEnvironmentPolicy?.() ?? nativeChatShellEnvironmentPolicy(null)
     })
   return {

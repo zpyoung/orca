@@ -1,3 +1,4 @@
+import type { CurrentRequestsSubscriber } from './agent-session-current-requests'
 // Per-subscriber cursors over one session's journal.
 //
 // Each subscriber advances independently: a client that connected two epochs
@@ -18,13 +19,18 @@ import {
   type SubscriberFieldHooks
 } from './agent-session-subscriber-frame-fields'
 import type { QueuePublication } from './structured-agent-session-queued-publication'
-import { deliverToSubscriber } from './agent-session-subscriber-catch-up'
+import {
+  deliverToSubscriber,
+  type SubscriberDeliveryPort
+} from './agent-session-subscriber-catch-up'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import { emptyAgentSessionBatch } from './agent-session-empty-batch'
 import { readAgentSessionHydrationPage } from './agent-session-history-page'
 import { subscriberHistoryReader } from './agent-session-bounded-frames'
 import { rememberSessionActivity } from './structured-agent-session-activity-retention'
 import { refreshDerivedStopNotes } from './agent-session-stop-note-refresh'
+import { refreshPublishedWork } from './agent-session-work-refresh'
+import type { StructuredAgentSessionCurrentWork } from './structured-agent-session-current-work'
 
 export type AgentSessionSubscriberEmit = (event: AgentSessionSubscribeEvent) => void
 export type AgentSessionSubscribeInput = {
@@ -36,7 +42,7 @@ export type AgentSessionSubscribeInput = {
   boundedFrames?: boolean
 }
 
-export type Subscriber = {
+export type Subscriber = CurrentRequestsSubscriber & {
   id: string
   sessionId: string
   emit: AgentSessionSubscriberEmit
@@ -44,11 +50,14 @@ export type Subscriber = {
   fence: number
   boundedFrames: boolean
   commands?: AgentSessionSlashCommand[] | null
-  /** The last draft list actually SENT — never advanced on a page that withheld
+  /** Canonical publication last sent — never advanced on a page that withheld
    *  it, or the final replacement would be suppressed by the identity dedup. */
   queuePublication?: QueuePublication
   /** Fingerprint of the background-task roster last SENT. */
   backgroundTasks?: string
+  /** The current-work view the last frame's fields were read under
+   *  (`StructuredAgentSessionCurrentWork.viewKey`); a change with no row still owes a frame. */
+  workView?: string
 }
 
 export type AgentSessionSubscribersHooks = {
@@ -59,6 +68,12 @@ export type AgentSessionSubscribersHooks = {
   readBackgroundTasks?: SubscriberFieldHooks['readBackgroundTasks']
   /** Fires after publications that can change journal content. */
   onJournalPublished?: (sessionId: string, journal: AgentSessionJournal) => void
+  /** The host's projection of current work (`structuredAgentSessionCurrentWork`), which every
+   *  page and frame states as its turn and prompt fields. */
+  readCurrentWork?: (
+    sessionId: string,
+    journal: AgentSessionJournal
+  ) => StructuredAgentSessionCurrentWork | undefined
   now?: () => number
 }
 
@@ -102,13 +117,11 @@ export class AgentSessionSubscribers {
     if (input.cursor) {
       this.deliver(subscriber, input.journal, hostNow, true)
       refreshDerivedStopNotes(
-        {
-          emit: (target, event) => this.emit(target, event),
-          isActive: (target) => this.isActive(target)
-        },
+        this.deliveryPort(),
         subscriber,
         input.journal,
-        hostNow
+        hostNow,
+        this.hooks.readCurrentWork?.(input.sessionId, input.journal)
       )
     } else {
       const page = readAgentSessionHydrationPage(
@@ -125,6 +138,7 @@ export class AgentSessionSubscribers {
         ...this.activityField(input.sessionId)
       })
       subscriber.cursor = page.liveCursor ?? page.window.nextCursor
+      refreshPublishedWork(this.deliveryPort(), subscriber, input.journal, work, { hostNow })
     }
     const { sessionId, id } = subscriber
     return () => this.close(sessionId, id)
@@ -156,10 +170,7 @@ export class AgentSessionSubscribers {
         this.activityBySession.delete(sessionId)
       }
     }
-    const hostNow = this.now()
-    for (const subscriber of this.subscribers(sessionId)) {
-      this.deliver(subscriber, journal, hostNow, false, activity)
-    }
+    this.deliverFrames(sessionId, journal, activity)
     if (activity === undefined) {
       this.hooks.onJournalPublished?.(sessionId, journal)
     }
@@ -189,6 +200,7 @@ export class AgentSessionSubscribers {
       })
       subscriber.cursor = page.liveCursor ?? page.window.nextCursor
       subscriber.fence = fence
+      refreshPublishedWork(this.deliveryPort(), subscriber, journal, work, { hostNow })
     }
     this.hooks.onJournalPublished?.(sessionId, journal)
   }
@@ -247,18 +259,25 @@ export class AgentSessionSubscribers {
     emitCheckpoint = false,
     activity?: AgentSessionTurnActivity | null
   ): void {
-    deliverToSubscriber(
-      {
-        hooks: this.hooks,
-        emit: (target, event, options) => this.emit(target, event, options),
-        isActive: (target) => this.isActive(target),
-        activity: (sessionId) => this.activityField(sessionId).activity
-      },
-      { subscriber, journal, hostNow, emitCheckpoint, activity }
-    )
+    deliverToSubscriber(this.deliveryPort(), {
+      subscriber,
+      journal,
+      hostNow,
+      emitCheckpoint,
+      activity
+    })
   }
 
   private now = (): number => this.hooks.now?.() ?? Date.now()
+
+  private deliveryPort(): SubscriberDeliveryPort {
+    return {
+      hooks: this.hooks,
+      emit: (target, event, options) => this.emit(target, event, options),
+      isActive: this.isActive,
+      activity: (sessionId) => this.activityField(sessionId).activity
+    }
+  }
 
   private isActive = (subscriber: Subscriber): boolean =>
     this.bySession.get(subscriber.sessionId)?.get(subscriber.id) === subscriber
@@ -268,7 +287,7 @@ export class AgentSessionSubscribers {
   private emit(
     subscriber: Subscriber,
     event: AgentSessionSubscribeEvent,
-    options?: { withholdQueued?: boolean }
+    options?: Parameters<SubscriberDeliveryPort['emit']>[2]
   ): void {
     try {
       const built = buildSubscriberFrame(

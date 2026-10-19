@@ -6,11 +6,7 @@ import type {
   AgentSessionOptionResult,
   AgentSessionOptionsResult
 } from '../../../src/shared/agent-session-wire'
-import type {
-  SessionOptionDescriptor,
-  SessionOptionsSurface,
-  SessionOptionValue
-} from '../../../src/shared/native-chat-session-options'
+import type { SessionOptionValue } from '../../../src/shared/native-chat-session-options'
 import {
   applyStructuredAgentSessionOptions,
   canSetStructuredAgentSessionOption,
@@ -18,11 +14,11 @@ import {
   commitStructuredAgentSessionOptionValues,
   createStructuredAgentSessionOptionState,
   structuredAgentSessionOptionPicks,
-  structuredAgentSessionOptionSnapshot,
   type StructuredAgentSessionOptionState
 } from '../../../src/shared/structured-agent-session-options'
 import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from '../../../src/shared/agent-chat-permission-mode'
 import type { RpcClient } from '../transport/rpc-client'
+import type { StructuredAgentSessionHostSupport } from './mobile-structured-agent-session-host-support'
 import {
   callAgentSession,
   type StructuredAgentSessionMutate
@@ -78,10 +74,6 @@ export function useMobileStructuredAgentOptions(args: {
     },
     []
   )
-  const [optionPickerRequest, setOptionPickerRequest] = useState<{
-    id: string
-    sequence: number
-  } | null>(null)
   const [conversationSupport, setConversationSupport] = useState<{
     sessionId: string
     commands: readonly AgentSessionConversationCommand[]
@@ -172,10 +164,18 @@ export function useMobileStructuredAgentOptions(args: {
     updateOptionState
   ])
 
-  const optionSnapshot = useMemo(
-    () => structuredAgentSessionOptionSnapshot(optionState),
-    [optionState]
-  )
+  // A host predating per-chat modes (1.4.224 and older) states none: say what its chats run instead.
+  const legacyHostPermissions =
+    agent !== null &&
+    agentChatPermissionModes(agent) !== null &&
+    hostSupport?.permissionModes === false &&
+    imageSupport?.sessionId === sessionId &&
+    !imageSupport.statesPermissionMode &&
+    optionState.permissionMode === null
+  const optionSnapshot = useMemo(() => {
+    const shown = structuredAgentSessionShownSnapshot(optionState)
+    return legacyHostPermissions ? [...shown, legacyHostPermissionDescriptor()] : shown
+  }, [legacyHostPermissions, optionState])
 
   const setStructuredOption = useCallback(
     async (id: string, value: SessionOptionValue): Promise<boolean> => {
@@ -187,7 +187,11 @@ export function useMobileStructuredAgentOptions(args: {
         !sessionId ||
         !optionCatalog ||
         encoded === null ||
-        !canSetStructuredAgentSessionOption(currentState, id, value)
+        !canSetStructuredAgentSessionOption(
+          structuredAgentSessionOptionView(currentState, undefined, {}),
+          id,
+          value
+        )
       ) {
         return false
       }
@@ -278,34 +282,12 @@ export function useMobileStructuredAgentOptions(args: {
     [agent, client, mutate, optionCatalog, sessionId, updateOptionState]
   )
 
-  const invokeStructuredOption = useCallback(
-    async (id: string) => {
-      if (!optionSnapshot.some((entry) => entry.id === id)) {
-        return false
-      }
-      setOptionPickerRequest((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }))
-      return true
-    },
-    [optionSnapshot]
-  )
-
-  const setOption = useCallback(
-    async (id: string, value: SessionOptionValue) => {
-      await setStructuredOption(id, value)
-      return { snapshot: structuredAgentSessionOptionSnapshot(optionStateRef.current) }
-    },
-    [setStructuredOption]
-  )
-
-  const optionSurface = useMemo<SessionOptionsSurface>(
-    () => ({
-      getSnapshot: () => optionSnapshot,
-      setOption,
-      invokeAction: async () => ({ snapshot: optionSnapshot }),
-      subscribe: () => () => {}
-    }),
-    [optionSnapshot, setOption]
-  )
+  const { optionPickerRequest, invokeStructuredOption, optionSurface } =
+    useMobileStructuredOptionSurface({
+      optionSnapshot,
+      setStructuredOption,
+      optionStateRef
+    })
 
   return {
     optionPickerRequest,

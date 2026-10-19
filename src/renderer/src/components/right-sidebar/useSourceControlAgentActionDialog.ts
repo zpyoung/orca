@@ -64,8 +64,6 @@ export function useSourceControlAgentActionDialog({
   // place instead of writing a global default the override would still shadow.
   const defaultSaveTargetValue =
     launchAgentScope.overridesGlobalAgent && repoId ? 'repo' : DEFAULT_SAVE_TARGET_VALUE
-  const ensureDetectedAgents = useAppStore((state) => state.ensureDetectedAgents)
-  const ensureRemoteDetectedAgents = useAppStore((state) => state.ensureRemoteDetectedAgents)
   const [commandTemplate, setCommandTemplate] = useState(
     savedCommandInputTemplate ?? '{basePrompt}'
   )
@@ -98,16 +96,19 @@ export function useSourceControlAgentActionDialog({
     }
     setDetecting(true)
     try {
-      const nextAgents =
-        typeof connectionId === 'string'
-          ? await ensureRemoteDetectedAgents(connectionId)
-          : await ensureDetectedAgents()
+      const state = useAppStore.getState()
+      // Why: the workspace's own host answers, including a paired server's SSH workspace.
+      const nextAgents = await (worktreeId
+        ? ensureDetectedAgentsForWorktree(state, worktreeId)
+        : typeof connectionId === 'string'
+          ? state.ensureRemoteDetectedAgents(connectionId)
+          : state.ensureDetectedAgents())
       setDetectedAgents(nextAgents)
       return nextAgents
     } finally {
       setDetecting(false)
     }
-  }, [connectionId, connectionUnavailable, ensureDetectedAgents, ensureRemoteDetectedAgents])
+  }, [connectionId, connectionUnavailable, worktreeId])
 
   useEffect(() => {
     if (!open) {

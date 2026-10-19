@@ -1,8 +1,3 @@
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { agentSessionAccountHome } from '../../shared/agent-session-account-home'
-import { isAgentSessionPreSpawnError } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
-import { supportsSupervisedProviderChildLocation } from '../provider-process/supervised-provider-child-location'
 import type {
   StructuredAgentAdapterContext,
   StructuredAgentRuntimeAdapter,

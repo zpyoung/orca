@@ -127,6 +127,7 @@ export function AgentPermissionsSetting({
 export function AgentsPane({
   settings,
   updateSettings,
+  hostScope,
   wslSupportedPlatform,
   wslAvailable,
   wslDistros,

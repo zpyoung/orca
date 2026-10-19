@@ -86,6 +86,7 @@ export function registerProjectGroupHandlers(
       rawArgs,
       'invalid_project_group_move_repo_args'
     )
+    assertWslMoveProjectWritable(store, { repoId: args.projectId })
     const moved = store.moveProjectToGroup(args.projectId, args.groupId, args.order)
     if (moved) {
       notifyReposChanged(mainWindow)

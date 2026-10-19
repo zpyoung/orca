@@ -14,6 +14,7 @@ import {
   SelectAccountParams,
   SelectCodexAccountForTargetParams
 } from '../../../../shared/rpc-contract/accounts-params'
+import { HostAccountLaunchEnvParams } from '../../../../shared/host-account-launch-env'
 
 // Why: monotonically increasing per-process counter avoids the Date.now()
 // collision that fired when two near-simultaneous accounts.subscribe calls

@@ -11,7 +11,6 @@ import {
   generateCommitMessageFromContextMock,
   cancelGenerateCommitMessageLocalMock,
   cancelGeneratePullRequestFieldsLocalMock,
-  getSshGitProviderMock,
   resetFilesystemIpcMocks
 } from './filesystem-test-harness'
 
@@ -26,10 +25,6 @@ vi.mock(
   async () => (await import('./filesystem-test-harness')).crashBreadcrumbMock
 )
 vi.mock(
-  '../local-downloaded-folder-promotion',
-  async () => (await import('./filesystem-test-harness')).folderPromotionMock
-)
-vi.mock(
   '../git/status',
   async () => (await import('./filesystem-test-harness')).gitStatusModuleMock
 )
@@ -41,10 +36,6 @@ vi.mock('../git/worktree', async () => (await import('./filesystem-test-harness'
 vi.mock(
   '../providers/ssh-filesystem-dispatch',
   async () => (await import('./filesystem-test-harness')).sshFilesystemDispatchMock
-)
-vi.mock(
-  '../providers/ssh-git-dispatch',
-  async () => (await import('./filesystem-test-harness')).sshGitDispatchMock
 )
 vi.mock(
   '../text-generation/commit-message-text-generation',
@@ -65,6 +56,7 @@ vi.mock(
 
 import { registerFilesystemHandlers } from './filesystem'
 import { invalidateAuthorizedRootsCache } from './registered-worktree-roots-cache'
+import { SSH_HOST_NOT_SERVED_MESSAGE } from '../providers/ssh-host-not-served-error'
 
 describe('registerFilesystemHandlers', () => {
   beforeEach(() => {
@@ -334,36 +326,6 @@ describe('registerFilesystemHandlers', () => {
     )
   })
 
-  it('enriches the SSH commit context from host meta using the remote path', async () => {
-    const context = { branch: 'main', stagedSummary: 'A\tremote.txt', stagedPatch: '+remote' }
-    const params = { agentId: 'custom', model: '', customAgentCommand: 'agent' }
-    const worktreeId = 'repo-1::/remote/repo'
-    resolveCommitMessageSettingsMock.mockReturnValue({ ok: true, params })
-    getSshGitProviderMock.mockReturnValue({
-      getStagedCommitContext: vi.fn().mockResolvedValue(context),
-      executeCommitMessagePlan: vi.fn()
-    })
-    generateCommitMessageFromContextMock.mockResolvedValue({ success: true, message: 'Add file' })
-    const linkedStore = {
-      ...store,
-      getWorktreeMeta: (id: string) => (id === worktreeId ? { linkedIssue: 77 } : undefined)
-    }
-
-    registerFilesystemHandlers(linkedStore as never)
-
-    await handlers.get('git:generateCommitMessage')!(null, {
-      worktreePath: '/remote/repo',
-      worktreeId,
-      connectionId: 'conn-1'
-    })
-
-    expect(generateCommitMessageFromContextMock).toHaveBeenCalledWith(
-      { ...context, linkedIssue: 77 },
-      params,
-      expect.objectContaining({ kind: 'remote' })
-    )
-  })
-
   it('returns a sanitized error when local agent account preparation fails', async () => {
     const context = {
       branch: 'feature/ai',
@@ -486,22 +448,16 @@ describe('registerFilesystemHandlers', () => {
 
   it('generates an SSH commit message using remote staged context and relay execution', async () => {
     const context = {
-      branch: 'main',
-      stagedSummary: 'A\tremote.txt',
-      stagedPatch: '+remote'
+      branch: 'feature/ai',
+      stagedSummary: 'M\tREADME.md',
+      stagedPatch: '+hello'
     }
-    const params = { agentId: 'custom', model: '', customAgentCommand: 'agent' }
-    const executeCommitMessagePlan = vi.fn()
-    const prepareForCodexLaunch = vi.fn(() => '/managed/codex-home')
-    const prepareForClaudeLaunch = vi.fn()
+    const params = { agentId: 'claude', model: 'haiku' }
     resolveCommitMessageSettingsMock.mockReturnValue({ ok: true, params })
-    getSshGitProviderMock.mockReturnValue({
-      getStagedCommitContext: vi.fn().mockResolvedValue(context),
-      executeCommitMessagePlan
-    })
+    getStagedCommitContextMock.mockResolvedValue(context)
     generateCommitMessageFromContextMock.mockResolvedValue({
       success: true,
-      message: 'Add remote file'
+      message: 'Update README'
     })
 
     const resolveBaseEnvironment = vi.fn(async () => ({}))
@@ -510,6 +466,8 @@ describe('registerFilesystemHandlers', () => {
       prepareForClaudeLaunch,
       resolveBaseEnvironment
     })
+
+    registerFilesystemHandlers(store as never)
 
     await expect(
       handlers.get('git:generateCommitMessage')!(null, {
@@ -545,10 +503,7 @@ describe('registerFilesystemHandlers', () => {
     expect(resolveBaseEnvironment).not.toHaveBeenCalled()
   })
 
-  it('routes SSH generation cancellations to separate provider operations', async () => {
-    const cancelGenerateCommitMessage = vi.fn().mockResolvedValue(undefined)
-    getSshGitProviderMock.mockReturnValue({ cancelGenerateCommitMessage })
-
+  it('ignores SSH generation cancellations instead of cancelling local work', async () => {
     registerFilesystemHandlers(store as never)
 
     await handlers.get('git:cancelGenerateCommitMessage')!(null, {
@@ -560,12 +515,6 @@ describe('registerFilesystemHandlers', () => {
       connectionId: 'conn-1'
     })
 
-    expect(cancelGenerateCommitMessage).toHaveBeenNthCalledWith(1, '/remote/repo', 'commit-message')
-    expect(cancelGenerateCommitMessage).toHaveBeenNthCalledWith(
-      2,
-      '/remote/repo',
-      'pull-request-fields'
-    )
     expect(cancelGenerateCommitMessageLocalMock).not.toHaveBeenCalled()
     expect(cancelGeneratePullRequestFieldsLocalMock).not.toHaveBeenCalled()
   })
@@ -600,27 +549,6 @@ describe('registerFilesystemHandlers', () => {
     await expect(
       handlers.get('git:generateCommitMessage')!(null, {
         worktreePath: WORKTREE_FEATURE_PATH
-      })
-    ).resolves.toEqual({ success: false, error: 'Failed to read staged changes.' })
-
-    expect(generateCommitMessageFromContextMock).not.toHaveBeenCalled()
-  })
-
-  it('sanitizes SSH staged-context read failures before returning to the renderer', async () => {
-    resolveCommitMessageSettingsMock.mockReturnValue({
-      ok: true,
-      params: { agentId: 'codex', model: 'gpt-5.4-mini' }
-    })
-    getSshGitProviderMock.mockReturnValue({
-      getStagedCommitContext: vi.fn().mockRejectedValue(new Error('fatal: /remote/secret failed'))
-    })
-
-    registerFilesystemHandlers(store as never)
-
-    await expect(
-      handlers.get('git:generateCommitMessage')!(null, {
-        worktreePath: '/remote/repo',
-        connectionId: 'conn-1'
       })
     ).resolves.toEqual({ success: false, error: 'Failed to read staged changes.' })
 

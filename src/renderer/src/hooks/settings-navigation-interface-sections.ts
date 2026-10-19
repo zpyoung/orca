@@ -56,7 +56,11 @@ export function buildInterfaceSettingsSections({
                 (entry) => hostQueuesMessages || entry.targetSectionId !== 'chat-queue-follow-ups'
               ),
               ...(showDesktopOnlySettings
-                ? [getChatNamingSearchEntry(), getChatInlineVisualsSearchEntry()]
+                ? [
+                    getChatProvidersSearchEntry(),
+                    getChatNamingSearchEntry(),
+                    getChatInlineVisualsSearchEntry()
+                  ]
                 : [])
             ],
             group: 'interface'

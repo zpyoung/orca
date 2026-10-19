@@ -1,12 +1,4 @@
-/**
- * Turns a saved record back into the editor's draft shape.
- *
- * Both builders are total: a schedule the editor cannot represent produces a
- * warning rather than a silently rewritten one, because saving would otherwise
- * replace a working cron the user never chose to change.
- */
-
-import type { Automation, ExternalAutomationJob } from '../../../../shared/automations-types'
+import type { Automation } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
 import {
   migrateLegacyAutomationLaunchArgs,

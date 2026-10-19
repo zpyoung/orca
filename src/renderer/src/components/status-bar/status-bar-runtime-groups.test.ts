@@ -7,11 +7,13 @@ import type {
 } from '../../../../shared/managed-account-types'
 import {
   buildClaudeStatusSwitchGroups,
+  resolveClaudeStatusAccountState
+} from './status-bar-claude-accounts'
+import {
   buildCodexStatusSwitchGroups,
-  getStatusBarPreferredWslDistro,
-  resolveClaudeStatusAccountState,
   resolveCodexStatusAccountState
-} from './StatusBar'
+} from './status-bar-codex-accounts'
+import { getStatusBarPreferredWslDistro } from './status-bar-runtime-targets'
 
 const hostLabel = navigator.userAgent.includes('Windows') ? 'Windows' : 'This device'
 
@@ -324,13 +326,12 @@ describe('status bar runtime switch groups', () => {
       ]
     } as GlobalSettings
 
-    expect(resolveCodexStatusAccountState(settings, remoteState)).toBe(remoteState)
+    expect(resolveCodexStatusAccountState(settings, remoteState, 'env-1')).toBe(remoteState)
     // Without a remote owner, settings-derived accounts win as before.
     expect(
-      resolveCodexStatusAccountState(
-        { ...settings, activeRuntimeEnvironmentId: null },
-        remoteState
-      ).accounts.map((account) => account.id)
+      resolveCodexStatusAccountState(settings, remoteState, null).accounts.map(
+        (account) => account.id
+      )
     ).toEqual(['desktop-codex-1'])
   })
 
@@ -357,12 +358,11 @@ describe('status bar runtime switch groups', () => {
       ]
     } as GlobalSettings
 
-    expect(resolveClaudeStatusAccountState(settings, remoteState)).toBe(remoteState)
+    expect(resolveClaudeStatusAccountState(settings, remoteState, 'env-1')).toBe(remoteState)
     expect(
-      resolveClaudeStatusAccountState(
-        { ...settings, activeRuntimeEnvironmentId: '   ' },
-        remoteState
-      ).accounts.map((account) => account.id)
+      resolveClaudeStatusAccountState(settings, remoteState, null).accounts.map(
+        (account) => account.id
+      )
     ).toEqual(['desktop-claude-1'])
   })
 })

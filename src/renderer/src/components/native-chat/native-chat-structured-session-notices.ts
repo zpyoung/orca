@@ -91,6 +91,8 @@ export function structuredSessionNotices({
   claudeSignIn?: NativeChatClaudeSignIn | null
   /** Why the host says no chat can start here, from `useNativeChatAvailabilityNotice`. */
   availability?: NativeChatComposerNotice | null
+  /** Why this chat's host may not take a turn, from `useNativeChatHostPermissionGate`. */
+  hostPermission?: NativeChatComposerNotice | null
 }): NativeChatComposerNotice[] {
   const launchNotice = nativeChatLaunchNotice({
     lifecycle: launch.lifecycle,
@@ -100,6 +102,7 @@ export function structuredSessionNotices({
     claudeSignIn
   })
   return [
+    ...(hostPermission ? [hostPermission] : []),
     ...(availability ? [availability] : []),
     ...(launchNotice && !sessionError ? [launchNotice] : []),
     ...(sessionError

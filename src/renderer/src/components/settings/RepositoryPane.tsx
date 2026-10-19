@@ -177,6 +177,7 @@ export function RepositoryPane({
   const identityEntryTitles = new Set([
     translate('auto.components.settings.repository.search.7e1e456a95', 'Display Name'),
     translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),
+    translate('components.RepositoryJiraProjectSection.title', 'Default Jira project'),
     translate('auto.components.settings.repository.search.githubAccount', 'GitHub Account'),
     translate(
       'auto.components.settings.repository.search.keepForkUpToDate',
@@ -307,6 +308,13 @@ export function RepositoryPane({
           <RepositoryIconPicker repo={repo} updateRepo={updateSelectedRepo} />
         </SearchableSetting>
 
+        <RepositoryJiraProjectSection
+          key={`${selectedHostId}:${repo.id}`}
+          repo={repo}
+          updateRepo={updateSelectedRepo}
+          forceVisible={forceFullPaneForRepoMatch}
+        />
+
         {!isFolder ? (
           <>
             <RepositoryHostSetupsSection
@@ -386,7 +394,7 @@ export function RepositoryPane({
       <SparsePresetSettingsSection key={`sparse-presets:${repo.id}`} repoId={repo.id} />
     ) : null,
     !isFolder && (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, mcpEntries)) ? (
-      <McpConfigSection key="mcp-configs" repo={repo} />
+      <McpConfigSection key={`mcp-configs:${selectedHostId}:${repo.id}`} repo={repo} />
     ) : null
   ].filter(Boolean)
 

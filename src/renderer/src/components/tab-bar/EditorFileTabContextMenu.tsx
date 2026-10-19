@@ -26,9 +26,10 @@ import { translate } from '@/i18n/i18n'
 import { LocalOnlyMenuHint } from '@/components/local-only-menu-hint'
 import {
   getRevealInFileManagerLabel,
-  isRevealInFileManagerBlocked,
+  getWorkspaceFileRevealOwner,
   revealInFileManager
 } from '@/lib/reveal-in-file-manager'
+import { isRevealOrEditorOpenBlocked } from '@/lib/local-path-open-guard'
 import { TabWorkspaceLayoutMenuSection } from './TabWorkspaceLayoutMenuSection'
 import { TAB_CONTEXT_MENU_CONTENT_CLASS } from './tab-context-menu-sizing'
 import { isVirtualEditorFile } from '@/store/slices/editor/tabs/editor-tab-content-type'
@@ -58,6 +59,7 @@ type EditorFileTabContextMenuProps = {
   onCloseAll: () => void
   onCloseToRight: () => void
   onCloseToLeft: () => void
+  onCloseSplitPane?: () => void
   onOpenMarkdownPreview: (
     file: {
       filePath: string
@@ -95,17 +97,19 @@ export function EditorFileTabContextMenu({
   onCloseAll,
   onCloseToRight,
   onCloseToLeft,
+  onCloseSplitPane,
   onOpenMarkdownPreview
 }: EditorFileTabContextMenuProps): React.JSX.Element {
   const renameShortcut = useOptionalShortcutLabel('tab.rename')
   const closeShortcut = useOptionalShortcutLabel('tab.close')
   const closeAllShortcut = useOptionalShortcutLabel('tab.closeAll')
-  const revealBlocked = useAppStore((s) =>
-    isRevealInFileManagerBlocked(s.settings, {
+  const revealOwner = useAppStore((s) =>
+    getWorkspaceFileRevealOwner(s, file.worktreeId, {
       connectionId: file.externalSshTargetId ?? repoConnectionId,
       runtimeEnvironmentId: file.runtimeEnvironmentId
     })
   )
+  const revealBlocked = isRevealOrEditorOpenBlocked(revealOwner)
 
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
@@ -155,6 +159,7 @@ export function EditorFileTabContextMenu({
             ? translate('auto.components.tab.bar.EditorFileTabContextMenu.8e9d603a09', 'Unpin Tab')
             : translate('auto.components.tab.bar.EditorFileTabContextMenu.fdd29eb669', 'Pin Tab')}
         </DropdownMenuItem>
+        <CopyTabIdMenuItem unifiedTabId={unifiedTabId} />
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => !isPinned && onClose()} disabled={isPinned}>
           <X className="size-3.5" />
@@ -244,7 +249,7 @@ export function EditorFileTabContextMenu({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               disabled={revealBlocked}
-              onSelect={() => void revealInFileManager(file.filePath)}
+              onSelect={() => void revealInFileManager(file.filePath, revealOwner)}
             >
               <ExternalLink className="size-3.5" />
               {getRevealInFileManagerLabel()}

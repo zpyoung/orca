@@ -1,48 +1,28 @@
-import type { Repo } from '../../../../shared/repo-types'
-import type { TerminalTab } from '../../../../shared/terminal-tab-types'
-import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
-export type { SidebarFilterState } from './visible-worktree-kinds'
+export type { SidebarFilterState } from './sidebar-filter-actions'
 export {
-  isAutomationGeneratedWorkspace,
-  isCliCreatedWorkspace,
-  isDetachedHeadWorkspace,
-  isSleepingSweepExemptionNarrowingList,
-  isSleepingSweepExemptWorkspace
-} from './visible-worktree-kinds'
-export { sidebarHasActiveFilters, computeClearFilterActions } from './sidebar-filter-actions'
-export type { ClearFilterActions } from './sidebar-filter-actions'
-import {
-  isAutomationGeneratedWorkspace,
-  isCliCreatedWorkspace,
-  isDetachedHeadWorkspace,
-  isSleepingSweepExemptWorkspace
-} from './visible-worktree-kinds'
+  computeVisibleWorktreeIds,
+  computeVisibleWorktrees,
+  type VisibleWorktreeOptions
+} from './compute-visible-worktrees'
+import { computeVisibleWorktreeIds } from './compute-visible-worktrees'
+export { sidebarHasActiveFilters } from './sidebar-filter-actions'
 import {
   getVisibleWorkspaceHostIdSet,
   worktreeMatchesVisibleHost
 } from './visible-worktree-host-scope'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { buildWorktreeComparator, sortWorktreesSmart } from './smart-sort'
-import { isInactiveWorkspace } from '@/lib/worktree-activity-state'
+import {
+  buildWorktreeComparator,
+  sortWorktreesSmart
+} from '../../../../shared/sidebar-list/smart-sort'
 export {
   EMPTY_STRUCTURED_CHAT_WORKTREE_IDS,
   getWorktreeIdsWithStructuredChat
 } from './visible-worktree-activity-inputs'
-// Runtime edge only one way: the builder imports VisibleWorktreeOptions as a type, which erases.
 import { buildVisibleWorktreeOptionsFromState } from './visible-worktree-options-from-state'
 import { useAppStore } from '@/store'
 import { getAllWorktreesFromState, getRepoMapFromState } from '@/store/selectors'
-import {
-  ALL_EXECUTION_HOSTS_SCOPE,
-  getSettingsFocusedExecutionHostId,
-  getWorktreeExecutionHostId,
-  type ExecutionHostId,
-  type ExecutionHostScope
-} from '../../../../shared/execution-host'
-import {
-  getCyclicProjectedWorktreeLineageIds,
-  getLineageRenderInfo
-} from './worktree-lineage-projection'
+import { getSettingsFocusedExecutionHostId } from '../../../../shared/execution-host'
 import {
   computeRenderedSidebarWorktreeOrder,
   computeRenderedSidebarWorktrees
