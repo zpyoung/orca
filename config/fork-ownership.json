@@ -855,16 +855,6 @@
       ]
     },
     {
-      "path": "config/scripts/pr-ready-check-reuse.test.mjs",
-      "feature": "fork-ownership-guard",
-      "kind": "import-swap",
-      "lines": [
-        "} from './fork-ownership-guard/pr-workflow-contract.mjs'",
-        "const workflow = workflowWithoutForkGuard(parse(readFileSync('.github/workflows/pr.yml', 'utf8')))",
-        "    for (const name of ['test_files', 'native_ime_source_changed']) {"
-      ]
-    },
-    {
       "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
@@ -5118,14 +5108,6 @@
       ]
     },
     {
-      "path": "config/scripts/localization-extraction-change-scope.test.mjs",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": [
-        "    /else\\s+bun config\\/scripts\\/fork-localization-catalog-check\\.mjs --verify-extraction\\s+fi/"
-      ]
-    },
-    {
       "path": "config/scripts/benchmark-ci-preflight-critical-path.mjs",
       "feature": "fork-benchmark-baseline",
       "kind": "registration",
@@ -5922,13 +5904,15 @@
     },
     {
       "path": "config/scripts/pr-code-change-scope.test.mjs",
-      "reason": "Retains upstream classifier behavior while dropping source-pinning assertions for the Windows PR job absent from the fork-owned workflow, and asserts the draft guard on code_paths (the tag's version asserts none and fails against the tag's own pr.yml).",
-      "status": "permanent"
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
     },
     {
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
-      "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
-      "status": "permanent"
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
     },
     {
       "path": "config/scripts/skills-cli-package-workflow.test.mjs",
@@ -6318,9 +6302,64 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/check-node-runtime-pin.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/ci-e2e-job-selection.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/ci-unit-exclusion-coverage.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/localization-extraction-change-scope.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/orcad-terminal-smoke-change-scope.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/pr-e2e-route-contracts.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/pr-ready-check-reuse.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
       "path": "config/scripts/pr-preflight-gates.test.mjs",
-      "reason": "Contracts for the fork-owned PR job graph: this fork removed the Windows PR packaging lane, so its preflight gating is asserted absent.",
-      "status": "permanent"
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
     },
     {
       "path": "src/shared/rpc-contract/rpc-params-catalog.generated.ts",
@@ -8497,20 +8536,12 @@
       "added": 12,
       "removed": 2
     },
-    "config/scripts/pr-ready-check-reuse.test.mjs": {
-      "added": 6,
-      "removed": 3
-    },
     "config/scripts/check-path-literal-ratchet.mjs": {
       "added": 5,
       "removed": 1
     },
     "config/scripts/run-node-server-tests.mjs": {
       "added": 2,
-      "removed": 1
-    },
-    "config/scripts/localization-extraction-change-scope.test.mjs": {
-      "added": 3,
       "removed": 1
     },
     "config/scripts/benchmark-ci-preflight-critical-path.mjs": {
