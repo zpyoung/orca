@@ -256,6 +256,27 @@ This merge is fork-against-fork, so `-X ours` is wrong here — it would discard
 
 Then re-run the Step 8 gate whole before pushing: the merge can break a file neither side broke.
 
+### An undecided escalation may already block this tag
+
+A run that stops on a human decision leaves no PR, so the check above cannot see it. It leaves a
+ledger `decision` naming the tag and a `sync-resolved/<tag>-<stamp>` tag instead. Until someone
+decides, every later run repeats the same merge against the same inputs and stops in the same place:
+decision-298 stopped v1.4.222, v1.4.223 and v1.4.224 syncs on four consecutive days, the last two
+against a `main` that had gained only README badge commits. Check before Step 3:
+
+```sh
+orca ledger list --type decision --state open --json   # titles naming a sync tag
+git log --oneline --no-merges "<that run's backup ref>"..origin/main \
+  | grep -v 'Update README downloads badge'
+git diff --stat "<that run's tag>" "$UPSTREAM_TARGET" -- <the files the decision names>
+```
+
+If the decision is still `proposed`, `main` gained no fork commit since the run that raised it, and
+the new tag leaves the decision's files unchanged, stop before Step 3 and report "needs attention:
+<decision id> is still undecided; nothing merged". The run cannot settle the decision, and re-running
+the merge only re-proves it. If any of the three has moved, run the normal procedure: the collision
+may have dissolved, and that is worth finding out.
+
 ## Step 3 — Backup
 
 Build a UTC stamp for the run (`date -u +%Y%m%d-%H%M%SZ`, or the PowerShell equivalent on Windows)
@@ -356,9 +377,14 @@ keeping the fork's version is correct — the fork owns its own version line.
 auto-resolvable, and only in the fork's favor:
 
 - **"deleted by them / modified by us"** (upstream deleted it, the fork modified it) → keep the
-  fork's file: `git checkout --ours -- <path>` then `git add <path>`.
+  fork's file: `git checkout --ours -- <path>` then `git add -f <path>`. The `-f` is needed because
+  `docs/**` is gitignored while upstream still tracks files under it, and a plain `git add` of a
+  conflicted ignored path refuses with "paths are ignored" and exits non-zero.
 - **"deleted by us / modified by them"** (the fork deleted it, upstream modified it) → honor the
   fork's deletion: `git rm -f <path>`.
+
+Run the two rules as separate commands. Chained with `&&`, a refused `git add` silently skips
+every `git rm`, and the commit then fails on paths you believed were resolved.
 
 Then `git commit --no-edit --no-verify`. Record `resolution=auto-ours+tree` and log every path
 touched with the rule applied. `--no-verify` is required, not a shortcut: husky's pre-commit hook
