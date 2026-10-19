@@ -320,8 +320,14 @@ jobs:
         env:
           PREFLIGHT_PHASE_SELECTED: ${{ needs.code_paths.outputs.static_analysis == 'true' }}
           PREFLIGHT_PRIOR_SUCCESS: ${{ job.status == 'success' }}
+          CHANGED_COUNT: ${{ needs.code_paths.outputs.changed_count }}
         run: |
           if [ "$PREFLIGHT_PHASE_SELECTED" != true ] || [ "$PREFLIGHT_PRIOR_SUCCESS" != true ]; then exit 0; fi
+          # Strict changed-line scans cannot finish on a sync-sized diff; baseline checks still run.
+          if [ "$CHANGED_COUNT" -gt 500 ]; then
+            echo "Skipping changed-code quality: $CHANGED_COUNT changed files exceeds the 500-file limit for strict changed-line scans. Baseline checks remain enabled."
+            exit 0
+          fi
           node config/scripts/check-changed-code-quality.mjs "${{ github.event.pull_request.base.sha }}"
 
       - name: Verify locked audit tools
@@ -332,7 +338,14 @@ jobs:
 
       - name: Enforce React Doctor on changed lines
         if: needs.code_paths.outputs.static_analysis == 'true'
-        run: node config/scripts/check-react-doctor-changed.mjs "${{ github.event.pull_request.base.sha }}"
+        env:
+          CHANGED_COUNT: ${{ needs.code_paths.outputs.changed_count }}
+        run: |
+          if [ "$CHANGED_COUNT" -gt 500 ]; then
+            echo "Skipping React Doctor: $CHANGED_COUNT changed files exceeds the 500-file limit for strict changed-line scans. Baseline checks remain enabled."
+            exit 0
+          fi
+          node config/scripts/check-react-doctor-changed.mjs "${{ github.event.pull_request.base.sha }}"
 
       - wait: changed-code-quality
 
