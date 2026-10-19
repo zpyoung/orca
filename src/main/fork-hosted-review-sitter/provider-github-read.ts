@@ -36,8 +36,8 @@ query($owner: String!, $repo: String!, $pr: Int!, $after: String) {
       headRefOid
       headRefName
       headRepository { nameWithOwner }
-      baseRefOid
       baseRefName
+      baseRef { target { oid } }
       mergeable
       mergeStateStatus
       reviewDecision
@@ -105,8 +105,8 @@ export type GitHubPullRequestState = {
   headRefOid?: unknown
   headRefName?: unknown
   headRepository?: { nameWithOwner?: unknown } | null
-  baseRefOid?: unknown
   baseRefName?: unknown
+  baseRef?: { target?: { oid?: unknown } | null } | null
   mergeable?: unknown
   mergeStateStatus?: unknown
   reviewDecision?: unknown
@@ -397,7 +397,8 @@ export async function loadGitHubState(
   const pages = await loadGitHubPages(ownerRepo, ghOptions, definition.reviewNumber, fresh, signal)
   const pr = pages.repository.pullRequest!
   const headSha = stringValue(pr.headRefOid)
-  const baseSha = stringValue(pr.baseRefOid)
+  // baseRefOid lags the base branch until the PR is pushed, but mergeability tracks the live tip
+  const baseSha = stringValue(pr.baseRef?.target?.oid)
   const baseRefName = stringValue(pr.baseRefName)
   const reviewPushTarget = fresh ? await git.reviewPushTarget(signal) : null
   const sourceIdentityComplete =
