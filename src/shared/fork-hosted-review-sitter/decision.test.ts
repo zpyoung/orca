@@ -9,6 +9,7 @@ import { hostedReviewAttemptFingerprint, hostedReviewContentIdentity } from './a
 import { deriveHostedReviewSitterDiscrepancies } from './reconciliation'
 import { paceHostedReview } from './kind-knowledge'
 import { HOSTED_REVIEW_STOP_PREDICATES } from './stop-policy'
+import { buildPrepareConflictAction } from './decision-action-builders'
 import type {
   HostedReviewCheckSnapshot,
   HostedReviewPreparedCommit,
@@ -476,6 +477,30 @@ describe('PR sitter desired-action safety policy', () => {
     expect(computeDesiredAction(conflicted, sitter(), ledger())).toMatchObject({
       kind: 'prepare-conflict-resolution'
     })
+  })
+
+  it('retries conflict preparation only once the base moves past an unverifiable attempt', () => {
+    // a worker that merged an already-contained base reports failure with no commit; rerunning the
+    // same (head, base) merge is deterministic, so only a new base tip earns another dispatch
+    const conflicted = review({
+      conflicts: 'present',
+      providerReadiness: { verdict: 'blocked', blockers: ['conflicts'] }
+    })
+    const history = ledger([
+      {
+        kind: 'action',
+        eventId: 'prepare-attempt',
+        actionId: 'prepare-stale-base',
+        atMs: 1_000,
+        action: buildPrepareConflictAction(conflicted),
+        state: 'failed'
+      }
+    ])
+
+    expect(computeDesiredAction(conflicted, sitter(), history)).toBeNull()
+    expect(
+      computeDesiredAction({ ...conflicted, baseSha: 'base-2' }, sitter(), history)
+    ).toMatchObject({ kind: 'prepare-conflict-resolution', headSha: HEAD, baseSha: 'base-2' })
   })
 
   it('still holds conflict resolution on a draft review', () => {
