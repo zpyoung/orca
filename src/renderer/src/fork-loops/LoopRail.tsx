@@ -51,20 +51,28 @@ function LoopRailPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const run = async (call: (api: LoopsApi) => Promise<LoopSnapshot>): Promise<void> => {
+  const run = async (call: (api: LoopsApi) => Promise<LoopSnapshot>): Promise<boolean> => {
     setBusy(true)
     setError(null)
     try {
       applyLoopSnapshot(await call(window.api.loops))
       setMode(null)
+      return true
     } catch (caught) {
       setError(
         caught instanceof Error && caught.message
           ? caught.message
           : translate('fork.loops.rail.actionFailed', 'That did not go through. Try again.')
       )
+      return false
     } finally {
       setBusy(false)
+    }
+  }
+
+  const sendSteer = async (text: string): Promise<void> => {
+    if (await run((api) => api.steer(loop.id, text))) {
+      setSteerText('')
     }
   }
 
@@ -189,11 +197,7 @@ function LoopRailPanel({
             event.preventDefault()
             const text = steerText.trim()
             if (text) {
-              void run(async (api) => {
-                const snapshot = await api.steer(loop.id, text)
-                setSteerText('')
-                return snapshot
-              })
+              void sendSteer(text)
             }
           }}
         >
