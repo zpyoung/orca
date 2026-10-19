@@ -5309,6 +5309,12 @@
       ]
     },
     {
+      "path": "config/process-host-direct-import-baseline.txt",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": ["src/main/fork-loops/loop-precheck-runner.ts"]
+    },
+    {
       "path": "config/scripts/generate-bundled-skill-guides.mjs",
       "feature": "fork-loops",
       "kind": "registration",
@@ -8892,6 +8898,10 @@
     },
     "mobile/src/worktree/workspace-list-types.ts": {
       "added": 2,
+      "removed": 0
+    },
+    "config/process-host-direct-import-baseline.txt": {
+      "added": 1,
       "removed": 0
     }
   }
