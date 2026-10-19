@@ -1,5 +1,5 @@
 ---
-last_released_commit: 4d57bf45c685667728e0b2e614f8e882879090c6
+last_released_commit: ad2869d55bf935c0359a6c8d3c06f6847cbfb3e6
 upstream_synced: v1.4.230
 ---
 
@@ -12,7 +12,45 @@ line per release, and detailed in each GitHub release's generated notes.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
 
+## [1.4.231-rc.0.zy03] - 2026-10-19
+
+Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4.230), by way of
+[v1.4.227](https://github.com/stablyai/orca/releases/tag/v1.4.227).
+
+### Added
+- Loops run an agent in a worktree's terminal over and over until a check command or an evaluator
+  says the work is done. Pick until-done, a fixed interval, or a queue of prompts, from the + menu
+  or with `orca loop`. A loop rail shows each iteration and lets you pause, steer, edit, or stop
+  it, with optional caps on iterations, minutes, and cost. A loop keeps running after its tab
+  closes, works over SSH, and shows its status in `worktree ps` and on mobile worktree rows.
+
+### Changed
+- Native chat code blocks now use upstream's syntax highlighter. The fork's own code-block
+  coloring is gone, so inline code in chat prose no longer gets the fork's accent chip. Tool
+  icons in chat keep their fork coloring.
+- Pull request CI now runs only the essential gates: the fork ownership guard, lint and
+  typecheck, unit tests, and cross-version wire checks. The standalone test workflows are off.
+- The daily upstream sync builds on an open sync PR for an older release instead of stalling
+  behind it, asks the owner when it needs a decision and waits for the answer, and checks locally
+  what PR CI would reject before it pushes.
+
+### Removed
+- The fork's additions to the SSH relay are retired, because upstream replaced the relay with its
+  managed remote host. Native chat transcript paging and live tail keep working for local chats.
+
+### Fixed
+- Pasting into the terminal dock's chat composer with Cmd+V, a paste event, or the app menu goes
+  to the composer again, instead of to the terminal beside it.
+- The hosted-review sitter now checks a pull request's conflicts against the base branch's current
+  tip. It used to keep retrying a no-op merge against an old base commit after the base moved.
+- The hosted-review sitter now waits for a GitHub workflow run to finish before rerunning its
+  failed jobs, instead of failing on GitHub's "already running" refusal on every tick.
+- Fork macOS release builds sign again. The packaged terminal host is now checked against the
+  fork's own Apple signing team, not upstream's.
+
 ## [1.4.231-rc.0.zy02] - 2026-10-19
+
+Not published: the build failed. Superseded by 1.4.231-rc.0.zy03.
 
 Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4.230), by way of
 [v1.4.227](https://github.com/stablyai/orca/releases/tag/v1.4.227).
