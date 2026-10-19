@@ -25,8 +25,23 @@ previous runs of this exact procedure, and it exists so you do not spend the bud
 wrong turn one of them already paid for.
 
 Arguments: `--unattended` suppresses every confirmation prompt. It does **not** grant extra
-latitude: an unattended run stops and reports wherever an attended run would ask a human, and the
-decisions this skill routes to a human stay routed to a human.
+latitude: the decisions this skill routes to a human stay routed to a human.
+
+**Escalating a decision means asking and waiting, attended or not.** Put the decision to the human
+through `orca ask` (load the `orca-ask` skill for the CLI), then wait with
+`orca-ask-wait <ask_id> 43200` run as a background command, which polls for up to 12 hours. On an
+answer, continue as the human chose. On `declined`, `timed_out` or `unavailable`, stop and report
+"needs attention: <the decision>" — that is the only path to a decision-shaped stop. Build each
+option from what you have read, naming the files it touches and which local and remote callers
+depend on them, never from a feature's name: v1.4.230's first relay ask offered to retire
+`native-chat-relay` outright when its renderer half also served local chat, and an agent had to
+catch it. Read the gating code before asking at all — a second ask that run was withdrawn after one
+`rg` showed the new store was dark by default.
+
+**A run ends only at Step 16.** Every wait — on CI, on an ask, on a release build — is a background
+command whose exit re-invokes you. Never end the turn, schedule a wakeup, or hand back to the human
+while the run's PR is open. The 2026-10-16 run ended its turn behind a background poll; its green PR
+#120 then sat unmerged for 68 hours while the next three daily runs stopped behind it.
 
 The run needs a disposable branch in a workspace of its own; the scheduled automation supplies one by
 creating a fresh worktree per run. This skill never creates, renames, or deletes a branch or a
@@ -188,16 +203,27 @@ env -u GITHUB_TOKEN gh pr list --repo zpyoung/orca --state open \
   --json number,title,url,headRefName,headRefOid
 ```
 
-**A sync PR for an older tag stops the run here.** If an open PR is titled
-`sync: absorb upstream <tag>` for any tag other than `$STABLE_TAG`, upstream shipped a newer stable
-release while an earlier sync was still unlanded. Neither continuation is safe: stable tags live on
-per-release branches, so the older tag is not an ancestor of the newer one and the adoption checks
-below fail by construction; and merging `$STABLE_TAG` onto a fresh `main` re-derives the older PR's
-resolution and races it. Stop before Step 3 — nothing backed up, merged, or pushed — and report
-"needs attention: sync PR #<n> for <tag> is still open; land or close it before syncing
-`$STABLE_TAG`". Once it lands, the newer tag is an ordinary one-release sync; once it is closed, the
-next run syncs `$STABLE_TAG` fresh. Hit on 2026-09-10 (#48, v1.4.198 vs v1.4.199) and 2026-09-26
-(#92, v1.4.209 vs v1.4.212).
+**A sync PR for an older tag is this run's base: stack on it, then close it.** If an open PR is
+titled `sync: absorb upstream <tag>` for a tag older than `$STABLE_TAG`, upstream shipped a newer
+stable release while an earlier sync was still unlanded. Merging `$STABLE_TAG` onto a fresh `main`
+would re-derive that PR's resolution and race it, and adopting it fails by construction, since
+stable tags live on per-release branches and the older tag is not an ancestor of the newer one.
+Build on its resolution instead:
+
+1. Check it as a base with the adoption checks below, testing that **its** tag is merged in place
+   of `$UPSTREAM_TARGET`. If it is not built on today's `main`, merge `main` into it first exactly
+   as that section describes. Red CI on it is not a reason to skip it: its failures become this
+   run's, and most of them are still real against the newer tag.
+2. Back up as Step 3 says. In Step 4, reset to the older PR's head instead of `$ORIGIN_MAIN_OLD`,
+   and run Steps 5–8 as usual from there, with the older tag as `$PREV_TAG` for every Step 6 audit
+   diff: its resolution is already in the tree.
+3. At Step 9, open the new PR, then close the older one with a comment naming its successor:
+   `env -u GITHUB_TOKEN gh pr close <n> --repo zpyoung/orca --comment "Superseded by #<new>, which
+   carries this resolution and $STABLE_TAG."` Leave its branch and backup ref alone.
+
+Landing the new PR lands both tags in one merge commit. Proven 2026-10-19: #122 (v1.4.230) on #120
+(v1.4.227). This used to be a hard stop, and it stalled the sync for days at a time: 2026-09-10
+(#48), 2026-09-26 (#92), and 2026-10-17 through 2026-10-19 (#120).
 
 A PR titled `sync: absorb upstream $STABLE_TAG` is this run's work, already done. **Adopt it — do not
 re-merge.** Verify it before you build on it, because its body is its own account and not evidence:
@@ -255,6 +281,27 @@ This merge is fork-against-fork, so `-X ours` is wrong here — it would discard
   three budgets from `+5/-2`, `+5/-2`, `+13/-4` to `+1/-1`, `+1/-1`, `+9/-3`.
 
 Then re-run the Step 8 gate whole before pushing: the merge can break a file neither side broke.
+
+### An undecided escalation may already block this tag
+
+A run that stops on a human decision leaves no PR, so the check above cannot see it. It leaves a
+ledger `decision` naming the tag and a `sync-resolved/<tag>-<stamp>` tag instead. Until someone
+decides, every later run repeats the same merge against the same inputs and stops in the same place:
+decision-298 stopped v1.4.222, v1.4.223 and v1.4.224 syncs on four consecutive days, the last two
+against a `main` that had gained only README badge commits. Check before Step 3:
+
+```sh
+orca ledger list --type decision --state open --json   # titles naming a sync tag
+git log --oneline --no-merges "<that run's backup ref>"..origin/main \
+  | grep -v 'Update README downloads badge'
+git diff --stat "<that run's tag>" "$UPSTREAM_TARGET" -- <the files the decision names>
+```
+
+If the decision is still `proposed`, `main` gained no fork commit since the run that raised it, and
+the new tag leaves the decision's files unchanged, stop before Step 3 and report "needs attention:
+<decision id> is still undecided; nothing merged". The run cannot settle the decision, and re-running
+the merge only re-proves it. If any of the three has moved, run the normal procedure: the collision
+may have dissolved, and that is worth finding out.
 
 ## Step 3 — Backup
 
@@ -356,9 +403,14 @@ keeping the fork's version is correct — the fork owns its own version line.
 auto-resolvable, and only in the fork's favor:
 
 - **"deleted by them / modified by us"** (upstream deleted it, the fork modified it) → keep the
-  fork's file: `git checkout --ours -- <path>` then `git add <path>`.
+  fork's file: `git checkout --ours -- <path>` then `git add -f <path>`. The `-f` is needed because
+  `docs/**` is gitignored while upstream still tracks files under it, and a plain `git add` of a
+  conflicted ignored path refuses with "paths are ignored" and exits non-zero.
 - **"deleted by us / modified by them"** (the fork deleted it, upstream modified it) → honor the
   fork's deletion: `git rm -f <path>`.
+
+Run the two rules as separate commands. Chained with `&&`, a refused `git add` silently skips
+every `git rm`, and the commit then fails on paths you believed were resolved.
 
 Then `git commit --no-edit --no-verify`. Record `resolution=auto-ours+tree` and log every path
 touched with the rule applied. `--no-verify` is required, not a shortcut: husky's pre-commit hook
@@ -392,11 +444,24 @@ output lists — `checkout.txt`, `remove.txt`, `ours.txt`, `merge-review.txt`. `
 no shell command: those paths took a real three-way merge and must be read by hand against the
 manifest's declared lines.
 
+`-X ours` resolved every conflicting hunk in those files toward the fork, so re-merge each seam file
+without it (`git merge-file --diff3 -p` with `$MERGE_HEAD_PRE`, `$PREV_TAG`, `$UPSTREAM_TARGET`) and
+resolve every file that reports a conflict. Do this even where `--verify-residuals` passes: a
+discarded upstream hunk the same size as the fork's keeps the budget intact. v1.4.215 had two such
+files that the residual check never flagged: `pr-e2e-gate-contract.test.mjs`, still naming a job
+upstream had retired, and `NativeChatToolLine.tsx`, with a hover-group rename lost.
+
+The `ours.txt` three-way merge has a matching blind spot. A clean merge imports upstream's new
+assertions into an exception-owned contract test even when they name a workflow or job the fork
+deletes. v1.4.215 did this for `track-community-prs.yaml` and `package_windows`. Nothing flags it
+until PR CI, so grep every merged exception test for the paths the manifest marks `deleted: true`
+and for jobs missing from the fork's `pr.yml`.
+
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
-feature-collision review**. Each can surface a decision the reference routes to a human. Under
-`--unattended`, that is a stopping condition: go to Step 16 with "needs attention: <the decision>"
-rather than choosing a side.
+feature-collision review**. Each can surface a decision the reference routes to a human. Escalate
+it as the Arguments section describes rather than choosing a side, and only an unanswered ask goes
+to Step 16 with "needs attention: <the decision>".
 
 **`ours.txt` is the list that loses work silently, so audit it.** An exception wins the whole file,
 which also discards every unrelated upstream change under that path — no conflict, no marker, and
@@ -562,6 +627,23 @@ that contains that upstream tag and nothing newer (`merge-base --is-ancestor` bo
 modules the harness loads are byte-identical across the two, repoint the constant, and declare it as
 a seam beside its siblings.
 
+**Sweep the release for upstream identity the fork must not inherit.** Upstream hardcodes its own
+signing team, bundle ids, runners and repository, and every new hardcode resets to the tag here.
+v1.4.230 brought five: its skills install URL and Blacksmith runner labels failed PR CI, and its Apple
+team id `6CX3WHS9HZ` passed PR CI and failed the first release build, which is the only place
+signing is checked:
+
+```sh
+git diff --name-only -G '6CX3WHS9HZ|com\.stablyai|blacksmith-|stablyai/orca' \
+  "$PREV_TAG" "$UPSTREAM_TARGET" -- . ':!docs' ':!*.md' ':!*.test.*' ':!*.spec.*' ':!**/tests/**'
+```
+
+Every listed file is a decision. A user-facing link to upstream stays: pointing those at upstream
+is deliberate. Anything the fork's build, signing, release, CI runners or skill installs read must
+end up fork-owned, as a seam or an exception, before the push. A hit in a file the fork already
+owns is usually upstream's new code next to the fork's existing override, so read the merged file
+rather than the diff.
+
 Commit the ownership resolution as a single follow-up commit on top of the merge, again with
 `--no-verify` for the reason in Step 5; Step 7 expects exactly one such extra commit.
 
@@ -608,8 +690,16 @@ A fix may:
   it is never an escalation on its own. The fix is names and types only, taken from upstream's own
   adoption commit for that rule; `references/file-ownership.md` § *When upstream tightens the linter*
   has the method and its limits
+- remove a job from the fork's `pr.yml` that the release cannot route: its `verify` selection has
+  no producer in the tag's `pr-code-change-scope.mjs`, or a script it runs does not exist in the
+  tag. `check-pr-verify-selections.mjs` (Step 8) names both cases. Remove the job, its `verify.needs`
+  entry, its `check_job` line and its env, and file a ledger `deferred` entry to restore it once a
+  stable tag ships the rest of the change: a later three-way merge against this tag sees only the
+  fork's removal, so it never brings the job back on its own. v1.4.230's release branch shipped
+  `dependency_isolation` that way (`597425845e`), and `verify` failed every PR until it was removed
 
-Escalate — stop, leave the PR open, report "needs attention" — for:
+Escalate — ask as the Arguments section describes, and on no answer stop, leave the PR open, and
+report "needs attention" — for:
 
 - any resolution that would cost fork feature functionality: upstream reworked the code a fork
   feature hangs off, and every fix available loses behavior this fork ships
@@ -629,7 +719,8 @@ Never, on either gate:
   green; "probably pre-existing" is a thing to prove in Step 10, not a reason to move on
 
 Each fix is its own commit, its message naming what broke and why the fix is the right one. Every
-fix commit appears in the Step 16 report.
+fix commit appears in the Step 16 report. Stage a fix by path (`git add <paths>`, or `git add -u`
+for tracked files), never with `git add -A` or `git commit -a`.
 
 ## Step 8 — Verification gate
 
@@ -642,23 +733,25 @@ specifies, including the manifest checks (`--verify-seams`, `--verify-residuals`
 fakes a result if skipped.
 
 Order: `pnpm install --frozen-lockfile` (re-run it here — the merge may have taken upstream's
-`pnpm-lock.yaml`) → manifest checks → typecheck → `pnpm lint`.
+`pnpm-lock.yaml`) → manifest checks → typecheck → `pnpm lint` → the CI-parity checks below.
 
 **Never run `pnpm typecheck` here.** `AGENTS.md` forbids it on this machine: it is
 `run-typecheck-projects-in-parallel.mjs`, which spawns a `tsc --noEmit` per project concurrently,
-and with several sync worktrees open that saturates every core. Run the same four projects one
-after another instead — same coverage, no concurrency — clearing the build cache before each, since
+and with several sync worktrees open that saturates every core. Run the projects it lists in
+`TYPECHECK_PROJECTS` one after another instead — same coverage, no concurrency — clearing the build cache before each, since
 composite projects cache errors across the `git checkout` swaps this step is full of:
 
 ```sh
 find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:node
 find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:web
 find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:cli
-find config -maxdepth 1 -name '*.tsbuildinfo' -delete && \
-  pnpm exec tsc --noEmit -p config/tsconfig.mobile-web.json
 ```
 
-Four separate commands on purpose, not a loop: under the sandboxed shell a command in a `for` body
+Read the project list from the tag's `config/scripts/run-typecheck-projects-in-parallel.mjs` rather
+than from here, because upstream edits it. v1.4.215 retired `config/tsconfig.mobile-web.json` in
+#22193, and a gate that still ran it failed with a missing-file error that names no type problem.
+
+Separate commands on purpose, not a loop: under the sandboxed shell a command in a `for` body
 can come back "command not found", which inverts the result silently, and a loop's `|| break` would
 swallow the exit code this gate turns on. Read each one's status before running the next. `zsh` has
 no `PIPESTATUS`, so do not pipe these into `tail` and expect `$?` to mean anything — redirect to a
@@ -668,6 +761,32 @@ file instead.
 `pnpm typecheck` and from the `typecheck` job in `pr.yml`, so `config/tsconfig.e2e.json` has drifted
 unchecked — 216 errors across 110 files on `main` at v1.4.207, none of them a sync's doing. Do not
 add it to the gate, and do not treat its output as merge damage.
+
+**Then run what PR CI checks before any test starts.** The `static analysis and typecheck` job
+stops at its first failing step and the unit shards wait behind it, so every step this gate skips
+costs a whole CI round to discover. v1.4.230 spent four rounds there, one new step each, and its
+unit tests first ran on the fifth push. Commit first, because two of these read committed state,
+then run each as its own command:
+
+```sh
+git status --porcelain --untracked-files=all       # must print nothing
+node config/scripts/fork-sync-gate/check-pr-verify-selections.mjs
+node .github/scripts/check-root-directory-entries.mjs "$(git merge-base origin/main HEAD)" HEAD
+node .github/scripts/check-fork-ownership.mjs "$(git rev-parse origin/main)" "$(git rev-parse HEAD)"
+node config/scripts/fork-sync-gate/replay-pr-preflight.mjs
+```
+
+- **The clean-tree check** catches build output before it is committed. Benchmark and sandbox runs
+  write into the tree, and `git add -A` swept `.build/release-javascript-measurements/` into a
+  v1.4.230 fix commit, which failed both guards below.
+- **`check-pr-verify-selections.mjs`** proves `pr.yml` can route every job `verify` requires and
+  that every script it runs exists. The fix policy says what to do when it names a job the release
+  cannot route.
+- **The two guards** are `pr.yml`'s own repository checks, run exactly as CI runs them.
+- **`replay-pr-preflight.mjs`** reads the `preflight` job out of `pr.yml` and runs every step it can
+  locally, in order, without stopping at the first failure. It skips the typecheck (run above, one
+  project at a time) and steps whose condition only CI can evaluate, and names each skip. A full
+  replay takes about three minutes.
 
 Every step is absolute: stop at the first failure and treat it as a hard fail. The reference's
 rule-tightening carve-out is the one exception, and it is an exception about *how the tree is
@@ -679,9 +798,9 @@ local run through a remote Docker host, and that host is a single shared box. Sh
 suite reports failures the code did not cause — timeouts, perf budgets, and temp-file races that
 land on a different random subset each run and clear the moment the same files run alone. Chasing
 them costs the run an hour and answers a question PR CI answers properly: the `test` matrix in
-`.github/workflows/pr.yml` runs the same suite on clean hosted runners, sharded 16 ways across two
-Node versions, and it is a required check for `verify`. A local pass never authorized a merge, and a
-local failure was never trustworthy on its own — so the local run buys nothing the PR does not.
+`.github/workflows/pr.yml` runs the same suite sharded across clean hosted runners, and it is a
+required check for `verify`. A local pass never authorized a merge, and a local failure was never
+trustworthy on its own — so the local run buys nothing the PR does not.
 
 A hard fail here is not the end of the run — work it under the fix policy above, then re-run the
 gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks lint, and a partial
@@ -736,20 +855,40 @@ Record `PR_NUMBER` and `PR_URL`. If a PR already exists for this branch, reuse i
 (`env -u GITHUB_TOKEN gh pr view "$SYNC_BRANCH" --repo zpyoung/orca --json number,url`) instead of
 opening a second one.
 
+**One writer per sync PR.** Two sessions drove #122 at once: commits landed while the lead waited
+on a poll, and the two merge commands ran two seconds apart. Record yourself as its driver
+(`orca worktree set --worktree active --comment "driving PR #<n> from session <id>" --json`). Before
+every push, fetch the branch and confirm its head is the commit you last pushed or adopted. A head
+you did not write means another writer is active: stop editing, read its commits, and continue
+from them or step back, rather than pushing over them. The wait in Step 10 exits on exactly that.
+
 ## Step 10 — Drive the PR green
 
-The run owns this PR until every required check passes or the budget runs out. The budget is
-**4 hours** from PR creation; compute the deadline once and honor it.
+The run owns this PR until its gate passes or the budget runs out. The budget is **4 hours** from
+PR creation, not counting time spent waiting on an answer to an ask; compute the deadline once and
+honor it.
 
-Poll the rollup rather than the web UI, at roughly two-minute intervals — `gh` shares the account's
-API rate limit, so do not tighten that:
+**Gating and advisory checks.** The merge gate is the `PR checks passed` job (job id `verify`) of the
+`PR Checks` workflow, `.github/workflows/pr.yml`, on the PR's exact head commit, and every job of
+that workflow is gating. Every other workflow's check is advisory: the benchmark comparisons, the
+SSH host matrices, `updater` and the rest. Advisory checks are reported and never block the merge. A
+failed advisory check is re-run once when its log shows a runner or network fault, and is named in
+the report either way. Don't fix one in a sync PR: the benchmark workflows already carry fork-aware
+baselines (`fork-benchmark-baseline`), and they still fail on a sync-sized diff by construction.
+
+Wait with one background command, which polls every two minutes (`gh` shares the account's API rate
+limit, so do not tighten it):
 
 ```sh
-env -u GITHUB_TOKEN gh pr view "$PR_NUMBER" --repo zpyoung/orca \
-  --json statusCheckRollup,mergeStateStatus,mergeable
+node config/scripts/fork-sync-gate/wait-pr-checks.mjs --pr "$PR_NUMBER" --head "$(git rev-parse HEAD)" \
+  --advisory-minutes 15 --timeout-minutes <minutes left in the budget>
 ```
 
-Wait between polls with a background wait or a monitor, never a foreground `sleep`.
+It exits `1` on the first failed gating job and names it, which is usually well before `verify`
+settles. It exits `0` once the gate is green and the advisory checks have settled, or 15 minutes
+after the gate went green, whichever comes first. It exits `3` when the head moves under you (see
+*One writer per sync PR*), `4` when the PR closes, and `2` at the deadline. Read `verify`'s own log
+when it fails: it is not a rollup, and its last lines name the selection or job that failed.
 
 This is where the test suite runs, so a failing `tests node <version> <shard>/<total>` check is the
 run's problem to resolve, exactly like any other check.
@@ -843,17 +982,22 @@ Every real failure goes through the fix policy above: diagnose the cause, fix it
 allows, commit it on its own, push, and let CI re-run. There is no fixed attempt limit — keep going
 while you are making progress and the budget holds.
 
-Stop and report "needs attention", PR left open, nothing merged, when: the policy says escalate, the
-same check fails after a fix aimed at it, or the deadline passes. Name the check, link the run, and
-state what you tried.
+Stop and report "needs attention", PR left open, nothing merged, when: an escalation's ask goes
+unanswered, the same check fails after a fix aimed at it, or the deadline passes. Name the check,
+link the run, and state what you tried.
 
 ## Step 11 — Merge the PR
 
-Only when every required check is green.
+Only when the Step 10 wait exited `0`: `PR checks passed` is green on the exact head, and the
+advisory window has closed. First append to the PR body every fix commit pushed since it opened and
+every advisory check still failing or pending. Then merge that exact commit:
 
 ```sh
-env -u GITHUB_TOKEN gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge
+env -u GITHUB_TOKEN gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge \
+  --match-head-commit "$(git rev-parse HEAD)"
 ```
+
+`--match-head-commit` refuses the merge if another writer pushed after the wait cleared it.
 
 `--merge` is mandatory. `--squash` and `--rebase` both mint new SHAs, which breaks this fork in two
 ways at once: it flattens the merge with `$UPSTREAM_TARGET`, so every later sync re-conflicts
@@ -1004,7 +1148,8 @@ Open it from its own branch — never `$SYNC_BRANCH`, which has already merged:
 git fetch origin main
 git checkout -b "sync-lessons/${STABLE_TAG}" origin/main
 # edit .claude/skills/sync-upstream/** only
-git commit -am "docs(sync-skill): <what the next run will do differently>"
+git add .claude/skills/sync-upstream/
+git commit -m "docs(sync-skill): <what the next run will do differently>"
 git push -u origin "sync-lessons/${STABLE_TAG}"
 env -u GITHUB_TOKEN gh pr create --repo zpyoung/orca --base main \
   --title "sync-skill: <the lesson in one line>" --body-file <path to the body file>
@@ -1014,8 +1159,20 @@ The body carries the evidence: the command that misled you, its output, the SHA 
 what the edit changes for the next run. A reviewer must be able to check the claim without
 reconstructing the run.
 
-**This PR is never auto-merged and never merged by the run.** Leave it open and name it in the
-report. It blocks nothing — the sync is already merged and any release already dispatched.
+**The run merges this PR itself once it qualifies.** Unmerged lessons teach nobody: three sat open
+for weeks (#99, #114, #125), and the v1.4.230 run hit #99's problem again. A lesson PR qualifies when
+all of these hold:
+
+- `git diff --name-only origin/main...HEAD` lists only paths under `.claude/skills/sync-upstream/`
+- no hunk of `git diff origin/main...HEAD` falls inside `## Hard safety rules` or the fix policy's
+  "Never, on either gate" list. Any doubt about that means it does not qualify
+- the Step 10 wait on it exits `0`, with `fork ownership guard` and `PR checks passed` green on its
+  exact head
+
+Then merge it as Step 11 merges the sync PR (`--merge --match-head-commit`). If one does not
+qualify, leave it open and name it in the report. Do the same for every earlier run's lesson PR
+still open, before opening this one, so the backlog never builds. It blocks nothing either way: the
+sync is already merged and any release already dispatched.
 
 Scope is `.claude/skills/sync-upstream/**` and nothing else. A lesson about the release procedure
 belongs to the `release` skill: report it, do not edit it from here.
@@ -1040,7 +1197,8 @@ belongs to the `release` skill: report it, do not edit it from here.
 - Release: `nothing to release` | `skipped (<reason>)` | `published <tag>` with the release URL |
   `needs attention` with the release skill's classified cause, plus every run, re-run, recut, and
   fix PR the skill reported
-- Learned: `nothing` | the lesson in one line and the URL of the skill PR left open for review
+- Learned: `nothing` | the lesson in one line and the URL of the skill PR, merged or left open with
+  the Step 15 condition it failed; plus every earlier lesson PR this run merged
 - All "needs attention" items
 
 ## Hard safety rules
@@ -1061,9 +1219,9 @@ belongs to the `release` skill: report it, do not edit it from here.
 - A fork commit unreachable after the merge is a hard failure, never a warning to push through.
 - Tests are PR CI's job, not the local gate's. Never re-add `pnpm test` to Step 8 to "check first",
   and never treat its absence as licence to open a PR from a tree Step 8 rejected.
-- A failing check is never tolerated. Re-running one once to rule out flake is not tolerating it — a
-  reproduced failure is either fixed under the fix policy or escalated with the PR left open, even
-  when it provably pre-dates the sync.
+- A failing gating check (Step 10 defines which are gating) is never tolerated. Re-running one once
+  to rule out flake is not tolerating it — a reproduced failure is either fixed under the fix policy
+  or escalated with the PR left open, even when it provably pre-dates the sync.
 - Never buy a green check by weakening what it checks: no skipped or narrowed tests, no `max-lines`
   disable or baseline bump, no relaxed lint rule, no loosened ownership guard. The fix policy is the
   whole of what a run may do to a red gate.
@@ -1079,6 +1237,6 @@ belongs to the `release` skill: report it, do not edit it from here.
   its own limits are part of that invocation. If it reports "nothing to release", that is the end
   of it.
 - This skill is revised by its own runs, but only through Step 15: a separate branch, a PR the run
-  never merges, and no edit to `## Hard safety rules` or the fix policy's never-list. Never edit the
-  skill on `$SYNC_BRANCH`, and never edit it as a way of getting a check green — a rule rewritten to
-  match what a run did is not a lesson, it is a cover-up.
+  merges only when Step 15's conditions all hold, and no edit to `## Hard safety rules` or the fix
+  policy's never-list. Never edit the skill on `$SYNC_BRANCH`, and never edit it as a way of getting
+  a check green — a rule rewritten to match what a run did is not a lesson, it is a cover-up.

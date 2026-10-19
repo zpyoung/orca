@@ -191,5 +191,6 @@ ci-shards/
 # Paired CI timing reports and temporary baseline plugin.
 .build/preflight-benchmark/
 /.build/windows-native-benchmark/
+/.build/release-javascript-measurements/
 
 .local/static-analysis-research/
