@@ -59,7 +59,10 @@
         "runEveryIteration": "After every iteration",
         "runOnClaim": "When the agent says it is done",
         "maxActiveMinutes": "Maximum active minutes",
-        "errorPrompt": "Enter a prompt to start the loop."
+        "errorPrompt": "Enter a prompt to start the loop.",
+        "editName": "Edit name",
+        "sessionFreshShort": "Fresh",
+        "sessionContinueShort": "Continue"
       },
       "rail": {
         "action": {

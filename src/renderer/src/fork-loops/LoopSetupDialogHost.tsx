@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/store'
 import { LoopSetupDialog } from './LoopSetupDialog'
 
@@ -11,14 +12,17 @@ export function LoopSetupDialogHost(): React.JSX.Element | null {
     return null
   }
   return (
-    <LoopSetupDialog
-      open
-      worktreeId={worktreeId}
-      onOpenChange={(open) => {
-        if (!open) {
-          closeLoopSetup()
-        }
-      }}
-    />
+    // why: App mounts this host outside its TooltipProvider, and the dialog renders tooltips
+    <TooltipProvider delayDuration={400}>
+      <LoopSetupDialog
+        open
+        worktreeId={worktreeId}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeLoopSetup()
+          }
+        }}
+      />
+    </TooltipProvider>
   )
 }

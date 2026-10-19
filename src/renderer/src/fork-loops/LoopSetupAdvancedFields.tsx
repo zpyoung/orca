@@ -162,7 +162,7 @@ export function wholeNumberError(): string {
   return translate('fork.loops.setup.errorWholeNumber', 'Enter a whole number of at least 1.')
 }
 
-/** Ordered, editable list of prompts a queue loop sends one per iteration. */
+/** Ordered, editable list of prompts a queue loop sends one per iteration; the caller supplies its label. */
 export function LoopSetupQueueItems({ draft, errors, update }: SectionProps): React.JSX.Element {
   const [pending, setPending] = useState('')
   const items = draft.queueItems
@@ -186,7 +186,7 @@ export function LoopSetupQueueItems({ draft, errors, update }: SectionProps): Re
       ? translate('fork.loops.setup.errorQueueBlankItem', 'Queue prompts cannot be blank.')
       : undefined
   return (
-    <Field label={translate('fork.loops.setup.queueItems', 'Queue')} error={error}>
+    <div className="space-y-2">
       <ol className="space-y-2">
         {items.map((item, index) => {
           const position = index + 1
@@ -276,7 +276,8 @@ export function LoopSetupQueueItems({ draft, errors, update }: SectionProps): Re
           {translate('fork.loops.setup.queueAdd', 'Add to queue')}
         </Button>
       </div>
-    </Field>
+      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+    </div>
   )
 }
 

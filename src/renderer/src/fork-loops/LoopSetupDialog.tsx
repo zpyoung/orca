@@ -1,55 +1,31 @@
-import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Repeat } from 'lucide-react'
 import { toast } from 'sonner'
+import { closeUnfocusedMonacoFindOrPreventDialogDismiss } from '@/components/editor/monaco-find-widget'
+import { getAutomationPromptEditorRoot } from '@/components/automations/AutomationEditorPromptEditor'
 import { Button } from '@/components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTarget'
 import { useDetectedAgents } from '@/hooks/useDetectedAgents'
 import { translate } from '@/i18n/i18n'
-import { getAgentCatalog } from '@/lib/agent-catalog'
+import { getAgentCatalog, type AgentCatalogEntry } from '@/lib/agent-catalog'
 import { useAppStore } from '@/store'
 import {
   defaultSessionPolicyForPreset,
   LoopCreateInputSchema,
-  LoopPresetSchema,
   type LoopConfig,
-  type LoopCreateInput,
-  type LoopPreset
+  type LoopCreateInput
 } from '../../../shared/fork-loops/loop-types'
-import { isTuiAgent } from '../../../shared/tui-agent-config'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import {
   DEFAULT_DISABLED_TUI_AGENTS,
   filterEnabledTuiAgents
 } from '../../../shared/tui-agent-selection'
-import {
-  IntervalFields,
-  MaxIterationsField,
-  PromptField,
-  SessionPolicyField,
-  useIsFolderWorkspace
-} from './loop-config-fields'
+import { useIsFolderWorkspace } from './loop-config-fields'
 import { selectLoopsForWorktree } from './loops-slice'
-import {
-  CheckboxField,
-  Field,
-  SelectField,
-  TextField,
-  LoopSetupAdvancedFields,
-  LoopSetupQueueItems,
-  type FieldError,
-  type LoopSetupDraft,
-  type SectionProps
-} from './LoopSetupAdvancedFields'
+import type { FieldError, LoopSetupDraft } from './LoopSetupAdvancedFields'
+import { LoopSetupPromptPane } from './LoopSetupPromptPane'
+import { LoopSetupSettingsSidebar, presetLabel } from './LoopSetupSettingsSidebar'
 
 const DEFAULT_MAX_ITERATIONS = '10'
 const COST_REPORTING_AGENTS: readonly string[] = ['claude', 'codex']
@@ -78,16 +54,6 @@ const INITIAL_DRAFT: LoopSetupDraft = {
   checkpointCommits: false,
   askBeforeNext: false,
   resumeAtLimitReset: false
-}
-
-function presetLabel(preset: LoopPreset): string {
-  if (preset === 'interval') {
-    return translate('fork.loops.setup.presetInterval', 'On an interval')
-  }
-  if (preset === 'queue') {
-    return translate('fork.loops.setup.presetQueue', 'Queue')
-  }
-  return translate('fork.loops.setup.presetUntilDone', 'Until done')
 }
 
 function autoName(draft: LoopSetupDraft): string {
@@ -190,7 +156,7 @@ function buildLoopCreateInput(
 }
 
 function useSelectableAgents(worktreeId: string): {
-  agents: { id: TuiAgent; label: string }[]
+  agents: AgentCatalogEntry[]
   isLocalHost: boolean
 } {
   const target = useAgentDetectionTargetForWorktree(worktreeId)
@@ -207,38 +173,6 @@ function useSelectableAgents(worktreeId: string): {
   return { agents, isLocalHost: target?.kind === 'local' }
 }
 
-function PresetFields({ draft, errors, update }: SectionProps): React.JSX.Element {
-  if (draft.preset === 'queue') {
-    return (
-      <div className="space-y-4">
-        <LoopSetupQueueItems draft={draft} errors={errors} update={update} />
-        <CheckboxField
-          id="loop-setup-repeat-queue"
-          label={translate('fork.loops.setup.repeatQueue', 'Start over when the queue is empty')}
-          checked={draft.repeatQueue}
-          onChange={(repeatQueue) => update({ repeatQueue })}
-        />
-      </div>
-    )
-  }
-  return (
-    <>
-      <PromptField
-        draft={draft}
-        errors={errors}
-        update={update}
-        errorMessage={translate(
-          'fork.loops.setup.errorPrompt',
-          'Enter a prompt to start the loop.'
-        )}
-      />
-      {draft.preset === 'interval' ? (
-        <IntervalFields draft={draft} errors={errors} update={update} />
-      ) : null}
-    </>
-  )
-}
-
 function LoopSetupForm({
   worktreeId,
   onOpenChange
@@ -249,6 +183,7 @@ function LoopSetupForm({
   const [draft, setDraft] = useState<LoopSetupDraft>(INITIAL_DRAFT)
   const [submitting, setSubmitting] = useState(false)
   const { agents, isLocalHost } = useSelectableAgents(worktreeId)
+  const defaultAgent = useAppStore((s) => s.settings?.defaultTuiAgent ?? null)
   const loops = useAppStore((s) => selectLoopsForWorktree(s, worktreeId))
   const applyLoopSnapshot = useAppStore((s) => s.applyLoopSnapshot)
   const hasRunningLoop = loops.some((loop) => loop.state === 'running')
@@ -281,86 +216,59 @@ function LoopSetupForm({
 
   return (
     <form
-      className="space-y-4"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault()
         void submit()
       }}
     >
-      {hasRunningLoop ? (
-        <p
-          role="status"
-          className="rounded-md border border-status-warning-border bg-status-warning-background px-3 py-2 text-xs text-status-warning-foreground"
-        >
-          {translate(
-            'fork.loops.setup.runningLoopWarning',
-            'This workspace already has a running loop. A second loop edits the same files at the same time.'
-          )}
+      <div className="flex min-h-0 flex-1 flex-row">
+        <LoopSetupPromptPane
+          draft={draft}
+          errors={errors}
+          update={update}
+          namePlaceholder={autoName(draft)}
+          warning={
+            hasRunningLoop
+              ? translate(
+                  'fork.loops.setup.runningLoopWarning',
+                  'This workspace already has a running loop. A second loop edits the same files at the same time.'
+                )
+              : null
+          }
+          onDismiss={() => onOpenChange(false)}
+        />
+        <LoopSetupSettingsSidebar
+          draft={draft}
+          errors={errors}
+          update={update}
+          agents={agents}
+          agent={agent}
+          defaultAgent={defaultAgent}
+          showCost={showCost}
+          showCheckpointCommits={!isFolderWorkspace}
+          onAgentChange={(next) => update({ agent: next })}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-border/50 px-5 py-3">
+        <p className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <Repeat className="size-3.5 shrink-0" />
+          <span className="truncate">
+            {translate(
+              'fork.loops.setup.description',
+              'Run an agent in this workspace over and over until the work is done.'
+            )}
+          </span>
         </p>
-      ) : null}
-      <TextField
-        id="loop-setup-name"
-        label={translate('fork.loops.setup.name', 'Name')}
-        placeholder={translate('fork.loops.setup.namePlaceholder', 'Defaults to the prompt')}
-        value={draft.name}
-        onChange={(name) => update({ name })}
-      />
-      <SelectField
-        label={translate('fork.loops.setup.agent', 'Agent')}
-        value={agent ?? ''}
-        options={agents.map((entry) => ({ value: entry.id, label: entry.label }))}
-        placeholder={translate('fork.loops.setup.noAgents', 'No agents detected')}
-        onChange={(value) => update({ agent: isTuiAgent(value) ? value : null })}
-      />
-      <Field label={translate('fork.loops.setup.preset', 'Run')}>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          value={draft.preset}
-          onValueChange={(value) => {
-            const preset = LoopPresetSchema.safeParse(value)
-            if (preset.success) {
-              update({
-                preset: preset.data,
-                sessionPolicy: defaultSessionPolicyForPreset(preset.data)
-              })
-            }
-          }}
-        >
-          {LoopPresetSchema.options.map((preset) => (
-            <ToggleGroupItem key={preset} value={preset} aria-label={presetLabel(preset)}>
-              <span className="text-xs">{presetLabel(preset)}</span>
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </Field>
-      <PresetFields draft={draft} errors={errors} update={update} />
-      <SessionPolicyField draft={draft} errors={errors} update={update} />
-      <MaxIterationsField draft={draft} errors={errors} update={update} />
-      <Collapsible>
-        <CollapsibleTrigger variant="row">
-          {translate('fork.loops.setup.advanced', 'Advanced')}
-          <ChevronDown className="size-4 text-muted-foreground" />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <LoopSetupAdvancedFields
-            draft={draft}
-            errors={errors}
-            update={update}
-            showCost={showCost}
-            showCheckpointCommits={!isFolderWorkspace}
-          />
-        </CollapsibleContent>
-      </Collapsible>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-          {translate('fork.loops.setup.cancel', 'Cancel')}
-        </Button>
-        <Button type="submit" disabled={!built || 'errors' in built || submitting}>
-          {translate('fork.loops.setup.start', 'Start loop')}
-        </Button>
-      </DialogFooter>
+        <div className="flex shrink-0 justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {translate('fork.loops.setup.cancel', 'Cancel')}
+          </Button>
+          <Button type="submit" disabled={!built || 'errors' in built || submitting}>
+            {translate('fork.loops.setup.start', 'Start loop')}
+          </Button>
+        </div>
+      </div>
     </form>
   )
 }
@@ -375,19 +283,30 @@ export function LoopSetupDialog({
   worktreeId: string
   onOpenChange: (open: boolean) => void
 }): React.JSX.Element {
+  const dialogContentRef = useRef<HTMLDivElement>(null)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-xl">
-        <div className="scrollbar-sleek grid max-h-[calc(85vh-3rem)] gap-4 overflow-y-auto">
-          <DialogHeader>
+      <DialogContent
+        ref={dialogContentRef}
+        aria-describedby={undefined}
+        className="h-[min(880px,90vh)] w-[min(1080px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[minmax(0,1fr)] overflow-hidden sm:max-w-[1080px]"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => {
+          if (
+            closeUnfocusedMonacoFindOrPreventDialogDismiss({
+              root: getAutomationPromptEditorRoot(dialogContentRef.current),
+              eventTarget: event.target
+            })
+          ) {
+            event.preventDefault()
+          }
+        }}
+      >
+        {/* why: DialogContent's padding is lint-locked, so the edge-to-edge panes cancel it here */}
+        <div className="-m-6 flex min-h-0 flex-col">
+          <div className="flex items-center border-b border-border/50 px-5 py-2.5 pr-12">
             <DialogTitle>{translate('fork.loops.setup.title', 'New loop')}</DialogTitle>
-            <DialogDescription>
-              {translate(
-                'fork.loops.setup.description',
-                'Run an agent in this workspace over and over until the work is done.'
-              )}
-            </DialogDescription>
-          </DialogHeader>
+          </div>
           <LoopSetupForm worktreeId={worktreeId} onOpenChange={onOpenChange} />
         </div>
       </DialogContent>

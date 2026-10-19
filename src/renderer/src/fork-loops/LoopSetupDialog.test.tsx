@@ -3,6 +3,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { LoopCreateInputSchema } from '../../../shared/fork-loops/loop-types'
 import { LoopSetupDialog } from './LoopSetupDialog'
 
@@ -69,9 +70,54 @@ vi.mock('@/components/ui/select', () => ({
   )
 }))
 
+// Monaco does not run under happy-dom; a labelled textarea stands in for the prompt editor.
+vi.mock('@/components/automations/AutomationEditorPromptEditor', () => ({
+  getAutomationPromptEditorRoot: () => null,
+  AutomationEditorPromptEditor: ({
+    value,
+    ariaLabel,
+    onChange
+  }: {
+    value: string
+    ariaLabel: string
+    onChange: (value: string) => void
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(event) => onChange(event.currentTarget.value)}
+    />
+  )
+}))
+
+// The cmdk popover only lists agents once opened; a native select keeps them queryable.
+vi.mock('@/components/agent/AgentCombobox', () => ({
+  default: ({
+    agents,
+    value,
+    onValueChange
+  }: {
+    agents: { id: string; label: string }[]
+    value: string | null
+    onValueChange: (value: string) => void
+  }) => (
+    <select value={value ?? ''} onChange={(event) => onValueChange(event.currentTarget.value)}>
+      {agents.map((agent) => (
+        <option key={agent.id} value={agent.id}>
+          {agent.label}
+        </option>
+      ))}
+    </select>
+  )
+}))
+
 function renderDialog(): { onOpenChange: ReturnType<typeof vi.fn> } {
   const onOpenChange = vi.fn()
-  render(<LoopSetupDialog open worktreeId="wt-1" onOpenChange={onOpenChange} />)
+  render(
+    <TooltipProvider>
+      <LoopSetupDialog open worktreeId="wt-1" onOpenChange={onOpenChange} />
+    </TooltipProvider>
+  )
   return { onOpenChange }
 }
 
@@ -85,8 +131,11 @@ function selectWithOption(value: string): HTMLElement {
   return select
 }
 
-function sessionSelect(): HTMLElement {
-  return selectWithOption('continue')
+function sessionPolicy(): string | undefined {
+  const checked = ['Fresh', 'Continue'].find(
+    (name) => screen.getByRole('radio', { name }).getAttribute('aria-checked') === 'true'
+  )
+  return checked?.toLowerCase()
 }
 
 async function submittedInput(): Promise<ReturnType<typeof LoopCreateInputSchema.parse>> {
@@ -162,11 +211,11 @@ describe('LoopSetupDialog', () => {
 
   it('sets the session default when the preset changes', () => {
     renderDialog()
-    expect(sessionSelect()).toHaveValue('fresh')
+    expect(sessionPolicy()).toBe('fresh')
     fireEvent.click(screen.getByRole('radio', { name: 'On an interval' }))
-    expect(sessionSelect()).toHaveValue('continue')
+    expect(sessionPolicy()).toBe('continue')
     fireEvent.click(screen.getByRole('radio', { name: 'Until done' }))
-    expect(sessionSelect()).toHaveValue('fresh')
+    expect(sessionPolicy()).toBe('fresh')
   })
 
   it('blocks submit when the interval is 0', () => {
