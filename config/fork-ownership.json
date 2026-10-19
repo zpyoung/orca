@@ -5150,6 +5150,14 @@
         "  primeTerminalUserInputKeyboardGate(session.pane.terminal)",
         "    if (isTerminalUserInputFromKeyboard(session.pane.terminal)) {"
       ]
+    },
+    {
+      "path": "config/scripts/localization-extraction-change-scope.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "    /else\\s+bun config\\/scripts\\/fork-localization-catalog-check\\.mjs --verify-extraction\\s+fi/"
+      ]
     }
   ],
   "exceptions": [
@@ -8376,6 +8384,10 @@
     },
     "config/scripts/run-node-server-tests.mjs": {
       "added": 2,
+      "removed": 1
+    },
+    "config/scripts/localization-extraction-change-scope.test.mjs": {
+      "added": 3,
       "removed": 1
     }
   }

@@ -464,7 +464,7 @@ jobs:
             scope="$(node config/scripts/localization-extraction-change-scope.mjs "$RUNNER_TEMP/localization-changes")" && [ "$scope" = false ]; then
             echo "Localization extraction inputs are unchanged."
           else
-            bun config/scripts/verify-localization-extraction.mjs
+            bun config/scripts/fork-localization-catalog-check.mjs --verify-extraction
           fi
 
       - name: Decide whether the orcad terminal smoke runs
@@ -521,7 +521,7 @@ jobs:
           PREFLIGHT_PRIOR_SUCCESS: ${{ job.status == 'success' }}
         run: |
           if [ "$PREFLIGHT_PHASE_SELECTED" != true ] || [ "$PREFLIGHT_PRIOR_SUCCESS" != true ]; then exit 0; fi
-          bun config/scripts/verify-localization-catalogs.mjs
+          bun config/scripts/fork-localization-catalog-check.mjs && bun config/scripts/generate-runtime-required-english-catalog.mjs
 
       - name: Verify localization coverage
         if: needs.code_paths.outputs.static_analysis == 'true'
