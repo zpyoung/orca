@@ -2,7 +2,6 @@ import React from 'react'
 import { jiraImageReference } from '../../../../shared/jira-attachment-image'
 import type { Components } from 'react-markdown'
 import { NATIVE_CHAT_FILE_HREF_PREFIX } from '../../../../shared/native-chat-href-routing'
-import { isMermaidFence } from './comment-mermaid-fence'
 import {
   CommentMarkdownDocumentCode,
   CommentMarkdownDocumentPre
@@ -253,7 +252,6 @@ export function createCompactCommentMarkdownComponents(
 
 export function createDocumentCommentMarkdownComponents(
   onLinkClick?: CommentMarkdownLinkClickHandler,
-  highlightCode?: boolean,
   renderCodeBlock?: DocumentCodeBlockRenderer
 ): Components {
   return {
@@ -275,18 +273,7 @@ export function createDocumentCommentMarkdownComponents(
           {children}
         </a>
       ),
-    code: highlightCode
-      ? ({ className, children }) =>
-          isMermaidFence(className) ? (
-            <CommentMarkdownDocumentCode className={className}>
-              {children}
-            </CommentMarkdownDocumentCode>
-          ) : (
-            <code className="rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]">
-              {children}
-            </code>
-          )
-      : CommentMarkdownDocumentCode,
+    code: CommentMarkdownDocumentCode,
     pre: ({ node, children }) => (
       <CommentMarkdownDocumentPre
         renderCodeBlock={renderCodeBlock}
@@ -384,18 +371,16 @@ export function selectCommentMarkdownComponents({
   variant,
   onLinkClick,
   renderCodeBlock,
-  expandImages,
-  highlightCode
+  expandImages
 }: {
   variant: 'compact' | 'document'
   onLinkClick?: CommentMarkdownLinkClickHandler
   renderCodeBlock?: DocumentCodeBlockRenderer
-  highlightCode?: boolean
   expandImages: boolean
 }): Components {
   if (variant === 'document') {
-    return onLinkClick || highlightCode || renderCodeBlock
-      ? createDocumentCommentMarkdownComponents(onLinkClick, highlightCode, renderCodeBlock)
+    return onLinkClick || renderCodeBlock
+      ? createDocumentCommentMarkdownComponents(onLinkClick, renderCodeBlock)
       : documentCommentMarkdownComponents
   }
   return onLinkClick || expandImages

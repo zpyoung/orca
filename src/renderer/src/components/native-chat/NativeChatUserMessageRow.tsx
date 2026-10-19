@@ -130,7 +130,6 @@ export function NativeChatUserMessageRow({
                 renderCodeBlock={NativeChatCodeBlock}
                 onLinkClick={onLinkClick}
                 allowFileUriLinks={allowFileUriLinks}
-                highlightCode
               />
             </NativeChatUserMessageFold>
           </>

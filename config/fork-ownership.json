@@ -33,7 +33,7 @@
     },
     {
       "name": "native-chat-coloring",
-      "purpose": "Renders native-chat tool calls with category glyphs/dots and syntax-highlighted code blocks instead of monochrome text.",
+      "purpose": "Colors native-chat tool calls with category glyphs and dots instead of monochrome text, and keeps the rich markdown editor's code-block token colors on the shared palette.",
       "globs": [
         "**/fork-native-chat-coloring/**",
         "src/renderer/src/assets/fork-native-chat-coloring.css"
@@ -285,18 +285,6 @@
         "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
         "    workspaceActivityCustomDays: 30,"
       ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatAssistantMessageRow.tsx",
-      "feature": "native-chat-coloring",
-      "kind": "passthrough",
-      "lines": ["          highlightCode"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatUserMessageRow.tsx",
-      "feature": "native-chat-coloring",
-      "kind": "passthrough",
-      "lines": ["                highlightCode"]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts",
@@ -1450,21 +1438,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/sidebar/CommentMarkdown.tsx",
-      "feature": "native-chat-coloring",
-      "kind": "passthrough",
-      "lines": [
-        "import rehypeHighlight from 'rehype-highlight'",
-        "  highlightCode?: boolean",
-        "      highlightCode = false,",
-        "          highlightCode",
-        "      [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode]",
-        "      return highlightCode ? [...plugins, rehypeHighlight] : plugins",
-        "    }, [extension, highlightCode])",
-        "              highlightCode && 'native-chat-code [&_pre_code]:text-inherit',"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/sidebar/WorktreeCard.tsx",
       "feature": "worktree-groups",
       "kind": "passthrough",
@@ -1500,18 +1473,6 @@
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": ["      {model.worktreeGroupDialog.dialog}"]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx",
-      "feature": "native-chat-coloring",
-      "kind": "passthrough",
-      "lines": [
-        "  highlightCode?: boolean,",
-        "import { isMermaidFence } from './comment-mermaid-fence'",
-        "    code: highlightCode",
-        "            <code className=\"rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]\">",
-        "    return onLinkClick || highlightCode || renderCodeBlock"
-      ]
     },
     {
       "path": "src/renderer/src/components/sidebar/worktree-drag-units.ts",
@@ -6372,14 +6333,6 @@
       "added": 10,
       "removed": 2
     },
-    "src/renderer/src/components/native-chat/NativeChatAssistantMessageRow.tsx": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/components/native-chat/NativeChatUserMessageRow.tsx": {
-      "added": 1,
-      "removed": 0
-    },
     "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts": {
       "added": 5,
       "removed": 5
@@ -6896,10 +6849,6 @@
       "added": 5,
       "removed": 0
     },
-    "src/renderer/src/components/sidebar/CommentMarkdown.tsx": {
-      "added": 11,
-      "removed": 6
-    },
     "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
       "added": 5,
       "removed": 2
@@ -6915,10 +6864,6 @@
     "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx": {
       "added": 1,
       "removed": 0
-    },
-    "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
-      "added": 19,
-      "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-drag-units.ts": {
       "added": 4,

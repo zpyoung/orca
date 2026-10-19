@@ -81,7 +81,6 @@ export function NativeChatAssistantMessageRow({
           onLinkClick={onLinkClick}
           allowFileUriLinks={allowFileUriLinks}
           linkifyFilePaths={onLinkClick !== undefined}
-          highlightCode
           {...(isSystem ? {} : NATIVE_CHAT_QUOTE_SOURCE_PROPS)}
           visualMessageId={message.role === 'assistant' ? message.id : undefined}
           // Structured text streams in place with no per-row state: only the live turn's frontier

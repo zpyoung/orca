@@ -6,7 +6,6 @@ import {
 import Markdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from 'rehype-sanitize'
 import remend from 'remend'
@@ -234,7 +233,6 @@ type CommentMarkdownProps = React.ComponentPropsWithoutRef<'div'> & {
   /** Turns detected file paths into links, keeping only those this confirms exist. */
   fileLinkExists?: FileLinkExists
   expandImages?: boolean
-  highlightCode?: boolean
   renderCodeBlock?: DocumentCodeBlockRenderer
   renderMermaid?: boolean
   keepMermaidSourceWhilePending?: boolean
@@ -279,7 +277,6 @@ const CommentMarkdown = React.memo(
       allowFileUriLinks = false,
       fileLinkExists,
       expandImages = false,
-      highlightCode = false,
       renderCodeBlock,
       renderMermaid = true,
       keepMermaidSourceWhilePending = false,
@@ -296,10 +293,9 @@ const CommentMarkdown = React.memo(
           variant,
           onLinkClick,
           renderCodeBlock,
-          expandImages,
-          highlightCode
+          expandImages
         }),
-      [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode]
+      [expandImages, renderCodeBlock, variant, onLinkClick]
     )
     const components = React.useMemo(
       () => (extension ? { ...baseComponents, ...extension.components } : baseComponents),
@@ -309,10 +305,10 @@ const CommentMarkdown = React.memo(
       () => ({ ...components, span: CommentMarkdownWords }),
       [components]
     )
-    const activeRehypePlugins = React.useMemo(() => {
-      const plugins = extension ? extensionRehypePlugins(extension) : rehypePlugins
-      return highlightCode ? [...plugins, rehypeHighlight] : plugins
-    }, [extension, highlightCode])
+    const activeRehypePlugins = React.useMemo(
+      () => (extension ? extensionRehypePlugins(extension) : rehypePlugins),
+      [extension]
+    )
     const activeRemarkPlugins = React.useMemo(() => {
       const plugins = fileLinkExists
         ? [...remarkPlugins, remarkNativeChatFileLinks(fileLinkExists)]
@@ -342,7 +338,6 @@ const CommentMarkdown = React.memo(
               // direct utility classes on <code>, so these overrides win reliably.
               '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none',
               'min-w-0 max-w-full [overflow-wrap:anywhere]',
-              highlightCode && 'native-chat-code [&_pre_code]:text-inherit',
               className
             )}
             {...rest}
