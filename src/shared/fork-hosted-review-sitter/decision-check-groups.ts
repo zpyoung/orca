@@ -90,6 +90,34 @@ export function areCurrentHeadChecksGreen(
   return true
 }
 
+function githubWorkflowRunId(check: HostedReviewCheckSnapshot): string | null {
+  return check.checkId.match(/^workflow:(\d+):check:/)?.[1] ?? null
+}
+
+/**
+ * Current-head checks outside the group that share a GitHub workflow run with it, in any scope.
+ * GitHub refuses to rerun a run's failed jobs until every job in that run has finished.
+ */
+export function workflowRunSiblingChecks(
+  review: HostedReviewSnapshot,
+  group: FailedCheckGroup
+): readonly HostedReviewCheckSnapshot[] {
+  if (review.provider !== 'github') {
+    return []
+  }
+  const runIds = new Set(group.checks.map(githubWorkflowRunId).filter((id) => id !== null))
+  const own = new Set(group.checks.map((check) => check.checkId))
+  return review.checks.filter((check) => {
+    const runId = githubWorkflowRunId(check)
+    return (
+      check.headSha === review.headSha &&
+      runId !== null &&
+      runIds.has(runId) &&
+      !own.has(check.checkId)
+    )
+  })
+}
+
 /** Failed current-head checks in scope, grouped by check key in a stable order. */
 export function failedCheckGroups(
   review: HostedReviewSnapshot,

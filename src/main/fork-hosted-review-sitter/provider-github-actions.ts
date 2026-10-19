@@ -5,6 +5,7 @@ import type {
   HostedReviewSitterDefinition
 } from '../../shared/fork-hosted-review-sitter/types'
 import { areCurrentHeadChecksGreen } from '../../shared/fork-hosted-review-sitter/decision-check-groups'
+import { extractExecError } from '../git/exec-error'
 import { throwIfAborted, type HostedReviewSitterGitExecution } from './provider-git'
 import {
   expectedStateMismatch,
@@ -114,6 +115,12 @@ function parseRerunTargets(checkIds: readonly string[]): {
   return { workflowIds: [...workflowIds], checkIds: [...directCheckIds] }
 }
 
+/** GitHub's refusal to rerun a run that has not finished; it guarantees no job was requeued. */
+function isWorkflowRunInProgressRefusal(error: unknown): boolean {
+  const { stderr } = extractExecError(error)
+  return /already running[\s\S]*HTTP 403/i.test(stderr)
+}
+
 async function rerunChecks(
   state: GitHubState,
   action: Extract<ProviderAction, { kind: 'rerun-check' }>,
@@ -136,22 +143,34 @@ async function rerunChecks(
   if (targets.workflowIds.length === 0 && targets.checkIds.length === 0) {
     throw new Error('GitHub returned no rerunnable failed checks.')
   }
+  let rerunAccepted = false
   for (const workflowId of targets.workflowIds) {
     throwIfAborted(signal)
     await assertLeaseHeld()
-    await runGitHubApi(
-      state.ownerRepo,
-      state.ghOptions,
-      'core',
-      [
-        'api',
-        '-X',
-        'POST',
-        `repos/${state.ownerRepo.owner}/${state.ownerRepo.repo}/actions/runs/${workflowId}/rerun-failed-jobs`
-      ],
-      signal,
-      () => tracker.markDispatched()
-    )
+    try {
+      await runGitHubApi(
+        state.ownerRepo,
+        state.ghOptions,
+        'core',
+        [
+          'api',
+          '-X',
+          'POST',
+          `repos/${state.ownerRepo.owner}/${state.ownerRepo.repo}/actions/runs/${workflowId}/rerun-failed-jobs`
+        ],
+        signal,
+        () => tracker.markDispatched()
+      )
+    } catch (error) {
+      if (!rerunAccepted && isWorkflowRunInProgressRefusal(error)) {
+        throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+          effect: 'not-landed' as const,
+          reason: 'workflow-run-in-progress'
+        })
+      }
+      throw error
+    }
+    rerunAccepted = true
   }
   for (const checkId of targets.checkIds) {
     throwIfAborted(signal)
