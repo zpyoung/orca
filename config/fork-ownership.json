@@ -5482,7 +5482,7 @@
       "feature": "fork-loops",
       "kind": "registration",
       "lines": [
-        "import { beginLoopsShutdown } from '../fork-loops/registration'",
+        "import { beginLoopsShutdown } from '../fork-loops/loops-shutdown'",
         "      { name: 'loops', promise: beginLoopsShutdown(state.loops) },"
       ]
     },

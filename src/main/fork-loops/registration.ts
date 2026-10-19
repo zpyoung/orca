@@ -29,10 +29,6 @@ import {
   type LoopUsageDeps
 } from './loop-usage'
 
-export function beginLoopsShutdown(service: LoopService | null): Promise<void> {
-  return service?.shutdown() ?? Promise.resolve()
-}
-
 type LoopTargetRuntime = {
   showManagedWorktree(
     selector: string
