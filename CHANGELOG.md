@@ -1,6 +1,6 @@
 ---
-last_released_commit: fb72307395c0dd365524fe4cde41038f701a74c4
-upstream_synced: v1.4.224
+last_released_commit: 0316f51c75f32b672b89b747123392e80ecca154
+upstream_synced: v1.4.230
 ---
 
 # Changelog
@@ -11,6 +11,28 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.231-rc.0.zy01] - 2026-10-19
+
+Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4.230), by way of
+[v1.4.227](https://github.com/stablyai/orca/releases/tag/v1.4.227).
+
+### Changed
+- Native chat code blocks now use upstream's syntax highlighter. The fork's own code-block
+  coloring is gone, so inline code in chat prose no longer gets the fork's accent chip. Tool
+  icons in chat keep their fork coloring.
+
+### Removed
+- The fork's additions to the SSH relay are retired, because upstream replaced the relay with its
+  managed remote host. Native chat transcript paging and live tail keep working for local chats.
+
+### Fixed
+- Pasting into the terminal dock's chat composer with Cmd+V, a paste event, or the app menu goes
+  to the composer again, instead of to the terminal beside it.
+- The hosted-review sitter now checks a pull request's conflicts against the base branch's current
+  tip. It used to keep retrying a no-op merge against an old base commit after the base moved.
+- The hosted-review sitter now waits for a GitHub workflow run to finish before rerunning its
+  failed jobs, instead of failing on GitHub's "already running" refusal on every tick.
 
 ## [1.4.225-rc.0.zy03] - 2026-10-14
 
