@@ -40,6 +40,12 @@ export const guardedSafeStorage = {
       throw new SafeStorageWithheldError(withheldReason)
     }
     return safeStorage.decryptString(cipher)
+  },
+  getSelectedStorageBackend(): string {
+    if (withheldReason !== null) {
+      throw new SafeStorageWithheldError(withheldReason)
+    }
+    return safeStorage.getSelectedStorageBackend()
   }
 }
 

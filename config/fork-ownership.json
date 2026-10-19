@@ -1664,7 +1664,7 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'",
+        "} from './fork-terminal-dock/terminal-dock-remote-conpty'",
         "      pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = String(remoteConptyUnverified)"
       ]
     },
@@ -2938,7 +2938,7 @@
       "lines": [
         "import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'",
         "import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'",
-        "/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */",
+        "/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', \u2026)`. */",
         "export type AskApi = {",
         "  onSet: (callback: (event: AskRegistryEvent) => void) => () => void",
         "  getSuppressionVerdict: () => Promise<ClaudeSuppressionVerdict>",
@@ -5132,7 +5132,9 @@
       "lines": [
         "} from './fork-benchmark-baseline/benchmark-baseline.mjs'",
         "  announceMissingBaseline({",
-        "        clearBuildOutputKeepingMobileWeb(root)"
+        "        clearBuildOutputKeepingMobileWeb(root)",
+        "  GOMEMLIMIT: NATIVE_COMPILER_MEMORY_LIMIT",
+        "  withNativeHeapEstimatesInSource(baselineSource(`config/scripts/${baselineName}`))"
       ]
     },
     {
@@ -5167,7 +5169,7 @@
       "path": ".github/workflows/preflight-benchmark.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    timeout-minutes: 45"]
+      "lines": ["    timeout-minutes: 60"]
     },
     {
       "path": "config/scripts/verify-skill-update-roundtrip.test.mjs",
@@ -5260,6 +5262,40 @@
       "lines": [
         "import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/local-build-compatibility-contract'",
         "    AssociatedBundleIdentifiers: [LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId],"
+      ]
+    },
+    {
+      "path": "src/main/host/safe-storage-availability.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "  getSelectedStorageBackend(): string {",
+        "    return safeStorage.getSelectedStorageBackend()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-check-and-review-actions.test.tsx",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": ["vi.mock('@/fork-hosted-review-sitter/fix-checks-agent-launch', () => ({"]
+    },
+    {
+      "path": "config/scripts/benchmark-preflight-compilers.mjs",
+      "feature": "fork-benchmark-baseline",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-benchmark-baseline/benchmark-baseline.mjs'",
+        "  GOMEMLIMIT: NATIVE_COMPILER_MEMORY_LIMIT",
+        "const nativeBatches = planTypecheckBatches(withNativeHeapEstimates(TYPECHECK_PROJECTS), {"
+      ]
+    },
+    {
+      "path": ".github/workflows/release-javascript-benchmark.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "          for attempt in 1 2 3 4 5 6; do",
+        "            [ \"$attempt\" = 6 ] && exit 1"
       ]
     }
   ],
@@ -5403,7 +5439,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -5525,7 +5561,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -5642,7 +5678,7 @@
       "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
-      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it — a correctness fix to upstream's own hook, not fork behavior."
+      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it \u2014 a correctness fix to upstream's own hook, not fork behavior."
     },
     {
       "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
@@ -5658,7 +5694,7 @@
     },
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -6962,7 +6998,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-pane-pane-created.ts": {
-      "added": 12,
+      "added": 14,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-pane-pane-closed.ts": {
@@ -8478,8 +8514,8 @@
       "removed": 1
     },
     "config/scripts/benchmark-ci-preflight-critical-path.mjs": {
-      "added": 16,
-      "removed": 1
+      "added": 27,
+      "removed": 3
     },
     "config/scripts/benchmark-preflight-compat-boundary.mjs": {
       "added": 19,
@@ -8520,6 +8556,22 @@
     "src/shared/wsl-move/wsl-move-storage-dispositions.ts": {
       "added": 14,
       "removed": 0
+    },
+    "src/main/host/safe-storage-availability.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-check-and-review-actions.test.tsx": {
+      "added": 3,
+      "removed": 1
+    },
+    "config/scripts/benchmark-preflight-compilers.mjs": {
+      "added": 11,
+      "removed": 2
+    },
+    ".github/workflows/release-javascript-benchmark.yml": {
+      "added": 7,
+      "removed": 2
     }
   }
 }

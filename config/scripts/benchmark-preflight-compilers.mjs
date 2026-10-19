@@ -12,6 +12,10 @@ import {
   planTypecheckBatches,
   resolveProjectCompiler
 } from './run-typecheck-projects-in-parallel.mjs'
+import {
+  NATIVE_COMPILER_MEMORY_LIMIT,
+  withNativeHeapEstimates
+} from './fork-benchmark-baseline/benchmark-baseline.mjs'
 
 const parityOnly = process.argv.slice(2).includes('--parity-only')
 if (process.argv.slice(2).some((argument) => argument !== '--parity-only')) {
@@ -22,7 +26,12 @@ const output = path.join(root, '.build/preflight-benchmark')
 const reportName = parityOnly ? 'compiler-parity' : 'compilers'
 mkdirSync(output, { recursive: true })
 const bun = process.env.ORCA_BENCHMARK_BUN ?? 'bun'
-const env = { ...process.env, ORCA_BACKGROUND_LAUNCH: '1', GOMAXPROCS: '4' }
+const env = {
+  ...process.env,
+  ORCA_BACKGROUND_LAUNCH: '1',
+  GOMAXPROCS: '4',
+  GOMEMLIMIT: NATIVE_COMPILER_MEMORY_LIMIT
+}
 const report = {
   sourceSha: process.env.GITHUB_SHA ?? null,
   host: {
@@ -59,7 +68,7 @@ report.host.bun = version.stdout.trim()
 report.host.typescript = JSON.parse(
   readFileSync(path.join(root, 'node_modules/typescript/package.json'))
 ).version
-const nativeBatches = planTypecheckBatches(TYPECHECK_PROJECTS, {
+const nativeBatches = planTypecheckBatches(withNativeHeapEstimates(TYPECHECK_PROJECTS), {
   budgetGib: Math.min(12, admissibleHeapGib(totalmem())),
   parallelism: Math.min(4, availableParallelism())
 })

@@ -2,16 +2,20 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { setPresenceGated } from '@/hooks/agent-auto-ack-presence'
 
 const mocks = vi.hoisted(() => ({
   storeState: {
     activeView: 'terminal',
     activeWorktreeId: null as string | null,
-    activeTab: null as { contentType: 'terminal'; entityId: string } | null,
-    getActiveTab: (_worktreeId: string): { contentType: 'terminal'; entityId: string } | null =>
-      mocks.storeState.activeTab,
     settings: {},
     floatingWorkspacePanelOpen: false,
+    groupsByWorktree: {} as Record<string, { id: string; activeTabId: string | null }[]>,
+    activeGroupIdByWorktree: {} as Record<string, string | null>,
+    unifiedTabsByWorktree: {} as Record<
+      string,
+      { id: string; contentType: 'terminal'; entityId: string }[]
+    >,
     terminalLayoutsByTabId: {} as Record<string, { activeLeafId: string | null }>,
     worktreesByRepo: {} as Record<string, unknown[]>
   }
@@ -37,7 +41,13 @@ const PANE_KEY = makePaneKey(TAB_ID, LEAF_ID)
 
 function setPaneFocused(focused: boolean): void {
   mocks.storeState.activeWorktreeId = focused ? WORKTREE_ID : null
-  mocks.storeState.activeTab = focused ? { contentType: 'terminal', entityId: TAB_ID } : null
+  mocks.storeState.groupsByWorktree = focused
+    ? { [WORKTREE_ID]: [{ id: 'group-1', activeTabId: 'unified-1' }] }
+    : {}
+  mocks.storeState.activeGroupIdByWorktree = focused ? { [WORKTREE_ID]: 'group-1' } : {}
+  mocks.storeState.unifiedTabsByWorktree = focused
+    ? { [WORKTREE_ID]: [{ id: 'unified-1', contentType: 'terminal', entityId: TAB_ID }] }
+    : {}
   mocks.storeState.terminalLayoutsByTabId = focused ? { [TAB_ID]: { activeLeafId: LEAF_ID } } : {}
 }
 
@@ -67,11 +77,14 @@ describe('useAskNotificationEscalation', () => {
     vi.useFakeTimers()
     document.hasFocus = vi.fn(() => true)
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    // Why: "viewed" needs confirmed user presence; the browser-style gate-off stands in for it here.
+    setPresenceGated(false)
     setPaneFocused(false)
     dispatch = stubNotificationsDispatch()
   })
 
   afterEach(() => {
+    setPresenceGated(true)
     vi.useRealTimers()
     delete (window as unknown as { api?: unknown }).api
   })

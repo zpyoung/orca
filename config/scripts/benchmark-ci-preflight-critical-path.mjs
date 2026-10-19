@@ -7,8 +7,10 @@ import { measurePreflightCommand } from './preflight-benchmark-command.mjs'
 import { buildCounterbalancedSchedule } from './counterbalanced-benchmark-schedule.mjs'
 import { summarizeBenchmarkSamples } from './benchmark-sample-summary.mjs'
 import {
+  NATIVE_COMPILER_MEMORY_LIMIT,
   announceMissingBaseline,
-  clearBuildOutputKeepingMobileWeb
+  clearBuildOutputKeepingMobileWeb,
+  withNativeHeapEstimatesInSource
 } from './fork-benchmark-baseline/benchmark-baseline.mjs'
 
 const comparison = process.argv[2]
@@ -18,7 +20,11 @@ if (!['smoke', 'sync-spawn', 'typecheck'].includes(comparison) || process.argv.l
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const output = path.join(root, '.build/preflight-benchmark')
 mkdirSync(output, { recursive: true })
-const env = { ...process.env, ORCA_BACKGROUND_LAUNCH: '1' }
+const env = {
+  ...process.env,
+  ORCA_BACKGROUND_LAUNCH: '1',
+  GOMEMLIMIT: NATIVE_COMPILER_MEMORY_LIMIT
+}
 const report = {
   sourceSha: process.env.GITHUB_SHA ?? null,
   comparison,
@@ -73,7 +79,10 @@ if (
 }
 const baselineFile = path.join(root, 'config/scripts', `.benchmark-baseline-${baselineName}`)
 const runnerFile = path.join(output, 'baseline-smoke-runner.mjs')
-writeFileSync(baselineFile, baselineSource(`config/scripts/${baselineName}`))
+writeFileSync(
+  baselineFile,
+  withNativeHeapEstimatesInSource(baselineSource(`config/scripts/${baselineName}`))
+)
 
 try {
   if (comparison !== 'smoke') {

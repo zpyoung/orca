@@ -45,3 +45,37 @@ export function clearBuildOutputKeepingMobileWeb(root) {
     }
   }
 }
+
+/**
+ * Peak memory of the native TypeScript compiler per project on this repo, measured on 4 CPUs.
+ * The node project alone needs about 13 GiB, so on a 16 GB runner no other project may run beside
+ * it; the estimates in older typecheck scripts (7, 6, 2) let node run beside cli and kill the runner.
+ */
+const NATIVE_HEAP_GIB = {
+  'tsconfig.node.json': 13,
+  'tsconfig.tc.web.json': 10,
+  'tsconfig.tc.cli.json': 3
+}
+
+/** Soft ceiling for the Go-based compiler so it collects garbage before the runner runs out. */
+export const NATIVE_COMPILER_MEMORY_LIMIT = '10GiB'
+
+/** The project list with the native compiler's measured heap in place of the registry's estimate. */
+export function withNativeHeapEstimates(projects) {
+  return projects.map((project) => {
+    const estimate = NATIVE_HEAP_GIB[path.basename(project.config)]
+    return estimate === undefined ? project : { ...project, heapGib: estimate }
+  })
+}
+
+/** An older typecheck script's source, admitting projects by the measured heap instead of its own. */
+export function withNativeHeapEstimatesInSource(source) {
+  return Object.entries(NATIVE_HEAP_GIB).reduce(
+    (current, [name, heapGib]) =>
+      current.replace(
+        new RegExp(`(config:\\s*'[^']*${name.replaceAll('.', '\\.')}',\\s*heapGib:\\s*)\\d+`),
+        `$1${heapGib}`
+      ),
+    source
+  )
+}

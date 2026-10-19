@@ -20,7 +20,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('sonner', () => ({
   toast: { error: mocks.toastError, message: vi.fn(), success: vi.fn() }
 }))
-vi.mock('@/lib/fix-checks-agent-launch', () => ({ startFixChecksAgent: mocks.startFixChecksAgent }))
+vi.mock('@/fork-hosted-review-sitter/fix-checks-agent-launch', () => ({
+  startFixChecksAgent: mocks.startFixChecksAgent
+}))
 vi.mock('@/runtime/gitlab-job-trace-client', () => ({
   loadGitLabJobLogDetails: mocks.loadGitLabJobLogDetails
 }))

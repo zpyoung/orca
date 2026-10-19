@@ -6,7 +6,12 @@ import {
   toRuntimeExecutionHostId
 } from '../../../../../shared/execution-host'
 import { isRemoteWindowsConptyStatusUnverified } from '@/lib/pane-manager/windows-pty-compatibility'
-import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './TerminalPaneDockMount'
+
+/** Dataset key use-terminal-pane-lifecycle stamps on a non-local pane's container with
+ *  its remote-host ConPTY verdict — windowsPty only ever installs for a local pane, so a
+ *  remote/SSH pane needs this separate signal to reach the same demotion decision. Defined here,
+ *  not in the dock mount, so the pane-created seam does not pull the dock UI into its import graph. */
+export const REMOTE_CONPTY_UNVERIFIED_DATASET_KEY = 'dockRemoteConptyUnverified'
 
 /**
  * Whether a non-local pane's remote host makes ConPTY reliability unverifiable —
