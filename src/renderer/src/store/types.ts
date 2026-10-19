@@ -48,7 +48,7 @@ import type { TerminalQuickCommandHostsSlice } from './slices/terminal-quick-com
 import type { StructuredSessionLaunchDirectorySlice } from './slices/structured-session-launch-directories'
 import type { AsksSlice } from './slices/fork-ask-question-tool/asks'
 import type { LedgerSlice } from './slices/ledger'
-import type { LoopsSlice } from '@/fork-loops/loops-slice'
+import type { LoopsSlice } from '../fork-loops/loops-slice'
 import type { HeimdallFleetSlice } from './slices/fork-heimdall/fleet'
 
 export type AppState = RepoSlice &

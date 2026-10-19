@@ -5591,7 +5591,7 @@
       "path": "src/renderer/src/store/types.ts",
       "feature": "fork-loops",
       "kind": "registration",
-      "lines": ["import type { LoopsSlice } from '@/fork-loops/loops-slice'", "  LoopsSlice &"]
+      "lines": ["import type { LoopsSlice } from '../fork-loops/loops-slice'", "  LoopsSlice &"]
     },
     {
       "path": "src/shared/protocol-version.ts",
