@@ -192,6 +192,11 @@
       "name": "automation-launch-settings",
       "purpose": "Carries structured model, effort, and agent-argument overrides from automations and source-control recipes into agent launches.",
       "globs": ["**/fork-automation-launch-settings/**"]
+    },
+    {
+      "name": "fork-benchmark-baseline",
+      "purpose": "Lets the advisory PR benchmarks report a script with no baseline commit instead of failing, and keeps the mobile web bundle across timed smoke runs.",
+      "globs": ["**/fork-benchmark-baseline/**"]
     }
   ],
   "seams": [
@@ -3346,8 +3351,8 @@
       "feature": "workspace-activity-window",
       "kind": "registration",
       "lines": [
-        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'",
-        "import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/use-workspace-review-filter'",
+        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter-context'",
+        "import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/workspace-review-filter-context'",
         "    workspaceActivity: getWorkspaceActivityFilterContext(state),",
         "    workspaceReview: getWorkspaceReviewFilterContext(state),"
       ]
@@ -5157,6 +5162,59 @@
       "kind": "passthrough",
       "lines": [
         "    /else\\s+bun config\\/scripts\\/fork-localization-catalog-check\\.mjs --verify-extraction\\s+fi/"
+      ]
+    },
+    {
+      "path": "config/scripts/benchmark-ci-preflight-critical-path.mjs",
+      "feature": "fork-benchmark-baseline",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-benchmark-baseline/benchmark-baseline.mjs'",
+        "  announceMissingBaseline({",
+        "        clearBuildOutputKeepingMobileWeb(root)"
+      ]
+    },
+    {
+      "path": "config/scripts/benchmark-preflight-compat-boundary.mjs",
+      "feature": "fork-benchmark-baseline",
+      "kind": "registration",
+      "lines": [
+        "import { announceMissingBaseline } from './fork-benchmark-baseline/benchmark-baseline.mjs'",
+        "const baselineMissing = announceMissingBaseline({",
+        "  ...(baselineMissing ? {} : { baseline: [process.execPath, baselinePath] }),",
+        "].filter(([, first]) => first in arms)) {"
+      ]
+    },
+    {
+      "path": "config/scripts/benchmark-preflight-localization-extraction.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "    ['config/scripts/fork-localization-catalog-check.mjs', '--verify-extraction'],"
+      ]
+    },
+    {
+      "path": ".github/workflows/preflight-critical-path-benchmark.yml",
+      "feature": "fork-benchmark-baseline",
+      "kind": "registration",
+      "lines": [
+        "      - uses: ./.github/actions/build-mobile-web-bundle",
+        "        if: matrix.comparison == 'smoke'"
+      ]
+    },
+    {
+      "path": ".github/workflows/preflight-benchmark.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    timeout-minutes: 45"]
+    },
+    {
+      "path": "config/scripts/verify-skill-update-roundtrip.test.mjs",
+      "feature": "skills-repository",
+      "kind": "passthrough",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_SLUG } from '../../src/shared/fork-skills-repository/skills-repository-url'",
+        "    expect(roundTripAddArgs(ORCA_SKILLS_REPOSITORY_SLUG, COMMIT, 'orca-cli')).toEqual("
       ]
     }
   ],
@@ -8388,6 +8446,30 @@
     },
     "config/scripts/localization-extraction-change-scope.test.mjs": {
       "added": 3,
+      "removed": 1
+    },
+    "config/scripts/benchmark-ci-preflight-critical-path.mjs": {
+      "added": 16,
+      "removed": 1
+    },
+    "config/scripts/benchmark-preflight-compat-boundary.mjs": {
+      "added": 19,
+      "removed": 9
+    },
+    "config/scripts/benchmark-preflight-localization-extraction.mjs": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/preflight-critical-path-benchmark.yml": {
+      "added": 3,
+      "removed": 0
+    },
+    ".github/workflows/preflight-benchmark.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    "config/scripts/verify-skill-update-roundtrip.test.mjs": {
+      "added": 2,
       "removed": 1
     }
   }

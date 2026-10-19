@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { measurePreflightCommand } from './preflight-benchmark-command.mjs'
 import { buildCounterbalancedSchedule } from './counterbalanced-benchmark-schedule.mjs'
 import { summarizeBenchmarkSamples } from './benchmark-sample-summary.mjs'
+import { announceMissingBaseline } from './fork-benchmark-baseline/benchmark-baseline.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const output = path.join(root, '.build/preflight-benchmark')
@@ -44,13 +45,22 @@ if (report.bunVersion !== '1.4.3') {
 report.baselineSha = (
   await requireSuccess('git', ['rev-parse', baselineRef], 'compat-baseline-sha')
 ).stdout.trim()
-const baselineSource = (
-  await requireSuccess(
-    'git',
-    ['show', `${report.baselineSha}:${sourcePath}`],
-    'compat-baseline-source'
-  )
-).stdout
+const baselineMissing = announceMissingBaseline({
+  root,
+  output,
+  comparison: 'compat-prefilter',
+  ref: report.baselineSha,
+  file: sourcePath
+})
+const baselineSource = baselineMissing
+  ? ''
+  : (
+      await requireSuccess(
+        'git',
+        ['show', `${report.baselineSha}:${sourcePath}`],
+        'compat-baseline-source'
+      )
+    ).stdout
 // Both versions inspect this checkout and load the same parser and source inventory.
 writeFileSync(
   baselinePath,
@@ -61,14 +71,14 @@ writeFileSync(
   )
 )
 const arms = {
-  baseline: [process.execPath, baselinePath],
+  ...(baselineMissing ? {} : { baseline: [process.execPath, baselinePath] }),
   node: [process.execPath, sourcePath],
   bun: [bun, sourcePath]
 }
 for (const [comparison, first, second] of [
   ['compat-prefilter', 'baseline', 'node'],
   ['compat-runtime', 'node', 'bun']
-]) {
+].filter(([, first]) => first in arms)) {
   let diagnostics
   for (const [pair, order] of buildCounterbalancedSchedule(4, first, second).entries()) {
     for (const arm of order) {

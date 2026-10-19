@@ -83,7 +83,7 @@ for (const [arm, program] of [
 ]) {
   const result = await requireSuccess(
     program,
-    ['config/scripts/verify-localization-extraction.mjs'],
+    ['config/scripts/fork-localization-catalog-check.mjs', '--verify-extraction'],
     `extraction-check-${arm}`
   )
   if (findings !== undefined && findings !== result.stdout) {

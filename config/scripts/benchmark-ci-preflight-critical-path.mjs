@@ -6,6 +6,10 @@ import { runProcessSync } from '@orca/process-host'
 import { measurePreflightCommand } from './preflight-benchmark-command.mjs'
 import { buildCounterbalancedSchedule } from './counterbalanced-benchmark-schedule.mjs'
 import { summarizeBenchmarkSamples } from './benchmark-sample-summary.mjs'
+import {
+  announceMissingBaseline,
+  clearBuildOutputKeepingMobileWeb
+} from './fork-benchmark-baseline/benchmark-baseline.mjs'
 
 const comparison = process.argv[2]
 if (!['smoke', 'sync-spawn', 'typecheck'].includes(comparison) || process.argv.length !== 3) {
@@ -56,6 +60,17 @@ const baselineName =
     : comparison === 'typecheck'
       ? 'run-typecheck-projects-in-parallel.mjs'
       : 'check-main-sync-spawn-ratchet.mjs'
+if (
+  announceMissingBaseline({
+    root,
+    output,
+    comparison,
+    ref: 'HEAD^1',
+    file: `config/scripts/${baselineName}`
+  })
+) {
+  process.exit(0)
+}
 const baselineFile = path.join(root, 'config/scripts', `.benchmark-baseline-${baselineName}`)
 const runnerFile = path.join(output, 'baseline-smoke-runner.mjs')
 writeFileSync(baselineFile, baselineSource(`config/scripts/${baselineName}`))
@@ -124,7 +139,7 @@ for (const [program, args] of ${JSON.stringify(steps)}) {
     for (const arm of order) {
       let result
       if (comparison === 'smoke') {
-        rmSync(path.join(root, 'out'), { recursive: true, force: true })
+        clearBuildOutputKeepingMobileWeb(root)
         result =
           arm === 'baseline'
             ? await command(process.execPath, [runnerFile], `smoke-${pair}-${arm}`)
