@@ -18,20 +18,16 @@ const projectDir = resolve(import.meta.dirname, '../..')
 const workflow = (name) =>
   parse(readFileSync(resolve(projectDir, `.github/workflows/${name}.yml`), 'utf8'))
 
-const shellRun = workflow('pr').jobs.shell_contracts.steps.find(
-  (step) => step.name === 'Test real shell contracts'
-).run
 const unitShardEnv = workflow('unit-tests').jobs.test.steps.find(
   (step) => step.name === 'Test shard'
 ).env
 
-const shellSpecs = shellRun.match(/src\/\S+\.test\.ts/g)
-
 describe('sandbox lane selection', () => {
-  it('runs the CI shell contracts serially without stale spec paths', () => {
+  it('runs the shell contracts serially without stale spec paths', () => {
     const command = laneCommand({ lane: 'shell', extraArgs: [] }, 1)
+    const shellSpecs = command.filter((arg) => arg.endsWith('.test.ts'))
 
-    expect(command.filter((arg) => arg.endsWith('.test.ts')).sort()).toEqual(shellSpecs.sort())
+    expect(shellSpecs.length).toBeGreaterThan(0)
     expect(command).toContain('--maxWorkers=1')
     expect(command.some((arg) => arg.startsWith('--shard='))).toBe(false)
     for (const spec of shellSpecs) {

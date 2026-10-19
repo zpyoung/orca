@@ -6356,6 +6356,12 @@
       "deleted": true
     },
     {
+      "path": "config/scripts/linux-package-fixture-cache.test.mjs",
+      "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
       "path": "config/scripts/pr-preflight-gates.test.mjs",
       "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
       "status": "permanent",

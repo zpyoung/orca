@@ -61,7 +61,7 @@ const IMAGE_CONTEXT_ROOTS = [
   'native/windows-security/package.json'
 ]
 
-/** Matches the serialized shell-contract selection in pr.yml. */
+/** The real-shell contracts the unit shards exclude, run serially. */
 const SHELL_CONTRACT_SPECS = [
   'src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts',
   'src/main/daemon/shell-ready.test.ts',

@@ -423,35 +423,6 @@ describe('CI dependency download caches', () => {
       })
     }
   })
-
-  it('seeds the existing Linux PR tool cache from successful main x64 release builds', () => {
-    const packaging = workflow('pr').jobs.package
-    const consumer = packaging.steps.find(
-      (step) => step.name === 'Cache electron-builder downloads'
-    )
-    const release = workflow('release-cut').jobs.build
-    const combined = release.steps.find((step) => step.name === 'Cache electron-builder downloads')
-    const writer = release.steps.find(
-      (step) => step.name === 'Seed shared Linux packaging downloads'
-    )
-    const linux = release.strategy.matrix.include.find((entry) => entry.platform === 'linux-x64')
-
-    expect(packaging['runs-on']).toBe(linux.os)
-    expect(writer.if).toBe("matrix.platform == 'linux-x64' && github.ref == 'refs/heads/main'")
-    expect(writer.uses).toBe('actions/cache@v5')
-    expect(writer.with.path).toBe(consumer.with.path)
-    expect(writer.with.key).toBe(consumer.with.key)
-    expect(writer.with['restore-keys']).toBeUndefined()
-    expect(writer.with['lookup-only']).toBe(true)
-    expect(release.steps.indexOf(writer)).toBeGreaterThan(release.steps.indexOf(combined))
-    expect(consumer.uses).toBe('actions/cache/restore@v5')
-    expect(consumer.with['restore-keys'].trim()).toBe('electron-builder-linux-')
-    expect(combined.uses).toBe('actions/cache@v5')
-    expect(linux.eb_cache_path.trim().split('\n')).toEqual([
-      '~/.cache/electron',
-      '~/.cache/electron-builder'
-    ])
-  })
 })
 
 it('shares Electron archives with PRs without uploading PR-local copies', () => {
