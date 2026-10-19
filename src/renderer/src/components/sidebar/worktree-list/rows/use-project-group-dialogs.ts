@@ -5,7 +5,11 @@ import { translate } from '@/i18n/i18n'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
 import type { LedgerRemovalPreview } from '../../../../../../shared/ledger'
 import { requestLedger } from '@/runtime/runtime-ledger-client'
 import { isLedgerRemovalConflict } from '@/store/repos/ledger-removal-conflict'
@@ -93,14 +97,14 @@ export function useProjectGroupDialogs(args: {
       if (repo.projectGroupId === groupId) {
         return
       }
-      void moveProjectToGroup(repo.id, groupId)
+      void moveProjectToGroup(repo.id, groupId, undefined, getRepoExecutionHostId(repo))
     },
     [moveProjectToGroup]
   )
 
   const handleRemoveProjectFromGroup = useCallback(
     (repo: Repo) => {
-      void moveProjectToGroup(repo.id, null)
+      void moveProjectToGroup(repo.id, null, undefined, getRepoExecutionHostId(repo))
     },
     [moveProjectToGroup]
   )
@@ -118,9 +122,10 @@ export function useProjectGroupDialogs(args: {
         return
       }
       if (nameDialog.type === 'create-from-repo') {
-        const group = await createProjectGroup(name)
+        const hostId = getRepoExecutionHostId(nameDialog.repo)
+        const group = await createProjectGroup(name, hostId)
         if (group) {
-          await moveProjectToGroup(nameDialog.repo.id, group.id)
+          await moveProjectToGroup(nameDialog.repo.id, group.id, undefined, hostId)
         }
         return
       }

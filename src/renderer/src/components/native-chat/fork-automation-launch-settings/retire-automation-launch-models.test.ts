@@ -2,24 +2,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { retireAutomationLaunchModelsMissingFromDiscovery } from './retire-automation-launch-models'
 
 const list = vi.fn()
+const listForTarget = vi.fn()
 const update = vi.fn()
 const resolveAutomationModelDiscoveryHostKey = vi.fn()
 
-vi.mock('../native-chat-session-option-discovery', () => ({
+vi.mock('./automation-model-discovery-host-key', () => ({
   resolveAutomationModelDiscoveryHostKey: (automation: unknown) =>
     resolveAutomationModelDiscoveryHostKey(automation)
 }))
 
 vi.mock('@/components/automations/automation-host-client', () => ({
-  getAutomationListTarget: () => ({ kind: 'local' }),
-  listAutomationsForTarget: () => list(),
+  listAutomationsForTarget: (target: unknown) => {
+    listForTarget(target)
+    return list()
+  },
   updateAutomationForTarget: (automation: unknown, updates: unknown) => update(automation, updates)
 }))
 
-vi.mock('@/store', () => ({ useAppStore: { getState: () => ({ settings: {} }) } }))
-
 beforeEach(() => {
   list.mockReset()
+  listForTarget.mockReset()
   update.mockReset().mockResolvedValue(undefined)
   resolveAutomationModelDiscoveryHostKey.mockReset().mockReturnValue('local')
 })
@@ -49,6 +51,22 @@ describe('retireAutomationLaunchModelsMissingFromDiscovery', () => {
         optionValues: { effort: 'high' }
       }
     })
+  })
+
+  it('lists the authority serving the probed host, not a focused server', async () => {
+    list.mockResolvedValue([])
+    await retireAutomationLaunchModelsMissingFromDiscovery('grok', 'runtime:env-7', [
+      { id: 'grok-4.5', label: 'Grok 4.5', options: [] }
+    ])
+    await retireAutomationLaunchModelsMissingFromDiscovery('grok', 'ssh:build-box', [
+      { id: 'grok-4.5', label: 'Grok 4.5', options: [] }
+    ])
+
+    expect(listForTarget).toHaveBeenNthCalledWith(1, {
+      kind: 'environment',
+      environmentId: 'env-7'
+    })
+    expect(listForTarget).toHaveBeenNthCalledWith(2, { kind: 'local' })
   })
 
   it('keeps models an automation on another host still resolves', async () => {

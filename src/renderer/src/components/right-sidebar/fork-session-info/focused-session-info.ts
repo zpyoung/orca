@@ -5,7 +5,7 @@ import type { AgentStatusEntry } from '../../../../../shared/agent-status-types'
 import { isTerminalLeafId, makePaneKey } from '../../../../../shared/stable-pane-id'
 import { parseWorkspaceKey } from '../../../../../shared/workspace-scope'
 import { resolvePaneWslDistro } from '../../terminal-pane/terminal-pane-wsl-distro'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
 
 export type FocusedSessionSelection = {
   tabId: string | null
@@ -16,7 +16,9 @@ export type FocusedSessionSelection = {
   workspaceLabel: string | null
   workspaceRoot: string | null
   connectionId: string | undefined
-  activeRuntimeEnvironmentId: string | null
+  runtimeEnvironmentId: string | null
+  /** Two hosts publish the focused workspace, so it counts as neither local nor any one server's. */
+  ownerAmbiguous: boolean
   wslDistro: string | null
   isLocalExecution: boolean
 }
@@ -92,10 +94,11 @@ export function resolveFocusedSession(state: FocusedSessionState): FocusedSessio
       ? (state.getKnownWorktreeById(state.activeWorktreeId) ?? undefined)
       : undefined
   const connectionId = status?.connectionId ?? folderWorkspace?.connectionId ?? undefined
-  const activeRuntimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(
-    state,
-    state.activeWorktreeId
-  )
+  const owner = state.activeWorktreeId
+    ? runtimeEnvironmentIdForWorkspaceOwner(state, { workspaceId: state.activeWorktreeId })
+    : null
+  const runtimeEnvironmentId = owner?.kind === 'resolved' ? owner.environmentId : null
+  const ownerAmbiguous = owner?.kind === 'ambiguous'
   const workspaceRoot = folderWorkspace?.folderPath ?? worktree?.path ?? null
   const wslDistro =
     state.activeWorktreeId && workspaceRoot
@@ -111,9 +114,10 @@ export function resolveFocusedSession(state: FocusedSessionState): FocusedSessio
     workspaceLabel: folderWorkspace?.name ?? worktree?.displayName ?? null,
     workspaceRoot,
     connectionId,
-    activeRuntimeEnvironmentId,
+    runtimeEnvironmentId,
+    ownerAmbiguous,
     wslDistro,
-    isLocalExecution: !connectionId && !activeRuntimeEnvironmentId && !wslDistro
+    isLocalExecution: !connectionId && !runtimeEnvironmentId && !ownerAmbiguous && !wslDistro
   }
 }
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Bot } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
+import { getWorktreeGitIdentityDisplay } from '../../../shared/worktree/git-identity-display'
 import { useAppStore } from '@/store'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { Worktree } from '../../../shared/worktree/types'

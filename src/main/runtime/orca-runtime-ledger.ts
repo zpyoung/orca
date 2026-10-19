@@ -22,9 +22,6 @@ import {
   toLocalWorktreeRuntimePath
 } from '../local-worktree-filesystem'
 import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
-import { isWindowsRemoteHost } from '../ssh/ssh-remote-platform'
 import type {
   ExpectedLedgerRevision,
   LedgerCatalogRemovalResult,
@@ -32,7 +29,7 @@ import type {
 } from './runtime-ledger-catalog-removal'
 
 /** Owns the profile-scoped ledger store and keeps its catalog in step with the repo graph. */
-export class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCatalog {
+export abstract class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCatalog {
   private readonly ledgerService: LedgerRuntimeService | null
   private ledgerCatalogReconcileQueue: Promise<void> = Promise.resolve()
 
@@ -80,9 +77,11 @@ export class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCatalog {
     })
   }
 
-  protected notifyWorktreesChanged(repoId: string): void {
+  notifyWorktreesChanged(
+    ...args: Parameters<OrcaRuntimeWithMigrationCatalog['notifyWorktreesChanged']>
+  ): void {
     this.queueLedgerCatalogReconciliation()
-    super.notifyWorktreesChanged(repoId)
+    super.notifyWorktreesChanged(...args)
   }
 
   protected notifyReposChanged(): void {
@@ -134,97 +133,64 @@ export class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCatalog {
     if (!rootPath) {
       return null
     }
-    const connectionId = repo?.connectionId ?? folder?.connectionId ?? null
-    const provider = connectionId ? getSshFilesystemProvider(connectionId) : null
-    const gitProvider = connectionId ? getSshGitProvider(connectionId) : null
-    if (connectionId && (!provider || !gitProvider)) {
+    if (repo?.connectionId ?? folder?.connectionId) {
       return null
     }
-    const remotePlatform = gitProvider?.getHostPlatform() ?? null
     const folderWslDistro =
-      process.platform === 'win32' && !connectionId && folder
+      process.platform === 'win32' && folder
         ? parseWslUncPath(folder.folderPath)?.distro
         : undefined
-    const localGitOptions =
-      repo && !connectionId
-        ? getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
-        : { wslDistro: folderWslDistro }
+    const localGitOptions = repo
+      ? getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
+      : { wslDistro: folderWslDistro }
     const localRootPath = toLocalWorktreeRuntimePath(rootPath, localGitOptions)
     const localAccess = getLocalWorktreePathAccess(localGitOptions)
     const workspace: LedgerHostWorkspace = {
       workspaceId,
       rootPath: localRootPath,
-      host: connectionId ?? 'local',
-      platform: remotePlatform
-        ? isWindowsRemoteHost(remotePlatform)
+      host: 'local',
+      platform: localGitOptions.wslDistro
+        ? 'posix'
+        : process.platform === 'win32'
           ? 'win32'
-          : 'posix'
-        : localGitOptions.wslDistro
-          ? 'posix'
-          : process.platform === 'win32'
-            ? 'win32'
-            : 'posix',
+          : 'posix',
       ...(worktree?.projectId ? { projectId: worktree.projectId } : {}),
       ...(worktree?.branch ? { branch: worktree.branch } : {}),
       isGit: Boolean(worktree)
     }
-    const io: LedgerHostIo = provider
-      ? {
-          readFile: async (path) => {
-            const result: unknown = await provider.readFile(path)
-            if (
-              !result ||
-              typeof result !== 'object' ||
-              !('content' in result) ||
-              typeof result.content !== 'string'
-            ) {
-              throw new Error('SSH file provider returned non-text content')
-            }
-            return result.content
-          },
-          listDirectory: async (path) =>
-            (await provider.readDir(path)).map((entry) => ({
-              name: entry.name,
-              isDirectory: entry.isDirectory
-            })),
-          observeRevision: async () => {
-            const result = await gitProvider!.exec(['rev-parse', 'HEAD'], rootPath)
-            return result.stdout.trim() || null
-          }
+    const io: LedgerHostIo = {
+      readFile: async (path) => {
+        const content = await localAccess.readPath(
+          toLocalWorktreeRuntimePath(path, localGitOptions)
+        )
+        if (typeof content !== 'string') {
+          throw new Error('Local file reader returned non-text content')
         }
-      : {
-          readFile: async (path) => {
-            const content = await localAccess.readPath(
-              toLocalWorktreeRuntimePath(path, localGitOptions)
-            )
-            if (typeof content !== 'string') {
-              throw new Error('Local file reader returned non-text content')
-            }
-            return content
-          },
-          listDirectory: async (path) => {
-            const runtimePath = toLocalWorktreeRuntimePath(path, localGitOptions)
-            const fsPath =
-              process.platform === 'win32' && localGitOptions.wslDistro
-                ? toWindowsWslPath(runtimePath, localGitOptions.wslDistro)
-                : runtimePath
-            return (await readdir(fsPath, { withFileTypes: true })).map((entry) => ({
-              name: entry.name,
-              isDirectory: entry.isDirectory()
-            }))
-          },
-          observeRevision: async () => {
-            try {
-              const result = await gitExecFileAsync(['rev-parse', 'HEAD'], {
-                cwd: rootPath,
-                ...localGitOptions
-              })
-              return result.stdout.trim() || null
-            } catch {
-              return null
-            }
-          }
+        return content
+      },
+      listDirectory: async (path) => {
+        const runtimePath = toLocalWorktreeRuntimePath(path, localGitOptions)
+        const fsPath =
+          process.platform === 'win32' && localGitOptions.wslDistro
+            ? toWindowsWslPath(runtimePath, localGitOptions.wslDistro)
+            : runtimePath
+        return (await readdir(fsPath, { withFileTypes: true })).map((entry) => ({
+          name: entry.name,
+          isDirectory: entry.isDirectory()
+        }))
+      },
+      observeRevision: async () => {
+        try {
+          const result = await gitExecFileAsync(['rev-parse', 'HEAD'], {
+            cwd: rootPath,
+            ...localGitOptions
+          })
+          return result.stdout.trim() || null
+        } catch {
+          return null
         }
+      }
+    }
     return { workspace, io }
   }
 
@@ -270,24 +236,15 @@ export class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCatalog {
     const host = location.base.host ?? hosts[0]
     const scoped = candidates.filter((repo) => (repo.connectionId ?? 'local') === host)
     const contexts = scoped.map((repo) => {
-      const connectionId = repo.connectionId ?? null
-      const gitProvider = connectionId ? getSshGitProvider(connectionId) : null
-      const remotePlatform = gitProvider?.getHostPlatform()
-      if (connectionId && !remotePlatform) {
+      if (repo.connectionId) {
         throw new LedgerError('workspace-missing', 'Location host platform is unavailable')
       }
-      const localGitOptions = !connectionId
-        ? getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
-        : undefined
-      const platform = remotePlatform
-        ? isWindowsRemoteHost(remotePlatform)
+      const localGitOptions = getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
+      const platform = localGitOptions.wslDistro
+        ? ('posix' as const)
+        : process.platform === 'win32'
           ? ('win32' as const)
           : ('posix' as const)
-        : localGitOptions?.wslDistro
-          ? ('posix' as const)
-          : process.platform === 'win32'
-            ? ('win32' as const)
-            : ('posix' as const)
       return { repo, rootPath: toLocalWorktreeRuntimePath(repo.path, localGitOptions), platform }
     })
     const absolute = contexts.find(

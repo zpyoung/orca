@@ -19,7 +19,6 @@ import {
   discardChangesMock,
   checkIgnoredPathsMock,
   listWorktreesMock,
-  getSshGitProviderMock,
   resetFilesystemIpcMocks
 } from './filesystem-test-harness'
 
@@ -34,10 +33,6 @@ vi.mock(
   async () => (await import('./filesystem-test-harness')).crashBreadcrumbMock
 )
 vi.mock(
-  '../local-downloaded-folder-promotion',
-  async () => (await import('./filesystem-test-harness')).folderPromotionMock
-)
-vi.mock(
   '../git/status',
   async () => (await import('./filesystem-test-harness')).gitStatusModuleMock
 )
@@ -49,10 +44,6 @@ vi.mock('../git/worktree', async () => (await import('./filesystem-test-harness'
 vi.mock(
   '../providers/ssh-filesystem-dispatch',
   async () => (await import('./filesystem-test-harness')).sshFilesystemDispatchMock
-)
-vi.mock(
-  '../providers/ssh-git-dispatch',
-  async () => (await import('./filesystem-test-harness')).sshGitDispatchMock
 )
 vi.mock(
   '../text-generation/commit-message-text-generation',
@@ -72,6 +63,7 @@ vi.mock(
 )
 
 import { registerFilesystemHandlers } from './filesystem'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import {
   registerWorktreeRootsForRepo,
   invalidateAuthorizedRootsCache
@@ -160,13 +152,9 @@ describe('registerFilesystemHandlers', () => {
     })
   })
 
-  it('forwards includeIgnored through local and SSH git status IPC', async () => {
+  it('forwards includeIgnored through local git status IPC', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     getStatusMock.mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    const sshProvider = {
-      getStatus: vi.fn().mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
 
     registerFilesystemHandlers(store as never)
 
@@ -174,23 +162,14 @@ describe('registerFilesystemHandlers', () => {
       worktreePath: WORKTREE_FEATURE_PATH,
       includeIgnored: true
     })
-    await handlers.get('git:status')!(null, {
-      worktreePath: '/remote/repo',
-      connectionId: 'ssh-1',
-      includeIgnored: true
-    })
 
     expect(getStatusMock).toHaveBeenCalledWith(WORKTREE_FEATURE_PATH, {
       admissionTier: 'status',
       includeIgnored: true
     })
-    expect(sshProvider.getStatus).toHaveBeenCalledWith('/remote/repo', {
-      admissionTier: 'status',
-      includeIgnored: true
-    })
   })
 
-  it('returns capped-state metadata unchanged across local and SSH status IPC', async () => {
+  it('returns capped-state metadata unchanged through local status IPC', async () => {
     const cappedStatus = {
       entries: [{ path: 'generated/a.ts', status: 'untracked', area: 'untracked' }],
       conflictOperation: 'unknown',
@@ -199,38 +178,21 @@ describe('registerFilesystemHandlers', () => {
     }
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     getStatusMock.mockResolvedValue(cappedStatus)
-    const sshProvider = { getStatus: vi.fn().mockResolvedValue(cappedStatus) }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
     registerFilesystemHandlers(store as never)
 
     await expect(
       handlers.get('git:status')!(null, { worktreePath: WORKTREE_FEATURE_PATH })
     ).resolves.toEqual(cappedStatus)
-    await expect(
-      handlers.get('git:status')!(null, {
-        worktreePath: '/remote/repo',
-        connectionId: 'ssh-1'
-      })
-    ).resolves.toEqual(cappedStatus)
   })
 
-  it('forwards upstream-negative-cache bypass through local and SSH git status IPC', async () => {
+  it('forwards upstream-negative-cache bypass through local git status IPC', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     getStatusMock.mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    const sshProvider = {
-      getStatus: vi.fn().mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
 
     registerFilesystemHandlers(store as never)
 
     await handlers.get('git:status')!(null, {
       worktreePath: WORKTREE_FEATURE_PATH,
-      bypassEffectiveUpstreamNegativeCache: true
-    })
-    await handlers.get('git:status')!(null, {
-      worktreePath: '/remote/repo',
-      connectionId: 'ssh-1',
       bypassEffectiveUpstreamNegativeCache: true
     })
 
@@ -239,29 +201,15 @@ describe('registerFilesystemHandlers', () => {
       includeIgnored: false,
       bypassEffectiveUpstreamNegativeCache: true
     })
-    expect(sshProvider.getStatus).toHaveBeenCalledWith('/remote/repo', {
-      admissionTier: 'status',
-      includeIgnored: false,
-      bypassEffectiveUpstreamNegativeCache: true
-    })
   })
 
-  it('forwards line-stat reuse through local and SSH git status IPC', async () => {
+  it('forwards line-stat reuse through local git status IPC', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     getStatusMock.mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    const sshProvider = {
-      getStatus: vi.fn().mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
     registerFilesystemHandlers(store as never)
 
     await handlers.get('git:status')!(null, {
       worktreePath: WORKTREE_FEATURE_PATH,
-      reuseLineStats: true
-    })
-    await handlers.get('git:status')!(null, {
-      worktreePath: '/remote/repo',
-      connectionId: 'ssh-1',
       reuseLineStats: true
     })
 
@@ -270,38 +218,19 @@ describe('registerFilesystemHandlers', () => {
       includeIgnored: false,
       reuseLineStats: true
     })
-    expect(sshProvider.getStatus).toHaveBeenCalledWith('/remote/repo', {
-      admissionTier: 'status',
-      includeIgnored: false,
-      reuseLineStats: true
-    })
   })
 
-  it('forwards a false line-stats request through local and SSH git status IPC', async () => {
+  it('forwards a false line-stats request through local git status IPC', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     getStatusMock.mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    const sshProvider = {
-      getStatus: vi.fn().mockResolvedValue({ entries: [], conflictOperation: 'unknown' })
-    }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
     registerFilesystemHandlers(store as never)
 
     await handlers.get('git:status')!(null, {
       worktreePath: WORKTREE_FEATURE_PATH,
       includeLineStats: false
     })
-    await handlers.get('git:status')!(null, {
-      worktreePath: '/remote/repo',
-      connectionId: 'ssh-1',
-      includeLineStats: false
-    })
 
     expect(getStatusMock).toHaveBeenCalledWith(WORKTREE_FEATURE_PATH, {
-      admissionTier: 'status',
-      includeIgnored: false,
-      includeLineStats: false
-    })
-    expect(sshProvider.getStatus).toHaveBeenCalledWith('/remote/repo', {
       admissionTier: 'status',
       includeIgnored: false,
       includeLineStats: false
@@ -374,8 +303,6 @@ describe('registerFilesystemHandlers', () => {
       return pending.promise
     }
     getDiffMock.mockImplementation(cancellableDiff)
-    const sshProvider = { getDiff: vi.fn(cancellableDiff) }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
     registerFilesystemHandlers(store as never)
 
     const firstEvent = { sender: Object.assign(new EventEmitter(), { id: 7 }) }
@@ -390,10 +317,9 @@ describe('registerFilesystemHandlers', () => {
     )
     const secondRequest = Promise.resolve(
       handlers.get('git:diff')!(secondEvent, {
-        worktreePath: '/remote/repo',
+        worktreePath: REPO_PATH,
         filePath: 'src/file.ts',
         staged: false,
-        connectionId: 'ssh-1',
         requestToken: 'diff-1'
       })
     )
@@ -401,7 +327,7 @@ describe('registerFilesystemHandlers', () => {
 
     await handlers.get('git:cancelDiff')!(firstEvent, { requestToken: 'diff-1' })
     expect(signals.get(WORKTREE_FEATURE_PATH)?.aborted).toBe(true)
-    expect(signals.get('/remote/repo')?.aborted).toBe(false)
+    expect(signals.get(REPO_PATH)?.aborted).toBe(false)
     await expect(firstRequest).rejects.toThrow('aborted')
 
     await handlers.get('git:cancelDiff')!(secondEvent, { requestToken: 'diff-1' })
@@ -443,13 +369,9 @@ describe('registerFilesystemHandlers', () => {
     expect(settledSignal?.aborted).toBe(false)
   })
 
-  it('checks ignored paths through local and SSH git providers', async () => {
+  it('checks ignored paths through the local git provider', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     checkIgnoredPathsMock.mockResolvedValue(['dist/bundle.js'])
-    const sshProvider = {
-      checkIgnoredPaths: vi.fn().mockResolvedValue(['build/output.js'])
-    }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
 
     registerFilesystemHandlers(store as never)
 
@@ -459,66 +381,51 @@ describe('registerFilesystemHandlers', () => {
         paths: ['dist/bundle.js', 'src/index.ts']
       })
     ).resolves.toEqual(['dist/bundle.js'])
-    await expect(
-      handlers.get('git:checkIgnored')!(null, {
-        worktreePath: '/remote/repo',
-        connectionId: 'ssh-1',
-        paths: ['build/output.js']
-      })
-    ).resolves.toEqual(['build/output.js'])
 
     expect(checkIgnoredPathsMock).toHaveBeenCalledWith(
       WORKTREE_FEATURE_PATH,
       [path.join('dist', 'bundle.js'), path.join('src', 'index.ts')],
       {}
     )
-    expect(sshProvider.checkIgnoredPaths).toHaveBeenCalledWith('/remote/repo', [
-      path.join('build', 'output.js')
-    ])
   })
 
-  it('routes abort merge through local and SSH git providers', async () => {
+  it('routes abort merge through the local git provider', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     abortMergeMock.mockResolvedValue(undefined)
-    const sshProvider = {
-      abortMerge: vi.fn().mockResolvedValue(undefined)
-    }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
 
     registerFilesystemHandlers(store as never)
 
     await handlers.get('git:abortMerge')!(null, { worktreePath: WORKTREE_FEATURE_PATH })
-    await handlers.get('git:abortMerge')!(null, {
-      worktreePath: '/remote/repo',
-      connectionId: 'ssh-1'
-    })
 
     expect(abortMergeMock).toHaveBeenCalledWith(WORKTREE_FEATURE_PATH, {
       admissionTier: 'interactive'
     })
-    expect(sshProvider.abortMerge).toHaveBeenCalledWith('/remote/repo')
   })
 
-  it('routes abort rebase through local and SSH git providers', async () => {
+  it('routes abort rebase through the local git provider', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     abortRebaseMock.mockResolvedValue(undefined)
-    const sshProvider = {
-      abortRebase: vi.fn().mockResolvedValue(undefined)
-    }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
 
     registerFilesystemHandlers(store as never)
 
     await handlers.get('git:abortRebase')!(null, { worktreePath: WORKTREE_FEATURE_PATH })
-    await handlers.get('git:abortRebase')!(null, {
-      worktreePath: '/remote/repo',
-      connectionId: 'ssh-1'
-    })
 
     expect(abortRebaseMock).toHaveBeenCalledWith(WORKTREE_FEATURE_PATH, {
       admissionTier: 'interactive'
     })
-    expect(sshProvider.abortRebase).toHaveBeenCalledWith('/remote/repo')
+  })
+
+  it('refuses SSH git IPC with the not-served error and never runs it locally', async () => {
+    registerFilesystemHandlers(store as never)
+
+    for (const channel of ['git:status', 'git:abortMerge', 'git:abortRebase']) {
+      await expect(
+        handlers.get(channel)!(null, { worktreePath: '/remote/repo', connectionId: 'ssh-1' })
+      ).rejects.toThrow(SshHostNotServedError)
+    }
+    expect(getStatusMock).not.toHaveBeenCalled()
+    expect(abortMergeMock).not.toHaveBeenCalled()
+    expect(abortRebaseMock).not.toHaveBeenCalled()
   })
 
   it('rejects git file paths that escape the selected worktree', async () => {

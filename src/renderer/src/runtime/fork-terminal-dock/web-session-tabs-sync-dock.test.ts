@@ -10,7 +10,8 @@ import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 
 import { recordWebAgentSessionHandoff } from '../web-agent-session-handoff'
 
-import { applyWebSessionTabsSnapshot, type WebSessionTabsSyncState } from '../web-session-tabs-sync'
+import { applyWebSessionTabsSnapshot } from '../web-session-tabs-sync/snapshot-api'
+import type { WebSessionTabsSyncState } from '../web-session-tabs-sync/state'
 
 vi.mock('../store', () => ({
   useAppStore: {
@@ -74,7 +75,7 @@ function makeSnapshot(
   }
 }
 
-import type * as WebRuntimeSessionModule from '../web-runtime-session'
+import type * as WebRuntimeTerminalActionsModule from '../web-runtime-terminal-actions'
 
 import {
   readTerminalDockPaneState,
@@ -89,8 +90,8 @@ function hasStoredPaneEntry(paneKey: string): boolean {
 }
 
 const setWebRuntimeTabPropsMock = vi.fn()
-vi.mock('../web-runtime-session', async (importOriginal) => {
-  const actual = await importOriginal<typeof WebRuntimeSessionModule>()
+vi.mock('../web-runtime-terminal-actions', async (importOriginal) => {
+  const actual = await importOriginal<typeof WebRuntimeTerminalActionsModule>()
   return {
     ...actual,
     setWebRuntimeTabProps: (...args: unknown[]) => setWebRuntimeTabPropsMock(...args)

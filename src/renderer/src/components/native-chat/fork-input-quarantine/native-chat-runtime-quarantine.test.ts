@@ -30,19 +30,18 @@ const TAB = 'tab-quarantine'
 const PTY = 'pty-quarantine'
 const TARGET: NativeChatResolvedTarget = {
   terminalTabId: TAB,
-  ptyId: PTY,
-  settings: undefined
+  ptyId: PTY
 }
 
 function acceptedWriteBytes(): string[] {
   return sendRuntimePtyInputAcceptance.mock.calls.flatMap((call) =>
-    typeof call[2] === 'string' ? [call[2]] : []
+    typeof call[1] === 'string' ? [call[1]] : []
   )
 }
 
 function verifiedWriteBytes(): string[] {
   return sendRuntimePtyInputVerified.mock.calls.flatMap((call) =>
-    typeof call[2] === 'string' ? [call[2]] : []
+    typeof call[1] === 'string' ? [call[1]] : []
   )
 }
 
@@ -125,7 +124,7 @@ describe('native-chat runtime quarantine boundary', () => {
     sendNativeChatAskAnswer(TARGET, [{ raw: '1' }, { raw: '2' }], onSettled)
     await vi.advanceTimersByTimeAsync(0)
     expect(verifiedWriteBytes()).toEqual(['1'])
-    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[4]?.isCancelled
+    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[3]?.isCancelled
     expect(typeof isCancelled).toBe('function')
 
     armTerminalInputQuarantine(TAB)
@@ -144,7 +143,7 @@ describe('native-chat runtime quarantine boundary', () => {
     sendRuntimePtyInputVerified.mockReturnValueOnce(body.promise)
     const pending = sendNativeChatMessageVerified(TARGET, '/model sonnet')
     await vi.advanceTimersByTimeAsync(0)
-    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[4]?.isCancelled
+    const isCancelled = sendRuntimePtyInputVerified.mock.calls[0]?.[3]?.isCancelled
     expect(typeof isCancelled).toBe('function')
 
     armTerminalInputQuarantine(TAB)

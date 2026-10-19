@@ -2,7 +2,7 @@ import type { AppState } from '@/store/types'
 import { getIndexedWorktreeMap } from '@/store/worktree-repo-index'
 import { detectAgentSessionContinuationAgents } from '@/lib/launch-agent-session-continuation'
 import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
 import { getFolderWorkspaceCandidateRepos } from '@/lib/folder-workspace-connection'
 import {
   LOCAL_EXECUTION_HOST_ID,
@@ -213,12 +213,16 @@ function resolveExecutionRoute(
   if (sshConnectionId === undefined) {
     return null
   }
-  const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, target.worktreeId)
+  const owner = runtimeEnvironmentIdForWorkspaceOwner(state, { workspaceId: target.worktreeId })
+  // Why: a twin-published workspace has no single host to run the handoff on.
+  if (owner.kind === 'ambiguous') {
+    return null
+  }
   return {
     ...target,
     initialCwd: target.workspacePath,
     sshConnectionId,
-    runtimeEnvironmentId
+    runtimeEnvironmentId: owner.environmentId
   }
 }
 

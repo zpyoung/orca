@@ -264,7 +264,7 @@ export function LedgerPage({
   }
   const updateFilter = (key: string, value: string) =>
     (
-      ({
+      {
         type: setType,
         state: setState,
         reviewed: setReviewed,
@@ -273,7 +273,7 @@ export function LedgerPage({
         branch: setBranch,
         query: setQuery,
         sort: setSort
-      })[key] as (next: string) => void
+      }[key] as (next: string) => void
     )(value)
   return (
     <main className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">

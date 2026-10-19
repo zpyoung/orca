@@ -6,13 +6,8 @@ import type { SessionOptionDescriptor } from '../../../../../shared/native-chat-
 import type { NativeChatPtySessionOptionsSurface } from '../native-chat-pty-session-options'
 
 const mocks = vi.hoisted(() => ({
-  getSettings: vi.fn(),
   subscribeLocal: vi.fn(),
   subscribeRemote: vi.fn()
-}))
-
-vi.mock('@/lib/agent-paste-draft', () => ({
-  getSettingsForAgentTabRuntimeOwner: mocks.getSettings
 }))
 
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
@@ -97,7 +92,6 @@ describe('useClaudeStartupFrameRevision', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
-    mocks.getSettings.mockReset().mockReturnValue({ activeRuntimeEnvironmentId: 'env-1' })
     mocks.subscribeLocal.mockReset()
     mocks.subscribeRemote.mockReset()
     unsubscribeLocal = vi.fn()
@@ -186,7 +180,6 @@ describe('useClaudeStartupFrameRevision', () => {
 
     expect(mocks.subscribeLocal).not.toHaveBeenCalled()
     expect(mocks.subscribeRemote).toHaveBeenCalledWith(
-      { activeRuntimeEnvironmentId: 'env-1' },
       'remote:env-1@@pty-1',
       'desktop:native-chat-startup-frame:remote:env-1@@pty-1',
       expect.any(Function)

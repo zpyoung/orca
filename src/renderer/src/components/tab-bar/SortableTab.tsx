@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { X, Minimize2, Pin } from 'lucide-react'
 import { stripLeadingAgentTitleDecoration } from '../../../../shared/agent-title-decoration'
-import { useTabAgent } from '@/lib/use-tab-agent'
 import { getAgentLabel } from '@/lib/agent-catalog'
 import { basename } from '@/lib/path'
 import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import { Input } from '@/components/ui/input'
 import { TabHoverCard } from './TabHoverCard'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
+import type { TerminalAgent } from '../../../../shared/terminal-agent'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import { useAppStore } from '../../store'
 import { selectTabHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
@@ -26,7 +26,6 @@ import { translate } from '@/i18n/i18n'
 import { TAB_LABEL_WIDTH_CLASSES } from './tab-width-rules'
 import { useTabStripSlotProps } from './use-tab-strip-slot-props'
 import { useTabStripPointerActivation } from './tab-strip-pointer-activation'
-import { TabCloseTooltip } from './TabCloseTooltip'
 import { TerminalTabLeadingIcon } from './TerminalTabLeadingIcon'
 import {
   isTerminalTabActivityLive,
@@ -34,9 +33,18 @@ import {
   terminalTabHasUnreadActivity
 } from './terminal-tab-activity-status'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
+import type { NativeChatTabSession } from './tab-session-history-switch'
 
-type SortableTabProps = {
-  tab: TerminalTab
+/** What the strip draws for a terminal or native chat tab; never a source of agent identity. */
+type SortableTabModel = Pick<
+  TerminalTab,
+  'id' | 'worktreeId' | 'title' | 'customTitle' | 'color' | 'shellOverride' | 'launchAgent'
+>
+
+export type SortableTabProps = {
+  tab: SortableTabModel
+  /** The tab's agent, resolved by the caller from its own source of truth (pane signals or the chat's provider). */
+  agent: TerminalAgent | null
   unifiedTabId: string
   groupId: string
   tabCount: number
@@ -50,6 +58,7 @@ type SortableTabProps = {
   onCloseOthers: (tabId: string) => void
   onCloseToRight: (tabId: string) => void
   onCloseToLeft: (tabId: string) => void
+  onCloseSplitPane?: () => void
   onSetCustomTitle: (tabId: string, title: string | null) => void
   onSetTabColor: (tabId: string, color: string | null) => void
   onTogglePin: () => void
@@ -64,12 +73,13 @@ type SortableTabProps = {
   /** Toggle the tab between terminal and native chat view. */
   onToggleViewMode?: () => void
   canSplitTerminal?: boolean
-  /** Set only for a native chat tab: the chat session it shows. */
-  structuredSessionId?: string
+  /** Set only for a native chat tab. */
+  nativeChat?: NativeChatTabSession
 }
 
 export default function SortableTab({
   tab,
+  agent: tabAgent,
   unifiedTabId,
   groupId,
   tabCount,
@@ -83,6 +93,7 @@ export default function SortableTab({
   onCloseOthers,
   onCloseToRight,
   onCloseToLeft,
+  onCloseSplitPane,
   onSetCustomTitle,
   onSetTabColor,
   onTogglePin,
@@ -94,7 +105,7 @@ export default function SortableTab({
   isChatView = false,
   onToggleViewMode,
   canSplitTerminal = true,
-  structuredSessionId
+  nativeChat
 }: SortableTabProps): React.JSX.Element {
   // Why: agent-completion unread exists even with terminal-attention off; collapse both sources to one primitive so unrelated tabs don't re-render.
   const hasUnreadActivity = useAppStore((s) =>
@@ -120,9 +131,6 @@ export default function SortableTab({
   // Why: shellOverride is stamped at create time, so changing the default shell later won't repaint existing tabs.
   const shellForIcon = tab.shellOverride
 
-  // Why: use hook status + title evidence so the icon reflects the harness running now, not just the launch command.
-  const tabAgent = useTabAgent(tab)
-
   // Why: with a provider icon shown, strip the agent's own leading glyph so the tab doesn't show two icons for one agent.
   const displayTitle =
     tab.customTitle ?? (tabAgent ? stripLeadingAgentTitleDecoration(tab.title) : tab.title)
@@ -134,7 +142,13 @@ export default function SortableTab({
   })
 
   // Why: no transform/transition/opacity so tabs stay anchored during drag, only the insertion bar moves (see TabBar.tsx).
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpening, setMenuOpening] = useState<number | null>(null)
+  const menuGeneration = useRef(0)
+  const setMenuOpen = useCallback((open: boolean) => {
+    // Every gesture retires the old opening, even when React batches close and reopen.
+    const generation = ++menuGeneration.current
+    setMenuOpening(open ? generation : null)
+  }, [])
   const [menuPoint, setMenuPoint] = useState({ x: 0, y: 0 })
   const {
     isEditing,
@@ -158,17 +172,17 @@ export default function SortableTab({
     const closeMenu = (): void => setMenuOpen(false)
     window.addEventListener(CLOSE_ALL_CONTEXT_MENUS_EVENT, closeMenu)
     return () => window.removeEventListener(CLOSE_ALL_CONTEXT_MENUS_EVENT, closeMenu)
-  }, [])
+  }, [setMenuOpen])
 
   // Why: webview clicks miss the renderer pointerdown Radix uses for outside-click, so dismiss on window blur instead.
   useEffect(() => {
-    if (!menuOpen) {
+    if (menuOpening === null) {
       return
     }
     const dismiss = (): void => setMenuOpen(false)
     window.addEventListener('blur', dismiss)
     return () => window.removeEventListener('blur', dismiss)
-  }, [menuOpen])
+  }, [menuOpening, setMenuOpen])
 
   // Why: while editing, drop drag listeners so typing can't start a drag; attributes stay spread to keep dnd-kit a11y.
   const dragListeners = isEditing ? undefined : listeners
@@ -314,40 +328,38 @@ export default function SortableTab({
         </button>
       )}
       {!isEditing && !isPinned && (
-        <TabCloseTooltip>
-          <button
-            className={`relative z-10 flex items-center justify-center w-4 h-4 rounded-sm shrink-0 ${
-              isActive
-                ? 'text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:text-foreground focus-visible:bg-muted'
-                : 'text-transparent group-hover:text-muted-foreground hover:!text-foreground hover:!bg-muted focus-visible:!text-foreground focus-visible:!bg-muted'
-            }`}
-            // Why: stable accessible name lets E2E drive the real close path instead of calling the store.
-            aria-label={translate(
-              'auto.components.tab.bar.SortableTab.6df69d9388',
-              'Close tab {{value0}}',
-              { value0: tabTitle }
-            )}
-            type="button"
-            data-tab-close-button="true"
-            onPointerDown={(e) => {
-              if (e.button === 0) {
-                e.stopPropagation()
-              }
-            }}
-            onMouseDown={(e) => {
-              if (e.button === 0) {
-                e.stopPropagation()
-              }
-            }}
-            onClick={(e) => {
-              e.preventDefault()
+        <button
+          className={`relative z-10 flex items-center justify-center w-4 h-4 rounded-sm shrink-0 ${
+            isActive
+              ? 'text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:text-foreground focus-visible:bg-muted'
+              : 'text-transparent group-hover:text-muted-foreground hover:!text-foreground hover:!bg-muted focus-visible:!text-foreground focus-visible:!bg-muted'
+          }`}
+          // Why: stable accessible name lets E2E drive the real close path instead of calling the store.
+          aria-label={translate(
+            'auto.components.tab.bar.SortableTab.6df69d9388',
+            'Close tab {{value0}}',
+            { value0: tabTitle }
+          )}
+          type="button"
+          data-tab-close-button="true"
+          onPointerDown={(e) => {
+            if (e.button === 0) {
               e.stopPropagation()
-              onClose(tab.id)
-            }}
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </TabCloseTooltip>
+            }
+          }}
+          onMouseDown={(e) => {
+            if (e.button === 0) {
+              e.stopPropagation()
+            }
+          }}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onClose(tab.id)
+          }}
+        >
+          <X className="w-3 h-3" />
+        </button>
       )}
     </div>
   )
@@ -363,7 +375,7 @@ export default function SortableTab({
           setMenuOpen(true)
         }}
       >
-        {isEditing || menuOpen ? (
+        {isEditing || menuOpening !== null ? (
           tabRoot
         ) : (
           <TabHoverCard
@@ -391,11 +403,17 @@ export default function SortableTab({
       </div>
 
       <SortableTabContextMenu
+        sessionSwitchOpening={menuOpening}
+        onSessionSwitchComplete={() => {
+          if (menuGeneration.current === menuOpening) {
+            setMenuOpen(false)
+          }
+        }}
         tab={tab}
         unifiedTabId={unifiedTabId}
         groupId={groupId}
         isActive={isActive}
-        open={menuOpen}
+        open={menuOpening !== null}
         point={menuPoint}
         tabCount={tabCount}
         hasTabsToRight={hasTabsToRight}
@@ -407,6 +425,7 @@ export default function SortableTab({
         onCloseOthers={onCloseOthers}
         onCloseToRight={onCloseToRight}
         onCloseToLeft={onCloseToLeft}
+        onCloseSplitPane={onCloseSplitPane}
         onRenameOpen={handleRenameOpen}
         onSetTabColor={onSetTabColor}
         onTogglePin={onTogglePin}
@@ -414,7 +433,7 @@ export default function SortableTab({
         isChatView={isChatView}
         onToggleViewMode={onToggleViewMode}
         canSplitTerminal={canSplitTerminal}
-        structuredSessionId={structuredSessionId}
+        nativeChat={nativeChat}
       />
     </>
   )

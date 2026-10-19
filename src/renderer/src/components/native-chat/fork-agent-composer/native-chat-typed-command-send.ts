@@ -45,7 +45,7 @@ export async function typeNativeChatCommand(
         if (invalidated) {
           return 'rejected'
         }
-        return (await sendRuntimePtyInputVerified(target.settings, target.ptyId, key, 'driving', {
+        return (await sendRuntimePtyInputVerified(target.ptyId, key, 'driving', {
           isCancelled: () => invalidated || signal?.aborted === true
         }))
           ? 'accepted'
@@ -70,7 +70,7 @@ export function sendNativeChatTypedCommand(
     ({ isCancelled, delay, markSubmitted }) => {
       const finish = (outcome: 'accepted' | 'rejected' | 'unknown'): void => {
         if (!isCancelled() && outcome !== 'accepted') {
-          void clearUnsubmittedAgentInput(target.settings, target.ptyId, undefined, delay).then(
+          void clearUnsubmittedAgentInput(target.ptyId, undefined, delay).then(
             markSubmitted,
             markSubmitted
           )
@@ -85,7 +85,7 @@ export function sendNativeChatTypedCommand(
           if (isCancelled()) {
             return 'rejected'
           }
-          return (await sendRuntimePtyInputVerified(target.settings, target.ptyId, key, 'driving', {
+          return (await sendRuntimePtyInputVerified(target.ptyId, key, 'driving', {
             isCancelled: () => isCancelled() || controller.signal.aborted
           }))
             ? 'accepted'
@@ -97,7 +97,7 @@ export function sendNativeChatTypedCommand(
       terminalTabId: target.terminalTabId,
       onCancelUnsubmitted: (cleanupDelay) => {
         controller.abort()
-        return clearUnsubmittedAgentInput(target.settings, target.ptyId, undefined, cleanupDelay)
+        return clearUnsubmittedAgentInput(target.ptyId, undefined, cleanupDelay)
       },
       onInvalidate: () => controller.abort()
     }

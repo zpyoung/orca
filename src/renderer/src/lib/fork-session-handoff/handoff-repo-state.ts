@@ -1,16 +1,18 @@
-import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
-import type { WorktreeRuntimeOwnerState } from '@/lib/worktree-runtime-owner'
+import { runtimeTargetForWorkspaceOwner } from '@/lib/resolve-owner'
+import type { WorktreeOperationRouteState } from '@/lib/worktree-operation-route'
+import { UNRESOLVED_GIT_HOST_ERROR } from '@/store/slices/editor/actions/git-operation-target'
 import type { GitStatusEntry, GitStatusResult } from '../../../../shared/git-status-types'
 import type { GitDiffResult } from '../../../../shared/git-diff-compare-types'
-import { getRuntimeGitDiff, getRuntimeGitStatus } from '@/runtime/runtime-git-client'
-import type { RuntimeGitContext } from '@/runtime/runtime-git-client'
+import { getRuntimeGitDiff } from '@/runtime/runtime-git-diff-client'
+import { getRuntimeGitStatus } from '@/runtime/runtime-git-status-client'
+import type { RuntimeGitContext } from '@/runtime/runtime-git-client-context'
 import { FORK_HANDOFF_DIFF_CHAR_CAP, type HandoffRepoStateBlock } from './handoff-brief-composer'
 import type { HandoffTargetResolution } from './handoff-target-resolution'
 
 export { FORK_HANDOFF_DIFF_CHAR_CAP } from './handoff-brief-composer'
 
 type HandoffRepoStateArgs = {
-  state: WorktreeRuntimeOwnerState
+  state: WorktreeOperationRouteState
   target: HandoffTargetResolution
   includeDiffBodies: boolean
   signal?: AbortSignal
@@ -67,8 +69,14 @@ export function formatHandoffStatusSummary(status: GitStatusResult): string {
 }
 
 function buildRuntimeGitContext(args: HandoffRepoStateArgs): RuntimeGitContext {
+  const target = runtimeTargetForWorkspaceOwner(args.state, {
+    workspaceId: args.target.worktreeId
+  })
+  if (!target) {
+    throw new Error(UNRESOLVED_GIT_HOST_ERROR)
+  }
   return {
-    settings: getSettingsForWorktreeRuntimeOwner(args.state, args.target.worktreeId),
+    target,
     worktreeId: args.target.worktreeId,
     worktreePath: args.target.workspacePath,
     ...(args.target.sshConnectionId ? { connectionId: args.target.sshConnectionId } : {})

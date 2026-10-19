@@ -22,8 +22,8 @@ const mocks = vi.hoisted(() => {
     applyLoopSnapshot: vi.fn()
   }
   const detectedIds: string[] = ['claude', 'gemini']
-  const target: { kind: string } = { kind: 'local' }
-  return { state, detectedIds, target, create: vi.fn() }
+  const hostId: string = 'local'
+  return { state, detectedIds, hostId, create: vi.fn() }
 })
 
 vi.mock('@/store', () => ({
@@ -35,8 +35,8 @@ vi.mock('@/store', () => ({
 vi.mock('@/hooks/useDetectedAgents', () => ({
   useDetectedAgents: () => ({ detectedIds: mocks.detectedIds })
 }))
-vi.mock('@/hooks/useAgentDetectionTarget', () => ({
-  useAgentDetectionTargetForWorktree: () => mocks.target
+vi.mock('@/lib/resolved-worktree-execution-host', () => ({
+  getResolvedExecutionHostIdForWorktree: () => mocks.hostId
 }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
@@ -173,7 +173,7 @@ beforeEach(() => {
   mocks.state.repos = [{ id: 'wt-1', kind: 'git' }]
   mocks.state.applyLoopSnapshot.mockReset()
   mocks.detectedIds = ['claude', 'gemini']
-  mocks.target = { kind: 'local' }
+  mocks.hostId = 'local'
   mocks.create.mockReset()
   mocks.create.mockImplementation(async () => ({ id: 'loop-1' }))
   Object.defineProperty(window, 'api', {
@@ -203,7 +203,7 @@ describe('LoopSetupDialog', () => {
   })
 
   it('hides cost fields for Claude on a remote host', () => {
-    mocks.target = { kind: 'ssh' }
+    mocks.hostId = 'ssh:target-1'
     renderDialog()
     openAdvanced()
     expect(screen.queryByLabelText('Maximum cost (USD)')).not.toBeInTheDocument()

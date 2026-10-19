@@ -45,7 +45,11 @@ describe('registerForkLocalizationCatalogs', () => {
           })
         }),
         expect.objectContaining({ auto: expect.any(Object) }),
-        expect.objectContaining({ 'fork.sessionInfo.title': expect.any(String) })
+        expect.objectContaining({
+          fork: expect.objectContaining({
+            sessionInfo: expect.objectContaining({ title: expect.any(String) })
+          })
+        })
       ])
     )
 
@@ -66,7 +70,11 @@ describe('registerForkLocalizationCatalogs', () => {
           })
         }),
         expect.objectContaining({ auto: expect.any(Object) }),
-        expect.objectContaining({ 'fork.sessionInfo.title': expect.any(String) })
+        expect.objectContaining({
+          fork: expect.objectContaining({
+            sessionInfo: expect.objectContaining({ title: expect.any(String) })
+          })
+        })
       ])
     )
   })

@@ -80,8 +80,7 @@ async function buildFixture(): Promise<Fixture> {
   const target = {
     kind: 'folder' as const,
     executionHostId: 'local' as const,
-    workspacePath,
-    fileProvider: null
+    workspacePath
   }
 
   const dispatchAction = {

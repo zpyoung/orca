@@ -58,8 +58,7 @@ function bindingWithEnrollment(enrollment: Partial<WatcherEnrollment>): Objectiv
     target: {
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath: '/workspace',
-      fileProvider: null
+      workspacePath: '/workspace'
     }
   }
 }

@@ -1,20 +1,16 @@
-import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { RuntimeTerminalSend } from '../../../shared/runtime-types'
 import { isTerminalInputTooLargeWithDeferredMeasurement } from '../../../shared/terminal-input'
 import { recordRuntimeTerminalInputForPtyId } from './runtime-terminal-input-recording'
 export { recordRuntimeTerminalInputForPtyId } from './runtime-terminal-input-recording'
-import {
-  callRuntimeRpc,
-  getActiveRuntimeTarget,
-  type RuntimeClientTarget
-} from './runtime-rpc-client'
+import { callRuntimeRpc } from './runtime-rpc-client'
 import { readTerminalSendAcknowledgment } from '../../../shared/terminal-send-acknowledgment'
 import { sendRuntimePtyInputVerified as sendRuntimePtyInputVerifiedUpstream } from './runtime-terminal-verified-input'
 import {
   getRemoteRuntimePtyEnvironmentId,
-  getRemoteRuntimeTerminalHandle
+  getRemoteRuntimePtyOwner
 } from './runtime-terminal-stream'
 import { parseAppSshPtyId } from '../../../shared/ssh-pty-id'
+import { isRemoteRuntimePtyId } from '../../../shared/remote-runtime-pty-id'
 import {
   classifyTerminalProcessInspectionFailure,
   clientOnlyUnverifiableInspection,
@@ -30,15 +26,12 @@ import type { TerminalInputKind } from '../../../shared/terminal-input-kind'
 
 export type RuntimeTerminalProcessInspection = TerminalProcessInspection
 
-const REMOTE_PTY_ID_PREFIX = 'remote:'
 const DESKTOP_RUNTIME_CLIENT = { id: 'orca-desktop', type: 'desktop' } as const
 function isRuntimePtyInputTooLarge(data: string): boolean | Promise<boolean> {
   return isTerminalInputTooLargeWithDeferredMeasurement(data)
 }
 
-export function isRemoteRuntimePtyId(ptyId: string): boolean {
-  return ptyId.startsWith(REMOTE_PTY_ID_PREFIX)
-}
+export { isRemoteRuntimePtyId } from '../../../shared/remote-runtime-pty-id'
 
 function isRemoteInspectionPtyId(ptyId: string): boolean {
   return getRemoteRuntimePtyEnvironmentId(ptyId) !== null || parseAppSshPtyId(ptyId) !== null
@@ -76,17 +69,12 @@ function normalizeInspectionResult(
 }
 
 export async function inspectRuntimeTerminalProcess(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   options?: { expectedIncarnationId?: string; scanChildProcesses?: boolean; steadyState?: boolean }
 ): Promise<RuntimeTerminalProcessInspection> {
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  const target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  const terminal = getRemoteRuntimeTerminalHandle(ptyId)
+  const owner = getRemoteRuntimePtyOwner(ptyId)
   const remote = isRemoteInspectionPtyId(ptyId)
-  if (target.kind !== 'environment' || !terminal) {
+  if (!owner) {
     try {
       const result = await (options
         ? window.api.pty.inspectProcess(ptyId, options)
@@ -103,10 +91,10 @@ export async function inspectRuntimeTerminalProcess(
 
   try {
     const result = await callRuntimeRpc<{ process: RuntimeTerminalProcessInspection }>(
-      target,
+      owner.target,
       'terminal.inspectProcess',
       {
-        terminal,
+        terminal: owner.terminal,
         ...(options?.expectedIncarnationId
           ? { expectedIncarnationId: options.expectedIncarnationId }
           : {}),
@@ -135,14 +123,10 @@ export async function inspectRuntimeTerminalProcess(
  * must read as "no new evidence", never as a shell confirmation.
  */
 export async function confirmRuntimeTerminalForegroundProcess(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string
 ): Promise<string | null> {
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  const target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  if (target.kind === 'environment' && getRemoteRuntimeTerminalHandle(ptyId)) {
+  // Why any remote id: an id without an owner segment still runs off this host, never locally.
+  if (isRemoteRuntimePtyId(ptyId)) {
     return null
   }
   const confirmForegroundProcess = window.api.pty.confirmForegroundProcess
@@ -154,7 +138,6 @@ export async function confirmRuntimeTerminalForegroundProcess(
 }
 
 export function sendRuntimePtyInput(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
   inputKind: TerminalInputKind
@@ -169,38 +152,33 @@ export function sendRuntimePtyInput(
     void tooLarge
       .then((resolvedTooLarge) => {
         if (!resolvedTooLarge) {
-          sendRuntimePtyInputWithinLimit(settings, ptyId, data, inputKind)
+          sendRuntimePtyInputWithinLimit(ptyId, data, inputKind)
         }
       })
       .catch(() => {})
     return true
   }
-  return sendRuntimePtyInputWithinLimit(settings, ptyId, data, inputKind)
+  return sendRuntimePtyInputWithinLimit(ptyId, data, inputKind)
 }
 
 // Why the kind reaches only the local write: terminal.send has no launch kind, and its query-reply
 // kind is for mobile clients, so the host classifies a desktop's environment write by its bytes.
 function sendRuntimePtyInputWithinLimit(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
   inputKind: TerminalInputKind
 ): boolean {
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  const target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  const terminal = getRemoteRuntimeTerminalHandle(ptyId)
-  if (target.kind !== 'environment' || !terminal) {
+  const owner = getRemoteRuntimePtyOwner(ptyId)
+  if (!owner) {
     window.api.pty.write(ptyId, data, inputKind)
     recordRuntimeTerminalInputForPtyId(ptyId)
     return true
   }
 
   void callRuntimeRpc<{ send: RuntimeTerminalSend }>(
-    target,
+    owner.target,
     'terminal.send',
-    { terminal, text: data, client: DESKTOP_RUNTIME_CLIENT },
+    { terminal: owner.terminal, text: data, client: DESKTOP_RUNTIME_CLIENT },
     { timeoutMs: 15_000 }
   )
     .then((result) => {
@@ -213,17 +191,6 @@ function sendRuntimePtyInputWithinLimit(
       // flushes a final input event. The next host snapshot will reattach.
     })
   return true
-}
-
-function resolveRuntimeSendTarget(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
-  ptyId: string
-): { target: RuntimeClientTarget; terminal: string | null } {
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  const target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  return { target, terminal: getRemoteRuntimeTerminalHandle(ptyId) }
 }
 
 /** `unverifiable` means the write may or may not have landed: never resend its bytes. */
@@ -240,7 +207,6 @@ export type RuntimePtyInputDelivery = 'accepted' | 'refused' | 'unverifiable'
  * pending still stops the write. An in-flight RPC cannot be recalled.
  */
 export async function sendRuntimePtyInputDelivery(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
   inputKind: TerminalInputKind,
@@ -254,8 +220,8 @@ export async function sendRuntimePtyInputDelivery(
   if (isCancelled?.()) {
     return 'refused'
   }
-  const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
-  if (target.kind !== 'environment' || !terminal) {
+  const owner = getRemoteRuntimePtyOwner(ptyId)
+  if (!owner) {
     // Why: fire-and-forget `write` can't observe a PTY-gone or mobile-lease
     // rejection; settlement makes main answer over the provider, SSH included.
     try {
@@ -272,10 +238,10 @@ export async function sendRuntimePtyInputDelivery(
   }
   try {
     const result = await callRuntimeRpc<{ send: RuntimeTerminalSend }>(
-      target,
+      owner.target,
       'terminal.send',
       {
-        terminal,
+        terminal: owner.terminal,
         text: data,
         client: DESKTOP_RUNTIME_CLIENT,
         ...(writeOptions?.requireWriteSettlement ? { requireWriteSettlement: true } : {})
@@ -295,16 +261,12 @@ export async function sendRuntimePtyInputDelivery(
 
 /** `sendRuntimePtyInputDelivery` collapsed to "known accepted": a lost acknowledgment reads false. */
 export async function sendRuntimePtyInputAcceptance(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
   inputKind: TerminalInputKind,
   isCancelled?: () => boolean
 ): Promise<boolean> {
-  return (
-    (await sendRuntimePtyInputDelivery(settings, ptyId, data, inputKind, isCancelled)) ===
-    'accepted'
-  )
+  return (await sendRuntimePtyInputDelivery(ptyId, data, inputKind, isCancelled)) === 'accepted'
 }
 
 /**
@@ -313,7 +275,6 @@ export async function sendRuntimePtyInputAcceptance(
  * replaced PTY never receives a write queued for the old one.
  */
 export async function sendRuntimePtyInputVerified(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
   inputKind: TerminalInputKind,
@@ -324,7 +285,7 @@ export async function sendRuntimePtyInputVerified(
     ? ({ requireWriteSettlement: true } as const)
     : undefined
   if (!isCancelled) {
-    return sendRuntimePtyInputVerifiedUpstream(settings, ptyId, data, inputKind, writeOptions)
+    return sendRuntimePtyInputVerifiedUpstream(ptyId, data, inputKind, writeOptions)
   }
   const tooLarge = isRuntimePtyInputTooLarge(data)
   if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
@@ -333,8 +294,8 @@ export async function sendRuntimePtyInputVerified(
   if (isCancelled()) {
     return false
   }
-  const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
-  if (target.kind !== 'environment' || !terminal) {
+  const owner = getRemoteRuntimePtyOwner(ptyId)
+  if (!owner) {
     if (writeOptions?.requireWriteSettlement) {
       const settled = await window.api.pty.writeAccepted(ptyId, data, inputKind, writeOptions)
       if (settled) {
@@ -358,10 +319,10 @@ export async function sendRuntimePtyInputVerified(
   }
   try {
     const result = await callRuntimeRpc<{ send: RuntimeTerminalSend }>(
-      target,
+      owner.target,
       'terminal.send',
       {
-        terminal,
+        terminal: owner.terminal,
         text: data,
         client: DESKTOP_RUNTIME_CLIENT,
         ...(writeOptions?.requireWriteSettlement ? { requireWriteSettlement: true } : {})

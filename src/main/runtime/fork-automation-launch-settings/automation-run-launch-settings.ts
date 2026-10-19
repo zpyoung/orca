@@ -9,7 +9,7 @@ import {
 } from '../../../shared/agent-startup-plan-inputs'
 import { hasExtraAgentArgs } from '../../../shared/automation-extra-agent-args'
 import { resolveTuiAgentLaunchArgs } from '../../../shared/tui-agent-launch-defaults'
-import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
+import { resolveStartupShell, type AgentStartupShell } from '../../../shared/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 
 /** Snapshot effective automation launch settings for a resolved execution host. */
@@ -18,15 +18,19 @@ export function resolveAutomationRunLaunchSettings(args: {
   settings: AgentStartupSettings
   platform: NodeJS.Platform
   isRemote: boolean
+  /** The shell the launch's PTY will be, when the host resolved one. */
+  shell?: AgentStartupShell
 }): AutomationRunLaunchSettings | null {
-  const shell = resolveStartupShell(
-    args.platform,
-    resolveLocalWindowsAgentStartupShell({
-      platform: args.platform,
-      isRemote: args.isRemote,
-      terminalWindowsShell: args.settings.terminalWindowsShell
-    })
-  )
+  const shell =
+    args.shell ??
+    resolveStartupShell(
+      args.platform,
+      resolveLocalWindowsAgentStartupShell({
+        platform: args.platform,
+        isRemote: args.isRemote,
+        terminalWindowsShell: args.settings.terminalWindowsShell
+      })
+    )
   const inheritedAgentArgs = resolveTuiAgentLaunchArgs(
     args.automation.agentId,
     args.settings.agentDefaultArgs
@@ -40,6 +44,7 @@ export function resolveAutomationRunLaunchSettings(args: {
           settings: args.settings,
           platform: args.platform,
           isRemote: args.isRemote,
+          shell,
           extraAgentArgs: args.automation.extraAgentArgs
         }).agentArgs ?? inheritedAgentArgs
     } catch {

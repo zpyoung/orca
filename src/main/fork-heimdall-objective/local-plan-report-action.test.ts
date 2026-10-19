@@ -89,8 +89,7 @@ function repairFixture(
     target: {
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath: '/workspace',
-      fileProvider: null
+      workspacePath: '/workspace'
     }
   } as unknown as ObjectiveSnapshotBinding
   const dispatchAction = {

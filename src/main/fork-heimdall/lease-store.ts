@@ -6,10 +6,11 @@ import type { WorkspaceKey } from '../../shared/fork-heimdall/watcher-types'
 import { resolveGitDir } from '../git/source-control/resolve-git-dir'
 import type { GitRuntimeOptions } from '../git/git-runtime-options'
 import { getErrorCode } from '../git/worktree-operation-options'
-import type { IFilesystemProvider } from '../providers/types'
 import { ExecutionHostNotDispatchableError } from '../providers/execution-host-provider-dispatch'
-import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
-import { requireRuntimeGitProvider } from '../runtime/runtime-git-command-target'
+import {
+  requireLocalRuntimeGitRoute,
+  type RuntimeGitTarget
+} from '../runtime/runtime-git-command-target'
 import { highestEpoch } from './lease-epoch-directory'
 import { LeaseWorkspaceRemovedError } from './lease-workspace-absence'
 import {
@@ -32,8 +33,6 @@ export type LeaseWorkspaceTarget = {
   executionHostId: ExecutionHostId
   workspacePath: string
   watcherId: string
-  /** Already routed by `requireRuntimeFileProvider`; null means genuinely local. */
-  fileProvider: IFilesystemProvider | null
   /** Required for git workspaces and resolved through `resolveRuntimeGitTarget`. */
   gitTarget?: RuntimeGitTarget
   /** Needed only when the execution host is local Node but the workspace path is WSL guest-spelled. */
@@ -267,12 +266,9 @@ export class HostRoutedLeaseStore implements LeaseStore {
     if (makeWorkspaceKey(target.executionHostId, target.workspacePath) !== key) {
       throw new LeaseConfigurationError('Lease target does not match its workspace key')
     }
-    const fs = target.fileProvider ?? createLocalLeaseFilesystem()
+    const fs = createLocalLeaseFilesystem()
     const localWorkspacePath =
-      target.fileProvider === null
-        ? (resolveWorktreeHostPath(target.workspacePath, target.localGitOptions) ??
-          target.workspacePath)
-        : target.workspacePath
+      resolveWorktreeHostPath(target.workspacePath, target.localGitOptions) ?? target.workspacePath
     let leaseDirectory: string
     let pathFlavor: LeasePathFlavor
     if (target.kind === 'folder') {
@@ -285,12 +281,11 @@ export class HostRoutedLeaseStore implements LeaseStore {
       if (target.gitTarget.executionHostId !== target.executionHostId) {
         throw new LeaseConfigurationError('Git and filesystem routes disagree on execution host')
       }
-      const provider = requireRuntimeGitProvider(target.gitTarget)
-      const gitDirectory = provider
-        ? (
-            await provider.exec(['rev-parse', '--absolute-git-dir'], target.workspacePath)
-          ).stdout.replace(/\r?\n$/, '')
-        : await resolveGitDir(target.workspacePath, target.gitTarget.localGitOptions)
+      requireLocalRuntimeGitRoute(target.gitTarget)
+      const gitDirectory = await resolveGitDir(
+        target.workspacePath,
+        target.gitTarget.localGitOptions
+      )
       if (!gitDirectory) {
         throw new LeaseConfigurationError('Git did not return an absolute git directory')
       }

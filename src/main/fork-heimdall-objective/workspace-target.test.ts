@@ -1,15 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
-} from '../providers/ssh-filesystem-dispatch'
-import type { IFilesystemProvider } from '../providers/types'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
+import type { ResolvedRuntimeFileTarget } from '../runtime/files/file-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import type { ResolvedRuntimeFileTarget } from '../runtime/runtime-file-command-target'
 import { resolveObjectiveWorkspaceTarget } from './workspace-target'
-
-const SSH_TARGET = 'objective-folder-target'
 
 function enrollment(
   executionHostId: WatcherEnrollment['executionHostId'] = 'local'
@@ -55,8 +49,6 @@ function fileRuntime(
   return { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
 }
 
-afterEach(() => unregisterSshFilesystemProvider(SSH_TARGET))
-
 describe('resolveObjectiveWorkspaceTarget', () => {
   it('resolves a folder repo root by its canonical repo-path workspace id', async () => {
     const resolveRuntimeFileTarget = vi.fn().mockResolvedValue(fileTarget('local'))
@@ -71,8 +63,7 @@ describe('resolveObjectiveWorkspaceTarget', () => {
     expect(target).toEqual({
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath: '/srv/project',
-      fileProvider: null
+      workspacePath: '/srv/project'
     })
   })
 
@@ -104,21 +95,16 @@ describe('resolveObjectiveWorkspaceTarget', () => {
     })
   })
 
-  it('keeps the canonical folder repo root bound to its enrolled SSH host', async () => {
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: opaque marker only; resolveObjectiveWorkspaceTarget never calls provider methods, only threads the reference through.
-    const provider = {} as IFilesystemProvider
-    registerSshFilesystemProvider(SSH_TARGET, provider)
-    const executionHostId = `ssh:${SSH_TARGET}` as const
+  it('refuses a folder repo root enrolled on an SSH host', async () => {
+    const executionHostId = 'ssh:objective-folder-target' as const
     const resolveRuntimeFileTarget = vi.fn().mockResolvedValue(fileTarget(executionHostId))
 
-    const target = await resolveObjectiveWorkspaceTarget(
-      fileRuntime(resolveRuntimeFileTarget),
-      enrollment(executionHostId)
-    )
-
+    await expect(
+      resolveObjectiveWorkspaceTarget(
+        fileRuntime(resolveRuntimeFileTarget),
+        enrollment(executionHostId)
+      )
+    ).rejects.toBeInstanceOf(SshHostNotServedError)
     expect(resolveRuntimeFileTarget).toHaveBeenCalledWith('id:folder-repo::/srv/project')
-    expect(target.executionHostId).toBe(executionHostId)
-    expect(target.workspacePath).toBe('/srv/project')
-    expect(target.fileProvider).toBe(provider)
   })
 })

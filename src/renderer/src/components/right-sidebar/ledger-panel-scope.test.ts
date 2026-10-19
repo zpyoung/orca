@@ -13,27 +13,39 @@ describe('ledger panel scope', () => {
     ['repo/worktree', false],
     ['folder:folder-id', true]
   ])('sends %s verbatim', (id, isFolderWorkspace) => {
-    expect(getLedgerPanelScope(id, { activeRuntimeEnvironmentId: null }, false)).toEqual({
+    expect(getLedgerPanelScope(id, { kind: 'resolved', environmentId: null }, false)).toEqual({
       workspaceId: id,
       isFolderWorkspace,
       hasGroup: false
     })
   })
   it('has no target without a workspace', () => {
-    expect(getLedgerPanelScope(null, { activeRuntimeEnvironmentId: 'paired' }, true)).toBeNull()
+    expect(
+      getLedgerPanelScope(null, { kind: 'resolved', environmentId: 'paired' }, true)
+    ).toBeNull()
   })
   it('preserves the resolved paired owner', () => {
-    expect(getLedgerPanelScope('remote', { activeRuntimeEnvironmentId: 'paired' }, true)).toEqual({
+    expect(
+      getLedgerPanelScope('remote', { kind: 'resolved', environmentId: 'paired' }, true)
+    ).toEqual({
       workspaceId: 'remote',
       isFolderWorkspace: false,
       hasGroup: true,
       environmentId: 'paired'
     })
   })
+  it('marks a twin-published workspace instead of picking a host', () => {
+    expect(getLedgerPanelScope('twin', { kind: 'ambiguous' }, false)).toEqual({
+      workspaceId: 'twin',
+      isFolderWorkspace: false,
+      hasGroup: false,
+      ownerAmbiguous: true
+    })
+  })
   it.each(['local', 'ssh'])('uses the local runtime for a resolved %s workspace', (id) => {
-    expect(getLedgerPanelScope(id, { activeRuntimeEnvironmentId: null }, false)).not.toHaveProperty(
-      'environmentId'
-    )
+    expect(
+      getLedgerPanelScope(id, { kind: 'resolved', environmentId: null }, false)
+    ).not.toHaveProperty('environmentId')
   })
   it.each([
     ['folder:x', 'x', true],

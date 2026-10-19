@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { posix, win32 } from 'node:path'
-import type { IFilesystemProvider } from '../providers/types'
+import type { IFilesystemProvider } from '../providers/filesystem-provider-contract'
 
 const LOOPS_EXCLUDE_LINE = '/.orca/loops/'
 const SAFE_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/

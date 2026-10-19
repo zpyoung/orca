@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE } from '../providers/ssh-git-dispatch'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import { isExecutionHostContactLoss } from './tick-error-classification'
 
 function coded(message: string, code: string): Error {
@@ -10,7 +10,7 @@ describe('isExecutionHostContactLoss', () => {
   it.each([
     ['a lost SSH link', coded('link lost', 'CONNECTION_LOST')],
     ['an SSH request with no answer', coded('timed out', 'SSH_MUX_REQUEST_TIMEOUT')],
-    ['a dropped SSH provider', new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)],
+    ['an SSH host this process does not serve', new SshHostNotServedError('box-1')],
     ['an unavailable remote runtime', coded('down', 'runtime_unavailable')],
     ['a closed remote runtime socket', new Error('Remote Orca runtime connection closed')]
   ])('reports %s as lost contact', (_label, error) => {

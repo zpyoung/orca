@@ -66,29 +66,35 @@ export function isSelectedActivityWorkspace(
   )
 }
 
-export function filterWorktreesByActivity(
-  worktrees: Worktree[],
+export function createActivityFilterPredicate(
   context: WorkspaceActivityFilterContext | undefined,
   repoMap: Map<string, Repo>
-): Worktree[] {
+): ((worktree: Worktree) => boolean) | null {
   if (
     !context ||
     context.workspaceActivityWindow === 'all' ||
     context.workspaceActivityWindow === 'live-only'
   ) {
-    return worktrees
+    return null
   }
   const days = workspaceActivityWindowDays(
     context.workspaceActivityWindow,
     context.workspaceActivityCustomDays
   )
   if (days === null) {
-    return worktrees
+    return null
   }
   const cutoff = context.now - days * 86400000
-  return worktrees.filter(
-    (worktree) =>
-      isSelectedActivityWorkspace(worktree, context) ||
-      activityTime(worktree, context, repoMap) >= cutoff
-  )
+  return (worktree) =>
+    isSelectedActivityWorkspace(worktree, context) ||
+    activityTime(worktree, context, repoMap) >= cutoff
+}
+
+export function filterWorktreesByActivity(
+  worktrees: Worktree[],
+  context: WorkspaceActivityFilterContext | undefined,
+  repoMap: Map<string, Repo>
+): Worktree[] {
+  const keep = createActivityFilterPredicate(context, repoMap)
+  return keep ? worktrees.filter(keep) : worktrees
 }

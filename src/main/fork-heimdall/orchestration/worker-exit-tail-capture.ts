@@ -1,5 +1,5 @@
 import type { RuntimePtyWorktreeRecord } from '../../runtime/runtime-terminal-state-records'
-import { redactWorkerTerminalLines } from '../../runtime/orchestration/worker-transcript-payload'
+import { redactWorkerTerminalLines } from '../../runtime/orchestration/worker-terminal-redaction'
 import { buildPreview } from '../../runtime/terminal-tail-state'
 
 // Capture only this PTY's retained output; never query or fall back across execution hosts.

@@ -8,7 +8,7 @@ import type {
 import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
 import type { Project } from '../../../../shared/project-types'
 import { readLedgerCatalog, type LedgerCatalog } from '@/runtime/runtime-ledger-catalog-client'
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'

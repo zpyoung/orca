@@ -95,10 +95,11 @@ describe('resolveFocusedSession', () => {
     expect(selected.isLocalExecution).toBe(false)
   })
 
-  it('marks active runtime environments as non-local execution', () => {
+  it('marks a workspace owned by a runtime environment as non-local execution', () => {
     expect(
-      resolveFocusedSession(state({ settings: { activeRuntimeEnvironmentId: 'runtime-1' } }))
-        .isLocalExecution
+      resolveFocusedSession(
+        state({ repos: [{ id: 'worktree-1', executionHostId: 'runtime:runtime-1' }] })
+      ).isLocalExecution
     ).toBe(false)
   })
 

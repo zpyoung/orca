@@ -115,8 +115,8 @@ async function resolveObjectiveReportLocation(
   target: ObjectiveWorkspaceTarget
 ): Promise<ObjectiveReportLocation> {
   if (target.kind === 'folder') {
-    if (target.fileProvider === null && target.executionHostId !== 'local') {
-      throw new Error('Remote objective target has no filesystem provider')
+    if (target.executionHostId !== 'local') {
+      throw new Error('Remote objective target is not served by this host')
     }
     const pathFlavor = resolveLeasePathFlavor(target.executionHostId, target.workspacePath)
     return {
@@ -135,14 +135,11 @@ async function resolveObjectiveReportLocation(
   if (!rawGitDirectory) {
     throw new Error('Git did not return an absolute git directory')
   }
-  const gitDirectory =
-    target.fileProvider === null
-      ? resolveGitMetadataPath(
-          target.workspacePath,
-          rawGitDirectory,
-          localGitOptionsForTarget(gitTarget)
-        )
-      : rawGitDirectory
+  const gitDirectory = resolveGitMetadataPath(
+    target.workspacePath,
+    rawGitDirectory,
+    localGitOptionsForTarget(gitTarget)
+  )
   if (!gitDirectory) {
     throw new Error('Git returned an unusable git directory')
   }
@@ -175,15 +172,11 @@ export async function issueObjectiveReportPath(
   attemptFingerprint: string
 ): Promise<string> {
   const location = await resolveObjectiveReportLocation(target)
-  if (target.fileProvider) {
-    await target.fileProvider.createDir(location.directory)
-  } else {
-    if (target.executionHostId !== 'local') {
-      throw new Error('Remote objective target has no filesystem provider')
-    }
-    await mkdir(location.directory, { recursive: true, mode: 0o700 })
-    await chmod(location.directory, 0o700)
+  if (target.executionHostId !== 'local') {
+    throw new Error('Remote objective target is not served by this host')
   }
+  await mkdir(location.directory, { recursive: true, mode: 0o700 })
+  await chmod(location.directory, 0o700)
   return reportPathForLocation(target, location, attemptFingerprint)
 }
 
@@ -309,12 +302,11 @@ async function readReportBytes(
   reportPath: string,
   authorityRoot: string
 ): Promise<ReportBytes | ObjectiveReportReadFailure> {
-  if (!target.fileProvider && target.executionHostId !== 'local') {
-    throw new Error('Remote objective target has no filesystem provider')
+  if (target.executionHostId !== 'local') {
+    throw new Error('Remote objective target is not served by this host')
   }
   return await readHardenedReportBytes({
     executionHostId: target.executionHostId,
-    fileProvider: target.fileProvider,
     reportPath,
     authorityRoot,
     maxBytes: MAX_OBJECTIVE_REPORT_BYTES

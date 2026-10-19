@@ -228,10 +228,6 @@ export function HandoffDestinationControls({
           onValueChange={onAgentChange}
           allowBlankTerminal={false}
           allowNarrowTrigger
-          emptyLabel={translate(
-            'components.agentSessionContinuation.forkSessionHandoff.selectAgent',
-            'Select an Agent'
-          )}
           triggerClassName="w-full min-w-0"
         />
         <AgentAvailabilityMessage

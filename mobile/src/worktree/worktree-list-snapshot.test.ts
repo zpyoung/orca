@@ -41,7 +41,6 @@ function worktree(overrides: Partial<Worktree> = {}): Worktree {
     path: worktreePath,
     liveTerminalCount: 1,
     hasAttachedPty: true,
-    preview: '$ codex',
     unread: false,
     lastOutputAt: 1234,
     isPinned: false,
@@ -222,13 +221,6 @@ describe('areWorktreeListsEqual', () => {
     const second = [worktree({ status: 'working', workingMode: 'monitoring' })]
 
     expect(areWorktreeListsEqual(first, second)).toBe(false)
-  })
-
-  it('treats missing and empty agent arrays as equivalent for rendering', () => {
-    const first = [worktree({ agents: undefined })]
-    const second = [worktree({ agents: [] })]
-
-    expect(areWorktreeListsEqual(first, second)).toBe(true)
   })
 
   describe('loop summaries', () => {

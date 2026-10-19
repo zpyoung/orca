@@ -79,8 +79,7 @@ function preparedWorkspace(
     target: {
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath: '/workspaces/node-a',
-      fileProvider: null
+      workspacePath: '/workspaces/node-a'
     },
     reuseTerminal: null
   }

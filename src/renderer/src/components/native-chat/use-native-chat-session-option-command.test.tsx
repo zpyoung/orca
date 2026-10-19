@@ -39,7 +39,7 @@ function renderDispatch(agent: 'codex' | 'claude' | 'openclaude', onSubmitted = 
       agent,
       onSubmitted,
       disabled: false,
-      resolveTarget: () => ({ terminalTabId: 'tab-1', settings: {}, ptyId: 'pty-1' }),
+      resolveTarget: () => ({ terminalTabId: 'tab-1', ptyId: 'pty-1' }),
       setHistory: vi.fn()
     })
   )
@@ -72,7 +72,7 @@ describe('useNativeChatSessionOptionCommand', () => {
     expect(onSubmitted).toHaveBeenCalledOnce()
 
     expect(typeNativeChatCommand).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '/model',
       expect.any(AbortSignal)
     )
@@ -84,7 +84,7 @@ describe('useNativeChatSessionOptionCommand', () => {
     await act(() => hook.result.current.dispatch('/model sonnet', { delivery: 'type' }))
 
     expect(sendNativeChatMessageVerified).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '/model sonnet',
       expect.any(AbortSignal)
     )

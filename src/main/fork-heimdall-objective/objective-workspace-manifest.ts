@@ -2,11 +2,9 @@ import { createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { lstat, readlink, readdir } from 'node:fs/promises'
 import { posix, win32 } from 'node:path'
-import { MAX_FILE_RANGE_READ_BYTES } from '../../shared/file-range-read'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
-import type { IFilesystemProvider } from '../providers/types'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
-import { runtimeFileRouteForTarget } from '../runtime/runtime-file-command-target'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
 import { objectiveGitCommandForTarget, type ObjectiveWorkspaceTarget } from './content-identity'
 import { computeGitWorktreeContentDigest } from './git-worktree-content-digest'
 import { gitPathModeEvidence, type GitPathModeEvidence } from './git-worktree-mode-evidence'
@@ -41,25 +39,6 @@ function sha256(parts: readonly (string | Buffer)[]): string {
     hash.update(part)
   }
   return hash.digest('hex')
-}
-
-export function objectiveFilesystemProviderForTarget(
-  target: ObjectiveWorkspaceTarget
-): IFilesystemProvider | null {
-  const route = runtimeFileRouteForTarget(target)
-  if (route.kind === 'local') {
-    if (target.fileProvider !== null) {
-      throw new Error('Objective filesystem routes are ambiguous')
-    }
-    return null
-  }
-  if (!route.provider) {
-    throw new Error('Objective SSH filesystem route is unavailable')
-  }
-  if (route.provider !== target.fileProvider) {
-    throw new Error('Objective SSH filesystem route changed after target resolution')
-  }
-  return route.provider
 }
 
 function parseNulPaths(stdout: string): string[] {
@@ -151,7 +130,7 @@ async function gitManifest(target: ObjectiveWorkspaceTarget) {
     resolveLeasePathFlavor(target.executionHostId, target.workspacePath) === win32
   const deletedPaths = new Set(parseNulPaths(deleted.stdout))
   const indexByPath = parseGitIndexIdentities(staged.stdout)
-  objectiveFilesystemProviderForTarget(target)
+  requireLocalRuntimeFileRoute(target)
   const paths = [...new Set(parseNulPaths(listed.stdout))]
     .filter((path) => !deletedPaths.has(path) && !isExcludedGitPath(path, caseInsensitive))
     .sort()
@@ -203,25 +182,20 @@ function candidateFromStat(absolutePath: string, path: string, stat: ObservedSta
   return candidate
 }
 
-async function listFolderCandidates(
-  target: ObjectiveWorkspaceTarget,
-  provider: IFilesystemProvider | null
-): Promise<FileCandidate[]> {
+async function listFolderCandidates(target: ObjectiveWorkspaceTarget): Promise<FileCandidate[]> {
   const flavor = resolveLeasePathFlavor(target.executionHostId, target.workspacePath)
   const windowsPaths = flavor === win32
   const directories = [{ absolutePath: target.workspacePath, relativePath: '' }]
   const files: FileCandidate[] = []
   while (directories.length > 0) {
     const directory = directories.pop()!
-    const children = provider
-      ? await provider.readDir(directory.absolutePath)
-      : await readdir(directory.absolutePath, { withFileTypes: true }).then((entries) =>
-          entries.map((entry) => ({
-            name: entry.name,
-            isDirectory: entry.isDirectory(),
-            isSymlink: entry.isSymbolicLink()
-          }))
-        )
+    const children = await readdir(directory.absolutePath, { withFileTypes: true }).then((entries) =>
+      entries.map((entry) => ({
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+        isSymlink: entry.isSymbolicLink()
+      }))
+    )
     for (const child of children) {
       validateChildName(child.name, windowsPaths)
       const relativePath = directory.relativePath
@@ -230,24 +204,19 @@ async function listFolderCandidates(
       if ((windowsPaths ? relativePath.toLowerCase() : relativePath) === '.orca') {
         continue
       }
-      if (provider && child.isSymlink && !provider.lstat) {
-        throw new Error(`Remote symlink identity is unavailable for ${relativePath}`)
-      }
       const absolutePath = flavor.join(directory.absolutePath, child.name)
-      const rawStat: ObservedStat = provider
-        ? await (provider.lstat?.(absolutePath) ?? provider.stat(absolutePath))
-        : await lstat(absolutePath).then((stat) => ({
-            type: stat.isDirectory()
-              ? 'directory'
-              : stat.isSymbolicLink()
-                ? 'symlink'
-                : stat.isFile()
-                  ? 'file'
-                  : 'other',
-            size: stat.size,
-            mtime: stat.mtimeMs,
-            mtimeMs: stat.mtimeMs
-          }))
+      const rawStat: ObservedStat = await lstat(absolutePath).then((stat) => ({
+        type: stat.isDirectory()
+          ? 'directory'
+          : stat.isSymbolicLink()
+            ? 'symlink'
+            : stat.isFile()
+              ? 'file'
+              : 'other',
+        size: stat.size,
+        mtime: stat.mtimeMs,
+        mtimeMs: stat.mtimeMs
+      }))
       if (rawStat.type === 'directory') {
         if (child.isSymlink) {
           throw new Error(`Symlink followed during observation: ${relativePath}`)
@@ -299,81 +268,18 @@ async function hashLocalCandidate(candidate: FileCandidate): Promise<string> {
   return fingerprint
 }
 
-async function hashRemoteCandidate(
-  provider: IFilesystemProvider,
-  candidate: FileCandidate,
-  rangeReads: boolean
-): Promise<string> {
-  let fingerprint: string
-  if (candidate.type === 'symlink') {
-    fingerprint = sha256([
-      'symlink-metadata\0',
-      String(candidate.size),
-      '\0',
-      String(candidate.mtimeMs)
-    ])
-  } else {
-    const hash = createHash('sha256')
-    let bytesRead = 0
-    if (rangeReads && provider.readFileRange) {
-      while (bytesRead < candidate.size) {
-        const length = Math.min(MAX_FILE_RANGE_READ_BYTES, candidate.size - bytesRead)
-        const window = await provider.readFileRange(candidate.absolutePath, bytesRead, length)
-        if (
-          window.bytesRead <= 0 ||
-          window.bytesRead > length ||
-          window.bytesRead !== window.bytes.byteLength
-        ) {
-          throw new Error(`Remote workspace file changed while reading ${candidate.path}`)
-        }
-        bytesRead += window.bytesRead
-        hash.update(window.bytes)
-      }
-    } else {
-      const read = await provider.readFile(candidate.absolutePath)
-      const bytes = read.isBinary
-        ? Buffer.from(read.content, 'base64')
-        : Buffer.from(read.content, 'utf8')
-      bytesRead = bytes.byteLength
-      hash.update(bytes)
-    }
-    if (bytesRead !== candidate.size) {
-      throw new Error(`Remote workspace file changed while reading ${candidate.path}`)
-    }
-    fingerprint = sha256(['file\0', hash.digest()])
-  }
-  const after = await (provider.lstat?.(candidate.absolutePath) ??
-    provider.stat(candidate.absolutePath))
-  if (!statStillMatches(candidate, after)) {
-    throw new Error(`Remote workspace entry changed while reading ${candidate.path}`)
-  }
-  return fingerprint
-}
-
 async function folderManifest(target: ObjectiveWorkspaceTarget) {
-  const provider = objectiveFilesystemProviderForTarget(target)
-  const candidates = await listFolderCandidates(target, provider)
-  const rangeReads = Boolean(
-    provider?.readFileRange &&
-    provider.supportsFileRangeRead &&
-    (await provider.supportsFileRangeRead())
-  )
-  return await mapWithConcurrency(
-    candidates,
-    provider ? 2 : HASH_CONCURRENCY,
-    async (candidate) => ({
-      path: candidate.path,
-      fingerprint: provider
-        ? await hashRemoteCandidate(provider, candidate, rangeReads)
-        : await hashLocalCandidate(candidate)
-    })
-  )
+  const candidates = await listFolderCandidates(target)
+  return await mapWithConcurrency(candidates, HASH_CONCURRENCY, async (candidate) => ({
+    path: candidate.path,
+    fingerprint: await hashLocalCandidate(candidate)
+  }))
 }
 
 export async function observeObjectiveWorkspaceManifest(
   target: ObjectiveWorkspaceTarget
 ): Promise<ObjectiveWorkspaceManifestEntry[]> {
-  objectiveFilesystemProviderForTarget(target)
+  requireLocalRuntimeFileRoute(target)
   return target.kind === 'git' ? await gitManifest(target) : await folderManifest(target)
 }
 

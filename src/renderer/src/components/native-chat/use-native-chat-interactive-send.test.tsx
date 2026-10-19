@@ -40,10 +40,6 @@ vi.mock('@/runtime/runtime-terminal-verified-input', () => ({
   sendRuntimePtyInputVerified: (...args: unknown[]) => mocks.sendRuntimePtyInputVerified(...args)
 }))
 
-vi.mock('@/lib/agent-paste-draft', () => ({
-  getSettingsForAgentTabRuntimeOwner: (terminalTabId: string) => ({ terminalTabId })
-}))
-
 vi.mock('./native-chat-runtime-send', () => ({
   sendNativeChatAskAnswer: (...args: unknown[]) => mocks.sendNativeChatAskAnswer(...args),
   sendNativeChatMessage: (...args: unknown[]) => mocks.sendNativeChatMessage(...args)
@@ -80,8 +76,7 @@ describe('useNativeChatInteractiveSend', () => {
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
       {
         terminalTabId: 'tab-1',
-        ptyId: 'pty-1',
-        settings: { terminalTabId: 'tab-1' }
+        ptyId: 'pty-1'
       },
       'B',
       { onDeliverySettled: expect.any(Function) }
@@ -135,8 +130,7 @@ describe('useNativeChatInteractiveSend', () => {
     expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
       {
         terminalTabId: 'tab-1',
-        ptyId: 'pty-1',
-        settings: { terminalTabId: 'tab-1' }
+        ptyId: 'pty-1'
       },
       [{ raw: '2' }],
       expect.any(Function)
@@ -155,8 +149,7 @@ describe('useNativeChatInteractiveSend', () => {
     expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
       {
         terminalTabId: 'tab-1',
-        ptyId: 'pty-1',
-        settings: { terminalTabId: 'tab-1' }
+        ptyId: 'pty-1'
       },
       [{ raw: '2' }],
       expect.any(Function)
@@ -225,12 +218,7 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => result.current.cancel())
 
     expect(mocks.cancel).toHaveBeenCalledOnce()
-    expect(mocks.sendRuntimePtyInput).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1' },
-      'pty-1',
-      '\x1b',
-      'driving'
-    )
+    expect(mocks.sendRuntimePtyInput).toHaveBeenCalledWith('pty-1', '\x1b', 'driving')
   })
 
   it.each(['opencode', 'opencode2'] as const)(
@@ -244,8 +232,7 @@ describe('useNativeChatInteractiveSend', () => {
       expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
         {
           terminalTabId: 'tab-1',
-          ptyId: 'pty-1',
-          settings: { terminalTabId: 'tab-1' }
+          ptyId: 'pty-1'
         },
         [{ raw: '\x1b' }, { raw: '\x1b' }]
       )
@@ -262,7 +249,6 @@ describe('useNativeChatInteractiveSend', () => {
       )
       await expect(result.current.cancelAsk()).resolves.toBe(true)
       expect(mocks.sendRuntimePtyInputVerified).toHaveBeenCalledExactlyOnceWith(
-        { terminalTabId: 'tab-1' },
         'pty-1',
         '\x1b',
         'driving',
@@ -291,8 +277,7 @@ describe('useNativeChatInteractiveSend', () => {
       expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
         {
           terminalTabId: 'tab-1',
-          ptyId: 'pty-1',
-          settings: { terminalTabId: 'tab-1' }
+          ptyId: 'pty-1'
         },
         [{ raw: '2' }],
         expect.any(Function)

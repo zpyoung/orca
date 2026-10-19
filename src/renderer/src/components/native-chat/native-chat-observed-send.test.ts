@@ -17,7 +17,7 @@ import {
 } from '../terminal-pane/terminal-input-quarantine'
 
 // The fork's send path is scoped to a terminal tab so reattach quarantine can invalidate it.
-const TARGET: NativeChatResolvedTarget = { terminalTabId: 'tab', ptyId: 'pane', settings: null }
+const TARGET: NativeChatResolvedTarget = { terminalTabId: 'tab', ptyId: 'pane' }
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -37,12 +37,12 @@ it('observes a refused write, skips Enter, and releases the queue for the next u
   sendNativeChatMessage(TARGET, 'refused', { onWriteRejected: rejected })
   await vi.advanceTimersByTimeAsync(1000)
   expect(rejected).toHaveBeenCalledOnce()
-  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[1])).toEqual([
     buildNativeChatPasteBytes('refused')
   ])
   sendNativeChatMessage(TARGET, 'next', { onWriteRejected: rejected })
   await vi.advanceTimersByTimeAsync(1000)
-  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[1])).toEqual([
     buildNativeChatPasteBytes('refused'),
     buildNativeChatPasteBytes('next'),
     NATIVE_CHAT_SUBMIT
@@ -60,7 +60,7 @@ it('reports a lost acknowledgment once as unconfirmed, never as rejection, and s
   await vi.advanceTimersByTimeAsync(120000)
   expect(rejected).not.toHaveBeenCalled()
   expect(unconfirmed).toHaveBeenCalledOnce()
-  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[1])).toEqual([
     buildNativeChatPasteBytes('uncertain'),
     NATIVE_CHAT_SUBMIT
   ])
@@ -72,7 +72,7 @@ it('serializes rapid sends through their acknowledged Enter and preserves the pa
   await vi.advanceTimersByTimeAsync(499)
   expect(io.delivery).toHaveBeenCalledOnce()
   await vi.advanceTimersByTimeAsync(501)
-  expect(io.delivery.mock.calls.map((call) => call[2])).toEqual([
+  expect(io.delivery.mock.calls.map((call) => call[1])).toEqual([
     buildNativeChatPasteBytes('one'),
     NATIVE_CHAT_SUBMIT,
     buildNativeChatPasteBytes('two'),
@@ -93,7 +93,7 @@ it.each(['accepted', 'refused', 'unknown'] as const)(
     expect(settled).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(1000)
     expect(settled).toHaveBeenCalledExactlyOnceWith(outcome === 'accepted')
-    expect(io.delivery.mock.calls.map((call) => call[2])).toEqual(
+    expect(io.delivery.mock.calls.map((call) => call[1])).toEqual(
       outcome === 'refused'
         ? [buildNativeChatPasteBytes('answer')]
         : [buildNativeChatPasteBytes('answer'), NATIVE_CHAT_SUBMIT]

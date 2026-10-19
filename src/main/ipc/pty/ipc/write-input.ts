@@ -1,15 +1,15 @@
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import type { PtyRendererDelivery } from '../session'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
-import type { IPtyProvider } from '../../../providers/types'
+import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import { isPtyWriteUnavailableError } from '../../../providers/pty-write-unavailable-error'
 import {
   isTerminalInputTooLargeWithDeferredMeasurement,
-  iterateTerminalInputChunks,
-  splitTerminalInputChunks
+  iterateTerminalInputChunks
 } from '../../../../shared/terminal-input'
 import { ptyOwnership } from '../provider/ownership-state'
 import { tryGetProviderForPty } from '../provider/registry'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import type { TerminalInputKind } from '../../../../shared/terminal-input-kind'
 import { interactiveOutputCharsByPty, lastInputAtByPty } from '../delivery/visibility-state'
 import { isSettledWrite, type WriteSettlement } from '../../../../shared/pty-write-settlement'
@@ -183,62 +183,6 @@ export function createPtyWriteInput(deps: {
     }
   }
 
-  // Why: the ack'd send path needs per-chunk settlement, not fire-and-forget
-  // dispatch — only providers that expose writeAcknowledged (SSH) opt in; others
-  // fall back to the plain fire-and-forget writer unchanged.
-  const writePtyProviderInputAcknowledged = (
-    provider: IPtyProvider,
-    id: string,
-    data: string
-  ): boolean | Promise<boolean> => {
-    const settlementWrite = (
-      provider as { writeAcknowledged?: (ptyId: string, chunk: string) => Promise<boolean> }
-    ).writeAcknowledged
-    if (!settlementWrite) {
-      return writePtyProviderInput(provider, id, data)
-    }
-    try {
-      const tooLarge = isTerminalInputTooLargeWithDeferredMeasurement(data)
-      if (typeof tooLarge === 'boolean') {
-        return tooLarge ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)
-      }
-      return tooLarge
-        .then((result) =>
-          result ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)
-        )
-        .catch((error) => {
-          reportUnavailablePtyWrite(id, error)
-          return false
-        })
-    } catch (error) {
-      reportUnavailablePtyWrite(id, error)
-      return false
-    }
-  }
-
-  const writePtyProviderInputAcknowledgedChunks = async (
-    writeChunk: (id: string, chunk: string) => Promise<boolean>,
-    id: string,
-    data: string
-  ): Promise<boolean> => {
-    try {
-      const chunks = splitTerminalInputChunks(data)
-      if (chunks.length === 0) {
-        return await writeChunk(id, data)
-      }
-      let allSettled = true
-      for (const chunk of chunks) {
-        if (!(await writeChunk(id, chunk))) {
-          allSettled = false
-        }
-      }
-      return allSettled
-    } catch (error) {
-      reportUnavailablePtyWrite(id, error)
-      return false
-    }
-  }
-
   const isPtyWritePayload = (value: unknown): value is PtyWritePayload =>
     typeof value === 'object' &&
     value !== null &&
@@ -274,7 +218,11 @@ export function createPtyWriteInput(deps: {
     verify = false
   ): boolean | Promise<boolean> => {
     const observe = (accepted: boolean): boolean => {
-      if (accepted && args.inputKind === 'driving' && ptyOwnership.get(args.id) === null) {
+      if (
+        accepted &&
+        args.inputKind === 'driving' &&
+        ptyOwnership.get(args.id) === LOCAL_EXECUTION_HOST_ID
+      ) {
         runtime?.observeClaudeTerminalEvidence?.(args.id, { kind: 'input', data: args.data })
       }
       return accepted
@@ -312,10 +260,8 @@ export function createPtyWriteInput(deps: {
     return writeAndObserveInput(provider, args, true)
   }
 
-  // Why: a disposed or backpressured SSH mux can silently drop provider.write's
-  // fire-and-forget notify, so this path settles over the transport instead of
-  // trusting write()'s void return — kept separate from writePtyInput so the
-  // fire-and-forget keystroke path never gains an await.
+  // Why: the composer needs writePtyInput's real boolean (PTY gone, mobile lease), which
+  // writePtyInputAccepted's narrower "reached the local PTY" answer does not carry.
   const writePtyInputProvablyLive = (args: PtyWritePayload): boolean | Promise<boolean> => {
     if (runtime?.getDriver(args.id).kind === 'mobile') {
       return false
@@ -326,7 +272,7 @@ export function createPtyWriteInput(deps: {
     }
     try {
       noteRendererPtyInput(args)
-      return writePtyProviderInputAcknowledged(provider, args.id, args.data)
+      return writePtyProviderInput(provider, args.id, args.data)
     } catch {
       return false
     }
@@ -340,7 +286,7 @@ export function createPtyWriteInput(deps: {
       return writePtyInputSettled(args)
     }
     // Why: the ack infers Ctrl+C/Escape reached the local PTY; SSH providers are fire-and-forget relay notifications and can't truthfully acknowledge yet.
-    if (ptyOwnership.get(args.id) !== null) {
+    if (ptyOwnership.get(args.id) !== LOCAL_EXECUTION_HOST_ID) {
       return false
     }
     const provider = tryGetProviderForPty(args.id)

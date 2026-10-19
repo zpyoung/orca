@@ -1,8 +1,6 @@
 import { ipcMain, type WebContents } from 'electron'
-import {
-  callRuntimeEnvironment,
-  getRuntimeEnvironmentStatus
-} from './runtime-environment-transport-routing'
+import { getRuntimeEnvironmentStatus } from './runtime-environments/runtime-environment-status-probe'
+import { callRuntimeEnvironment } from './runtime-environments/runtime-environment-transport-routing'
 import { isTrustedUIRenderer } from './ui'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { LedgerRequest, LedgerResponse } from '../../shared/ledger'

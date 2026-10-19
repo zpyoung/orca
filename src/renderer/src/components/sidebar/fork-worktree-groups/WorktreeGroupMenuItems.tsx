@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx,src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
 import React, { useCallback, useState } from 'react'
 import { CircleX, FolderInput, FolderPlus } from 'lucide-react'
 import {
@@ -14,6 +14,7 @@ import { useAppStore } from '@/store'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { translate } from '@/i18n/i18n'
+import { getWorktreeExecutionHostId } from '../../../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../../../shared/workspace-scope'
 import {
   addWorktreeToGroup,
@@ -242,7 +243,17 @@ export function useWorktreeGroupDialog({
   )
   const handleSubmit = useCallback(
     async (name: string) => {
-      await createGroupFromWorktree(worktree, name, createProjectGroup, updateWorktreeMeta)
+      // Why: read at submit, not render, so the menu needs no repo catalog just to open.
+      const hostId = getWorktreeExecutionHostId(
+        worktree,
+        useAppStore.getState().repos.find((repo) => repo.id === worktree.repoId)
+      )
+      await createGroupFromWorktree(
+        worktree,
+        name,
+        (groupName) => createProjectGroup(groupName, hostId),
+        updateWorktreeMeta
+      )
     },
     [createProjectGroup, updateWorktreeMeta, worktree]
   )

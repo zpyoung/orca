@@ -3,7 +3,6 @@
 // the caller is allowed to schedule the submit CR, so a rejected/suppressed
 // write can never be followed by a CR as if the body had landed.
 
-import type { RuntimeSettings } from '../native-chat-runtime-send'
 import {
   sendObservedWrite,
   type NativeChatDeliveryObserver,
@@ -17,7 +16,6 @@ import {
  * not complete, so callers must treat it as `may-not-have-sent`.
  */
 export function sendBodyAccepted(
-  settings: RuntimeSettings,
   ptyId: string,
   chunks: readonly string[],
   isCancelled: () => boolean,
@@ -29,7 +27,7 @@ export function sendBodyAccepted(
         if (!ok || isCancelled()) {
           return false
         }
-        return sendObservedWrite(settings, ptyId, bytes, isCancelled, delivery)
+        return sendObservedWrite(ptyId, bytes, isCancelled, delivery)
       }),
     Promise.resolve(true)
   )
@@ -42,7 +40,6 @@ export function sendBodyAccepted(
  * submit CR) unless the body is confirmed on the PTY.
  */
 export function runBodyAcceptedThen(
-  settings: RuntimeSettings,
   ptyId: string,
   chunks: readonly string[],
   isCancelled: () => boolean,
@@ -51,7 +48,7 @@ export function runBodyAcceptedThen(
   onAccepted: () => void,
   delivery?: NativeChatDeliveryObserver
 ): void {
-  sendBodyAccepted(settings, ptyId, chunks, isCancelled, delivery)
+  sendBodyAccepted(ptyId, chunks, isCancelled, delivery)
     .then((accepted) => {
       if (isCancelled()) {
         reportOutcome('may-not-have-sent')

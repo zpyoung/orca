@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
@@ -28,12 +28,6 @@ import type {
 } from '../../../../../shared/native-chat-session-options'
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
-import {
-  nativeChatComposerPrimaryButton,
-  type NativeChatQueueResume
-} from '../native-chat-composer-primary-action'
-import { NativeChatQueueSendConfirmDialog } from '../NativeChatQueueSendConfirmDialog'
-import type { NativeChatQueueSendConfirm } from '../use-native-chat-held-queue-composer-send'
 import type { NativeChatComposerGoalMode } from '../use-native-chat-composer-submit'
 import { useNativeChatComposerDraftUnsaved } from '../use-native-chat-draft-unsaved'
 
@@ -46,6 +40,7 @@ export type AgentComposerFieldProps = {
   disabled: boolean
   hasPty: boolean
   canSend: boolean
+  unavailableHint?: string | undefined
   layout?: 'dock'
   autocomplete: ComposerAutocomplete
   mentionFiles: NativeChatMentionFiles
@@ -82,13 +77,12 @@ export type AgentComposerFieldProps = {
   onDictationHoldEnd: () => void
   onSend: () => void
   onStop?: () => void
-  queueResume?: NativeChatQueueResume | undefined
-  queueSendConfirm?: NativeChatQueueSendConfirm | null
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
   contextUsage?: NativeChatContextUsageSummary | null
   sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
   goalMode?: NativeChatComposerGoalMode
+  agent?: string
 }
 
 export type AgentComposerImageAttachment = {
@@ -152,6 +146,7 @@ export function AgentComposerField({
   disabled,
   hasPty,
   canSend,
+  unavailableHint,
   layout,
   autocomplete,
   mentionFiles,
@@ -184,13 +179,12 @@ export function AgentComposerField({
   onDictationHoldEnd,
   onSend,
   onStop,
-  queueResume,
-  queueSendConfirm = null,
   sessionOptionsSurface,
   sessionOptionsSnapshot,
   contextUsage,
   sessionOptionsPickerRequest,
-  goalMode
+  goalMode,
+  agent
 }: AgentComposerFieldProps): React.JSX.Element {
   const draftNotSaved = useNativeChatComposerDraftUnsaved(draftScopeKey)
   const optionCount =
@@ -231,23 +225,8 @@ export function AgentComposerField({
     onImeSettled(element)
   }
 
-  const primary = nativeChatComposerPrimaryButton({
-    // Why: Stop is its own button here, so the primary button only ever sends or resumes.
-    isWorking: false,
-    composerEmpty: draft.trim() === '' && imageAttachments.length === 0,
-    queueResume,
-    composerDisabled: disabled,
-    sendDisabled: sendButtonDisabled
-  })
-  const primaryAction = primary.action === 'resume' ? 'resume' : 'send'
-  const { resume } = primary
   // Stable so the memoized option pickers keep their identity.
   const focusComposer = useCallback(() => textareaRef.current?.focus(), [textareaRef])
-  // The button disables while resuming, which drops its focus; typing is what comes next.
-  const resumeQueue = (): void => {
-    resume?.()
-    textareaRef.current?.focus()
-  }
 
   return (
     <div className={cn('bg-chat-canvas', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}>
@@ -256,7 +235,9 @@ export function AgentComposerField({
         <div
           className={cn(
             'relative w-full',
-            layout === 'dock' ? 'flex h-full min-h-0 flex-col' : 'mx-auto max-w-(--chat-content-max-width)'
+            layout === 'dock'
+              ? 'flex h-full min-h-0 flex-col'
+              : 'mx-auto max-w-(--chat-content-max-width)'
           )}
         >
           {autocomplete.mode === 'slash' ? (
@@ -407,7 +388,7 @@ export function AgentComposerField({
                         'components.native-chat.goal.placeholder',
                         'Describe your goal, define measurable outcomes for best results'
                       )
-                    : nativeChatComposerPlaceholder(hasPty, canSend, afterStop)
+                    : (unavailableHint ?? nativeChatComposerPlaceholder(hasPty, canSend, afterStop))
                 }
                 // Why: coarse-pointer min-height follows the app's touch target convention.
                 // field-sizing:content grows the field with the draft; the 8lh cap (plus
@@ -429,8 +410,7 @@ export function AgentComposerField({
               <AgentComposerActions
                 attachDisabled={attachDisabled}
                 dictationDisabled={dictationDisabled}
-                sendDisabled={primary.disabled}
-                primaryAction={primaryAction}
+                sendDisabled={sendButtonDisabled}
                 sendBlockedReason={sendBlockedReason}
                 draftNotSaved={draftNotSaved}
                 isWorking={isWorking}
@@ -443,19 +423,18 @@ export function AgentComposerField({
                 onDictationHoldEnd={onDictationHoldEnd}
                 onSend={onSend}
                 onStop={onStop}
-                {...(resume ? { onResume: resumeQueue } : {})}
                 sessionOptionsSurface={sessionOptionsSurface}
                 sessionOptionsSnapshot={sessionOptionsSnapshot}
                 contextUsage={contextUsage}
                 sessionOptionsPickerRequest={sessionOptionsPickerRequest}
                 focusComposer={focusComposer}
                 onExitGoalMode={goalMode?.active ? goalMode.exit : undefined}
+                {...(agent ? { agent } : {})}
               />
             </div>
           </div>
         </div>
       </div>
-      <NativeChatQueueSendConfirmDialog confirm={queueSendConfirm} focusComposer={focusComposer} />
     </div>
   )
 }

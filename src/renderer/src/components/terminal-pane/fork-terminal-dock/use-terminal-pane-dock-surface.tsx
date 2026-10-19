@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { useAppStore } from '@/store'
-import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
 import type { TerminalPaneController } from '../use-terminal-pane-controller'
 import { TerminalPaneDockMount } from './TerminalPaneDockMount'
 import { useTerminalPaneDock } from './use-terminal-pane-dock'
 import {
-  resolveRemoteDockConptyUnverified,
+  resolveRemoteDockConptyUnverifiedForWorktree,
   restampRemoteDockConptyUnverifiedForLivePanes
 } from './terminal-dock-remote-conpty'
 import {
@@ -87,10 +86,7 @@ export function useTerminalPaneDockSurface(controller: TerminalPaneController): 
   // upstream pins the controller chain's per-pane store-subscription count.
   const remoteConptyUnverified = useAppStore((store) =>
     store.settings?.experimentalTerminalDock === true
-      ? resolveRemoteDockConptyUnverified({
-          executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
-          state: store
-        })
+      ? resolveRemoteDockConptyUnverifiedForWorktree(store, worktreeId)
       : null
   )
   useEffect(() => {

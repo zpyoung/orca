@@ -243,7 +243,7 @@ function localAnswerArgs() {
     agent: 'omp' as const,
     disabled: false,
     isDispatchingSessionOption: false,
-    resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId: 'pty-a', settings: null }),
+    resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId: 'pty-a' }),
     onSlashCommand: vi.fn(),
     onSubmitted: vi.fn(),
     answerCommandLocally: () => 'Context: 20k / 272k tokens',
@@ -302,7 +302,7 @@ it('reveals only the pane whose option send it was, at the press', async () => {
       return useNativeChatSessionOptionCommand({
         agent: 'codex',
         disabled: false,
-        resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId, settings: null }),
+        resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId }),
         onSubmitted: reveal.revealLatest
       })
     },
@@ -331,7 +331,7 @@ it('reveals a PTY option send at the press, before the terminal confirms it', as
     const command = useNativeChatSessionOptionCommand({
       agent: 'codex',
       disabled: false,
-      resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId: 'pty-a', settings: null }),
+      resolveTarget: () => ({ terminalTabId: 'tab-a', ptyId: 'pty-a' }),
       onSubmitted: transcript.revealLatest
     })
     return { ...transcript, command }
@@ -397,16 +397,19 @@ it('reveals a structured prompt answer at the press, before the host accepts it'
         respond: async () => host.promise,
         queuedMessages: {
           queueCapable: true,
+          clearCapable: true,
+          editCapable: false,
+          editor: undefined,
           cards: [],
           pause: null,
-          resuming: false,
           resume: async () => false,
+          clear: async () => true,
+          queuePending: null,
+          pending: () => null,
           steer: async () => {},
           remove: async () => {},
           edit: async () => {},
-          steerNewest: () => false,
-          queueResume: undefined,
-          queueHold: undefined
+          steerNewest: () => false
         }
       },
       vi.fn()

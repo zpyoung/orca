@@ -4,12 +4,7 @@ import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import { agentHookServer } from '../agent-hooks/server'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import type { Store } from '../persistence'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
-import type { SshConnection } from '../ssh/ssh-connection'
-import { shellEscape } from '../ssh/ssh-connection-utils'
-import { execCommand } from '../ssh/ssh-relay-exec-command'
-import { getRegisteredSshState, getSshConnectionManager } from '../ssh/ssh-target-registry'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { bindLoopService } from '../runtime/rpc/methods/fork-loops/service-binding'
 import { parseWslPath } from '../wsl'
@@ -23,7 +18,7 @@ import { diffSnapshots, snapshotWorkingTree } from './loop-diff'
 import type { LoopEvidenceTools, LoopTargets } from './loop-driver'
 import { evaluateIteration } from './loop-evaluator'
 import { forwardLoopChangesToRenderer } from './loop-ipc-forward'
-import { createLocalLoopFilesystem, type LoopGitRunner } from './loop-notes-file'
+import { createLocalLoopFilesystem } from './loop-notes-file'
 import { notifyLoop } from './loop-notify'
 import { LoopService } from './loop-service'
 import { LoopStore } from './loop-store'
@@ -36,66 +31,6 @@ import {
 
 export function beginLoopsShutdown(service: LoopService | null): Promise<void> {
   return service?.shutdown() ?? Promise.resolve()
-}
-
-const SSH_GIT_ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/
-const SSH_GIT_TIMEOUT_MS = 120_000
-
-/** One POSIX shell line that runs git in `cwd` with `env` set for that command only. */
-export function buildSshGitCommand(
-  cwd: string,
-  args: string[],
-  env: Record<string, string>
-): string {
-  const assignments = Object.entries(env).map(([key, value]) => {
-    if (!SSH_GIT_ENV_KEY.test(key)) {
-      throw new Error(`Invalid environment variable name: ${JSON.stringify(key)}`)
-    }
-    return `${key}=${shellEscape(value)}`
-  })
-  const invocation = ['git', ...args.map(shellEscape)].join(' ')
-  return `cd ${shellEscape(cwd)} && ${assignments.length > 0 ? `env ${assignments.join(' ')} ` : ''}${invocation}`
-}
-
-type SshGitConnection = Pick<SshConnection, 'exec' | 'usesSystemSshTransport'>
-
-/**
- * Git over the SSH shell route, the one transport that can carry the snapshot's temporary
- * `GIT_INDEX_FILE`. Refuses Windows hosts because the command line is POSIX-quoted.
- */
-export function createSshShellGitRunner(args: {
-  connectionId: string
-  cwd: string
-  remotePlatform: string | undefined
-  getConnection?: () => SshGitConnection | null
-}): LoopGitRunner {
-  const getConnection =
-    args.getConnection ??
-    (() => {
-      const connection = getSshConnectionManager()?.getConnection(args.connectionId)
-      return connection?.getState().status === 'connected' ? connection : null
-    })
-  return async (gitArgs, options) => {
-    if (args.remotePlatform === 'win32') {
-      throw new Error('Loop git commands do not support the Windows SSH command dialect.')
-    }
-    const connection = getConnection()
-    if (!connection) {
-      throw new Error('SSH target is not connected.')
-    }
-    let stderr = ''
-    const stdout = await execCommand(
-      connection,
-      buildSshGitCommand(args.cwd, gitArgs, options?.env ?? {}),
-      {
-        timeoutMs: SSH_GIT_TIMEOUT_MS,
-        onStderr: (chunk) => {
-          stderr = chunk
-        }
-      }
-    )
-    return { stdout, stderr }
-  }
 }
 
 type LoopTargetRuntime = {
@@ -144,37 +79,7 @@ export async function resolveLoopTargets(
       }
     }
   }
-  const fs = getSshFilesystemProvider(host.targetId)
-  const git = getSshGitProvider(host.targetId)
-  if (!fs) {
-    throw new Error('The SSH host is not connected.')
-  }
-  const remotePlatform = getRegisteredSshState(host.targetId)?.remotePlatform
-  const shellGit = createSshShellGitRunner({
-    connectionId: host.targetId,
-    cwd: path,
-    remotePlatform
-  })
-  return {
-    executionHostId,
-    check: {
-      type: 'ssh',
-      cwd: path,
-      connectionId: host.targetId,
-      remotePlatform
-    },
-    workspace: {
-      kind,
-      workspacePath: path,
-      pathFlavor: 'posix',
-      fs,
-      // the provider's git.exec cannot pass env, so calls that need a private index use the shell route
-      runGit:
-        kind === 'git' && git
-          ? async (args, options) => (options?.env ? shellGit(args, options) : git.exec(args, path))
-          : null
-    }
-  }
+  throw new SshHostNotServedError(host.targetId)
 }
 
 function createEvidenceTools(store: Store): LoopEvidenceTools {

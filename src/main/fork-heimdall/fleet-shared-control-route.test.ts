@@ -6,7 +6,7 @@ import {
 import { RUNTIME_CAPABILITIES, RUNTIME_PROTOCOL_VERSION } from '../../shared/protocol-version'
 import { createSharedControlSubscription } from '../../shared/remote-runtime-shared-control-subscriptions'
 import { getCleanupRequest } from '../../shared/remote-runtime-shared-control-protocol'
-import { shouldRouteSubscriptionBySupport } from '../ipc/runtime-environment-support-routing'
+import { shouldRouteSubscriptionBySupport } from '../ipc/runtime-environments/runtime-environment-support-routing'
 
 describe('Heimdall remote shared-control route', () => {
   it('advertises mutations without changing the runtime protocol version', () => {

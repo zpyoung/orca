@@ -11,6 +11,7 @@ import RunningTerminalCloseDialog from './components/terminal-pane/RunningTermin
 import { LoopCloseDialogHost } from './fork-loops/LoopCloseDialogHost'
 import { LoopSetupDialogHost } from './fork-loops/LoopSetupDialogHost'
 import WorktreeBaseFallbackDialog from './components/WorktreeBaseFallbackDialog'
+import ClaudeAccountSwitchDialog from './components/ClaudeAccountSwitchDialog'
 import { useUnreadDockBadge } from './hooks/useUnreadDockBadge'
 import { AppBackgroundServices } from './app-shell/AppBackgroundServices'
 import { AppRootSurfaces } from './app-shell/AppRootSurfaces'
@@ -34,6 +35,7 @@ import { useOnboardingAndFeatureTips } from './app-shell/use-onboarding-and-feat
 import { usePersistedUIWriter } from './app-shell/use-persisted-ui-writer'
 import { useRuntimeGraphSync } from './app-shell/use-runtime-graph-sync'
 import { useWindowVisibilityEffects } from './app-shell/use-window-visibility-effects'
+import { SpaceWindowStatePublisher } from './components/workspace-space/SpaceWindowStatePublisher'
 
 function App(): React.JSX.Element {
   const layout = useAppChromeLayout()
@@ -95,6 +97,7 @@ function App(): React.JSX.Element {
           <DocPreviewExternalLinkConfirmation />
           <LinkRoutingPreferenceDialogProvider>
             <AppBackgroundServices />
+            <SpaceWindowStatePublisher />
             <AppWorkspaceShell layout={layout} floatingWorkspace={floatingWorkspace} />
             <AppRootSurfaces
               floatingWorkspace={floatingWorkspace}
@@ -107,6 +110,7 @@ function App(): React.JSX.Element {
       </TooltipProvider>
       <SkillFreshnessNudge />
       <WorktreeBaseFallbackDialog />
+      <ClaudeAccountSwitchDialog />
       <PinnedTabCloseDialog />
       <RunningTerminalCloseDialog />
       <LoopSetupDialogHost />

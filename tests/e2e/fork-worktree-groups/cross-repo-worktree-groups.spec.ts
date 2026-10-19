@@ -97,7 +97,7 @@ async function seedRepos(page: Page, repos: readonly SeededRepoPath[]): Promise<
     let foundRepos = findSeededRepos()
     const repoDeadline = Date.now() + 10_000
     while (foundRepos.some((repo) => !repo) && Date.now() < repoDeadline) {
-      await state.fetchRepos()
+      await state.fetchRepos({ runtimeEnvironmentId: null, throwOnError: true })
       foundRepos = findSeededRepos()
       if (foundRepos.every((repo) => repo)) {
         break
@@ -158,7 +158,7 @@ async function createProjectGroup(page: Page, name: string): Promise<string> {
     if (!store) {
       throw new Error('window.__store is not available')
     }
-    const group = await store.getState().createProjectGroup(name)
+    const group = await store.getState().createProjectGroup(name, 'local')
     if (!group) {
       throw new Error(`Failed to create project group: ${name}`)
     }
@@ -197,13 +197,13 @@ async function seedFolderWorkspace(
       name: args.groupName,
       parentPath: args.parentPath
     })
-    await store.getState().fetchProjectGroups()
+    await store.getState().fetchProjectGroups({ runtimeEnvironmentId: null, throwOnError: true })
     const workspace = await window.api.folderWorkspaces.create({
       projectGroupId: group.id,
       name: args.workspaceName,
       folderPath: args.folderPath
     })
-    await store.getState().fetchFolderWorkspaces()
+    await store.getState().fetchFolderWorkspaces({ runtimeEnvironmentId: null, throwOnError: true })
     return { groupId: group.id, folderWorktreeId: `folder:${workspace.id}` }
   }, args)
 }

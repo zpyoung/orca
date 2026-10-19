@@ -9,7 +9,7 @@ import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail
 import type { ObjectivePlanTask } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { ExecuteContext, LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { objectiveGitCommandForTarget, type ObjectiveWorkspaceTarget } from './content-identity'
@@ -153,11 +153,11 @@ export async function resolveObjectiveDispatchTarget(
   ) {
     throw new Error('Resolved objective dispatch worktree authority changed after creation')
   }
+  requireLocalRuntimeFileRoute(target)
   return {
     kind: 'git',
     executionHostId: target.executionHostId,
     workspacePath: target.worktree.path,
-    fileProvider: requireRuntimeFileProvider(target),
     gitTarget: target
   }
 }

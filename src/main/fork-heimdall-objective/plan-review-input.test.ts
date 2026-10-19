@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   ledger as watcherLedger,
   projection,
@@ -10,7 +10,6 @@ import type {
   ObjectivePlanTask,
   PlannerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
-import type { IFilesystemProvider } from '../providers/types'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
@@ -182,24 +181,17 @@ describe('writePlanReviewInputFile', () => {
     expect(mode).toBe(0o600)
   })
 
-  it('writes through the file provider for a remote target', async () => {
-    const writeFileMock = vi.fn().mockResolvedValue(undefined)
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only writeFile is exercised.
-    const fileProvider = { writeFile: writeFileMock } as unknown as IFilesystemProvider
+  it('refuses to write for a non-local execution host', async () => {
     const target: ObjectiveWorkspaceTarget = {
       kind: 'folder',
       executionHostId: 'ssh:plan-review-input-test',
-      workspacePath: '/srv/objective',
-      fileProvider
+      workspacePath: '/srv/objective'
     }
     const reportPath = '/srv/objective/.orca/heimdall/objective/reports/deadbeef.json'
 
-    const written = await writePlanReviewInputFile(target, reportPath, input())
-
-    expect(written).toBe(
-      '/srv/objective/.orca/heimdall/objective/reports/deadbeef.plan-review-input.json'
+    await expect(writePlanReviewInputFile(target, reportPath, input())).rejects.toThrow(
+      'Remote objective target is not served by this host'
     )
-    expect(writeFileMock).toHaveBeenCalledWith(written, JSON.stringify(input()))
   })
 
   it('fails the dispatch instead of writing a file still oversized after every field is trimmed', async () => {

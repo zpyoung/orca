@@ -1,6 +1,7 @@
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
-import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { resolveOwner } from '@/lib/resolve-owner'
 import { useAppStore } from '@/store'
+import { toRuntimeExecutionHostId } from '../../../../../shared/execution-host'
 import type { TuiAgent } from '../../../../../shared/tui-agent'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
 import { prepareAgentSessionContinuationFromPane as prepareUpstreamAgentSessionContinuationFromPane } from '../../terminal-pane/terminal-agent-session-continuation'
@@ -26,6 +27,19 @@ export type ForkSessionHandoffRequestWithSource = ForkSessionHandoffRequest & {
 
 type PreparePaneArgs = Parameters<typeof prepareUpstreamAgentSessionContinuationFromPane>[0]
 
+/** The host that owns the source pane's workspace; null when no row or several hosts claim it. */
+function resolveSourceExecutionHostId(
+  state: Parameters<typeof resolveOwner>[0],
+  worktreeId: string
+): string | null {
+  const match = resolveOwner(state, { workspaceId: worktreeId })
+  if (match.kind !== 'resolved') {
+    return null
+  }
+  const { endpoint, at } = match.owner
+  return endpoint.kind === 'environment' ? toRuntimeExecutionHostId(endpoint.environmentId) : at
+}
+
 /** Extends upstream pane capture with the live source identity used by handoff controls. */
 export function prepareAgentSessionContinuationFromPane(
   args: PreparePaneArgs
@@ -43,7 +57,7 @@ export function prepareAgentSessionContinuationFromPane(
       sourcePaneKey,
       sourceWorktreeId: args.worktreeId,
       anchorWorktreeId: args.worktreeId,
-      sourceExecutionHostId: getExecutionHostIdForWorktree(state, args.worktreeId),
+      sourceExecutionHostId: resolveSourceExecutionHostId(state, args.worktreeId),
       providerSessionId: state.agentStatusByPaneKey[sourcePaneKey]?.providerSession?.id ?? null,
       vaultSessionId: null,
       vaultAgent: null,

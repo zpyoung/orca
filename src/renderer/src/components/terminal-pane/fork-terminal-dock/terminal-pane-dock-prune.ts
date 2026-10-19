@@ -29,7 +29,7 @@ export function resolveTerminalDockPruneTarget(args: {
   return { unifiedTabId: unifiedTab.id, paneKey: makePaneKey(args.tabId, args.leafId) }
 }
 
-/** Prunes a retiring pane's dock state from both the store record and the localStorage
+/** Prunes a retiring pane's dock state from both the store record and the browser-storage
  *  fallback in one call, so the two can't drift apart at a close/detach edge. */
 export function pruneTerminalDockPaneKeysEverywhere(args: {
   unifiedTabsByWorktree: Record<string, Tab[]>
@@ -47,7 +47,7 @@ export function pruneTerminalDockPaneKeysEverywhere(args: {
   removeTerminalDockPaneKeys(new Set([target.paneKey]))
 }
 
-/** Pane keys to evict from the dock localStorage record when a tab's whole PaneManager
+/** Pane keys to evict from the dock browser-storage record when a tab's whole PaneManager
  *  tears down — `tabStillExists` false is a genuine close, not a rehome/remount that
  *  keeps the same tab (and its dock state) alive elsewhere. */
 export function collectTerminalDockPaneKeysForTabTeardown(args: {

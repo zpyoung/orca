@@ -8,7 +8,8 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Tab } from '../../../../shared/tab-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 
-import { applyWebSessionTabsSnapshot, type WebSessionTabsSyncState } from '../web-session-tabs-sync'
+import { applyWebSessionTabsSnapshot } from '../web-session-tabs-sync/snapshot-api'
+import type { WebSessionTabsSyncState } from '../web-session-tabs-sync/state'
 
 vi.mock('../store', () => ({
   useAppStore: {
@@ -73,12 +74,12 @@ function makeSnapshot(
   }
 }
 
-import type * as WebRuntimeSessionModule from '../web-runtime-session'
+import type * as WebRuntimeTerminalActionsModule from '../web-runtime-terminal-actions'
 import { TERMINAL_DOCK_ECHO_WINDOW_MS } from './web-session-terminal-dock-reconcile'
 
 const setWebRuntimeTabPropsMock = vi.fn()
-vi.mock('../web-runtime-session', async (importOriginal) => {
-  const actual = await importOriginal<typeof WebRuntimeSessionModule>()
+vi.mock('../web-runtime-terminal-actions', async (importOriginal) => {
+  const actual = await importOriginal<typeof WebRuntimeTerminalActionsModule>()
   return {
     ...actual,
     setWebRuntimeTabProps: (...args: unknown[]) => setWebRuntimeTabPropsMock(...args)

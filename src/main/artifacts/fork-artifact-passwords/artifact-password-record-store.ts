@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { safeStorage } from 'electron'
+import { guardedSafeStorage } from '../../host/safe-storage-availability'
 import { writeDurableSecureJsonFile } from '../../../shared/secure-file'
 import { getOrcaProfileDirectory } from '../../orca-profiles/profile-storage-paths'
 import type { ArtifactShareScope } from '../artifact-share-record-store'
@@ -208,10 +208,11 @@ function readFile(profileId: string, userDataPath: string): ArtifactPasswordFile
 function assertSecureStorageAvailable(): void {
   let available = false
   try {
-    available = safeStorage.isEncryptionAvailable()
+    available = guardedSafeStorage.isEncryptionAvailable()
     if (
       process.platform === 'linux' &&
-      (!available || ['basic_text', 'unknown'].includes(safeStorage.getSelectedStorageBackend()))
+      (!available ||
+        ['basic_text', 'unknown'].includes(guardedSafeStorage.getSelectedStorageBackend()))
     ) {
       available = false
     }
@@ -226,7 +227,7 @@ function assertSecureStorageAvailable(): void {
 function encryptPassphrase(passphrase: string): string {
   assertSecureStorageAvailable()
   try {
-    return safeStorage.encryptString(passphrase).toString('base64')
+    return guardedSafeStorage.encryptString(passphrase).toString('base64')
   } catch (error) {
     throw new Error('The artifact passphrase could not be stored securely.', { cause: error })
   }
@@ -235,7 +236,7 @@ function encryptPassphrase(passphrase: string): string {
 function decryptPassphrase(blob: string): string | null {
   try {
     assertSecureStorageAvailable()
-    return safeStorage.decryptString(Buffer.from(blob, 'base64'))
+    return guardedSafeStorage.decryptString(Buffer.from(blob, 'base64'))
   } catch {
     return null
   }

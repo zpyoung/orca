@@ -6,11 +6,6 @@ const coloringCss = fs.readFileSync(
   new URL('../fork-native-chat-coloring.css', import.meta.url),
   'utf8'
 )
-const chatCodeColorsCss = coloringCss.slice(
-  coloringCss.indexOf('.native-chat-code .hljs-keyword {'),
-  coloringCss.indexOf('/* Why: CodeBlockLowlight')
-)
-
 function getCssBlockBody(css: string, selector: string): string {
   const ruleMarker = css.indexOf(`${selector} {`)
   expect(ruleMarker).toBeGreaterThanOrEqual(0)
@@ -63,31 +58,8 @@ const HLJS_TOKENS: { name: string; light: string; dark: string }[] = [
 
 const ALL_TOKENS = [...PALETTE_TOKENS, ...HLJS_TOKENS]
 
-// hljs-built_in is highlight.js's own class name; the token stays hyphenated like every other token.
-const NATIVE_CHAT_CODE_CLASS_TO_TOKEN: { className: string; token: string }[] = [
-  { className: 'hljs-keyword', token: '--hljs-keyword' },
-  { className: 'hljs-string', token: '--hljs-string' },
-  { className: 'hljs-number', token: '--hljs-number' },
-  { className: 'hljs-comment', token: '--hljs-comment' },
-  { className: 'hljs-function', token: '--hljs-function' },
-  { className: 'hljs-title', token: '--hljs-title' },
-  { className: 'hljs-built_in', token: '--hljs-built-in' },
-  { className: 'hljs-type', token: '--hljs-type' },
-  { className: 'hljs-attr', token: '--hljs-attr' },
-  { className: 'hljs-selector-class', token: '--hljs-selector-class' },
-  { className: 'hljs-variable', token: '--hljs-variable' },
-  { className: 'hljs-meta', token: '--hljs-meta' },
-  { className: 'hljs-tag', token: '--hljs-tag' },
-  { className: 'hljs-name', token: '--hljs-name' },
-  { className: 'hljs-params', token: '--hljs-params' },
-  { className: 'hljs-literal', token: '--hljs-literal' },
-  { className: 'hljs-regexp', token: '--hljs-regexp' },
-  { className: 'hljs-operator', token: '--hljs-operator' },
-  { className: 'hljs-property', token: '--hljs-property' }
-]
-
 describe('chat transcript color tokens', () => {
-  it('imports the native chat code colors stylesheet', () => {
+  it('imports the native chat coloring stylesheet', () => {
     expect(mainCss).toContain("@import './fork-native-chat-coloring.css';")
   })
 
@@ -129,34 +101,5 @@ describe('chat transcript color tokens', () => {
     for (const token of ALL_TOKENS) {
       expect(pluginSecurityChrome).not.toContain(token.name)
     }
-  })
-})
-
-describe('native chat code colors stylesheet', () => {
-  it('defines all 19 .native-chat-code .hljs-* rules against the matching token', () => {
-    for (const { className, token } of NATIVE_CHAT_CODE_CLASS_TO_TOKEN) {
-      const marker = `.native-chat-code .${className} {`
-      const start = chatCodeColorsCss.indexOf(marker)
-      expect(start).toBeGreaterThanOrEqual(0)
-
-      const bodyStart = chatCodeColorsCss.indexOf('{', start) + 1
-      const bodyEnd = chatCodeColorsCss.indexOf('}', bodyStart)
-      const body = chatCodeColorsCss.slice(bodyStart, bodyEnd)
-
-      expect(body).toContain(`color: var(${token});`)
-    }
-  })
-
-  it('gives .native-chat-code .hljs-comment an italic style, matching the editor', () => {
-    const start = chatCodeColorsCss.indexOf('.native-chat-code .hljs-comment {')
-    const bodyStart = chatCodeColorsCss.indexOf('{', start) + 1
-    const bodyEnd = chatCodeColorsCss.indexOf('}', bodyStart)
-    const body = chatCodeColorsCss.slice(bodyStart, bodyEnd)
-
-    expect(body).toContain('font-style: italic;')
-  })
-
-  it('contains no literal hex color value', () => {
-    expect(chatCodeColorsCss).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
   })
 })

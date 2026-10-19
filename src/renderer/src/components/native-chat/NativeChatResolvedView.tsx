@@ -2,7 +2,6 @@ import { cn } from '@/lib/utils'
 import { NATIVE_CHAT_APPEARANCE_ROOT_CLASS } from './native-chat-appearance-style'
 import { useNativeChatStoreAppearanceStyle } from './use-native-chat-store-appearance-style'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNativeChatComposerRevealFocus } from './use-native-chat-composer-reveal-focus'
 import { useAppStore } from '../../store'
 import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-adoption'
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
@@ -42,16 +41,12 @@ import {
   deriveNativeChatStreamingText,
   nativeChatStreamingMessage
 } from '../../../../shared/native-chat-streaming'
-import { shouldFocusNativeChatPaneFromPointerTarget } from './native-chat-typing-redirect'
-import { routeNativeChatRootKeyToInput } from './native-chat-root-key-routing'
+import { useNativeChatRootInputRouting } from './use-native-chat-root-input-routing'
 import {
   emptyNativeChatContextMenuActions,
   useNativeChatContextMenu
 } from './use-native-chat-context-menu'
-import {
-  createNativeChatRuntimeSelector,
-  selectNativeChatSshConnectionId
-} from './fork-native-chat-relay/native-chat-runtime-owner'
+import { createNativeChatRuntimeSelector } from './native-chat-runtime-owner'
 import { useNativeChatPasteBridge } from './use-native-chat-paste-bridge'
 import { LinkActionPopover } from '@/components/link-actions/LinkActionPopover'
 import { useNativeChatLinkActions } from './use-native-chat-link-actions'
@@ -82,7 +77,6 @@ export function NativeChatResolvedView({
   // the remote runtime host for a runtime-owned pane; null keeps the local path.
   const selectOwner = useMemo(() => createNativeChatRuntimeSelector(terminalTabId), [terminalTabId])
   const runtimeEnvironmentId = useAppStore(selectOwner)
-  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))
   const keybindings = useAppStore((s) => s.keybindings)
   const session = useNativeChatRetainedSession({
     paneKey,
@@ -90,7 +84,7 @@ export function NativeChatResolvedView({
     sessionId,
     transcriptPath,
     runtimeEnvironmentId,
-    sshConnectionId
+    enabled: isVisible
   })
   const launchPrompt = useAppStore((s) => s.nativeChatLaunchPromptByTabId[terminalTabId] ?? null)
   const clearNativeChatLaunchPrompt = useAppStore((s) => s.clearNativeChatLaunchPrompt)
@@ -136,20 +130,6 @@ export function NativeChatResolvedView({
   const questionAnswerInputRef = useRef<HTMLInputElement>(null)
   const fileLinkContext = useNativeChatFileLinkContext(terminalTabId)
   const onPaste = useNativeChatPasteBridge({ rootRef, composerRef, questionAnswerInputRef })
-  const contextMenu = useNativeChatContextMenu({
-    rootRef,
-    composerRef,
-    enabled: isVisible,
-    onSwitchToTerminal,
-    splitShortcutLabels: {
-      right: formatShortcutLabel('terminal.splitRight', keybindings),
-      down: formatShortcutLabel('terminal.splitDown', keybindings)
-    },
-    actions: {
-      onPaste,
-      ...(contextMenuActions ?? emptyNativeChatContextMenuActions)
-    }
-  })
 
   // Optimistic "queued" sends (mobile parity): a composer send is echoed
   // immediately and pruned once its real user turn lands in the transcript, so
@@ -158,7 +138,7 @@ export function NativeChatResolvedView({
     () => ({ paneKey, agent, sessionId }),
     [paneKey, agent, sessionId]
   )
-  const delivery = useNativeChatPendingDelivery({ paneKey, agent, messages: session.messages })
+  const delivery = useNativeChatPendingDelivery({ paneKey, agent, session })
   const { pending, record, clear } = delivery
   // Slash commands aren't chat turns, so they get a small local "Ran /clear"
   // system line instead of a user bubble. Capped + cached per conversation.
@@ -232,9 +212,11 @@ export function NativeChatResolvedView({
   })
   const { card: shownPromptCard, collapsedCard } = promptCardPresentation
   const mountedPromptCard = shownPromptCard ?? collapsedCard
-  useNativeChatComposerRevealFocus({
+  const rootInput = useNativeChatRootInputRouting({
+    tabId: terminalTabId,
     rootRef,
     composerRef,
+    questionAnswerInputRef,
     isVisible,
     isFocusedGroup,
     composerReady: shownPromptCard === null && targetPtyId !== null && canSend
@@ -328,6 +310,20 @@ export function NativeChatResolvedView({
   // Only the focused conversation accepts chat text-size shortcuts.
   useNativeChatFontSize(isConversation && isVisible && isFocusedGroup, rootRef)
   const find = useNativeChatFind(isVisible && isFocusedGroup, rootRef, composerRef, messageListRef)
+  const contextMenu = useNativeChatContextMenu({
+    rootRef,
+    composerRef,
+    enabled: isVisible,
+    onSwitchToTerminal,
+    splitShortcutLabels: {
+      right: formatShortcutLabel('terminal.splitRight', keybindings),
+      down: formatShortcutLabel('terminal.splitDown', keybindings)
+    },
+    actions: { onPaste, ...(contextMenuActions ?? emptyNativeChatContextMenuActions) },
+    messageListRef,
+    fileLinkContext,
+    onFind: find.open
+  })
   const appearanceStyle = useNativeChatStoreAppearanceStyle()
 
   return (
@@ -342,9 +338,7 @@ export function NativeChatResolvedView({
           event.stopPropagation()
           return
         }
-        if (event.button === 0 && shouldFocusNativeChatPaneFromPointerTarget(event.target)) {
-          rootRef.current?.focus({ preventScroll: true })
-        }
+        rootInput.onPointerDownCapture(event)
       }}
       onKeyDownCapture={(event) => {
         find.onKeyDownCapture(event)
@@ -361,7 +355,7 @@ export function NativeChatResolvedView({
           }
           return
         }
-        routeNativeChatRootKeyToInput(event, composerRef.current, questionAnswerInputRef.current)
+        rootInput.onKeyDownCapture(event)
       }}
       onContextMenuCapture={contextMenu.onContextMenuCapture}
       className={cn(

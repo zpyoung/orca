@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LedgerOwner } from '../../../../shared/ledger'
 import type { Project } from '../../../../shared/project-types'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
-import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 
 export type LedgerOwnerLabels = {
   /** The owner's display name, or `null` while it is unresolved or no longer in the catalog. */

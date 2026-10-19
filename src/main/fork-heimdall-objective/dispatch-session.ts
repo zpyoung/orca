@@ -14,6 +14,7 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { inspectHeimdallWorkerTerminal } from '../fork-heimdall/orchestration/worker-dispatch-routing'
 import type { ObjectiveStore } from './objective-store'
 import type { ObjectiveSnapshotBinding } from './execution-context'
+import { composeWorktreeId } from '../../shared/worktree/id'
 
 export type ObjectiveDispatchSessionReuse =
   | { status: 'reusable'; terminalHandle: string }
@@ -240,7 +241,7 @@ export async function resolveObjectiveSerialLaneTerminal(args: {
     terminalHandle,
     workspaceId:
       args.binding.enrollment.worktreeId ??
-      `${args.binding.enrollment.repoId}::${args.binding.enrollment.workspacePath}`
+      composeWorktreeId(args.binding.enrollment.repoId, args.binding.enrollment.workspacePath)
   })
   if (session.status === 'unverifiable') {
     throw new Error(`Objective lane session is unverifiable: ${session.reason}`)

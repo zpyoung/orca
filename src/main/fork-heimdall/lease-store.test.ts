@@ -3,17 +3,27 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DirEntry } from '../../shared/filesystem-entry-types'
-import type { IFilesystemProvider } from '../providers/types'
-import type { SshGitProvider } from '../providers/ssh-git-provider'
+import { SSH_HOST_NOT_SERVED_MESSAGE } from '../providers/ssh-host-not-served-error'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
 import {
   HostRoutedLeaseStore,
   LeaseLostError,
   makeWorkspaceKey,
   type LeaseWorkspaceTarget
 } from './lease-store'
+import type { LeaseHostFilesystem } from './lease-host-filesystem'
+import type * as LeaseHostFilesystemModule from './lease-host-filesystem'
 import { LeaseWorkspaceRemovedError } from './lease-workspace-absence'
+
+const filesystemState = vi.hoisted(() => ({ active: null as LeaseHostFilesystem | null }))
+
+vi.mock('./lease-host-filesystem', async (importOriginal) => {
+  const original = await importOriginal<typeof LeaseHostFilesystemModule>()
+  return {
+    ...original,
+    createLocalLeaseFilesystem: () => filesystemState.active ?? original.createLocalLeaseFilesystem()
+  }
+})
 
 class MemoryFilesystem {
   readonly directories = new Set(['/workspace', '/workspace/.orca', '/workspace/.orca/heimdall'])
@@ -113,23 +123,19 @@ class MemoryFilesystem {
     this.files.delete(path)
   }
 
-  asProvider(): IFilesystemProvider {
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: lease-store.ts only calls readDir/readFile/writeFile/rename/stat/createDir/createDirNoClobber/deletePath on this provider, all implemented above.
-    return this as unknown as IFilesystemProvider
+  asLeaseFilesystem(): LeaseHostFilesystem {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: lease-store.ts only calls readDir/readFile/writeFile/rename/stat/createDir/createDirNoClobber on this filesystem, all implemented above.
+    return this as unknown as LeaseHostFilesystem
   }
 }
 
-function remoteTarget(
-  fs: MemoryFilesystem,
-  workspacePath = '/workspace',
-  executionHostId: LeaseWorkspaceTarget['executionHostId'] = 'ssh:host-a'
-): LeaseWorkspaceTarget {
+function memoryTarget(fs: MemoryFilesystem, workspacePath = '/workspace'): LeaseWorkspaceTarget {
+  filesystemState.active = fs.asLeaseFilesystem()
   return {
     kind: 'folder',
-    executionHostId,
+    executionHostId: 'local',
     workspacePath,
-    watcherId: 'watcher-1',
-    fileProvider: fs.asProvider()
+    watcherId: 'watcher-1'
   }
 }
 
@@ -172,9 +178,8 @@ function releasedState(content: string): boolean | null {
 }
 
 const temporaryPaths: string[] = []
-const GIT_TEST_HOST = 'lease-git-path'
 afterEach(() => {
-  unregisterSshGitProvider(GIT_TEST_HOST)
+  filesystemState.active = null
   for (const path of temporaryPaths.splice(0)) {
     rmSync(path, { recursive: true, force: true })
   }
@@ -183,8 +188,8 @@ afterEach(() => {
 describe('host-routed epoch lease', () => {
   it('acquires and refuses another holder while the host-mtime lease is live', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
-    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const key = makeWorkspaceKey('local', '/workspace')
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
 
     const first = await store.acquireOrRenew(key, 'owner-a', 90_000)
     const second = await store.acquireOrRenew(key, 'owner-b', 90_000)
@@ -200,8 +205,8 @@ describe('host-routed epoch lease', () => {
 
   it('refuses release by a different holder at the current epoch', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
-    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const key = makeWorkspaceKey('local', '/workspace')
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
     const first = await store.acquireOrRenew(key, 'owner-a', 90_000)
     if (first.status !== 'held') {
       throw new Error('expected lease')
@@ -217,8 +222,8 @@ describe('host-routed epoch lease', () => {
 
   it('takes over at a higher epoch only after host-clock expiry', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
-    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const key = makeWorkspaceKey('local', '/workspace')
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
     await store.acquireOrRenew(key, 'owner-a', 90_000)
     fs.now += 90_001
 
@@ -231,8 +236,8 @@ describe('host-routed epoch lease', () => {
     const leaseDirectory = '/workspace/.orca/heimdall/lease'
     await fs.createDir(leaseDirectory)
     await fs.createDirNoClobber(`${leaseDirectory}/epoch-1`)
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
-    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const key = makeWorkspaceKey('local', '/workspace')
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
 
     await expect(store.acquireOrRenew(key, 'owner-b', 90_000)).resolves.toMatchObject({
       status: 'unverifiable',
@@ -260,9 +265,9 @@ describe('host-routed epoch lease', () => {
       await fs.createDirNoClobber(epochDirectory)
       fs.now += 90_001
       await fs.writeFile(holderPath, content)
-      const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+      const key = makeWorkspaceKey('local', '/workspace')
       const store = new HostRoutedLeaseStore({
-        resolveTarget: async () => remoteTarget(fs)
+        resolveTarget: async () => memoryTarget(fs)
       })
 
       await expect(store.acquireOrRenew(key, 'owner-b', 90_000)).resolves.toMatchObject({
@@ -279,9 +284,9 @@ describe('host-routed epoch lease', () => {
 
   it('keeps the live holder record readable while a renewal publishes', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
-    const firstStore = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
-    const secondStore = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const key = makeWorkspaceKey('local', '/workspace')
+    const firstStore = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
+    const secondStore = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
     await firstStore.acquireOrRenew(key, 'owner-a', 90_000)
     const barrier = createOperationBarrier()
     const holderPath = '/workspace/.orca/heimdall/lease/epoch-1/holder.json'
@@ -307,12 +312,12 @@ describe('host-routed epoch lease', () => {
 
   it('rechecks the highest epoch after publishing a holder record', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const key = makeWorkspaceKey('local', '/workspace')
     const firstStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const secondStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const barrier = createOperationBarrier()
     const holderPath = '/workspace/.orca/heimdall/lease/epoch-1/holder.json'
@@ -339,8 +344,8 @@ describe('host-routed epoch lease', () => {
 
   it('rejects renewal and assertHeld under an older epoch', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
-    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const key = makeWorkspaceKey('local', '/workspace')
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
     const first = await store.acquireOrRenew(key, 'owner-a', 90_000)
     if (first.status !== 'held') {
       throw new Error('expected lease')
@@ -358,9 +363,9 @@ describe('host-routed epoch lease', () => {
     vi.useFakeTimers()
     try {
       const fs = new MemoryFilesystem()
-      const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+      const key = makeWorkspaceKey('local', '/workspace')
       const store = new HostRoutedLeaseStore({
-        resolveTarget: async () => remoteTarget(fs)
+        resolveTarget: async () => memoryTarget(fs)
       })
       const first = await store.acquireOrRenew(key, 'owner-a', 90_000)
       if (first.status !== 'held') {
@@ -404,12 +409,12 @@ describe('host-routed epoch lease', () => {
 
   it('rechecks the highest epoch after a renewal write before returning held', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const key = makeWorkspaceKey('local', '/workspace')
     const firstStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const secondStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const first = await firstStore.acquireOrRenew(key, 'owner-a', 90_000)
     if (first.status !== 'held') {
@@ -442,12 +447,12 @@ describe('host-routed epoch lease', () => {
 
   it('rechecks the highest epoch after assertHeld host operations', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const key = makeWorkspaceKey('local', '/workspace')
     const firstStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const secondStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const first = await firstStore.acquireOrRenew(key, 'owner-a', 90_000)
     if (first.status !== 'held') {
@@ -477,12 +482,12 @@ describe('host-routed epoch lease', () => {
 
   it('rechecks the highest epoch when release resumes after host I/O', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const key = makeWorkspaceKey('local', '/workspace')
     const firstStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const secondStore = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const first = await firstStore.acquireOrRenew(key, 'owner-a', 90_000)
     if (first.status !== 'held') {
@@ -512,9 +517,9 @@ describe('host-routed epoch lease', () => {
 
   it('rejects assertHeld transport failures as LeaseLostError', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const key = makeWorkspaceKey('local', '/workspace')
     const store = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs)
+      resolveTarget: async () => memoryTarget(fs)
     })
     const first = await store.acquireOrRenew(key, 'owner-a', 90_000)
     if (first.status !== 'held') {
@@ -532,9 +537,9 @@ describe('host-routed epoch lease', () => {
 
   it('answers invariant target mismatch as a configuration error', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const key = makeWorkspaceKey('local', '/workspace')
     const store = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs, '/different-workspace')
+      resolveTarget: async () => memoryTarget(fs, '/different-workspace')
     })
 
     await expect(store.acquireOrRenew(key, 'owner', 90_000)).resolves.toEqual({
@@ -577,24 +582,24 @@ describe('host-routed epoch lease', () => {
       }
     })
     await expect(
-      store.acquireOrRenew(makeWorkspaceKey('ssh:host-a', '/workspace'), 'owner', 90_000)
+      store.acquireOrRenew(makeWorkspaceKey('local', '/workspace'), 'owner', 90_000)
     ).resolves.toEqual({ status: 'unverifiable', reason: failure.message })
   })
   it('does not turn a lease filesystem error into registry absence', async () => {
     const fs = new MemoryFilesystem()
     vi.spyOn(fs, 'createDir').mockRejectedValue(new Error('selector_not_found'))
-    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
     await expect(
-      store.acquireOrRenew(makeWorkspaceKey('ssh:host-a', '/workspace'), 'owner', 90_000)
+      store.acquireOrRenew(makeWorkspaceKey('local', '/workspace'), 'owner', 90_000)
     ).resolves.toEqual({ status: 'unverifiable', reason: 'selector_not_found' })
   })
 
   it('answers transport failure as unverifiable, never held', async () => {
     const fs = new MemoryFilesystem()
     fs.fail = true
-    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => memoryTarget(fs) })
     await expect(
-      store.acquireOrRenew(makeWorkspaceKey('ssh:host-a', '/workspace'), 'owner', 90_000)
+      store.acquireOrRenew(makeWorkspaceKey('local', '/workspace'), 'owner', 90_000)
     ).resolves.toMatchObject({ status: 'unverifiable' })
   })
 
@@ -613,7 +618,7 @@ describe('host-routed epoch lease', () => {
       const fs = new MemoryFilesystem()
       const key = makeWorkspaceKey('local', workspacePath)
       const store = new HostRoutedLeaseStore({
-        resolveTarget: async () => remoteTarget(fs, workspacePath, 'local')
+        resolveTarget: async () => memoryTarget(fs, workspacePath)
       })
 
       await expect(store.acquireOrRenew(key, 'owner', 90_000)).resolves.toMatchObject({
@@ -624,60 +629,10 @@ describe('host-routed epoch lease', () => {
     }
   )
 
-  it('keeps a literal backslash in a POSIX SSH workspace name', async () => {
-    const fs = new MemoryFilesystem()
-    const workspacePath = '/srv/repo\\name'
-    const leaseDirectory = '/srv/repo\\name/.orca/heimdall/lease'
-    const key = makeWorkspaceKey('ssh:host-a', workspacePath)
-    const store = new HostRoutedLeaseStore({
-      resolveTarget: async () => remoteTarget(fs, workspacePath)
-    })
-
-    await expect(store.acquireOrRenew(key, 'owner', 90_000)).resolves.toMatchObject({
-      status: 'held',
-      epoch: 1
-    })
-    expect(fs.directories.has(leaseDirectory)).toBe(true)
-  })
-
-  it('strips only the command newline from a remote absolute git directory', async () => {
-    const fs = new MemoryFilesystem()
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: requireRuntimeGitProvider only calls exec() on this provider; the rest of SshGitProvider's large surface is unused here.
-    registerSshGitProvider(GIT_TEST_HOST, {
-      exec: vi.fn(async () => ({
-        stdout: '/srv/repo/.git \n',
-        stderr: ''
-      }))
-    } as unknown as SshGitProvider)
-    const workspacePath = '/srv/repo'
-    const executionHostId = `ssh:${GIT_TEST_HOST}` as const
-    const key = makeWorkspaceKey(executionHostId, workspacePath)
-    const store = new HostRoutedLeaseStore({
-      resolveTarget: async () => ({
-        kind: 'git',
-        executionHostId,
-        workspacePath,
-        watcherId: 'watcher-1',
-        fileProvider: fs.asProvider(),
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only executionHostId is read on this route; the full Worktree/GitWorktreeInfo shape is unused here.
-        gitTarget: {
-          executionHostId,
-          worktree: { id: 'worktree-1', path: workspacePath }
-        } as unknown as RuntimeGitTarget
-      })
-    })
-
-    await expect(store.acquireOrRenew(key, 'owner', 90_000)).resolves.toMatchObject({
-      status: 'held',
-      epoch: 1
-    })
-    expect(fs.directories.has('/srv/repo/.git /orca-heimdall/lease')).toBe(true)
-  })
-
   it('describes only cached lease locations and never resolves a cold route', async () => {
     const fs = new MemoryFilesystem()
-    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
-    const resolveTarget = vi.fn(async () => remoteTarget(fs))
+    const key = makeWorkspaceKey('local', '/workspace')
+    const resolveTarget = vi.fn(async () => memoryTarget(fs))
     const store = new HostRoutedLeaseStore({ resolveTarget })
 
     expect(store.describeLocation(key)).toBeNull()
@@ -685,14 +640,14 @@ describe('host-routed epoch lease', () => {
 
     await store.acquireOrRenew(key, 'owner', 90_000)
     expect(store.describeLocation(key)).toEqual({
-      executionHostId: 'ssh:host-a',
+      executionHostId: 'local',
       leaseDirectory: '/workspace/.orca/heimdall/lease',
       pathSeparator: '/'
     })
     expect(resolveTarget).toHaveBeenCalledOnce()
   })
 
-  it('routes local folder leases through node fs only when the route provider is null', async () => {
+  it('routes local folder leases through node fs', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heimdall-lease-'))
     temporaryPaths.push(root)
     const key = makeWorkspaceKey('local', root)
@@ -701,11 +656,33 @@ describe('host-routed epoch lease', () => {
         kind: 'folder',
         executionHostId: 'local',
         workspacePath: root,
-        watcherId: 'watcher-local',
-        fileProvider: null
+        watcherId: 'watcher-local'
       })
     })
     const result = await store.acquireOrRenew(key, 'owner', 90_000)
     expect(result.status).toBe('held')
+  })
+
+  it('answers a git target on an SSH host as unverifiable instead of reading it locally', async () => {
+    const executionHostId = 'ssh:host-a' as const
+    const key = makeWorkspaceKey(executionHostId, '/srv/repo')
+    const store = new HostRoutedLeaseStore({
+      resolveTarget: async () => ({
+        kind: 'git',
+        executionHostId,
+        workspacePath: '/srv/repo',
+        watcherId: 'watcher-1',
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only executionHostId is read on this route; the full Worktree/GitWorktreeInfo shape is unused here.
+        gitTarget: {
+          executionHostId,
+          worktree: { id: 'worktree-1', path: '/srv/repo' }
+        } as unknown as RuntimeGitTarget
+      })
+    })
+
+    await expect(store.acquireOrRenew(key, 'owner', 90_000)).resolves.toEqual({
+      status: 'unverifiable',
+      reason: SSH_HOST_NOT_SERVED_MESSAGE
+    })
   })
 })

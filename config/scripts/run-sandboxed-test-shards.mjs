@@ -55,9 +55,10 @@ const IMAGE_CONTEXT_ROOTS = [
   'pnpm-workspace.yaml',
   // install-electron-package-binary.mjs re-exports its zip extractor from here.
   'src/shared/zip-extractor-command.ts',
-  // script-child-process.mjs bundles run-process.ts and its import closure.
-  'src/shared/child-process',
-  'src/shared/growing-byte-buffer.ts'
+  // Workspace packages: pnpm install links them, and image-build scripts import @orca/process-host.
+  'src/packages',
+  'native/windows-registry/package.json',
+  'native/windows-security/package.json'
 ]
 
 /** Matches the serialized shell-contract selection in pr.yml. */
@@ -77,7 +78,6 @@ const SHELL_CONTRACT_SPECS = [
   'src/main/terminal-history-fish-session.node-pty.test.ts',
   'src/main/zsh-scoped-histfile.live-shell.test.ts',
   'src/main/zsh-startup-hook-user-config-equivalence.live-shell.test.ts',
-  'src/main/zsh-wrapper-version-mismatch.live-shell.test.ts',
   'src/main/runtime/structured-session-cli-login-shell.live-shell.test.ts',
   'src/renderer/src/components/terminal-pane/fish-color-scheme-child-stdin.node-pty.test.ts',
   'src/shared/fish-query-reply-child-stdin.node-pty.test.ts',
@@ -536,6 +536,11 @@ function runShard({ item, options, imageTag, sourceTarPath, dockerEnv }) {
   const dockerArgs = [
     'run',
     '--interactive',
+    // Without an init as PID 1, orphaned descendants stay zombies, and process-group tests read them as alive.
+    '--init',
+    // CI sets this for every test; without it browser and real-process suites try to show windows.
+    '--env',
+    'ORCA_BACKGROUND_LAUNCH=1',
     ...(options.keepFailed ? ['--name', containerName] : ['--rm']),
     ...laneEnvArgs(options.lane),
     ...options.extraEnv.flatMap((pair) => ['--env', pair]),

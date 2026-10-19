@@ -26,7 +26,6 @@ import {
   NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS
 } from './native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'
-import type { RuntimeSettings } from './native-chat-runtime-send'
 import { NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT } from './fork-agent-composer/native-chat-runtime-clear'
 import {
   NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS,
@@ -42,16 +41,13 @@ import { sendNativeChatMessageWithImageAttachments as sendNativeChatMessageWithA
 
 const TAB = 'tab-runtime-send'
 const PTY = 'pty-1'
-const SETTINGS: RuntimeSettings = {}
 const TARGET: NativeChatResolvedTarget = {
   terminalTabId: TAB,
-  ptyId: PTY,
-  settings: SETTINGS
+  ptyId: PTY
 }
 const targetForPty = (ptyId: string): NativeChatResolvedTarget => ({
   terminalTabId: TAB,
-  ptyId,
-  settings: SETTINGS
+  ptyId
 })
 
 // Clear writes go through the fire-and-forget transport; body and Enter go
@@ -61,8 +57,8 @@ function mergedWriteBytes(): string[] {
   const entries: { order: number; bytes: string }[] = []
   for (const mock of [sendRuntimePtyInput, sendRuntimePtyInputAcceptance]) {
     mock.mock.calls.forEach((call, index) => {
-      if (typeof call[2] === 'string') {
-        entries.push({ order: mock.mock.invocationCallOrder[index], bytes: call[2] })
+      if (typeof call[1] === 'string') {
+        entries.push({ order: mock.mock.invocationCallOrder[index], bytes: call[1] })
       }
     })
   }
@@ -75,7 +71,7 @@ function expectWriteOrder(expected: string[]): void {
 
 function expectVerifiedWriteOrder(expected: string[]): void {
   const bytes = sendRuntimePtyInputVerified.mock.calls.flatMap((call) =>
-    typeof call[2] === 'string' ? [call[2]] : []
+    typeof call[1] === 'string' ? [call[1]] : []
   )
   expect(bytes).toEqual(expected)
 }
@@ -189,7 +185,6 @@ describe('sendNativeChatMessage', () => {
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
-      SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving'
@@ -224,7 +219,7 @@ describe('sendNativeChatMessage', () => {
     // acceptance-aware transport now (r4-2).
     const byPty = (ptyId: string): string[] =>
       sendRuntimePtyInputAcceptance.mock.calls.flatMap((call) =>
-        call[1] === ptyId && typeof call[2] === 'string' ? [call[2]] : []
+        call[0] === ptyId && typeof call[1] === 'string' ? [call[1]] : []
       )
     expect(byPty('pty-a')).toEqual([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
@@ -241,9 +236,9 @@ describe('sendNativeChatMessage', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     const bodyCall = sendRuntimePtyInputAcceptance.mock.calls.find(
-      (call) => call[2] === buildNativeChatPasteBytes('hi')
+      (call) => call[1] === buildNativeChatPasteBytes('hi')
     )
-    const isCancelled = bodyCall?.[4] as (() => boolean) | undefined
+    const isCancelled = bodyCall?.[3] as (() => boolean) | undefined
     expect(isCancelled).toBeInstanceOf(Function)
     expect(isCancelled?.()).toBe(false)
 
@@ -352,7 +347,7 @@ describe('sendNativeChatMessage post-send observation', () => {
     expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
     expect(
       sendRuntimePtyInputAcceptance.mock.calls.some(
-        (call) => call[2] === buildNativeChatPasteBytes('hi') || call[2] === NATIVE_CHAT_SUBMIT
+        (call) => call[1] === buildNativeChatPasteBytes('hi') || call[1] === NATIVE_CHAT_SUBMIT
       )
     ).toBe(false)
   })
@@ -364,7 +359,7 @@ describe('sendNativeChatMessage post-send observation', () => {
     sendNativeChatMessage(TARGET, 'hi', { confirmSubmitted, onOutcome })
     await settleSend()
 
-    expect(sendRuntimePtyInputAcceptance.mock.calls.map((call) => call[2])).toEqual([
+    expect(sendRuntimePtyInputAcceptance.mock.calls.map((call) => call[1])).toEqual([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       buildNativeChatPasteBytes('hi'),
       NATIVE_CHAT_SUBMIT
@@ -438,7 +433,7 @@ describe('sendNativeChatMessage post-send observation', () => {
 
     expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
     expect(
-      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[1] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
   })
 
@@ -458,7 +453,7 @@ describe('sendNativeChatMessage post-send observation', () => {
     await fullObservationWindow()
 
     expect(
-      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[1] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
     expect(onOutcome).toHaveBeenCalledOnce()
   })
@@ -513,7 +508,7 @@ describe('sendNativeChatMessage post-send observation', () => {
     // just tried to clean up.
     expect(
       sendRuntimePtyInputAcceptance.mock.calls.some(
-        (call) => call[2] === buildNativeChatPasteBytes('second')
+        (call) => call[1] === buildNativeChatPasteBytes('second')
       )
     ).toBe(false)
   })
@@ -538,7 +533,6 @@ describe('sendNativeChatMessageVerified', () => {
       expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
     })
     expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      SETTINGS,
       PTY,
       buildNativeChatPasteBytes('/model sonnet'),
       'driving',
@@ -549,7 +543,6 @@ describe('sendNativeChatMessageVerified', () => {
 
     expect(await result).toBe(true)
     expect(sendRuntimePtyInputVerified).toHaveBeenLastCalledWith(
-      SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving',
@@ -557,7 +550,7 @@ describe('sendNativeChatMessageVerified', () => {
     )
     expect(
       sendRuntimePtyInputVerified.mock.calls.some(
-        (call) => call[2] === NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
+        (call) => call[1] === NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
       )
     ).toBe(false)
   })
@@ -570,7 +563,7 @@ describe('sendNativeChatMessageVerified', () => {
 
     expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
     expect(
-      sendRuntimePtyInputVerified.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+      sendRuntimePtyInputVerified.mock.calls.some((call) => call[1] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
   })
 
@@ -586,17 +579,13 @@ describe('sendNativeChatMessageVerified', () => {
 
     expect(await result).toBe(true)
     const submits = sendRuntimePtyInputAcceptance.mock.calls.filter(
-      (call) => call[2] === NATIVE_CHAT_SUBMIT
+      (call) => call[1] === NATIVE_CHAT_SUBMIT
     )
     // Only the verified path's Enter — chat's delayed Enter was cancelled.
     expect(submits).toHaveLength(0)
-    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      SETTINGS,
-      PTY,
-      NATIVE_CHAT_SUBMIT,
-      'driving',
-      { isCancelled: expect.any(Function) }
-    )
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(PTY, NATIVE_CHAT_SUBMIT, 'driving', {
+      isCancelled: expect.any(Function)
+    })
   })
 
   it('returns false when the delayed Enter wait is aborted', async () => {
@@ -609,7 +598,7 @@ describe('sendNativeChatMessageVerified', () => {
 
     expect(await result).toBe(false)
     expect(
-      sendRuntimePtyInputVerified.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+      sendRuntimePtyInputVerified.mock.calls.some((call) => call[1] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
   })
 
@@ -630,13 +619,12 @@ describe('sendNativeChatMessageVerified', () => {
     // interleave with its body/Enter.
     sendNativeChatAskAnswer(TARGET, [{ raw: '2' }])
     await vi.advanceTimersByTimeAsync(0)
-    expect(sendRuntimePtyInput).not.toHaveBeenCalledWith(SETTINGS, PTY, '2')
+    expect(sendRuntimePtyInput).not.toHaveBeenCalledWith(PTY, '2')
 
     resolveBody(true)
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     expect(await optionResult).toBe(true)
     expect(sendRuntimePtyInputVerified).toHaveBeenLastCalledWith(
-      SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving',
@@ -646,7 +634,7 @@ describe('sendNativeChatMessageVerified', () => {
     // Only once the option command's CR has landed does the card's queued
     // selector write fire.
     await vi.runAllTimersAsync()
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(PTY, '2', 'driving')
   })
 })
 
@@ -741,7 +729,6 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
-      SETTINGS,
       PTY,
       buildNativeChatPasteBytes('what do you see?'),
       'driving',
@@ -750,7 +737,6 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
-      SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving'
@@ -777,7 +763,6 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(totalWriteCalls()).toBe(3)
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
-      SETTINGS,
       PTY,
       NATIVE_CHAT_SUBMIT,
       'driving'
@@ -799,7 +784,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
     ])
     expect(
-      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[1] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
   })
 
@@ -828,14 +813,13 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledWith(
-      SETTINGS,
       PTY,
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       'driving'
     )
     expect(
       sendRuntimePtyInputAcceptance.mock.calls.some(
-        (call) => call[2] === buildNativeChatPasteBytes('second send')
+        (call) => call[1] === buildNativeChatPasteBytes('second send')
       )
     ).toBe(true)
   })
@@ -890,7 +874,7 @@ describe('empty prompt submit', () => {
   it('submits an empty prompt with a bare Enter', () => {
     submitNativeChatPrompt(TARGET)
     expect(sendRuntimePtyInput).toHaveBeenCalledOnce()
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT, 'driving')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(PTY, NATIVE_CHAT_SUBMIT, 'driving')
   })
 })
 
@@ -925,14 +909,13 @@ describe('sendNativeChatAskAnswer', () => {
     )
 
     vi.advanceTimersByTime(0)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '1', 'driving')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(PTY, '1', 'driving')
 
     vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving')
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(PTY, '2', 'driving')
 
     vi.advanceTimersByTime(NATIVE_CHAT_QUESTION_STEP_MS)
     expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(
-      SETTINGS,
       PTY,
       buildNativeChatPasteBytes('custom answer'),
       'driving'
@@ -986,7 +969,7 @@ describe('sendNativeChatAskAnswer', () => {
     const handle = sendNativeChatAskAnswer(TARGET, [{ raw: '2' }], onSettled)
     await vi.advanceTimersByTimeAsync(handle.settleAfterMs)
 
-    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(SETTINGS, PTY, '2', 'driving', {
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(PTY, '2', 'driving', {
       isCancelled: expect.any(Function),
       requireWriteSettlement: true
     })

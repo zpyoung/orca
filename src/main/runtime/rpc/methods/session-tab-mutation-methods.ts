@@ -6,7 +6,12 @@ import {
   translateProjectedSessionTabMove
 } from './session-tab-browser-placement-projection'
 import { projectSessionTabsForClient } from './session-tabs-inventory'
-import { ActivateTab, MoveTab, SetTabProps, UpdatePaneLayout } from './session-tabs-schemas'
+import {
+  ActivateTab,
+  MoveTab,
+  SetTabProps,
+  UpdatePaneLayout
+} from '../../../../shared/rpc-contract/session-tabs-schemas-params'
 
 export const SESSION_TAB_MUTATION_METHODS = [
   defineMethod({
@@ -113,6 +118,7 @@ export const SESSION_TAB_MUTATION_METHODS = [
         ...(params.color !== undefined ? { color: params.color } : {}),
         ...(params.isPinned !== undefined ? { isPinned: params.isPinned } : {}),
         ...(params.viewMode !== undefined ? { viewMode: params.viewMode } : {}),
+        ...(params.customTitle !== undefined ? { customTitle: params.customTitle } : {}),
         ...(params.terminalDock !== undefined ? { terminalDock: params.terminalDock } : {})
       })
     }

@@ -2,7 +2,6 @@ import { useCallback, useLayoutEffect, useRef } from 'react'
 import { useAppStore } from '../../store'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-verified-input'
-import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { AgentType } from '../../../../shared/native-chat-types'
 import {
   resolveNativeChatTranscriptAgent,
@@ -100,12 +99,7 @@ export function useNativeChatInteractiveSend(
       if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
         return
       }
-      sendRuntimePtyInput(
-        getSettingsForAgentTabRuntimeOwner(terminalTabId),
-        targetPtyId,
-        raw,
-        'driving'
-      )
+      sendRuntimePtyInput(targetPtyId, raw, 'driving')
     },
     [terminalTabId, targetPtyId]
   )
@@ -113,13 +107,9 @@ export function useNativeChatInteractiveSend(
   const sendRawVerified = useCallback(
     (raw: string): Promise<boolean> =>
       targetPtyId && !isTerminalInputQuarantined(terminalTabId)
-        ? sendRuntimePtyInputVerified(
-            getSettingsForAgentTabRuntimeOwner(terminalTabId),
-            targetPtyId,
-            raw,
-            'driving',
-            { requireWriteSettlement: true }
-          ).catch(() => false)
+        ? sendRuntimePtyInputVerified(targetPtyId, raw, 'driving', {
+            requireWriteSettlement: true
+          }).catch(() => false)
         : Promise.resolve(false),
     [terminalTabId, targetPtyId]
   )
@@ -142,8 +132,7 @@ export function useNativeChatInteractiveSend(
       }
       // Cancel any prior in-flight answer before starting a new one.
       cancelInFlight()
-      const settings = getSettingsForAgentTabRuntimeOwner(terminalTabId)
-      const target = { terminalTabId, ptyId: targetPtyId, settings }
+      const target = { terminalTabId, ptyId: targetPtyId }
       // Selector TUIs ignore pasted labels; Codex uses a different key sequence.
       const stepsAnswer = shouldStepNativeChatAskAnswer(agent)
       const buildsCodexAnswer = resolveNativeChatTranscriptAgent(agent) === 'codex'
@@ -211,14 +200,10 @@ export function useNativeChatInteractiveSend(
         return
       }
       // OpenCode confirms interruption with a second Escape; pace writes like mobile Stop.
-      inFlightRef.current = sendNativeChatAskAnswer(
-        {
-          terminalTabId,
-          ptyId: targetPtyId,
-          settings: getSettingsForAgentTabRuntimeOwner(terminalTabId)
-        },
-        [{ raw: ESC }, { raw: ESC }]
-      )
+      inFlightRef.current = sendNativeChatAskAnswer({ terminalTabId, ptyId: targetPtyId }, [
+        { raw: ESC },
+        { raw: ESC }
+      ])
       return
     }
     sendRaw(ESC)

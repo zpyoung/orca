@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     loadLedger: vi.fn()
   },
   environmentId: undefined as string | undefined,
+  ownerAmbiguous: false,
   request: vi.fn(),
   catalog: vi.fn(),
   form: null as LedgerEntryFormProps | null,
@@ -35,10 +36,12 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
 vi.mock('@/runtime/runtime-ledger-client', () => ({
   requestLedger: (...args: unknown[]) => mocks.request(...args)
 }))
-vi.mock('./file-explorer-runtime-owner', () => ({
-  getRightSidebarWorktreeRuntimeSettings: (id: string) => {
-    mocks.runtimeSettings(id)
-    return { activeRuntimeEnvironmentId: mocks.environmentId }
+vi.mock('@/lib/resolve-owner', () => ({
+  runtimeEnvironmentIdForWorkspaceOwner: (_state: unknown, ref: { workspaceId: string }) => {
+    mocks.runtimeSettings(ref.workspaceId)
+    return mocks.ownerAmbiguous
+      ? { kind: 'ambiguous' }
+      : { kind: 'resolved', environmentId: mocks.environmentId ?? null }
   }
 }))
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
@@ -141,6 +144,7 @@ beforeEach(() => {
   mocks.store.repos = [{ id: 'repo-a', projectGroupId: 'group-a' }]
   mocks.store.folderWorkspaces = [{ id: 'folder-a', name: 'Folder A', projectGroupId: 'group-a' }]
   mocks.environmentId = undefined
+  mocks.ownerAmbiguous = false
   mocks.request.mockResolvedValue(response())
   mocks.catalog.mockResolvedValue({ groups: [], projects: [] })
   container = document.createElement('div')
@@ -158,6 +162,12 @@ describe('LedgerPanel', () => {
     mocks.store.activeWorktreeId = null
     await render()
     expect(container.textContent).toContain('Open a workspace to see its ledger.')
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+  it('refuses to query a workspace that two hosts publish', async () => {
+    mocks.ownerAmbiguous = true
+    await render()
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('single project')
     expect(mocks.request).not.toHaveBeenCalled()
   })
   it('routes folder keys verbatim and marks raw folder origins', async () => {

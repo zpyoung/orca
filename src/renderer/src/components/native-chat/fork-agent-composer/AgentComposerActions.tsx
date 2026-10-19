@@ -1,6 +1,6 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
-import { ArrowUp, CircleAlert, Mic, Play, Plus, Square } from 'lucide-react'
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
+import { ArrowUp, CircleAlert, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
@@ -9,18 +9,16 @@ import type {
   SessionOptionsSurface
 } from '../../../../../shared/native-chat-session-options'
 import { NativeChatSessionOptionPickers } from '../NativeChatSessionOptionPickers'
+import { NativeChatComposerPermissionPicker } from '../NativeChatPermissionModePicker'
 import { NativeChatComposerGoalChip } from '../NativeChatComposerGoalChip'
 import { NativeChatContextUsageRing } from '../NativeChatContextUsageRing'
 import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
-import type { NativeChatComposerPrimaryAction } from '../native-chat-composer-primary-action'
 
 export type AgentComposerActionsProps = {
   attachDisabled: boolean
   dictationDisabled: boolean
   sendDisabled: boolean
-  /** What the Send button does (`nativeChatComposerPrimaryAction`); Stop is its own button. */
-  primaryAction: Exclude<NativeChatComposerPrimaryAction, 'stop'>
   /** Shown on the disabled send button: what the user can do to send. */
   sendBlockedReason?: string | null
   /** Storage refused this draft; it is held in memory only. */
@@ -36,8 +34,6 @@ export type AgentComposerActionsProps = {
   onDictationHoldEnd: () => void
   onSend: () => void
   onStop?: () => void
-  /** Releases the held queue when the primary action is Resume. */
-  onResume?: () => void
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
   sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
@@ -46,13 +42,14 @@ export type AgentComposerActionsProps = {
   onExitGoalMode?: () => void
   /** Absent until the session has reported or the transcript can estimate. */
   contextUsage?: NativeChatContextUsageSummary | null
+  /** The chat's agent, whose permission modes the picker describes. */
+  agent?: string
 }
 
 export function AgentComposerActions({
   attachDisabled,
   dictationDisabled,
   sendDisabled,
-  primaryAction,
   sendBlockedReason,
   draftNotSaved,
   isWorking,
@@ -65,37 +62,32 @@ export function AgentComposerActions({
   onDictationHoldEnd,
   onSend,
   onStop,
-  onResume,
   sessionOptionsSurface,
   sessionOptionsSnapshot,
   sessionOptionsPickerRequest,
   onExitGoalMode,
   contextUsage,
-  focusComposer
+  focusComposer,
+  agent
 }: AgentComposerActionsProps): React.JSX.Element {
-  const resumes = primaryAction === 'resume'
   const dictationLabel = isDictating
     ? translate('components.native-chat.composer.stopDictation', 'Stop dictation')
     : translate('components.native-chat.composer.startDictation', 'Start dictation')
-  const sendReason = resumes ? null : (sendBlockedReason ?? null)
+  const sendReason = sendBlockedReason ?? null
   const stopLabel = isStopping
     ? translate('components.native-chat.status.stopping', 'Stopping…')
     : translate('components.native-chat.stop', 'Stop the agent')
   const sendButton = (
     <Button
       type="button"
-      aria-label={
-        resumes
-          ? translate('components.native-chat.queuedMessages.resume', 'Resume')
-          : (sendReason ?? translate('components.native-chat.composer.send', 'Send'))
-      }
+      aria-label={sendReason ?? translate('components.native-chat.composer.send', 'Send')}
       disabled={sendDisabled}
-      onClick={resumes ? onResume : onSend}
+      onClick={onSend}
       variant="default"
       size="icon"
       className="size-8 rounded-full pointer-coarse:size-10"
     >
-      {resumes ? <Play className="size-3.5 fill-current" /> : <ArrowUp className="size-4" />}
+      <ArrowUp className="size-4" />
     </Button>
   )
 
@@ -120,6 +112,11 @@ export function AgentComposerActions({
             {translate('components.native-chat.composer.attach', 'Attach file')}
           </TooltipContent>
         </Tooltip>
+        <NativeChatComposerPermissionPicker
+          surface={sessionOptionsSurface}
+          snapshot={sessionOptionsSnapshot}
+          {...(agent ? { agent } : {})}
+        />
         {onExitGoalMode ? <NativeChatComposerGoalChip onExit={onExitGoalMode} /> : null}
       </div>
       <div className="ml-auto flex items-center gap-1.5">

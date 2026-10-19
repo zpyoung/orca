@@ -248,7 +248,11 @@ export async function readNativeChatTranscriptTail(
   | { error: string; notFound?: true }
 > {
   if (resolveNativeChatTranscriptAgent(args.agent) === 'opencode') {
-    return readOpenCodeNativeChatTranscriptTail(args, {}, signal)
+    return readOpenCodeNativeChatTranscriptTail(
+      { ...args, agent: args.agent === 'zcode' ? 'zcode' : undefined },
+      {},
+      signal
+    )
   }
   const decode = nativeChatLineDecoderForAgent(args.agent)
   const decodeCompanion = nativeChatTranscriptCompanionDecoderForAgent(args.agent)

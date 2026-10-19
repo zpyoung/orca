@@ -2,8 +2,7 @@ import {
   isRecoverableRemoteRuntimeConnectionError,
   toRemoteRuntimeClientErrorLike
 } from '../../shared/remote-runtime-client-error-classification'
-import { SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE } from '../providers/ssh-git-dispatch'
-import { SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE } from '../providers/ssh-filesystem-dispatch'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import { isSshRequestOutcomeUnverifiable } from '../ssh/ssh-channel-multiplexer'
 
 /**
@@ -15,11 +14,7 @@ export function isExecutionHostContactLoss(error: unknown): boolean {
   if (isSshRequestOutcomeUnverifiable(error)) {
     return true
   }
-  if (
-    error instanceof Error &&
-    (error.message === SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE ||
-      error.message === SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
-  ) {
+  if (error instanceof SshHostNotServedError) {
     return true
   }
   return error instanceof Error

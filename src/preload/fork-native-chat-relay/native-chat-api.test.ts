@@ -23,7 +23,7 @@ vi.mock('electron', () => ({
 
 vi.mock('@electron-toolkit/preload', () => ({ electronAPI: {} }))
 
-describe('native-chat relay preload API', () => {
+describe('native-chat preload API', () => {
   const originalContextIsolated = Object.getOwnPropertyDescriptor(process, 'contextIsolated')
 
   beforeEach(() => {
@@ -52,15 +52,14 @@ describe('native-chat relay preload API', () => {
     }
   })
 
-  it('forwards relay ownership and pagination in object-form reads', async () => {
+  it('forwards pagination in object-form reads', async () => {
     await import('../index')
     const api = exposeInMainWorld.mock.calls.find(([name]) => name === 'api')?.[1] as PreloadApi
     const args = {
       agent: 'claude' as const,
       sessionId: 'session-1',
       limit: 40,
-      transcriptPath: '/remote/transcript.jsonl',
-      sshConnectionId: 'ssh-1',
+      transcriptPath: '/local/transcript.jsonl',
       beforeOffset: 8192
     }
 

@@ -1,7 +1,7 @@
 import React from 'react'
+import { jiraImageReference } from '../../../../shared/jira-attachment-image'
 import type { Components } from 'react-markdown'
 import { NATIVE_CHAT_FILE_HREF_PREFIX } from '../../../../shared/native-chat-href-routing'
-import { isMermaidFence } from './comment-mermaid-fence'
 import {
   CommentMarkdownDocumentCode,
   CommentMarkdownDocumentPre
@@ -21,9 +21,13 @@ export type CommentMarkdownLinkClickHandler = (
   href: string | undefined
 ) => void
 
+/** Rendered as a component, so it may hold state. */
 export type DocumentCodeBlockRenderer = (props: {
   children?: React.ReactNode
   language?: string
+  /** The line the fence starts on in the whole document. Streaming fixes only escape characters
+   *  within a line or append at the end, so it holds while the text grows and when it finishes. */
+  sourceLine?: number
 }) => React.JSX.Element
 
 export function isTrustedCompactImageSrc(src: string | undefined): src is string {
@@ -32,7 +36,9 @@ export function isTrustedCompactImageSrc(src: string | undefined): src is string
   }
   const normalized = src.trim().toLowerCase()
   return (
-    normalized.startsWith('blob:') || /^data:image\/(?:png|jpe?g|gif|webp);base64,/.test(normalized)
+    jiraImageReference(src) !== null ||
+    normalized.startsWith('blob:') ||
+    /^data:image\/(?:png|jpe?g|gif|webp);base64,/.test(normalized)
   )
 }
 
@@ -246,7 +252,6 @@ export function createCompactCommentMarkdownComponents(
 
 export function createDocumentCommentMarkdownComponents(
   onLinkClick?: CommentMarkdownLinkClickHandler,
-  highlightCode?: boolean,
   renderCodeBlock?: DocumentCodeBlockRenderer
 ): Components {
   return {
@@ -268,20 +273,12 @@ export function createDocumentCommentMarkdownComponents(
           {children}
         </a>
       ),
-    code: highlightCode
-      ? ({ className, children }) =>
-          isMermaidFence(className) ? (
-            <CommentMarkdownDocumentCode className={className}>
-              {children}
-            </CommentMarkdownDocumentCode>
-          ) : (
-            <code className="rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]">
-              {children}
-            </code>
-          )
-      : CommentMarkdownDocumentCode,
-    pre: ({ children }) => (
-      <CommentMarkdownDocumentPre renderCodeBlock={renderCodeBlock}>
+    code: CommentMarkdownDocumentCode,
+    pre: ({ node, children }) => (
+      <CommentMarkdownDocumentPre
+        renderCodeBlock={renderCodeBlock}
+        blockLine={node?.position?.start.line}
+      >
         {children}
       </CommentMarkdownDocumentPre>
     ),
@@ -374,18 +371,16 @@ export function selectCommentMarkdownComponents({
   variant,
   onLinkClick,
   renderCodeBlock,
-  expandImages,
-  highlightCode
+  expandImages
 }: {
   variant: 'compact' | 'document'
   onLinkClick?: CommentMarkdownLinkClickHandler
   renderCodeBlock?: DocumentCodeBlockRenderer
-  highlightCode?: boolean
   expandImages: boolean
 }): Components {
   if (variant === 'document') {
-    return onLinkClick || highlightCode || renderCodeBlock
-      ? createDocumentCommentMarkdownComponents(onLinkClick, highlightCode, renderCodeBlock)
+    return onLinkClick || renderCodeBlock
+      ? createDocumentCommentMarkdownComponents(onLinkClick, renderCodeBlock)
       : documentCommentMarkdownComponents
   }
   return onLinkClick || expandImages

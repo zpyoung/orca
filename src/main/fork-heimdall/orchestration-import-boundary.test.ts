@@ -18,7 +18,6 @@ const EXPECTED_FEATURE_DIRECTORIES = [
   'src/main/runtime/rpc/methods/fork-heimdall-objective',
   'src/preload/fork-heimdall',
   'src/preload/fork-hosted-review-sitter',
-  'src/relay/fork-hosted-review-sitter',
   'src/renderer/src/fork-heimdall',
   'src/renderer/src/fork-heimdall-objective',
   'src/renderer/src/fork-hosted-review-sitter',

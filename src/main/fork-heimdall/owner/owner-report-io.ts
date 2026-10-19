@@ -33,12 +33,8 @@ export async function issueOwnerReportPath(
   location: OwnerReportLocation,
   wakeToken: string
 ): Promise<string> {
-  if (location.fileProvider) {
-    await location.fileProvider.createDir(location.directory)
-  } else {
-    await mkdir(location.directory, { recursive: true, mode: 0o700 })
-    await chmod(location.directory, 0o700)
-  }
+  await mkdir(location.directory, { recursive: true, mode: 0o700 })
+  await chmod(location.directory, 0o700)
   return ownerReportPathForWake(location, wakeToken)
 }
 
@@ -58,7 +54,6 @@ export async function readOwnerReport<T>(
   }
   const read = await readHardenedReportBytes({
     executionHostId: location.executionHostId,
-    fileProvider: location.fileProvider,
     reportPath: expectedPath,
     authorityRoot: location.authorityRoot,
     maxBytes: MAX_OWNER_REPORT_BYTES

@@ -126,6 +126,30 @@ describe('useNativeChatLiveSession — transport routing', () => {
     resetMockTransports()
   })
 
+  it('does no transcript IO while disabled, and starts it when enabled', async () => {
+    const transport = getMockTransport('env-1')
+    const args = {
+      paneKey: PANE,
+      agent: AGENT,
+      sessionId: SESSION,
+      runtimeEnvironmentId: 'env-1'
+    }
+    const root = await render({ ...args, enabled: false })
+
+    expect(transport.readSession).not.toHaveBeenCalled()
+    expect(transport.subscribe).not.toHaveBeenCalled()
+    expect(latest?.readPhase).toBe('loading')
+
+    await rerender(root, { ...args, enabled: true })
+
+    expect(transport.readSession).toHaveBeenCalledOnce()
+    expect(transport.subscribe).toHaveBeenCalledOnce()
+
+    await rerender(root, { ...args, enabled: false })
+
+    expect(transport.unsubscribe).toHaveBeenCalledOnce()
+  })
+
   it('seeds from readSession alongside the subscription for the initial runtime load', async () => {
     await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
 
@@ -432,24 +456,6 @@ describe('useNativeChatLiveSession — transport routing', () => {
     )
     expect(transport.readSession.mock.calls.at(-1)?.[0]).not.toHaveProperty('beforeOffset')
     expect(latest?.messages.map((m) => m.id)).toEqual(['grown'])
-  })
-
-  it('routes an ssh-owned pane read through the connection that owns it', async () => {
-    const transport = getMockTransport(null)
-    await render({
-      paneKey: PANE,
-      agent: AGENT,
-      sessionId: SESSION,
-      sshConnectionId: 'ssh:host-1'
-    })
-
-    expect(transport.readSession).toHaveBeenCalledWith(
-      expect.objectContaining({ sshConnectionId: 'ssh:host-1' })
-    )
-    expect(transport.subscribe).toHaveBeenCalledWith(
-      expect.objectContaining({ sshConnectionId: 'ssh:host-1' }),
-      expect.any(Function)
-    )
   })
 
   it('seeds ready from readSession when the subscription never delivers a frame', async () => {

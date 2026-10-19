@@ -1,14 +1,14 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Repeat } from 'lucide-react'
 import { toast } from 'sonner'
 import { closeUnfocusedMonacoFindOrPreventDialogDismiss } from '@/components/editor/monaco-find-widget'
 import { getAutomationPromptEditorRoot } from '@/components/automations/AutomationEditorPromptEditor'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTarget'
-import { useDetectedAgents } from '@/hooks/useDetectedAgents'
+import { useDetectedAgents, type AgentDetectionTarget } from '@/hooks/useDetectedAgents'
 import { translate } from '@/i18n/i18n'
 import { getAgentCatalog, type AgentCatalogEntry } from '@/lib/agent-catalog'
+import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
 import { useAppStore } from '@/store'
 import {
   defaultSessionPolicyForPreset,
@@ -16,6 +16,7 @@ import {
   type LoopConfig,
   type LoopCreateInput
 } from '../../../shared/fork-loops/loop-types'
+import { parseExecutionHostId } from '../../../shared/execution-host'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import {
   DEFAULT_DISABLED_TUI_AGENTS,
@@ -155,11 +156,30 @@ function buildLoopCreateInput(
   return errors.size > 0 ? { errors } : { input }
 }
 
+function detectionTargetForHost(
+  hostId: string | null,
+  worktreeId: string
+): AgentDetectionTarget | undefined {
+  const host = parseExecutionHostId(hostId)
+  if (!host) {
+    return undefined
+  }
+  if (host.kind === 'ssh') {
+    return { kind: 'ssh', connectionId: host.targetId }
+  }
+  if (host.kind === 'runtime') {
+    return { kind: 'runtime', environmentId: host.environmentId, worktreeId }
+  }
+  return { kind: 'local' }
+}
+
 function useSelectableAgents(worktreeId: string): {
   agents: AgentCatalogEntry[]
   isLocalHost: boolean
 } {
-  const target = useAgentDetectionTargetForWorktree(worktreeId)
+  // routes by the worktree's own host; the shared hook falls back to the Active Server setting
+  const hostId = useAppStore((s) => getResolvedExecutionHostIdForWorktree(s, worktreeId))
+  const target = useMemo(() => detectionTargetForHost(hostId, worktreeId), [hostId, worktreeId])
   const { detectedIds } = useDetectedAgents(target)
   const defaultAgent = useAppStore((s) => s.settings?.defaultTuiAgent)
   const disabledAgents = useAppStore(

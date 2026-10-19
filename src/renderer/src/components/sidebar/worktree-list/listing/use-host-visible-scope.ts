@@ -9,12 +9,12 @@ import {
 import type { SidebarWorktreeFilters } from './use-filters'
 import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'
 import { filterFolderWorkspacesForActivityScope } from '../../fork-workspace-activity-window/workspace-activity-folder-filter'
-import { filterFolderWorkspacesFromOtherDevices } from '../../workspace-creator-visibility'
+import { filterFolderWorkspacesFromOtherDevices } from '../../../../../../shared/workspace-creator-visibility'
 import {
   filterFolderWorkspacesForVisibleHosts,
   filterProjectGroupsForVisibleHosts,
   getVisibleSidebarHostIdSet
-} from './host-filtering'
+} from '../../../../../../shared/sidebar-list/host-filtering'
 
 // Narrows repos, project groups, and folder workspaces to the hosts (and devices) the
 // current host filter admits.

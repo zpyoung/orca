@@ -177,7 +177,6 @@ export function LoopSetupSettingsSidebar({
           onValueChange={onAgentChange}
           defaultAgent={defaultAgent}
           allowBlankTerminal={false}
-          emptyLabel={translate('fork.loops.setup.noAgents', 'No agents detected')}
           triggerClassName={`h-9 w-full min-w-0 ${AUTOMATION_EDITOR_PICKER_TRIGGER_CLASS}`}
           allowNarrowTrigger
         />
