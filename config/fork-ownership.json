@@ -164,6 +164,11 @@
       "globs": ["**/fork-sync-precheck/**"]
     },
     {
+      "name": "fork-sync-gate",
+      "purpose": "Local checks and a CI wait that let the sync skill find what PR CI would reject before pushing, and drive the PR from one background command.",
+      "globs": ["**/fork-sync-gate/**"]
+    },
+    {
       "name": "fork-ownership-guard",
       "purpose": "Teaches upstream's PR aggregate-gate tests that the fork's ownership guard is an ungated job required by verify.",
       "globs": ["**/fork-ownership-guard/**"]
@@ -787,7 +792,7 @@
       "path": ".gitignore",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["!docs/fork-upstreaming.md"]
+      "lines": ["!docs/fork-upstreaming.md", "/.build/release-javascript-measurements/"]
     },
     {
       "path": ".oxlintrc.json",
@@ -6570,7 +6575,7 @@
       "removed": 0
     },
     ".gitignore": {
-      "added": 14,
+      "added": 15,
       "removed": 2
     },
     ".oxlintrc.json": {
