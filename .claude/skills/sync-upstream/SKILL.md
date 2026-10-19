@@ -199,6 +199,13 @@ resolution and races it. Stop before Step 3 — nothing backed up, merged, or pu
 next run syncs `$STABLE_TAG` fresh. Hit on 2026-09-10 (#48, v1.4.198 vs v1.4.199) and 2026-09-26
 (#92, v1.4.209 vs v1.4.212).
 
+That stop is for the unattended run. When a person directs the run past it, stack instead of
+racing: back up `main`, `git reset --hard` to the older PR's head, merge `$STABLE_TAG` onto it with
+`-X ours`, and resolve from Step 6 as usual, with the older tag's resolution already in the tree.
+Open the result as a new PR. Landing it lands both tags in one merge commit, and GitHub marks the
+older PR merged because its head becomes an ancestor of `main`. Proven 2026-10-19: #122 (v1.4.230)
+on #120 (v1.4.227).
+
 A PR titled `sync: absorb upstream $STABLE_TAG` is this run's work, already done. **Adopt it — do not
 re-merge.** Verify it before you build on it, because its body is its own account and not evidence:
 

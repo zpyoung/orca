@@ -356,3 +356,32 @@ want the same action for opposite reasons — so say which one happened in the r
 `v1.4.206` at `b10226a7ed`, the next run sees a tag `main` does not contain and merges it, leaving
 `main` with two distinct "release: v1.4.206" commits. That merge is legitimate — the tag would be a
 real new release — but the duplicate is worth expecting rather than diagnosing from scratch.
+
+## A tag whose last commit swaps in main's workflows
+
+**What happened.** Upstream now tags some stable releases on top of a release-branch commit that
+replaces that branch's `.github/workflows/` files with `main`'s, so the release token is allowed to
+push the tag. v1.4.227 carried `a220036892` ("ci: carry main's workflow files so the release tag
+can be pushed", 63 files) and v1.4.230 carried `597425845e` ("ci: match main's workflow files so the
+release token can tag this branch", 9 files) directly below `release: v1.4.230`. The release
+branch's `config/scripts/` tests stayed at the branch's own age, so the tag disagrees with itself:
+on PR #122, 8 workflow-contract tests were red with the test and every file it reads byte-identical
+to `v1.4.230`. `pr.yml` also gained main's `dependency_isolation` job (+65 lines) without the scope
+script that emits its selection, so `verify` failed every PR with "missing or invalid selection".
+Step 6 resets upstream-owned workflows to the tag, which is exactly what imports the mismatch.
+
+**The tell.** The commit directly below `release: <tag>` touches only `.github/workflows/`:
+
+```sh
+git log --oneline -3 "$UPSTREAM_TARGET"
+git show --stat --format='%h %s' "$UPSTREAM_TARGET^" | tail -3
+```
+
+A test red in CI whose file and inputs all match the tag (`git diff --quiet "$UPSTREAM_TARGET" --
+<test> <inputs>`) is the same thing seen from the other end. It is not merge damage and not flake.
+
+**The right move.** For every upstream-owned workflow that commit touched, take its parent's copy
+(`git checkout "<sha>^" -- <paths>`), which is the release branch's own consistent pair of workflow
+and test. For a fork-owned workflow such as `pr.yml`, rebuild from the parent too, or strip that
+commit's hunks out of it by hand. Do not take main's version of the scripts to match the workflows,
+and do not edit the red tests: they are upstream-owned and correct for the release they ship in.
