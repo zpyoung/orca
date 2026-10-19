@@ -1,4 +1,5 @@
 import { heimdallHostOperationOwnership } from './fork-heimdall/heimdall-host-operation-ownership'
+import { loopsHostOperationOwnership } from './fork-loops/loops-host-operation-ownership'
 
 /**
  * Who decides where an operation runs.
@@ -99,6 +100,10 @@ export function getHostOperationOwnership(method: string): HostOperationOwnershi
   const heimdallOwnership = heimdallHostOperationOwnership(method)
   if (heimdallOwnership) {
     return heimdallOwnership
+  }
+  const loopsOwnership = loopsHostOperationOwnership(method)
+  if (loopsOwnership) {
+    return loopsOwnership
   }
   const ownership =
     OWNERSHIP_BY_METHOD.get(method) ??

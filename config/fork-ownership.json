@@ -5229,6 +5229,15 @@
       ]
     },
     {
+      "path": "src/shared/host-operation-ownership.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "import { loopsHostOperationOwnership } from './fork-loops/loops-host-operation-ownership'",
+        "  const loopsOwnership = loopsHostOperationOwnership(method)"
+      ]
+    },
+    {
       "path": "src/shared/wsl-move/wsl-move-storage-dispositions.ts",
       "feature": "heimdall",
       "kind": "registration",
@@ -5262,6 +5271,16 @@
       "kind": "registration",
       "lines": [
         "      'src/renderer/src/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state.ts',"
+      ]
+    },
+    {
+      "path": "src/shared/wsl-move/wsl-move-storage-dispositions.ts",
+      "feature": "fork-loops",
+      "kind": "registration",
+      "lines": [
+        "} from '../fork-loops/wsl-move-storage-dispositions'",
+        "  ...LOOPS_SQLITE_SCHEMA_FILE_DATABASES,",
+        "    ...Object.entries(LOOPS_SQLITE_TABLE_DISPOSITIONS),"
       ]
     },
     {
@@ -8853,11 +8872,11 @@
       "removed": 1
     },
     "src/shared/host-operation-ownership.ts": {
-      "added": 8,
+      "added": 13,
       "removed": 0
     },
     "src/shared/wsl-move/wsl-move-storage-dispositions.ts": {
-      "added": 14,
+      "added": 20,
       "removed": 0
     },
     "src/main/host/safe-storage-availability.ts": {

@@ -11,6 +11,10 @@ import {
   ASK_SQLITE_SCHEMA_FILE_DATABASES,
   ASK_SQLITE_TABLE_DISPOSITIONS
 } from '../fork-ask-question-tool/wsl-move-storage-dispositions'
+import {
+  LOOPS_SQLITE_SCHEMA_FILE_DATABASES,
+  LOOPS_SQLITE_TABLE_DISPOSITIONS
+} from '../fork-loops/wsl-move-storage-dispositions'
 
 /**
  * Renderer modules that use localStorage, by what they keep. A new module fails the census test
@@ -128,6 +132,7 @@ export const SQLITE_SCHEMA_FILE_DATABASES: Record<string, string> = {
   'src/main/runtime/orchestration/mutation-receipt-capacity.ts': 'orchestration',
   ...HEIMDALL_SQLITE_SCHEMA_FILE_DATABASES,
   ...ASK_SQLITE_SCHEMA_FILE_DATABASES,
+  ...LOOPS_SQLITE_SCHEMA_FILE_DATABASES,
   // Test fixtures that mirror third-party agent and browser databases.
   'src/main/ai-vault/session-scanner-opencode-sqlite-fixture.ts': 'test-fixture',
   'src/main/ai-vault/session-scanner-test-fixtures.ts': 'test-fixture',
@@ -147,6 +152,7 @@ export const SQLITE_TABLE_DISPOSITIONS: Record<string, WslMoveFieldDisposition> 
   Object.fromEntries([
     ...Object.entries(HEIMDALL_SQLITE_TABLE_DISPOSITIONS),
     ...Object.entries(ASK_SQLITE_TABLE_DISPOSITIONS),
+    ...Object.entries(LOOPS_SQLITE_TABLE_DISPOSITIONS),
     ...tables(
       'agent-session-journal',
       [
