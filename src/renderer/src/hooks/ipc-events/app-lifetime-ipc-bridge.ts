@@ -37,6 +37,7 @@ import { registerWslAccountNoticeIpcBridge } from './wsl-account-notice-ipc-brid
 import { registerWslHostIpcBridge } from './wsl-host-ipc-bridge'
 import { wireAskIpcEvents } from '@/components/fork-ask-question-tool/wire-ask-ipc-events'
 import { wireHeimdallIpcEvents } from '@/fork-heimdall/wire-heimdall-ipc-events'
+import { wireLoopsIpcEvents } from '@/fork-loops/wire-loops-ipc-events'
 
 function isRuntimeEnvironmentActive(): boolean {
   return Boolean(useAppStore.getState().settings?.activeRuntimeEnvironmentId?.trim())
@@ -53,6 +54,7 @@ export function installAppLifetimeIpcEvents(): () => void {
   const unsubs: (() => void)[] = []
   unsubs.push(wireAskIpcEvents(useAppStore))
   unsubs.push(wireHeimdallIpcEvents(useAppStore))
+  unsubs.push(wireLoopsIpcEvents(useAppStore))
   const backgroundWakeDispatcher = createBackgroundSleepingAgentWakeDispatcher()
   unsubs.push(backgroundWakeDispatcher.dispose)
   unsubs.push(attachMobileMarkdownBridge())

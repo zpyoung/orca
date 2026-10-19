@@ -53,6 +53,7 @@ import { createStructuredSessionLaunchDirectorySlice } from './structured-sessio
 import { createWorkspaceAttentionSlice } from './workspace-attention/workspace-attention-slice'
 import { createAsksSlice } from './fork-ask-question-tool/asks'
 import { createLedgerSlice } from './ledger'
+import { createLoopsSlice } from '@/fork-loops/loops-slice'
 import { createHeimdallFleetSlice } from './fork-heimdall/fleet'
 import '@/i18n/i18n'
 import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
@@ -117,6 +118,7 @@ export function createTestStore() {
     ...createWorkspaceAttentionSlice(...a),
     ...createLedgerSlice(...a),
     ...createAsksSlice(...a),
+    ...createLoopsSlice(...a),
     ...createHeimdallFleetSlice(...a)
   }))
 }

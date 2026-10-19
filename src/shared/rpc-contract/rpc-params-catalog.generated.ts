@@ -30,6 +30,7 @@ import {
   WatcherCommandRequestSchema,
   WatcherTargetSchema
 } from '../fork-heimdall/api'
+import { LoopCreateInputSchema } from '../fork-loops/loop-types'
 import { HostAccountLaunchEnvParams } from '../host-account-launch-env'
 import {
   PairingGetEndpointsParamsSchema,
@@ -1114,6 +1115,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'linear.teamStates': TeamId,
   'linear.testConnection': WorkspaceSelection,
   'linear.updateIssue': IssueUpdateOfLinearParams,
+  'loops:create': LoopCreateInputSchema,
   'managedRuntime.cancel': ManagedRuntimeCancelParams,
   'managedRuntime.install': ManagedRuntimeAgentParams,
   'managedRuntime.remove': ManagedRuntimeAgentParams,
@@ -1416,6 +1418,18 @@ export const RPC_METHODS_WITHOUT_SHARED_PARAMS: readonly string[] = [
   'heimdall:list',
   'ledger.request',
   'ledger.ui',
+  'loops:bindTab',
+  'loops:detach',
+  'loops:edit',
+  'loops:get',
+  'loops:iterations',
+  'loops:list',
+  'loops:openTab',
+  'loops:pause',
+  'loops:queue',
+  'loops:resume',
+  'loops:steer',
+  'loops:stop',
   'orchestration.send',
   'orchestration.taskUpdate',
   'projectGroup.delete',

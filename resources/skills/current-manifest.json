@@ -178,6 +178,22 @@
       ]
     },
     {
+      "name": "orca-loop",
+      "sourcePath": "skills/orca-loop",
+      "packageDigest": "1517eb518d724e778ecd651d2804ed5533fcb02fef0333b8e20556945fe1b63f",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 2614,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "828c795c986afe86544672c31cfd4da17a134dc02749cca03412279b115113e7",
+          "textNormalizedSha256": "828c795c986afe86544672c31cfd4da17a134dc02749cca03412279b115113e7",
+          "identitySha256": "828c795c986afe86544672c31cfd4da17a134dc02749cca03412279b115113e7"
+        }
+      ]
+    },
+    {
       "name": "orca-per-workspace-env",
       "sourcePath": "skills/orca-per-workspace-env",
       "packageDigest": "103f0671da111c9ad3def6c46da8d432e656878b840e6cc742219f4a3a4dbceb",

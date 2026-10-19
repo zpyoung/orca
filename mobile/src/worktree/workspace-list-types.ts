@@ -7,6 +7,7 @@ import type {
 } from '../../../src/shared/runtime-types'
 import type { ProjectSectionRepo } from '../../../src/shared/project-section-grouping'
 import type { WorkspaceRowFilters } from '../../../src/shared/workspace-view/workspace-row-filters'
+import type { LoopWorktreeSummary } from '../../../src/shared/fork-loops/loop-types'
 
 export type Worktree = {
   sectionListKey?: string
@@ -75,6 +76,7 @@ export type Worktree = {
   status?: 'working' | 'active' | 'permission' | 'done' | 'inactive'
   workingMode?: AgentWorkingMode
   agents?: RuntimeWorktreeAgentRow[]
+  loop?: LoopWorktreeSummary
 }
 
 /** The desktop's Workspace options filters, one shared value. */

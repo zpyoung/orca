@@ -13,6 +13,7 @@ import {
   HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY
 } from './fork-heimdall/capability'
+import { LOOPS_RUNTIME_CAPABILITY } from './fork-loops/capability'
 import { AGENT_SESSION_CURRENT_REQUESTS_CLIENT_CAPABILITY } from './agent-session-current-requests-capability'
 import { AI_VAULT_CHAT_FORK_SOURCE_CAPABILITY } from './ai-vault-resume-preparation'
 import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from './jira-agent-capability'
@@ -311,6 +312,7 @@ export const RUNTIME_CAPABILITIES = [
   RUNTIME_SOURCE_FENCE_RUNTIME_CAPABILITY,
   SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY,
   ASK_REGISTRY_RUNTIME_CAPABILITY,
+  LOOPS_RUNTIME_CAPABILITY,
   ...agentLaunchCapabilities.AGENT_LAUNCH_RUNTIME_CAPABILITIES
 ] as const
 

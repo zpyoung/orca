@@ -24,6 +24,7 @@ const CANONICAL_GUIDE_NAMES = [
   'orca-jira',
   'orca-ledger',
   'orca-linear',
+  'orca-loop',
   'orca-per-workspace-env',
   'orchestration'
 ]
@@ -42,6 +43,7 @@ const GUIDE_ALIASES = {
   'orca-jira': [],
   'orca-ledger': [],
   'orca-linear': [],
+  'orca-loop': [],
   'orca-per-workspace-env': [],
   orchestration: []
 }
@@ -63,6 +65,7 @@ const STUB_TOPICS = [
   'orca-jira',
   'orca-ledger',
   'orca-linear',
+  'orca-loop',
   'orca-per-workspace-env',
   'orchestration'
 ]

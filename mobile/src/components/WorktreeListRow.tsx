@@ -3,6 +3,7 @@ import { Bell, ChevronDown, ChevronRight, GitBranch, GitPullRequest } from 'luci
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { MobileRenderableRepoIcon } from '../host-screen/host-screen-reply-schema'
 import { triggerMediumImpact } from '../platform/haptics'
+import { LoopWorktreeLabel } from '../worktree/fork-loops/loop-worktree-label'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { Worktree } from '../worktree/workspace-list-types'
 import type { WorktreeCardDetails } from '../../../src/shared/worktree/card-properties'
@@ -197,6 +198,7 @@ function WorktreeListRowComponent({
             fullList={agentActivityDisplayMode === 'full'}
           />
         ) : null}
+        <LoopWorktreeLabel loop={item.loop} />
         {lineageChildCount > 0 && onToggleLineage ? (
           <Pressable
             style={styles.lineageToggle}

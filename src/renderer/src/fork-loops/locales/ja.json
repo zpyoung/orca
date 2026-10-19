@@ -1,0 +1,247 @@
+{
+  "fork": {
+    "loops": {
+      "setup": {
+        "presetInterval": "一定間隔",
+        "presetQueue": "キュー",
+        "presetUntilDone": "完了するまで",
+        "errorWholeNumber": "1 以上の整数を入力してください。",
+        "createFailed": "ループを開始できませんでした。",
+        "runningLoopWarning": "このワークスペースではすでにループが実行中です。2 つ目のループは同じファイルを同時に編集します。",
+        "name": "名前",
+        "namePlaceholder": "未入力の場合はプロンプトを使用",
+        "agent": "Agent",
+        "noAgents": "Agent が検出されませんでした",
+        "preset": "実行方法",
+        "queueItems": "キュー",
+        "queueItem": "キューの項目 {{n}}",
+        "queueMoveUp": "キューの項目 {{n}} を上へ移動",
+        "queueMoveDown": "キューの項目 {{n}} を下へ移動",
+        "queueRemove": "キューの項目 {{n}} を削除",
+        "queueNew": "新しいキュー項目",
+        "queueNewPlaceholder": "1 回のイテレーション用のプロンプト",
+        "queueAdd": "キューに追加",
+        "errorQueueEmpty": "キューにプロンプトを 1 つ以上追加してください。",
+        "errorQueueBlankItem": "キューのプロンプトは空にできません。",
+        "repeatQueue": "キューが空になったら最初からやり直す",
+        "prompt": "プロンプト",
+        "promptPlaceholder": "各イテレーションで Agent に何をさせますか?",
+        "intervalMinutes": "実行間隔(分)",
+        "session": "セッション",
+        "sessionFresh": "イテレーションごとに新しいセッション",
+        "sessionContinue": "同じセッションを継続",
+        "maxIterations": "最大イテレーション数",
+        "maxIterationsHint": "空欄にすると上限なしで実行します。",
+        "advanced": "詳細設定",
+        "checkCommand": "完了チェックのコマンド",
+        "checkHint": "ワークスペースで実行されます。終了コード 0 は作業完了を意味します。",
+        "evaluator": "完了条件",
+        "evaluatorHint": "別の Agent が変更内容を読み、この条件が満たされているか判定します。",
+        "maxCost": "最大コスト(USD)",
+        "errorCost": "0 より大きい金額を入力してください。",
+        "protectedPaths": "保護するパス",
+        "protectedPathsHint": "1 行に 1 つのパスまたは glob。Agent が変更するとループは一時停止します。",
+        "noProgress": "変更のないイテレーションが 3 回続いたら一時停止",
+        "checkpointCommits": "イテレーションごとにチェックポイントをコミット",
+        "askBeforeNext": "新しいイテレーションの前に確認する",
+        "resumeAtLimitReset": "使用上限のリセット時に再開する",
+        "cancel": "キャンセル",
+        "start": "ループを開始",
+        "title": "新しいループ",
+        "description": "作業が完了するまで、このワークスペースで Agent を繰り返し実行します。",
+        "menuItem": "ループ…",
+        "intervalAnchor": "起点",
+        "anchorFromEnd": "前回のイテレーションの終了時",
+        "anchorWallClock": "時計の時刻",
+        "checkTimeout": "チェックのタイムアウト(秒)",
+        "errorCheckTimeout": "1〜600 秒で入力してください。",
+        "checkRunWhen": "チェックの実行タイミング",
+        "runEveryIteration": "イテレーションごと",
+        "runOnClaim": "Agent が完了を宣言したとき",
+        "maxActiveMinutes": "最大稼働時間(分)",
+        "errorPrompt": "ループを開始するにはプロンプトを入力してください。"
+      },
+      "rail": {
+        "action": {
+          "cancel": "キャンセル",
+          "edit": "編集",
+          "pause": "一時停止",
+          "resume": "再開",
+          "steer": "指示する…",
+          "stop": "停止"
+        },
+        "actionFailed": "操作を完了できませんでした。もう一度お試しください。",
+        "badge": {
+          "fail": "失敗",
+          "none": "チェックなし",
+          "pass": "成功"
+        },
+        "check": {
+          "failed": "チェック失敗",
+          "none": "チェックなし",
+          "passed": "チェック成功"
+        },
+        "detail": {
+          "added": "{{value}} 追加",
+          "back": "戻る",
+          "changes": "変更",
+          "check": "完了チェック",
+          "checkStderr": "チェックのエラー",
+          "checkStdout": "チェックの出力",
+          "cost": "コスト",
+          "duration": "所要時間",
+          "evaluator": "評価",
+          "evaluatorMet": "条件を満たした",
+          "evaluatorNotMet": "条件を満たしていない",
+          "evaluatorReason": "評価者の理由",
+          "loadFailed": "このイテレーションの出力を読み込めませんでした。",
+          "loading": "出力を読み込み中…",
+          "noChanges": "未計測",
+          "noOutput": "Agent の出力は取得されませんでした。",
+          "noRecord": "このイテレーションの出力は記録されていません。",
+          "outcome": "結果",
+          "outputTail": "Agent の出力",
+          "removed": "{{value}} 削除",
+          "title": "イテレーション {{n}}"
+        },
+        "edit": {
+          "errorName": "名前を入力してください。",
+          "errorPrompt": "プロンプトを入力してください。",
+          "name": "名前",
+          "pacing": "実行間隔",
+          "pacingInterval": "一定間隔で実行",
+          "pacingOnIdle": "Agent がアイドルになり次第",
+          "save": "保存"
+        },
+        "endReason": {
+          "crashed": "Agent がクラッシュ",
+          "interrupted": "中断",
+          "running": "実行中",
+          "settled": "完了",
+          "stopped": "停止"
+        },
+        "iteration": {
+          "current": "イテレーション {{n}}",
+          "currentOfMax": "イテレーション {{n}} / {{max}}",
+          "done": "{{n}} 回のイテレーションが完了",
+          "doneOfMax": "{{max}} 回中 {{n}} 回のイテレーションが完了"
+        },
+        "iterations": {
+          "empty": "完了したイテレーションはまだありません",
+          "title": "イテレーション"
+        },
+        "label": "ループ",
+        "lastCheck": {
+          "failed": "イテレーション {{n}} で失敗",
+          "passed": "イテレーション {{n}} で成功",
+          "title": "直近のチェック"
+        },
+        "meter": {
+          "cost": "コスト",
+          "costUnavailable": "コストを取得できません",
+          "ofCap": "{{spent}} / {{cap}}",
+          "time": "時間"
+        },
+        "pause": {
+          "agentBlocked": "Agent がブロックされています",
+          "agentDecide": "Agent が判断を求めています",
+          "askBeforeNext": "続行の承認待ち",
+          "capCost": "コスト上限に達しました",
+          "capIterations": "イテレーション上限に達しました",
+          "capTime": "時間上限に達しました",
+          "crashed": "Agent がクラッシュし続けました",
+          "interruptedByRestart": "アプリの再起動により中断されました",
+          "noProgress": "直近のイテレーションで進捗がありません",
+          "protectedPath": "保護されたパスに変更がありました",
+          "queueExhausted": "キューが空です",
+          "unverifiable": "Agent のホストとの接続が失われました",
+          "usageLimit": "Agent の利用上限に達しました",
+          "user": "ユーザーが一時停止しました"
+        },
+        "phase": {
+          "checking": "完了チェックを実行中",
+          "evaluating": "結果を評価中",
+          "needsYou": "あなたの対応待ち",
+          "relaunching": "Agent を再起動中",
+          "sending": "プロンプトを送信中",
+          "waiting": "次のイテレーションを待機中",
+          "working": "Agent が作業中"
+        },
+        "preset": {
+          "interval": "{{minutes}} 分ごと",
+          "queue": "キューを順に処理",
+          "untilDone": "完了するまで"
+        },
+        "question": {
+          "blocked": "ブロック中",
+          "decide": "判断が必要です"
+        },
+        "queue": {
+          "add": "追加",
+          "done": "完了",
+          "editLabel": "キュー項目を編集",
+          "empty": "キューは空です",
+          "inFlight": "実行中",
+          "moveDown": "下へ移動",
+          "moveUp": "上へ移動",
+          "newLabel": "新しいキュー項目",
+          "placeholder": "次のタスクを入力してください",
+          "remove": "削除",
+          "title": "キュー"
+        },
+        "resume": {
+          "addLabel": "追加するイテレーション数",
+          "iterations": "イテレーション"
+        },
+        "state": {
+          "completed": "完了",
+          "needsYou": "対応が必要",
+          "paused": "一時停止中",
+          "running": "実行中",
+          "stopped": "停止",
+          "unverifiable": "確認不可"
+        },
+        "steer": {
+          "label": "指示メモ",
+          "placeholder": "次のイテレーションへの指示",
+          "send": "送信"
+        },
+        "stop": {
+          "afterIteration": "このイテレーションの後",
+          "now": "今すぐ",
+          "prompt": "ループを停止"
+        },
+        "strip": {
+          "label": "ループの状態",
+          "sessionFresh": "新規セッション",
+          "sessionContinued": "継続セッション"
+        },
+        "unverifiableHint": "Agent のホストに接続できないため、ループは進行していません。",
+        "skippedTicks_one": "{{count}} 回のティックをスキップ",
+        "skippedTicks_other": "{{count}} 回のティックをスキップ"
+      },
+      "status": {
+        "glyph": {
+          "tooltip": "ループ {{n}} · {{state}}",
+          "tooltipWithCap": "ループ {{n}}/{{max}} · {{state}}",
+          "open": "ループを開く",
+          "state": {
+            "running": "実行中",
+            "needsYou": "対応が必要",
+            "paused": "一時停止中",
+            "detached": "切り離し済み",
+            "unverifiable": "確認不可"
+          }
+        },
+        "close": {
+          "title": "実行中のループを閉じますか？",
+          "description": "このタブはループ「{{name}}」を実行しています。バックグラウンドで実行を続けるか、今すぐ停止してください。",
+          "cancel": "キャンセル",
+          "stop": "ループを停止",
+          "keepRunning": "実行を続ける",
+          "failed": "ループを更新できなかったため、タブは開いたままです。"
+        }
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@ import type {
   WorktreeLineage,
   WorktreeLineageWarning
 } from './worktree/lineage-types'
+import type { LoopWorktreeSummary } from './fork-loops/loop-types'
 import type { RuntimeListingHostScope } from './runtime-listing-host-scope'
 import type { GitWorktreeInfo, Worktree } from './worktree/types'
 import type { WorkspaceStatusWarning } from './workspace-status-warning'
@@ -55,6 +56,7 @@ export type RuntimeWorktreePsSummary = {
   workspaceKind?: 'git' | 'folder-workspace'
   worktreeId: string
   repoId: string
+  loop?: LoopWorktreeSummary
   hostId?: Worktree['hostId']
   terminalPlatform?: NodeJS.Platform
   repo: string

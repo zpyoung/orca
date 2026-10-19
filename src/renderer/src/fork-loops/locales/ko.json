@@ -1,0 +1,247 @@
+{
+  "fork": {
+    "loops": {
+      "setup": {
+        "presetInterval": "일정 간격",
+        "presetQueue": "대기열",
+        "presetUntilDone": "완료될 때까지",
+        "errorWholeNumber": "1 이상의 정수를 입력하세요.",
+        "createFailed": "루프를 시작할 수 없습니다.",
+        "runningLoopWarning": "이 작업 공간에는 이미 실행 중인 루프가 있습니다. 두 번째 루프는 같은 파일을 동시에 수정합니다.",
+        "name": "이름",
+        "namePlaceholder": "비워 두면 프롬프트 사용",
+        "agent": "에이전트",
+        "noAgents": "감지된 에이전트가 없습니다",
+        "preset": "실행 방식",
+        "queueItems": "대기열",
+        "queueItem": "대기열 항목 {{n}}",
+        "queueMoveUp": "대기열 항목 {{n}} 위로 이동",
+        "queueMoveDown": "대기열 항목 {{n}} 아래로 이동",
+        "queueRemove": "대기열 항목 {{n}} 제거",
+        "queueNew": "새 대기열 항목",
+        "queueNewPlaceholder": "한 번의 반복을 위한 프롬프트",
+        "queueAdd": "대기열에 추가",
+        "errorQueueEmpty": "대기열에 프롬프트를 하나 이상 추가하세요.",
+        "errorQueueBlankItem": "대기열 프롬프트는 비워 둘 수 없습니다.",
+        "repeatQueue": "대기열이 비면 처음부터 다시 시작",
+        "prompt": "프롬프트",
+        "promptPlaceholder": "매 반복마다 에이전트가 무엇을 해야 하나요?",
+        "intervalMinutes": "실행 간격(분)",
+        "session": "세션",
+        "sessionFresh": "반복마다 새 세션",
+        "sessionContinue": "같은 세션 이어가기",
+        "maxIterations": "최대 반복 횟수",
+        "maxIterationsHint": "비워 두면 제한 없이 실행합니다.",
+        "advanced": "고급",
+        "checkCommand": "완료 확인 명령",
+        "checkHint": "작업 공간에서 실행됩니다. 종료 코드 0은 작업이 끝났다는 뜻입니다.",
+        "evaluator": "완료 조건",
+        "evaluatorHint": "다른 에이전트가 변경 내용을 읽고 이 조건이 충족되었는지 판단합니다.",
+        "maxCost": "최대 비용(USD)",
+        "errorCost": "0보다 큰 금액을 입력하세요.",
+        "protectedPaths": "보호할 경로",
+        "protectedPathsHint": "한 줄에 경로나 glob 하나. 에이전트가 변경하면 루프가 일시 중지됩니다.",
+        "noProgress": "변경 없는 반복이 3번 이어지면 일시 중지",
+        "checkpointCommits": "매 반복 후 체크포인트 커밋",
+        "askBeforeNext": "새 반복 전에 확인",
+        "resumeAtLimitReset": "사용 한도가 초기화되면 다시 시작",
+        "cancel": "취소",
+        "start": "루프 시작",
+        "title": "새 루프",
+        "description": "작업이 끝날 때까지 이 작업 공간에서 에이전트를 반복 실행합니다.",
+        "menuItem": "루프…",
+        "intervalAnchor": "기준 시점",
+        "anchorFromEnd": "마지막 반복이 끝난 시점",
+        "anchorWallClock": "시계 시각",
+        "checkTimeout": "확인 제한 시간(초)",
+        "errorCheckTimeout": "1~600초로 입력하세요.",
+        "checkRunWhen": "확인 실행 시점",
+        "runEveryIteration": "매 반복 후",
+        "runOnClaim": "에이전트가 끝났다고 말할 때",
+        "maxActiveMinutes": "최대 활성 시간(분)",
+        "errorPrompt": "루프를 시작하려면 프롬프트를 입력하세요."
+      },
+      "rail": {
+        "action": {
+          "cancel": "취소",
+          "edit": "편집",
+          "pause": "일시 중지",
+          "resume": "재개",
+          "steer": "방향 지정…",
+          "stop": "중지"
+        },
+        "actionFailed": "작업을 완료하지 못했습니다. 다시 시도하세요.",
+        "badge": {
+          "fail": "실패",
+          "none": "검사 없음",
+          "pass": "통과"
+        },
+        "check": {
+          "failed": "검사 실패",
+          "none": "검사 없음",
+          "passed": "검사 통과"
+        },
+        "detail": {
+          "added": "{{value}} 추가",
+          "back": "뒤로",
+          "changes": "변경 사항",
+          "check": "완료 검사",
+          "checkStderr": "검사 오류",
+          "checkStdout": "검사 출력",
+          "cost": "비용",
+          "duration": "소요 시간",
+          "evaluator": "평가기",
+          "evaluatorMet": "조건 충족",
+          "evaluatorNotMet": "조건 미충족",
+          "evaluatorReason": "평가자 사유",
+          "loadFailed": "이 반복의 출력을 불러오지 못했습니다.",
+          "loading": "출력을 불러오는 중…",
+          "noChanges": "측정되지 않음",
+          "noOutput": "캡처된 에이전트 출력이 없습니다.",
+          "noRecord": "이 반복에 기록된 출력이 없습니다.",
+          "outcome": "결과",
+          "outputTail": "에이전트 출력",
+          "removed": "{{value}} 삭제",
+          "title": "반복 {{n}}"
+        },
+        "edit": {
+          "errorName": "이름을 입력하세요.",
+          "errorPrompt": "프롬프트를 입력하세요.",
+          "name": "이름",
+          "pacing": "실행 간격",
+          "pacingInterval": "일정 간격으로",
+          "pacingOnIdle": "에이전트가 유휴 상태가 되는 즉시",
+          "save": "저장"
+        },
+        "endReason": {
+          "crashed": "에이전트 충돌",
+          "interrupted": "중단됨",
+          "running": "진행 중",
+          "settled": "완료됨",
+          "stopped": "중지됨"
+        },
+        "iteration": {
+          "current": "반복 {{n}}",
+          "currentOfMax": "반복 {{n}} / {{max}}",
+          "done": "반복 {{n}}회 완료",
+          "doneOfMax": "반복 {{max}}회 중 {{n}}회 완료"
+        },
+        "iterations": {
+          "empty": "아직 완료된 반복이 없습니다",
+          "title": "반복"
+        },
+        "label": "루프",
+        "lastCheck": {
+          "failed": "반복 {{n}}에서 실패",
+          "passed": "반복 {{n}}에서 통과",
+          "title": "최근 검사"
+        },
+        "meter": {
+          "cost": "비용",
+          "costUnavailable": "비용을 사용할 수 없음",
+          "ofCap": "{{spent}} / {{cap}}",
+          "time": "시간"
+        },
+        "pause": {
+          "agentBlocked": "에이전트가 막혔습니다",
+          "agentDecide": "에이전트가 결정을 요청합니다",
+          "askBeforeNext": "진행 승인을 기다리는 중",
+          "capCost": "비용 한도에 도달했습니다",
+          "capIterations": "반복 한도에 도달했습니다",
+          "capTime": "시간 한도에 도달했습니다",
+          "crashed": "에이전트가 계속 충돌했습니다",
+          "interruptedByRestart": "앱 재시작으로 중단되었습니다",
+          "noProgress": "최근 반복에서 진전이 없습니다",
+          "protectedPath": "보호된 경로를 건드렸습니다",
+          "queueExhausted": "대기열이 비어 있습니다",
+          "unverifiable": "에이전트 호스트와의 연결이 끊어졌습니다",
+          "usageLimit": "에이전트 사용 한도에 도달했습니다",
+          "user": "사용자가 일시 중지함"
+        },
+        "phase": {
+          "checking": "완료 검사 실행 중",
+          "evaluating": "결과 평가 중",
+          "needsYou": "사용자 입력 대기 중",
+          "relaunching": "에이전트 다시 시작 중",
+          "sending": "프롬프트 전송 중",
+          "waiting": "다음 반복 대기 중",
+          "working": "에이전트 작업 중"
+        },
+        "preset": {
+          "interval": "{{minutes}}분마다",
+          "queue": "대기열 순차 처리",
+          "untilDone": "완료될 때까지"
+        },
+        "question": {
+          "blocked": "막힘",
+          "decide": "결정이 필요합니다"
+        },
+        "queue": {
+          "add": "추가",
+          "done": "완료",
+          "editLabel": "대기열 항목 편집",
+          "empty": "대기열이 비어 있습니다",
+          "inFlight": "진행 중",
+          "moveDown": "아래로 이동",
+          "moveUp": "위로 이동",
+          "newLabel": "새 대기열 항목",
+          "placeholder": "다음 작업을 설명하세요",
+          "remove": "제거",
+          "title": "대기열"
+        },
+        "resume": {
+          "addLabel": "추가할 반복 횟수",
+          "iterations": "회 반복"
+        },
+        "state": {
+          "completed": "완료됨",
+          "needsYou": "확인 필요",
+          "paused": "일시 중지됨",
+          "running": "실행 중",
+          "stopped": "중지됨",
+          "unverifiable": "확인 불가"
+        },
+        "steer": {
+          "label": "방향 지정 메모",
+          "placeholder": "다음 반복을 위한 안내",
+          "send": "보내기"
+        },
+        "stop": {
+          "afterIteration": "이번 반복 후",
+          "now": "지금",
+          "prompt": "루프 중지"
+        },
+        "strip": {
+          "label": "루프 상태",
+          "sessionFresh": "새 세션",
+          "sessionContinued": "이어서 진행하는 세션"
+        },
+        "unverifiableHint": "에이전트 호스트에 연결할 수 없어 루프가 진행되지 않습니다.",
+        "skippedTicks_one": "틱 {{count}}회 건너뜀",
+        "skippedTicks_other": "틱 {{count}}회 건너뜀"
+      },
+      "status": {
+        "glyph": {
+          "tooltip": "루프 {{n}} · {{state}}",
+          "tooltipWithCap": "루프 {{n}}/{{max}} · {{state}}",
+          "open": "루프 열기",
+          "state": {
+            "running": "실행 중",
+            "needsYou": "확인 필요",
+            "paused": "일시 중지됨",
+            "detached": "분리됨",
+            "unverifiable": "확인 불가"
+          }
+        },
+        "close": {
+          "title": "실행 중인 루프를 닫을까요?",
+          "description": "이 탭은 루프 \"{{name}}\"을(를) 실행 중입니다. 백그라운드에서 계속 실행하거나 지금 중지하세요.",
+          "cancel": "취소",
+          "stop": "루프 중지",
+          "keepRunning": "계속 실행",
+          "failed": "루프를 업데이트할 수 없어 탭을 열어 둡니다."
+        }
+      }
+    }
+  }
+}

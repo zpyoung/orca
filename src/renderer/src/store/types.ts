@@ -50,6 +50,7 @@ import type { StructuredSessionLaunchDirectorySlice } from './slices/structured-
 import type { WorkspaceAttentionSlice } from './slices/workspace-attention/workspace-attention-contract'
 import type { AsksSlice } from './slices/fork-ask-question-tool/asks'
 import type { LedgerSlice } from './slices/ledger'
+import type { LoopsSlice } from '../fork-loops/loops-slice'
 import type { HeimdallFleetSlice } from './slices/fork-heimdall/fleet'
 
 export type AppState = RepoSlice &
@@ -102,4 +103,5 @@ export type AppState = RepoSlice &
   WorkspaceAttentionSlice &
   LedgerSlice &
   AsksSlice &
+  LoopsSlice &
   HeimdallFleetSlice

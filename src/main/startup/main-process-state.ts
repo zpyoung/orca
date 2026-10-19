@@ -21,6 +21,7 @@ import type { AgentAwakeService } from '../agent-awake-service'
 import type { CrashReportStore } from '../crash-reporting/crash-report-store'
 import type { AutomationService } from '../automations/service'
 import type { HeimdallKernelService } from '../fork-heimdall/kernel-service'
+import type { LoopService } from '../fork-loops/loop-service'
 import type { PluginService } from '../plugins/plugin-service'
 import type { PluginKillListService } from '../plugins/plugin-kill-list-service'
 import type { PluginMarketplaceService } from '../plugins/plugin-marketplace-service'
@@ -109,6 +110,8 @@ export const mainProcessState = {
   automations: null as AutomationService | null,
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: widens the null initializer to the slot's type, the idiom every sibling field uses.
   heimdall: null as HeimdallKernelService | null,
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: widens the null initializer to the slot's type, the idiom every sibling field uses.
+  loops: null as LoopService | null,
   pluginService: null as PluginService | null,
   pluginKillListService: null as PluginKillListService | null,
   pluginMarketplaceService: null as PluginMarketplaceService | null,

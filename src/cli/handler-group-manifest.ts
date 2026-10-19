@@ -66,6 +66,20 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS
   },
   {
+    name: 'loop',
+    keys: [
+      'loop create',
+      'loop list',
+      'loop show',
+      'loop pause',
+      'loop resume',
+      'loop stop',
+      'loop steer',
+      'loop edit'
+    ],
+    load: async () => (await import('./fork-loops/handlers.js')).LOOP_HANDLERS
+  },
+  {
     name: 'artifacts',
     keys: [
       'artifacts list',

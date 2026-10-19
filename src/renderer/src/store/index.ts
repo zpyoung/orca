@@ -52,6 +52,7 @@ import { createStructuredSessionLaunchDirectorySlice } from './slices/structured
 import { createWorkspaceAttentionSlice } from './slices/workspace-attention/workspace-attention-slice'
 import { createAsksSlice } from './slices/fork-ask-question-tool/asks'
 import { createLedgerSlice } from './slices/ledger'
+import { createLoopsSlice } from '@/fork-loops/loops-slice'
 import { createHeimdallFleetSlice } from './slices/fork-heimdall/fleet'
 import { e2eConfig } from '@/lib/e2e-config'
 import type { createWebRuntimeSessionTerminal } from '@/runtime/web-runtime-terminal-creation'
@@ -136,6 +137,7 @@ export const useAppStore = create<AppState>()(
         ...createWorkspaceAttentionSlice(...a),
         ...createLedgerSlice(...a),
         ...createAsksSlice(...a),
+        ...createLoopsSlice(...a),
         ...createHeimdallFleetSlice(...a)
       }
     })

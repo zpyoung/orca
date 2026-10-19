@@ -16,6 +16,8 @@ import {
 } from '../runtime-worktree-ps-activity'
 import { applyRuntimeWorktreePsUnverifiableTerminals } from '../runtime-worktree-ps-unverifiable-terminals'
 import { attachRuntimeWorktreeAgentRows } from '../runtime-worktree-agent-rows'
+import { requireLoopService } from '../rpc/methods/fork-loops/service-binding'
+import { attachWorktreeLoopSummaries } from '../../fork-loops/worktree-ps-loop-summary'
 import { compareWorktreePs } from '../runtime-worktree-status-projection'
 import type { Repo } from '../../../shared/repo-types'
 import type { StructuredAgentId } from '../../../shared/agent-session-provider-handle'
@@ -126,6 +128,7 @@ export abstract class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithWorktr
       orchestrationByPaneKey: this.agentOrchestrationProjection.buildByPaneKey(),
       getSummary
     })
+    attachWorktreeLoopSummaries(summaries, () => requireLoopService(this))
 
     const sorted = [...summaries.values()].sort(compareWorktreePs)
     // Why: the same cap starvation as worktree.list — a host whose rows all sort last gets no

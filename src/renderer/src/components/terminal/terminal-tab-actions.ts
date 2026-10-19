@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store'
+import { guardLoopTerminalClose } from '@/fork-loops/loop-close-guard'
 import { closeWebRuntimeSessionTab } from '@/runtime/web-runtime-session-tab-lifecycle'
 import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session-environment'
 import { toHostSessionTabId } from '../../../../shared/terminal-surface-id'
@@ -81,6 +82,13 @@ export function closeTerminalTab(
   // Why no early return: an unrouted close still prunes locally and reaches main's close record;
   // teardown of a PTY whose host is unproven fails closed on its own.
   const worktreeRoute = resolveTerminalCloseRoute(state, owningWorktreeId, terminalTabId)
+  if (
+    guardLoopTerminalClose(terminalTabId, options, () =>
+      closeTerminalTab(tabId, { ...options, force: true })
+    )
+  ) {
+    return
+  }
 
   // Why: a pinned tab routes through the confirmation guard instead of closing
   // outright. `force` is the post-confirmation re-entry, which skips the guard.

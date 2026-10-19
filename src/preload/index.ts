@@ -3,6 +3,7 @@ import { buildForkSessionHandoffApi } from './fork-session-handoff/session-hando
 import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
 import { buildForkAskApi } from './fork-ask-question-tool/ask-preload-api'
 import { buildForkHeimdallApi } from './fork-heimdall/heimdall-preload-api'
+import { buildForkLoopsApi } from './fork-loops/loops-preload-api'
 import { buildHostedReviewAgentApi } from './fork-hosted-review-sitter/hosted-review-agent-preload-api'
 import type { PreloadApi } from './api-types'
 import { installBrowserFindListener } from './preload-runtime-support'
@@ -195,6 +196,7 @@ const api = {
   agentStatus: agentStatusApi,
   asks: buildForkAskApi(),
   heimdall: buildForkHeimdallApi(),
+  loops: buildForkLoopsApi(),
   hostedReviewAgent: buildHostedReviewAgentApi(),
   speech: speechApi
 } satisfies PreloadApi
