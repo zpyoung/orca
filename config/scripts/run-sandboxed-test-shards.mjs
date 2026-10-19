@@ -536,6 +536,11 @@ function runShard({ item, options, imageTag, sourceTarPath, dockerEnv }) {
   const dockerArgs = [
     'run',
     '--interactive',
+    // Without an init as PID 1, orphaned descendants stay zombies, and process-group tests read them as alive.
+    '--init',
+    // CI sets this for every test; without it browser and real-process suites try to show windows.
+    '--env',
+    'ORCA_BACKGROUND_LAUNCH=1',
     ...(options.keepFailed ? ['--name', containerName] : ['--rm']),
     ...laneEnvArgs(options.lane),
     ...options.extraEnv.flatMap((pair) => ['--env', pair]),

@@ -2,12 +2,21 @@
 
 import '@testing-library/jest-dom/vitest'
 
-import { cleanup, render } from '@testing-library/react'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { cleanup, render, waitFor } from '@testing-library/react'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
 import { NativeChatMessageList } from '../NativeChatMessageList'
 import type { NativeChatLiveSession } from '../use-native-chat-live-session'
 import { installNativeChatMessageListTestViewport } from '../native-chat-message-list-test-viewport'
+
+vi.mock('@/lib/syntax-highlighting/oniguruma', async () => ({
+  loadOniguruma: (await import('@/lib/syntax-highlighting/oniguruma-test-harness'))
+    .loadNodeOniguruma
+}))
+
+// Chat code fences are colored by upstream's TextMate highlighter, which tokenizes after mount
+// and carries each token's theme colors as custom properties.
+const COLORED_TOKENS = 'span[style*="--syntax-dark"]'
 
 afterEach(cleanup)
 
@@ -45,7 +54,7 @@ function sessionWith(messages: NativeChatMessage[]): NativeChatLiveSession {
 }
 
 describe('NativeChatMessageList code coloring', () => {
-  it('colors a fenced code block in an assistant message with hljs token classes', () => {
+  it('colors a fenced code block in an assistant message with syntax token colors', async () => {
     const { container } = render(
       <NativeChatMessageList
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
@@ -55,8 +64,10 @@ describe('NativeChatMessageList code coloring', () => {
       />
     )
 
-    const tokens = container.querySelectorAll('[class*="hljs"]')
-    expect(tokens.length).toBeGreaterThan(0)
+    await waitFor(
+      () => expect(container.querySelectorAll(COLORED_TOKENS).length).toBeGreaterThan(0),
+      { timeout: 10_000 }
+    )
   })
 
   it('marks the markdown wrapper with the native-chat-code class the stylesheet targets', () => {
@@ -72,7 +83,7 @@ describe('NativeChatMessageList code coloring', () => {
     expect(container.querySelector('.native-chat-code')).not.toBeNull()
   })
 
-  it('colors a fenced code block in a user message (the other call site)', () => {
+  it('colors a fenced code block in a user message (the other call site)', async () => {
     const { container } = render(
       <NativeChatMessageList
         session={sessionWith([messageWith('user', 'u1', FENCED_CODE)])}
@@ -83,7 +94,10 @@ describe('NativeChatMessageList code coloring', () => {
     )
 
     expect(container.querySelector('.native-chat-code')).not.toBeNull()
-    expect(container.querySelectorAll('[class*="hljs"]').length).toBeGreaterThan(0)
+    await waitFor(
+      () => expect(container.querySelectorAll(COLORED_TOKENS).length).toBeGreaterThan(0),
+      { timeout: 10_000 }
+    )
   })
 
   it('colors inline code in chat prose with the code-accent classes', () => {
@@ -101,7 +115,7 @@ describe('NativeChatMessageList code coloring', () => {
     expect(inlineCode).toHaveClass('bg-code-accent-surface')
   })
 
-  it('still colors code when onLinkClick is omitted (the falsy-handler production path)', () => {
+  it('still colors code when onLinkClick is omitted (the falsy-handler production path)', async () => {
     const { container } = render(
       <NativeChatMessageList
         session={sessionWith([messageWith('assistant', 'a1', FENCED_CODE)])}
@@ -111,7 +125,10 @@ describe('NativeChatMessageList code coloring', () => {
     )
 
     expect(container.querySelector('.native-chat-code')).not.toBeNull()
-    expect(container.querySelectorAll('[class*="hljs"]').length).toBeGreaterThan(0)
+    await waitFor(
+      () => expect(container.querySelectorAll(COLORED_TOKENS).length).toBeGreaterThan(0),
+      { timeout: 10_000 }
+    )
   })
   it('uses the chat user surface for user message bubbles', () => {
     const { container } = render(

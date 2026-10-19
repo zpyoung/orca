@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Tab } from '../../../../../shared/tab-types'
 import type * as AgentStatusModule from '@/lib/agent-status'
-import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
+import type * as ResolveOwnerModule from '@/lib/resolve-owner'
 import type * as WebRuntimeTerminalActionsModule from '@/runtime/web-runtime-terminal-actions'
 import { toWebTerminalSurfaceTabId } from '../../../../../shared/terminal-surface-id'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
@@ -19,22 +19,23 @@ vi.mock('@/lib/agent-status', async (importOriginal) => {
   }
 })
 
-const getRuntimeEnvironmentIdForWorktreeMock = vi.fn<(...args: unknown[]) => string | null>(
-  () => null
-)
-vi.mock('@/lib/worktree-runtime-owner', async (importOriginal) => {
-  const actual = await importOriginal<typeof WorktreeRuntimeOwnerModule>()
+const runtimeOwnerEnvironmentIdMock = vi.fn<(...args: unknown[]) => string | null>(() => null)
+vi.mock('@/lib/resolve-owner', async (importOriginal) => {
+  const actual = await importOriginal<typeof ResolveOwnerModule>()
   return {
     ...actual,
-    getRuntimeEnvironmentIdForWorktree: (...args: unknown[]) =>
-      getRuntimeEnvironmentIdForWorktreeMock(...args)
+    runtimeEnvironmentIdForWorkspaceOwner: (...args: unknown[]) => ({
+      kind: 'resolved' as const,
+      environmentId: runtimeOwnerEnvironmentIdMock(...args)
+    }),
+    runtimeEnvironmentIdUnlessTwin: (...args: unknown[]) => runtimeOwnerEnvironmentIdMock(...args)
   }
 })
 
 // Why: setWebRuntimeTabProps (real impl, imported via vi.importActual below) reads
 // useAppStore.getState() directly; stub it so that import doesn't pull in the full
-// app store composition just to satisfy a call whose result the mocked
-// getRuntimeEnvironmentIdForWorktree above ignores anyway.
+// app store composition just to satisfy a call whose result the runtime owner
+// mock above ignores anyway.
 vi.mock('@/store', () => ({ useAppStore: { getState: vi.fn(() => ({})), setState: vi.fn() } }))
 
 const setWebRuntimeTabPropsMock = vi.fn()
@@ -148,8 +149,8 @@ describe('TabsSlice terminal dock state', () => {
 
   describe('terminal dock state', () => {
     beforeEach(() => {
-      getRuntimeEnvironmentIdForWorktreeMock.mockReset()
-      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue(null)
+      runtimeOwnerEnvironmentIdMock.mockReset()
+      runtimeOwnerEnvironmentIdMock.mockReturnValue(null)
       setWebRuntimeTabPropsMock.mockReset()
     })
 
@@ -204,7 +205,7 @@ describe('TabsSlice terminal dock state', () => {
 
     it('mirrors only the single-pane patch to the host', async () => {
       seedDockTab()
-      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      runtimeOwnerEnvironmentIdMock.mockReturnValue('env-1')
       const paneKey = makePaneKey('dock-tab-1', LEAF_ID)
 
       store
@@ -224,7 +225,7 @@ describe('TabsSlice terminal dock state', () => {
       // segment must follow, or the host accumulates a second, web-namespaced record.
       const mirroredTabId = toWebTerminalSurfaceTabId('host-tab-9')
       seedDockTab({ id: mirroredTabId })
-      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      runtimeOwnerEnvironmentIdMock.mockReturnValue('env-1')
       const localPaneKey = makePaneKey(mirroredTabId, LEAF_ID)
 
       store
@@ -241,7 +242,7 @@ describe('TabsSlice terminal dock state', () => {
 
     it('clamps an out-of-range gutterRows locally and mirrors the clamped value', async () => {
       seedDockTab()
-      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      runtimeOwnerEnvironmentIdMock.mockReturnValue('env-1')
       const paneKey = makePaneKey('dock-tab-1', LEAF_ID)
 
       store.getState().setTabTerminalDockState('dock-tab-1', { paneKey, gutterRows: 999 })
@@ -281,7 +282,7 @@ describe('TabsSlice terminal dock state', () => {
       // Why: the mock above only proves tabs.ts *calls* setWebRuntimeTabProps with the
       // patch; it says nothing about whether that function forwards the field onto the
       // wire. Use the real implementation here to close that specific gap.
-      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      runtimeOwnerEnvironmentIdMock.mockReturnValue('env-1')
       const runtimeCall = vi
         .fn()
         .mockResolvedValue({ id: 'p', ok: true, result: { updated: true } })
@@ -364,7 +365,7 @@ describe('TabsSlice terminal dock state', () => {
           [paneKeyC]: { docked: true, gutterRows: 10 }
         }
       })
-      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      runtimeOwnerEnvironmentIdMock.mockReturnValue('env-1')
 
       store.getState().pruneTerminalDockPaneKeys('dock-tab-1', [paneKeyA, paneKeyC, 'pane-missing'])
 
@@ -387,7 +388,7 @@ describe('TabsSlice terminal dock state', () => {
           [localPaneKeyB]: { docked: false, gutterRows: 8 }
         }
       })
-      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      runtimeOwnerEnvironmentIdMock.mockReturnValue('env-1')
 
       store.getState().pruneTerminalDockPaneKeys(mirroredTabId, [localPaneKeyA])
 

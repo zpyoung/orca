@@ -138,7 +138,7 @@ export async function launchHeadlessAutomationAgent(
     terminalSessionId: terminal.tabId ?? null,
     terminalPaneKey: terminal.paneKey ?? null,
     terminalPtyId: terminal.ptyId ?? null,
-    launchSettings
+    ...(launchSettings ? { launchSettings } : {})
   }
 }
 

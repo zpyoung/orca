@@ -76,7 +76,7 @@ export function prepareWebSessionTabsSnapshotUnified(
     if (provisionalPendingMutations) {
       provisionalPendingMutationsByHostTabId.set(hostTabId, provisionalPendingMutations)
     }
-    // Why: this is the localStorage twin of the in-memory rekey above — old hosts that never
+    // Why: this is the browser-storage twin of the in-memory rekey above — old hosts that never
     // echo the dock field rely on it surviving under the pane's final identity after a reload.
     if (hostTerminalDockSyncEnabled) {
       rekeyTerminalDockPaneKeys(provisionalTabId, toWebTerminalSurfaceTabId(hostTabId))

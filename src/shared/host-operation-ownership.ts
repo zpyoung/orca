@@ -1,3 +1,5 @@
+import { heimdallHostOperationOwnership } from './fork-heimdall/heimdall-host-operation-ownership'
+
 /**
  * Who decides where an operation runs.
  * - `host`: the host that owns the resource (a workspace, terminal, session or account).
@@ -19,6 +21,7 @@ export const HOST_OPERATION_OWNERSHIP = {
   agentTeams: 'host',
   aiVault: 'host',
   artifacts: 'host',
+  ask: 'host',
   automation: 'host',
   browser: 'host',
   clipboard: 'host',
@@ -35,6 +38,7 @@ export const HOST_OPERATION_OWNERSHIP = {
   hostedReview: 'credential',
   jira: 'scope-picked',
   layout: 'host',
+  ledger: 'host',
   linear: 'scope-picked',
   managedRuntime: 'host',
   managedServer: 'host',
@@ -92,6 +96,10 @@ const STREAM_METHOD = /^(un)?(subscribe|watch)/i
 
 /** Null for a namespace nobody classified, so callers fail closed. */
 export function getHostOperationOwnership(method: string): HostOperationOwnership | null {
+  const heimdallOwnership = heimdallHostOperationOwnership(method)
+  if (heimdallOwnership) {
+    return heimdallOwnership
+  }
   const ownership =
     OWNERSHIP_BY_METHOD.get(method) ??
     OWNERSHIP_BY_NAMESPACE.get(method.slice(0, method.indexOf('.')))

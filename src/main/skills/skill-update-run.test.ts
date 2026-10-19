@@ -7,6 +7,7 @@ import {
 } from '../../shared/windows-batch-spawn'
 import { CANCEL_RELEASE_TIMEOUT_MS, SkillUpdateRunner } from './skill-update-run'
 import { SKILLS_CLI_VERSION } from '../../shared/agent-feature-install-commands'
+import { ORCA_SKILLS_REPOSITORY_URL } from '../../shared/fork-skills-repository/skills-repository-url'
 
 class FakeChild extends EventEmitter {
   stdout = new EventEmitter()
@@ -60,7 +61,7 @@ describe('SkillUpdateRunner', () => {
       '--yes',
       `skills@${SKILLS_CLI_VERSION}`,
       'add',
-      'https://github.com/stablyai/orca/tree/0123456789abcdef0123456789abcdef01234567',
+      `${ORCA_SKILLS_REPOSITORY_URL}/tree/0123456789abcdef0123456789abcdef01234567`,
       '--skill',
       'orca-cli',
       '--skill',

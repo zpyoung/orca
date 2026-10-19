@@ -3,6 +3,14 @@ import {
   notApplicableDisposition,
   type WslMoveFieldDisposition
 } from './wsl-move-dispositions'
+import {
+  HEIMDALL_SQLITE_SCHEMA_FILE_DATABASES,
+  HEIMDALL_SQLITE_TABLE_DISPOSITIONS
+} from '../fork-heimdall/wsl-move-storage-dispositions'
+import {
+  ASK_SQLITE_SCHEMA_FILE_DATABASES,
+  ASK_SQLITE_TABLE_DISPOSITIONS
+} from '../fork-ask-question-tool/wsl-move-storage-dispositions'
 
 /**
  * Renderer modules that use localStorage, by what they keep. A new module fails the census test
@@ -61,6 +69,7 @@ export const LOCAL_STORAGE_MODULE_DISPOSITIONS: Record<string, WslMoveFieldDispo
       'src/renderer/src/components/onboarding/onboarding-feature-setup.ts',
       'src/renderer/src/components/pet/PetOverlay.tsx',
       'src/renderer/src/components/right-sidebar/ai-vault-view-options-persistence.ts',
+      'src/renderer/src/components/right-sidebar/fork-session-info/session-info-accordion-state.ts',
       'src/renderer/src/components/right-sidebar/pr-comment-presentation.ts',
       'src/renderer/src/components/settings/BrowserUsePane.tsx',
       'src/renderer/src/components/settings/local-network-connection-history.ts',
@@ -69,6 +78,7 @@ export const LOCAL_STORAGE_MODULE_DISPOSITIONS: Record<string, WslMoveFieldDispo
       'src/renderer/src/components/sidebar/mobile-sidebar-onboarding-badge.ts',
       'src/renderer/src/components/sidebar/SeveredTerminalDaemonBanner.tsx',
       'src/renderer/src/components/sidebar/SidebarToolbar.tsx',
+      'src/renderer/src/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state.ts',
       'src/renderer/src/components/terminal-pane/terminal-freeze-breadcrumbs.ts',
       'src/renderer/src/components/terminal-pane/terminal-render-desync-trigger.ts',
       'src/renderer/src/components/terminal-pane/terminal-startup-timing.ts',
@@ -116,6 +126,8 @@ export const SQLITE_SCHEMA_FILE_DATABASES: Record<string, string> = {
   'src/main/runtime/orchestration/db/schema/migrate-v39.ts': 'orchestration',
   'src/main/runtime/orchestration/db/schema/migrate.ts': 'orchestration',
   'src/main/runtime/orchestration/mutation-receipt-capacity.ts': 'orchestration',
+  ...HEIMDALL_SQLITE_SCHEMA_FILE_DATABASES,
+  ...ASK_SQLITE_SCHEMA_FILE_DATABASES,
   // Test fixtures that mirror third-party agent and browser databases.
   'src/main/ai-vault/session-scanner-opencode-sqlite-fixture.ts': 'test-fixture',
   'src/main/ai-vault/session-scanner-test-fixtures.ts': 'test-fixture',
@@ -133,6 +145,8 @@ const tables = (
 /** Tables by `<database>.<table>`. Migration copies (`*_new`, `*_v35`) sit with what they rebuild. */
 export const SQLITE_TABLE_DISPOSITIONS: Record<string, WslMoveFieldDisposition> =
   Object.fromEntries([
+    ...Object.entries(HEIMDALL_SQLITE_TABLE_DISPOSITIONS),
+    ...Object.entries(ASK_SQLITE_TABLE_DISPOSITIONS),
     ...tables(
       'agent-session-journal',
       [

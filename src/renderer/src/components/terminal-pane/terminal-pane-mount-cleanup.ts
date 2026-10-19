@@ -128,7 +128,7 @@ export function cleanupTerminalPaneMount(args: {
   panePtyBindingsRef.current.clear()
   paneTransportsRef.current.clear()
   // Why: a genuinely closed tab (not a rehome/remount) leaves no per-pane retirement
-  // callback to prune the dock localStorage record — enumerate its panes here so
+  // callback to prune the dock's persisted record — enumerate its panes here so
   // entries don't accumulate one-per-closed-tab until the record's write quota dies.
   const teardownDockPaneKeys = collectTerminalDockPaneKeysForTabTeardown({
     tabId,

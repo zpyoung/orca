@@ -71,6 +71,7 @@ vi.mock('./client', () => ({
 import { launchMacDaemonFromStableBundle, macDaemonJobLabel } from './macos-daemon-launchd'
 import type { DaemonChildSpawnOptions } from './daemon-launched-child-spawn'
 import { PROTOCOL_VERSION } from './daemon-protocol-version'
+import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/local-build-compatibility-contract'
 
 const ok: ProcessResult = { code: 0, signal: null, stdout: '', stderr: '', timedOut: false }
 const stopped = { ...ok, stdout: 'gui/501/x = {\n\tstate = not running\n}\n' }
@@ -222,7 +223,7 @@ it('launches the copied helper on plain Node and leaves no inherited credentials
     Label: macDaemonJobLabel(state.root),
     KeepAlive: false,
     // Local Network access for a plist-launched job resolves through its associated app.
-    AssociatedBundleIdentifiers: ['com.stablyai.orca'],
+    AssociatedBundleIdentifiers: [LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId],
     EnvironmentVariables: { ORCA_TEST_SECRET: 'test-value' }
   })
   expect(JSON.stringify(job)).not.toContain('NODE_CHANNEL_FD')

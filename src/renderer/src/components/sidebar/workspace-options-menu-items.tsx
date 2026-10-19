@@ -38,7 +38,7 @@ import {
 } from '../../../../shared/workspace-view/workspace-view-options'
 import { translate } from '@/i18n/i18n'
 import { SidebarGroupByToggle } from './SidebarGroupByToggle'
-import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'
+import { WorkspaceActivityOptionRow } from './fork-workspace-activity-window/WorkspaceActivityOptionRow'
 import { getForkOnlyFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'
 import { WorkspaceReviewFilterRows } from './fork-workspace-review-filters/WorkspaceReviewFilterRows'
 
@@ -218,7 +218,7 @@ const OPTION_ITEMS: Record<WorkspaceViewOptionKey, ComponentType<OptionItemProps
   cardLayout: WorktreeCardLayoutMenuItem,
   cardProperties: WorktreeCardPropertiesMenuItem,
   cardDisplay: WorktreeCardDisplayMenuItem,
-  hideSleepingWorkspaces: WorkspaceActivityWindowControl,
+  hideSleepingWorkspaces: WorkspaceActivityOptionRow,
   alwaysShowDefaultBranchWorkspace: () => (
     <WorkspaceFilterOptionRow optionKey="alwaysShowDefaultBranchWorkspace" />
   ),

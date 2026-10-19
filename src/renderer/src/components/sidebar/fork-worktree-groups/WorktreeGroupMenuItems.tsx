@@ -228,12 +228,6 @@ export function useWorktreeGroupDialog({
   dialogActiveRef
 }: WorktreeGroupDialogProps): WorktreeGroupDialog {
   const createProjectGroup = useAppStore((state) => state.createProjectGroup)
-  const hostId = useAppStore((state) =>
-    getWorktreeExecutionHostId(
-      worktree,
-      state.repos.find((repo) => repo.id === worktree.repoId)
-    )
-  )
   const updateWorktreeMeta = useAppStore((state) => state.updateWorktreeMeta)
   const [open, setOpen] = useState(false)
   const openDialog = useCallback(() => {
@@ -249,6 +243,11 @@ export function useWorktreeGroupDialog({
   )
   const handleSubmit = useCallback(
     async (name: string) => {
+      // Why: read at submit, not render, so the menu needs no repo catalog just to open.
+      const hostId = getWorktreeExecutionHostId(
+        worktree,
+        useAppStore.getState().repos.find((repo) => repo.id === worktree.repoId)
+      )
       await createGroupFromWorktree(
         worktree,
         name,
@@ -256,7 +255,7 @@ export function useWorktreeGroupDialog({
         updateWorktreeMeta
       )
     },
-    [createProjectGroup, hostId, updateWorktreeMeta, worktree]
+    [createProjectGroup, updateWorktreeMeta, worktree]
   )
 
   return {

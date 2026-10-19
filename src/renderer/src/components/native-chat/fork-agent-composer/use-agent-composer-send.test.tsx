@@ -78,14 +78,12 @@ describe('useAgentComposerSend (tier-independent retention)', () => {
     })
 
     expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledWith(
-      {},
       'pty-native-chat',
       buildNativeChatPasteBytes('plain send'),
       'driving',
       expect.any(Function)
     )
     expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledWith(
-      {},
       'pty-native-chat',
       NATIVE_CHAT_SUBMIT,
       'driving'
@@ -125,7 +123,6 @@ describe('useAgentComposerSend (tier-independent retention)', () => {
       await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     })
     expect(sendRuntimePtyInputAcceptance).not.toHaveBeenCalledWith(
-      {},
       'pty-native-chat-cancel',
       NATIVE_CHAT_SUBMIT
     )
