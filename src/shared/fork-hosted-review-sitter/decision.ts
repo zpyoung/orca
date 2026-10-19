@@ -24,6 +24,7 @@ import {
   freshFailedChecksAfterRerun,
   groupRequiresOwnerForRecovery,
   primaryFailedCheckGroup,
+  workflowRunSiblingChecks,
   type FailedCheckGroup
 } from './decision-check-groups'
 import type {
@@ -69,6 +70,7 @@ export type HostedReviewSitterNoActionReason =
   | 'rerun-in-flight'
   | 'rerun-unresolved'
   | 'awaiting-rerun-result'
+  | 'awaiting-workflow-run'
   | 'failure-signature-unavailable'
   | 'check-rerun-unavailable'
   | 'fix-already-attempted'
@@ -146,6 +148,15 @@ function latestRerunForCheck(
   return latest
 }
 
+function rerunWhenWorkflowRunSettled(
+  review: HostedReviewSnapshot,
+  group: FailedCheckGroup
+): PhaseOutcome {
+  return workflowRunSiblingChecks(review, group).some((check) => check.state === 'pending')
+    ? declined('awaiting-workflow-run', group.checkKey)
+    : { action: buildRerunAction(review, group) }
+}
+
 function desiredFixAction(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger,
@@ -169,14 +180,14 @@ function desiredFixAction(
   } else {
     const rerunEntry = latestRerunForCheck(ledger, review.headSha, group.checkKey)
     if (!rerunEntry) {
-      return { action: buildRerunAction(review, group) }
+      return rerunWhenWorkflowRunSettled(review, group)
     }
     const rerunDisposition = getHostedReviewAttemptDisposition(ledger, rerunEntry.action)
     if (rerunDisposition === 'in-flight') {
       return declined('rerun-in-flight')
     }
     if (rerunDisposition === 'retryable-failure') {
-      return { action: buildRerunAction(review, group) }
+      return rerunWhenWorkflowRunSettled(review, group)
     }
     if (rerunDisposition === 'unresolved') {
       if (

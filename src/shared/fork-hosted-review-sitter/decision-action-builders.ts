@@ -3,7 +3,11 @@ import {
   hostedReviewContentIdentity,
   makeHostedReviewEvidenceKey
 } from './action-identity'
-import { currentHeadChecks, type FailedCheckGroup } from './decision-check-groups'
+import {
+  currentHeadChecks,
+  workflowRunSiblingChecks,
+  type FailedCheckGroup
+} from './decision-check-groups'
 import type {
   HostedReviewAttemptEntry,
   HostedReviewCheckSnapshot,
@@ -29,12 +33,17 @@ export function buildRerunAction(
     .filter((signature): signature is string => signature !== null)
     .sort()
   const failureSignature = signatures[0] ?? null
+  // the gate retries a not-landed rerun only on new evidence; its workflow run moving is that evidence
+  const siblingObservationIds = workflowRunSiblingChecks(review, group)
+    .map((check) => check.observationId)
+    .sort()
   const evidenceKey = makeHostedReviewEvidenceKey([
     'rerun-check',
     review.headSha,
     group.checkKey,
     failureSignature,
-    ...observationIds
+    ...observationIds,
+    ...(siblingObservationIds.length > 0 ? ['workflow-run', ...siblingObservationIds] : [])
   ])
   return {
     kind: 'rerun-check',
