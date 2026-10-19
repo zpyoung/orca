@@ -10,6 +10,7 @@ import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
 import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
 import type {
   RuntimeTerminalCreate,
+  RuntimeTerminalResolvePane,
   RuntimeTerminalWait
 } from '../../shared/runtime-terminal-contracts'
 import type { TuiAgent } from '../../shared/tui-agent'
@@ -72,6 +73,7 @@ export type LoopDriverRuntime = AgentRelaunchRuntime & {
   ): Promise<RuntimeTerminalWait>
   getTerminalHandleForPaneKey?(paneKey: string): string | null
   getTerminalPtyIdForHandle?(handle: string): string | null
+  resolveTerminalPane?(paneKey: string): RuntimeTerminalResolvePane
   getPtyLivenessVerdict?(ptyId: string): PtyLivenessVerdict | null
   readTerminal?(handle: string, options?: { limit?: number }): Promise<{ tail: string[] }>
   getAgentStatusRowsForPane?(paneKey: string): readonly { state: string }[]

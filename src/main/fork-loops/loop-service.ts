@@ -14,6 +14,7 @@ import type { RuntimeTerminalFocus } from '../../shared/runtime-terminal-contrac
 import { relaunchAgentInNewTab, requireLaunchedTabIdentity } from './agent-session-relaunch'
 import { validateLoopCheckHost, type LoopCheckTarget } from './loop-check'
 import { LoopStoreError, type LoopPatch, type StoredLoop } from './loop-database'
+import { resolvePane } from './loop-agent-session'
 import { LoopDriver, type LoopDriverDeps, type LoopDriverRuntime } from './loop-driver'
 import { isLoopEvaluatorAvailable } from './loop-evaluator'
 import { ensureLoopNotesFile } from './loop-notes-file'
@@ -288,14 +289,10 @@ export class LoopService {
   async bindTab(loopId: string, tab: { tabId: string; paneKey: string }): Promise<LoopSnapshot> {
     const loop = this.getOrThrow(loopId)
     const { runtime } = this.deps
-    if (
-      typeof runtime.getTerminalHandleForPaneKey !== 'function' ||
-      typeof runtime.getTerminalPtyIdForHandle !== 'function'
-    ) {
+    if (typeof runtime.getTerminalHandleForPaneKey !== 'function') {
       fail('loop_runtime_unavailable', 'The runtime cannot resolve terminal panes')
     }
-    const handle = runtime.getTerminalHandleForPaneKey(tab.paneKey)
-    const ptyId = handle ? runtime.getTerminalPtyIdForHandle(handle) : null
+    const ptyId = resolvePane(runtime, tab.paneKey)?.ptyId
     if (!ptyId || ptyId !== loop.ptyId || !tab.paneKey.startsWith(`${tab.tabId}:`)) {
       fail('loop_invalid_transition', `Pane ${tab.paneKey} does not host loop ${loopId}'s agent`)
     }
@@ -320,7 +317,7 @@ export class LoopService {
     if (typeof runtime.getTerminalHandleForPaneKey !== 'function') {
       fail('loop_runtime_unavailable', 'The runtime cannot reveal a background terminal')
     }
-    const handle = loop.paneKey ? runtime.getTerminalHandleForPaneKey(loop.paneKey) : null
+    const handle = resolvePane(runtime, loop.paneKey)?.handle
     if (!loop.paneKey || !handle) {
       return this.reopenAgentTab(loop)
     }

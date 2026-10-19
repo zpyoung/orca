@@ -811,6 +811,26 @@ describe('LoopService tab binding', () => {
     expect(bound.tab).toEqual({ tabId: 'tab-0', paneKey: 'tab-0:leaf-0' })
   })
 
+  it('binds a renderer tab pane whose pty only the pane resolver can name', async () => {
+    const h = createHarness()
+    h.addPane('tab-0:leaf-0', 'term-0', 'pty-0')
+    h.seed({ state: 'paused' })
+    // the real runtime answers getTerminalPtyIdForHandle only for headless pty handles
+    h.runtime.getTerminalPtyIdForHandle = () => null
+    const runtime: LoopServiceRuntime = h.runtime
+    runtime.resolveTerminalPane = (paneKey) => ({
+      handle: 'term-0',
+      tabId: 'tab-0',
+      leafId: 'leaf-0',
+      ptyId: paneKey === 'tab-0:leaf-0' ? 'pty-0' : null,
+      connected: true
+    })
+
+    const bound = await h.service.bindTab('loop-seed', { tabId: 'tab-0', paneKey: 'tab-0:leaf-0' })
+
+    expect(bound.tab).toEqual({ tabId: 'tab-0', paneKey: 'tab-0:leaf-0' })
+  })
+
   it('reports an unavailable runtime when it cannot resolve panes or reveal terminals', async () => {
     const h = createHarness({ runtime: 'partial' })
     h.seed({ state: 'paused' })

@@ -5,6 +5,8 @@ import {
   holdUntilPaneLive,
   LoopUserInputDuringSendError,
   observeUntilSettled,
+  relaunchLoopAgent,
+  resolvePane,
   sendAgentPrompt
 } from './loop-agent-session'
 import type { LoopDriverRuntime } from './loop-driver-types'
@@ -243,5 +245,92 @@ describe('observeUntilSettled hold callbacks', () => {
 
     expect(settlement.kind).toBe('crashed')
     expect(events).toEqual(['hold-start', 'hold-end'])
+  })
+})
+
+/** A runtime shaped like the real one: the handle-to-pty lookup answers only for headless ptys. */
+function rendererTabRuntime(panes: Record<string, { ptyId: string; connected: boolean }>) {
+  const handleFor = (paneKey: string): string | null => (panes[paneKey] ? `term:${paneKey}` : null)
+  return {
+    getTerminalHandleForPaneKey: handleFor,
+    getTerminalPtyIdForHandle: () => null,
+    resolveTerminalPane: (paneKey: string) => {
+      const pane = panes[paneKey]
+      const handle = handleFor(paneKey)
+      if (!pane || !handle) {
+        throw new Error('terminal_not_found')
+      }
+      const [tabId = '', leafId = ''] = paneKey.split(':')
+      return { handle, tabId, leafId, ptyId: pane.ptyId, connected: pane.connected }
+    },
+    launchAgentTerminal: vi.fn(async () => ({
+      handle: 'term:tab-2:leaf-2',
+      tabId: 'tab-2',
+      paneKey: 'tab-2:leaf-2',
+      ptyId: 'pty-2',
+      worktreeId: 'wt-1',
+      title: 'Fix tests'
+    })),
+    closeTerminalTab: vi.fn(async (handle: string) => ({
+      handle,
+      tabId: 'tab-1',
+      closeMode: 'tab' as const,
+      ptyKilled: true
+    }))
+  } satisfies LoopDriverRuntime
+}
+
+const RELAUNCH_LOOP = {
+  worktreeId: 'wt-1',
+  detached: false,
+  agent: 'claude' as const,
+  name: 'Fix tests',
+  launchOverrides: null,
+  paneKey: 'tab-1:leaf-1'
+}
+
+describe('resolvePane on renderer tabs', () => {
+  it('finds a live renderer tab pane the handle lookup cannot answer for', () => {
+    const runtime = rendererTabRuntime({ 'tab-1:leaf-1': { ptyId: 'pty-1', connected: true } })
+
+    expect(resolvePane(runtime, 'tab-1:leaf-1')).toEqual({
+      handle: 'term:tab-1:leaf-1',
+      ptyId: 'pty-1'
+    })
+  })
+
+  it('treats a pane whose process ended, or that is gone, as no pane', () => {
+    const runtime = rendererTabRuntime({ 'tab-1:leaf-1': { ptyId: 'pty-1', connected: false } })
+
+    expect(resolvePane(runtime, 'tab-1:leaf-1')).toBeNull()
+    expect(resolvePane(runtime, 'tab-9:leaf-9')).toBeNull()
+  })
+})
+
+describe('relaunchLoopAgent tab cleanup', () => {
+  it('closes the previous live tab after the new one launches', async () => {
+    const runtime = rendererTabRuntime({ 'tab-1:leaf-1': { ptyId: 'pty-1', connected: true } })
+    const previous = resolvePane(runtime, 'tab-1:leaf-1')
+
+    const launched = await relaunchLoopAgent(runtime, RELAUNCH_LOOP, previous)
+
+    expect(launched.paneKey).toBe('tab-2:leaf-2')
+    expect(runtime.closeTerminalTab).toHaveBeenCalledWith('term:tab-1:leaf-1')
+  })
+
+  it('closes the tab of the last pane when its agent already exited', async () => {
+    const runtime = rendererTabRuntime({ 'tab-1:leaf-1': { ptyId: 'pty-1', connected: false } })
+
+    await relaunchLoopAgent(runtime, RELAUNCH_LOOP, resolvePane(runtime, 'tab-1:leaf-1'))
+
+    expect(runtime.closeTerminalTab).toHaveBeenCalledWith('term:tab-1:leaf-1')
+  })
+
+  it('closes nothing when the last tab is already gone', async () => {
+    const runtime = rendererTabRuntime({})
+
+    await relaunchLoopAgent(runtime, RELAUNCH_LOOP, null)
+
+    expect(runtime.closeTerminalTab).not.toHaveBeenCalled()
   })
 })

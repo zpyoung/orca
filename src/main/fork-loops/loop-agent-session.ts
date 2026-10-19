@@ -45,17 +45,41 @@ export function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
 
 /** The live handle and pty behind a pane key, or null when the pane is gone or unresolvable. */
 export function resolvePane(runtime: LoopDriverRuntime, paneKey: string | null): PaneRef | null {
-  if (
-    !paneKey ||
-    typeof runtime.getTerminalHandleForPaneKey !== 'function' ||
-    typeof runtime.getTerminalPtyIdForHandle !== 'function'
-  ) {
+  if (!paneKey || typeof runtime.getTerminalHandleForPaneKey !== 'function') {
     return null
   }
   try {
     const handle = runtime.getTerminalHandleForPaneKey(paneKey)
-    const ptyId = handle ? runtime.getTerminalPtyIdForHandle(handle) : null
-    return handle && ptyId ? { handle, ptyId } : null
+    if (!handle) {
+      return null
+    }
+    const ptyId =
+      typeof runtime.getTerminalPtyIdForHandle === 'function'
+        ? runtime.getTerminalPtyIdForHandle(handle)
+        : null
+    if (ptyId) {
+      return { handle, ptyId }
+    }
+    // getTerminalPtyIdForHandle answers only for headless pty handles, never a renderer tab's pane
+    if (typeof runtime.resolveTerminalPane !== 'function') {
+      return null
+    }
+    const pane = runtime.resolveTerminalPane(paneKey)
+    return pane.ptyId && pane.connected !== false
+      ? { handle: pane.handle, ptyId: pane.ptyId }
+      : null
+  } catch {
+    return null
+  }
+}
+
+/** The handle still naming the loop's last pane, live or not, so a relaunch can close its tab. */
+function lastPaneHandle(runtime: LoopDriverRuntime, paneKey: string | null): string | null {
+  if (!paneKey || typeof runtime.getTerminalHandleForPaneKey !== 'function') {
+    return null
+  }
+  try {
+    return runtime.getTerminalHandleForPaneKey(paneKey)
   } catch {
     return null
   }
@@ -157,12 +181,16 @@ function backgroundAgentLauncher(
 }
 
 /**
- * Starts a fresh agent for the loop and closes `previous`. A close that fails after the new tab
- * launched is reported in `closeError` instead of failing, so the loop still binds the new tab.
+ * Starts a fresh agent for the loop and closes its previous tab: `previous` when live, else the tab
+ * of the loop's last pane if it is still open. A close that fails after the new tab launched is
+ * reported in `closeError` instead of failing, so the loop still binds the new tab.
  */
 export async function relaunchLoopAgent(
   runtime: LoopDriverRuntime,
-  loop: StoredLoop,
+  loop: Pick<
+    StoredLoop,
+    'worktreeId' | 'detached' | 'agent' | 'name' | 'launchOverrides' | 'paneKey'
+  >,
   previous: PaneRef | null
 ): Promise<RelaunchedAgentTab & { closeError: string | null }> {
   let closeError: string | null = null
@@ -187,7 +215,7 @@ export async function relaunchLoopAgent(
   }
   const launched = await relaunchAgentInNewTab(wrapped, {
     worktreeId: loop.worktreeId,
-    previousHandle: previous?.handle ?? null,
+    previousHandle: previous?.handle ?? lastPaneHandle(runtime, loop.paneKey),
     agent: loop.agent,
     title: loop.name,
     ...(loop.launchOverrides ? { launchOverrides: loop.launchOverrides } : {})
