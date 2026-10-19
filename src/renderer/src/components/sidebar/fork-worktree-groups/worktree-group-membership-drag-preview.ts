@@ -3,7 +3,7 @@ import type { Worktree } from '../../../../../shared/worktree/types'
 import {
   getProjectHeaderRevealTarget,
   type ProjectGroupingModel
-} from '../worktree-list/grouping/project-grouping'
+} from '../../../../../shared/project-section-grouping'
 import { measureProjectHeaderDragRects } from '../project-header-drop'
 import { measureProjectGroupHeaderDragRects } from '../project-group-header-drop'
 import {

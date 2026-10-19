@@ -1,10 +1,9 @@
 import type { Repo } from '../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
-import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
-import { getGitHubPRCacheKey } from '@/store/slices/github-cache-key'
+import { getWorktreeGitIdentityDisplay } from '../../../../../shared/worktree/git-identity-display'
+import { getGitHubPRCacheKey } from '../../../../../shared/github/github-cache-key'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
 import type { AppState } from '@/store/types'
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import { resolveWorkspaceReview } from './workspace-review-resolution'
 
 export type WorkspaceReviewFilterContext = {
@@ -12,9 +11,6 @@ export type WorkspaceReviewFilterContext = {
   hidePassingCheckWorkspaces: boolean
   prCache: AppState['prCache'] | null
   hostedReviewCache: AppState['hostedReviewCache'] | null
-  // The only settings field the cache keys read, kept primitive so an unrelated settings write
-  // cannot re-key the sidebar's visibility scan.
-  activeRuntimeEnvironmentId: GlobalSettings['activeRuntimeEnvironmentId'] | null
 }
 
 function cacheEntries(worktree: Worktree, repo: Repo, context: WorkspaceReviewFilterContext) {
@@ -23,11 +19,10 @@ function cacheEntries(worktree: Worktree, repo: Repo, context: WorkspaceReviewFi
   if (!branchName) {
     return undefined
   }
-  const settings = { activeRuntimeEnvironmentId: context.activeRuntimeEnvironmentId }
   const hostedKey = getHostedReviewCacheKey(
     repo.path,
     branchName,
-    settings,
+    null,
     repo.id,
     repo.connectionId,
     repo.executionHostId,
@@ -37,7 +32,7 @@ function cacheEntries(worktree: Worktree, repo: Repo, context: WorkspaceReviewFi
     repo.path,
     repo.id,
     branchName,
-    settings,
+    null,
     repo.connectionId,
     repo.executionHostId,
     true
@@ -48,15 +43,14 @@ function cacheEntries(worktree: Worktree, repo: Repo, context: WorkspaceReviewFi
   }
 }
 
-export function filterWorktreesByReview(
-  worktrees: Worktree[],
+export function createReviewFilterPredicate(
   context: WorkspaceReviewFilterContext | undefined,
   repoMap: Map<string, Repo>
-): Worktree[] {
+): ((worktree: Worktree) => boolean) | null {
   if (!context || (!context.hideCompletedReviewWorkspaces && !context.hidePassingCheckWorkspaces)) {
-    return worktrees
+    return null
   }
-  return worktrees.filter((worktree) => {
+  return (worktree) => {
     const repo = repoMap.get(worktree.repoId)
     if (!repo) {
       return true
@@ -83,5 +77,14 @@ export function filterWorktreesByReview(
       return false
     }
     return true
-  })
+  }
+}
+
+export function filterWorktreesByReview(
+  worktrees: Worktree[],
+  context: WorkspaceReviewFilterContext | undefined,
+  repoMap: Map<string, Repo>
+): Worktree[] {
+  const keep = createReviewFilterPredicate(context, repoMap)
+  return keep ? worktrees.filter(keep) : worktrees
 }

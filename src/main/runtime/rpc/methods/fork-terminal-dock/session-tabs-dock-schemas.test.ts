@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SetTabProps } from '../session-tabs-schemas'
+import { SetTabProps } from '../../../../../shared/rpc-contract/session-tabs-schemas-params'
 import { OrcaRuntimeService } from '../../../orca-runtime'
 import {
   DEFAULT_TERMINAL_DOCK_GUTTER_ROWS,

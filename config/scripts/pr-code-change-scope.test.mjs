@@ -126,6 +126,7 @@ describe('per-job path classification', () => {
   })
 
   it('runs the Codex index-heal contract only when the heal or its transport changes', () => {
+    expectClassification(['src/main/codex/codex-app-server-session.test.ts'], {})
     expectClassification(['src/main/codex/codex-session-index-heal.ts'], {
       codex_index_heal_contract: true,
       package: true,
@@ -188,10 +189,9 @@ describe('per-job path classification', () => {
   })
 
   it('runs native package jobs only for the platform that ships the changed native', () => {
-    expectClassification(['native/windows-cli-launcher/src/main.rs'], {
-      package_windows: true
-    })
-    expectClassification(['native/computer-use-linux/runtime.py'], {
+    expectClassification(['native/windows-cli-launcher/src/main.rs'], { package_windows: true })
+    expectClassification(['native/computer-use-linux/runtime.py'], { package: true })
+    expectClassification(['native/wayland-clipboard/wayland-clipboard.c'], {
       package: true
     })
     expectClassification(['native/computer-use-macos/Package.swift'], {})
@@ -201,9 +201,10 @@ describe('per-job path classification', () => {
     for (const file of [
       'config/scripts/package-linux-formats.mjs',
       'config/scripts/package-linux-formats-appimage.mjs',
-      'config/scripts/script-child-process.mjs',
+      'config/scripts/process-failure-message.mjs',
       'config/scripts/space-sharing-copy.mjs',
       '.github/actions/prepare-linux-package-fixture/action.yml',
+      '.github/actions/prepare-wayland-clipboard/action.yml',
       'config/docker/cli-launch-contract/Dockerfile',
       'config/docker/cli-launch-contract/run-cli-case.sh',
       'config/docker/headless-pairing/Dockerfile',
@@ -214,8 +215,7 @@ describe('per-job path classification', () => {
       'config/scripts/static-appimage-package-contract.cjs'
     ]) {
       expectClassification([file], {
-        package: true,
-        mobile_web_app: file === 'config/scripts/script-child-process.mjs'
+        package: true
       })
     }
   })
@@ -229,8 +229,7 @@ describe('per-job path classification', () => {
       'config/scripts/run-daemon-shutdown-descendants-docker.mjs'
     ]) {
       expectClassification([file], {
-        package: true,
-        mobile_web_app: file === 'config/scripts/script-child-process.mjs'
+        package: true
       })
     }
     for (const file of [
@@ -281,7 +280,8 @@ describe('per-job path classification', () => {
     )
     for (const file of [
       'src/main/runtime/structured-session-login-shell-test-harness.ts',
-      'src/main/runtime/structured-session-child-identity-env.ts'
+      'src/main/runtime/structured-session-child-env.ts',
+      'src/main/runtime/structured-session-child-env.test-support.ts'
     ]) {
       expectClassification([file], {
         shell_contracts: true,
@@ -314,8 +314,7 @@ describe('per-job path classification', () => {
     for (const file of [
       'config/scripts/build-mobile-web-app-bundle.mjs',
       'config/scripts/run-mobile-web-app-checks.mjs',
-      'config/scripts/script-child-process.mjs',
-      'src/shared/child-process/run-process.ts',
+      'src/packages/process-host/src/run-process.ts',
       'config/scripts/mobile-web-app-route-manifest.mjs',
       'mobile/web-entry/index.tsx',
       'mobile/app/h/[hostId]/index.tsx',
@@ -363,7 +362,7 @@ describe('per-job path classification', () => {
       'src/main/runtime/agent-session-record-store.ts',
       'src/main/runtime/rpc/dispatcher.ts',
       'src/main/runtime/rpc/methods/ai-vault.ts',
-      'src/main/runtime/rpc/methods/browser-tab-create-schema.ts',
+      'src/shared/rpc-contract/browser-tab-create-params.ts',
       'src/main/runtime/rpc/methods/session-tabs.ts',
       'src/main/runtime/rpc/methods/structured-agent-session.ts',
       'src/main/runtime/rpc/methods/structured-agent-session-gate.ts',
@@ -382,7 +381,9 @@ describe('per-job path classification', () => {
       expectClassification([file], {
         'cross-version-wire': true,
         package: true,
-        package_windows: true
+        package_windows: true,
+        // The session-tabs RPC publishes layout, so the layout oracle gates it too.
+        layout_oracle: file === 'src/main/runtime/rpc/methods/session-tabs.ts'
       })
     }
     expectClassification(
@@ -577,7 +578,9 @@ describe('PR Checks skip wiring', () => {
 
   it('keeps the root and README guards on docs-only PRs without another runner', () => {
     const detector = prWorkflow.jobs.code_paths
-    expect(detector.if).toBeUndefined()
+    expect(detector.if).toBe(
+      "github.event_name != 'pull_request' || github.event.pull_request.draft != true"
+    )
     expect(detector.needs).toBeUndefined()
     for (const name of ['Reject new root-level files and folders', 'Check README local links']) {
       const step = detector.steps.find((candidate) => candidate.name === name)

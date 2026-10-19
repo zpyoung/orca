@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo } from 'react'
 import { useAppStore } from '../../store'
 import { sendNativeChatTypedCommand } from './native-chat-runtime-send'
 import { isSlashCommandDraft } from '../../../../shared/native-chat-slash-commands'
@@ -25,7 +25,8 @@ import { useNativeChatSessionOptionCommand } from './use-native-chat-session-opt
 import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
 import { useNativeChatComposerCatalog } from './use-native-chat-composer-catalog'
-import { useNativeChatHeldQueueComposerSend } from './use-native-chat-held-queue-composer-send'
+import { useNativeChatStructuredComposerSend } from './use-native-chat-structured-composer-send'
+import { useNativeChatMobileHoldNotice } from './use-native-chat-mobile-hold-notice'
 import { useNativeChatComposerSubmit } from './use-native-chat-composer-submit'
 import { answerNativeChatCommandInComposer } from './use-native-chat-local-command-answer'
 import { seedHistory } from './fork-agent-composer/agent-composer-history'
@@ -65,6 +66,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       targetPtyId,
       agent,
       canSend = true,
+      unavailableHint,
       sendDisabled = false,
       layout,
       isWorking = false,
@@ -91,6 +93,14 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     },
     ref
   ): React.JSX.Element {
+    const holdNotice = useNativeChatMobileHoldNotice(
+      structuredTransport ? null : targetPtyId,
+      canSend
+    )
+    const composerNotices = useMemo(
+      () => (holdNotice ? [...(notices ?? []), holdNotice] : notices),
+      [notices, holdNotice]
+    )
     const coreProps = {
       terminalTabId,
       paneKey,
@@ -98,6 +108,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       targetPtyId,
       agent,
       canSend,
+      unavailableHint,
       allowWithoutTarget: Boolean(structuredTransport),
       sendDisabled,
       layout,
@@ -105,7 +116,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       isStopping,
       afterStop,
       inputOwnedByCard,
-      notices,
+      notices: composerNotices,
       sendTier,
       onSendOutcome,
       onStop,
@@ -144,6 +155,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       caret: core.caret,
       agentCommands,
       recalledFromHistory: core.history.index !== null,
+      disabled: core.disabled,
       sessionSkillNames,
       textareaRef: core.textareaRef,
       setDraft: core.setDraft,
@@ -182,19 +194,20 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       [draftScopeKey]
     )
 
-    const { pickAttachments, resolveAttachmentOwner } = useNativeChatFileDrops({
-      paneKey,
-      draftScopeKey,
-      targetPtyId,
-      structuredTransport,
-      terminalTabId,
-      structuredWorktreeId: structuredTransport?.worktreeId,
-      structuredSession: structuredTransport,
-      disabled: core.disabled,
-      attachResolvedPaths,
-      pendingChips: attachments.pendingChips,
-      setNotice: core.setNotice
-    })
+    const { pickAttachments, attachExternalPaths, captureCopiedFiles, resolveAttachmentOwner } =
+      useNativeChatFileDrops({
+        paneKey,
+        draftScopeKey,
+        targetPtyId,
+        structuredTransport,
+        terminalTabId,
+        structuredWorktreeId: structuredTransport?.worktreeId,
+        structuredSession: structuredTransport,
+        disabled: core.disabled,
+        attachResolvedPaths,
+        pendingChips: attachments.pendingChips,
+        setNotice: core.setNotice
+      })
 
     const { handlePaste, pasteFromClipboard } = useNativeChatComposerPaste({
       targetKey: JSON.stringify([
@@ -210,6 +223,8 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       caret: core.caret,
       resolveAttachmentOwner,
       attachResolvedPaths,
+      attachCopiedFiles: attachExternalPaths,
+      captureCopiedFiles,
       beginPendingImageAttachment: attachments.beginPendingImageAttachment,
       // Settles into the scope cache, which outlives a composer a prompt card unmounted.
       resolvePendingImageAttachment: attachments.pendingChips.resolve,
@@ -220,7 +235,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setNotice: core.setNotice
     })
 
-    const dictation = useNativeChatDictation(core.textareaRef)
+    const dictation = useNativeChatDictation(core.textareaRef, core.disabled)
 
     const { dispatch: dispatchSessionOptionCommand, isDispatching: isDispatchingSessionOption } =
       useNativeChatSessionOptionCommand({
@@ -248,7 +263,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     const sessionOptionsSnapshot = structuredTransport?.optionSnapshot ?? ptySessionOptionsSnapshot
 
     const historyTransport = useAgentComposerStructuredHistory(structuredTransport, core.setHistory)
-    const { send: sendStructured, fieldProps: queue } = useNativeChatHeldQueueComposerSend({
+    const sendStructured = useNativeChatStructuredComposerSend({
       agent,
       draftScopeKey,
       imageAttachments,
@@ -307,6 +322,9 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     const bridges: AgentComposerHostBridges = {
       ...(structuredTransport ? { sendOverride: submitStructured } : {}),
       sendHeld: structuredTransport?.sendOut === true,
+      ...(structuredTransport?.sendBlockedReason !== undefined
+        ? { sendBlockedReason: structuredTransport.sendBlockedReason }
+        : {}),
       answerLocally: (text) =>
         isSlashCommandDraft(text) &&
         !isDispatchingSessionOption &&
@@ -336,7 +354,6 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       ...(steerQueued ? { steerQueued } : {}),
       goalMode,
       contextUsage: contextUsageSummary,
-      ...queue,
       imageAttachments,
       onAttach: pickAttachments,
       onRemoveImageAttachment: removeImageAttachment,
@@ -408,6 +425,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       <AgentComposerField
         {...fieldProps}
         sessionOptionsPickerRequest={structuredTransport?.optionPickerRequest ?? null}
+        agent={agent}
       />
     )
   }

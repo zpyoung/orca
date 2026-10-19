@@ -164,8 +164,7 @@ export function baseDeps(ledgerStore: MemoryLedgerStore): TestRoutingDependencie
         kind: 'folder',
         executionHostId: 'local',
         workspacePath: '/workspace',
-        watcherId: 'watcher-1',
-        fileProvider: null
+        watcherId: 'watcher-1'
       }),
       ensureRun: async () => ({ runId: 'run-1' })
     },

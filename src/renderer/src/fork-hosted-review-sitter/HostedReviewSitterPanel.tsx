@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
 import type { HostedReviewInfo } from '../../../shared/hosted-review'
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
@@ -550,9 +550,12 @@ function HostedReviewSitterPanelContent({
 export function HostedReviewSitterReviewPanel(
   props: HostedReviewSitterReviewPanelProps
 ): React.JSX.Element | null {
-  const runtimeEnvironmentId = useAppStore((state) =>
-    getRuntimeEnvironmentIdForWorktree(state, props.worktreeId)
-  )
+  // Why: null is a twin-published workspace and '' is this app, so the selector stays primitive.
+  const ownerEnvironmentKey = useAppStore((state) => {
+    const owner = runtimeEnvironmentIdForWorkspaceOwner(state, { workspaceId: props.worktreeId })
+    return owner.kind === 'resolved' ? (owner.environmentId ?? '') : null
+  })
+  const runtimeEnvironmentId = ownerEnvironmentKey || null
   const runtimeEnvironmentPairingRevision = useAppStore((state) => {
     if (!runtimeEnvironmentId) {
       return null
@@ -572,6 +575,10 @@ export function HostedReviewSitterReviewPanel(
     runtimeEnvironmentId,
     runtimeEnvironmentPairingRevision
   ])
+  // Why: a watcher armed on a guessed host would watch a different machine's checkout.
+  if (ownerEnvironmentKey === null) {
+    return null
+  }
   return (
     <HostedReviewSitterPanelContent
       key={identityKey}

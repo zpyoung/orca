@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { getManagedStatusLineScript } from './session-info-statusline-chaining'
 import { SESSION_INFO_STATUSLINE_CHAIN_ENV } from './session-info-statusline-chain-script'
 

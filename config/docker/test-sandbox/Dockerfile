@@ -88,17 +88,20 @@ WORKDIR /work
 
 COPY --chown=runner:runner package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY --chown=runner:runner config/patches ./config/patches
+# Why: pnpm-workspace.yaml lists these packages, so install fails without their manifests.
+COPY --chown=runner:runner src/packages ./src/packages
+COPY --chown=runner:runner native/windows-registry/package.json ./native/windows-registry/package.json
+COPY --chown=runner:runner native/windows-security/package.json ./native/windows-security/package.json
 
 RUN pnpm install --no-frozen-lockfile --no-prefer-frozen-lockfile --ignore-scripts
 
 COPY --chown=runner:runner config/scripts ./config/scripts
 # Why: install-electron-package-binary.mjs re-exports its zip extractor from src/shared.
 COPY --chown=runner:runner src/shared/zip-extractor-command.ts ./src/shared/zip-extractor-command.ts
-# Why: config/scripts/script-child-process.mjs bundles run-process.ts and its import closure.
-COPY --chown=runner:runner src/shared/child-process ./src/shared/child-process
-COPY --chown=runner:runner src/shared/growing-byte-buffer.ts ./src/shared/growing-byte-buffer.ts
 
-RUN node config/scripts/ensure-native-runtime.mjs --runtime=node \
+# Why build:packages first: ensure-native-runtime.mjs imports @orca/process-host's dist output.
+RUN pnpm run build:packages \
+  && node config/scripts/ensure-native-runtime.mjs --runtime=node \
   && node config/scripts/install-electron-package-binary.mjs \
   && sha256sum pnpm-lock.yaml | cut -d ' ' -f 1 > /home/runner/lockfile.sha256
 

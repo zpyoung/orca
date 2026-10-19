@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { mintDeviceCredential } from '../../../device-credential'
 import {
   DESKTOP_RENDERER_CLIENT_ID,
   isLocalArtifactPasswordCaller
@@ -48,8 +49,11 @@ describe('artifact password local caller', () => {
   // Why: the gate is only sound while no paired device token can equal the renderer literal.
   // Tokens are randomBytes(24).toString('hex') — 48 lowercase hex chars, which this never is.
   it('cannot collide with a registry-issued device token', () => {
-    const source = readFileSync(join(REPO_ROOT, 'src/main/runtime/device-registry.ts'), 'utf8')
-    expect(source).toContain("token: randomBytes(24).toString('hex')")
+    const minter = readFileSync(join(REPO_ROOT, 'src/main/runtime/device-credential.ts'), 'utf8')
+    expect(minter).toContain("token: randomBytes(24).toString('hex')")
+    const registry = readFileSync(join(REPO_ROOT, 'src/main/runtime/device-registry.ts'), 'utf8')
+    expect(registry).toContain('...mintDeviceCredential()')
+    expect(mintDeviceCredential().token).toMatch(/^[0-9a-f]{48}$/)
     expect(DESKTOP_RENDERER_CLIENT_ID).not.toMatch(/^[0-9a-f]{48}$/)
   })
 })

@@ -19,8 +19,8 @@ const MESSAGE = 'please also run lint'
 const retained = vi.hoisted((): { session: NativeChatLiveSession | null } => ({ session: null }))
 const composer = vi.hoisted(() => ({ mounts: 0, typed: vi.fn<(text: string) => boolean>() }))
 const pty = vi.hoisted(() => ({
-  verified: vi.fn<(settings: unknown, id: string, data: string) => Promise<boolean>>(),
-  raw: vi.fn<(settings: unknown, id: string, data: string) => boolean>()
+  verified: vi.fn<(id: string, data: string) => Promise<boolean>>(),
+  raw: vi.fn<(id: string, data: string) => boolean>()
 }))
 vi.mock('./use-native-chat-retained-session', () => ({
   useNativeChatRetainedSession: () => retained.session
@@ -28,10 +28,9 @@ vi.mock('./use-native-chat-retained-session', () => ({
 vi.mock('@/runtime/runtime-terminal-inspection', async (importOriginal) => ({
   ...(await importOriginal<RuntimeTerminalInspection>()),
   sendRuntimePtyInput: pty.raw,
-  sendRuntimePtyInputAcceptance: async (settings: unknown, id: string, data: string) =>
-    pty.raw(settings, id, data),
-  sendRuntimePtyInputDelivery: async (settings: unknown, id: string, data: string) =>
-    (await pty.verified(settings, id, data)) ? 'accepted' : 'refused'
+  sendRuntimePtyInputAcceptance: async (id: string, data: string) => pty.raw(id, data),
+  sendRuntimePtyInputDelivery: async (id: string, data: string) =>
+    (await pty.verified(id, data)) ? 'accepted' : 'refused'
 }))
 vi.mock('@/runtime/runtime-terminal-verified-input', () => ({
   sendRuntimePtyInputVerified: pty.verified
@@ -74,8 +73,7 @@ vi.mock('./NativeChatComposer', async () => {
           let pendingId: string | undefined
           const target = {
             terminalTabId: props.terminalTabId,
-            ptyId: props.targetPtyId ?? '',
-            settings: null
+            ptyId: props.targetPtyId ?? ''
           }
           const handle = sendNativeChatMessage(target, MESSAGE, {
             onWriteRejected: () => {
@@ -176,34 +174,39 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
-  resetNativeChatPtySendQueuesForTests()
-  restoreViewport()
-  useAppStore.setState({ agentStatusByPaneKey: {}, nativeChatLaunchPromptByTabId: {} })
+  try {
+    cleanup()
+    resetNativeChatPtySendQueuesForTests()
+    restoreViewport()
+    useAppStore.setState({ agentStatusByPaneKey: {}, nativeChatLaunchPromptByTabId: {} })
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 describe('a prompt card hides the composer without unmounting it', () => {
   it('keeps an in-flight message visible and never submits it into the approval', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     setStatus({ state: 'working' })
     renderPane()
     await act(async () => {
       fireEvent.click(screen.getByTestId('composer-send'))
     })
-    expect(pty.verified.mock.calls.map((call) => call[2]).join('')).toContain(MESSAGE)
+    expect(pty.verified.mock.calls.map((call) => call[1]).join('')).toContain(MESSAGE)
 
     // The approval arrives inside the body-to-Enter gap.
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await vi.advanceTimersByTimeAsync(100)
       setStatus({ state: 'waiting', interactivePrompt: approval })
     })
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 900))
+      await vi.advanceTimersByTimeAsync(900)
     })
 
     expect(document.querySelector('[data-native-chat-approval-card="true"]')).not.toBeNull()
-    expect(pty.verified.mock.calls.map((call) => call[2])).not.toContain('\r')
+    expect(pty.verified.mock.calls.map((call) => call[1])).not.toContain('\r')
     // Only the pre-body clear: retiring the send types nothing under the card.
-    expect(pty.raw.mock.calls.map((call) => call[2])).toEqual(['\x15'])
+    expect(pty.raw.mock.calls.map((call) => call[1])).toEqual(['\x15'])
     expect(screen.getByTestId('composer-send').closest('[hidden]')).not.toBeNull()
     expect(screen.getAllByText(MESSAGE).length).toBeGreaterThan(0)
     expect(screen.getByText('Message not sent')).toBeInTheDocument()

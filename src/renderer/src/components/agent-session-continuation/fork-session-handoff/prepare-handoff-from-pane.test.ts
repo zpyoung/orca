@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager'
-import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { resolveOwner } from '@/lib/resolve-owner'
 import { prepareAgentSessionContinuationFromPane as prepareUpstreamAgentSessionContinuationFromPane } from '../../terminal-pane/terminal-agent-session-continuation'
 import {
   isForkSessionHandoffRequest,
@@ -19,8 +19,11 @@ const { storeState } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/store', () => ({ useAppStore: { getState: () => storeState } }))
-vi.mock('@/lib/worktree-runtime-owner', () => ({
-  getExecutionHostIdForWorktree: vi.fn(() => 'ssh:dev-box')
+vi.mock('@/lib/resolve-owner', () => ({
+  resolveOwner: vi.fn(() => ({
+    kind: 'resolved',
+    owner: { endpoint: { kind: 'self' }, at: 'ssh:dev-box' }
+  }))
 }))
 vi.mock('../../terminal-pane/terminal-agent-session-continuation', () => ({
   prepareAgentSessionContinuationFromPane: vi.fn()
@@ -60,7 +63,7 @@ describe('prepareAgentSessionContinuationFromPane', () => {
     })
 
     expect(prepareUpstreamAgentSessionContinuationFromPane).toHaveBeenCalledOnce()
-    expect(getExecutionHostIdForWorktree).toHaveBeenCalledWith(storeState, 'repo::/worktree')
+    expect(resolveOwner).toHaveBeenCalledWith(storeState, { workspaceId: 'repo::/worktree' })
     expect(result?.forkSource).toMatchObject({
       sourcePaneKey: 'tab-1:11111111-1111-4111-8111-111111111111',
       sourceWorktreeId: 'repo::/worktree',
@@ -88,6 +91,37 @@ describe('prepareAgentSessionContinuationFromPane', () => {
     })
 
     expect(result).toBeNull()
-    expect(getExecutionHostIdForWorktree).not.toHaveBeenCalled()
+    expect(resolveOwner).not.toHaveBeenCalled()
+  })
+
+  it('reports a runtime-owned source by its server host id', () => {
+    vi.mocked(resolveOwner).mockReturnValueOnce({
+      kind: 'resolved',
+      owner: { endpoint: { kind: 'environment', environmentId: 'env-1' }, at: 'local' }
+    })
+    const result = prepareAgentSessionContinuationFromPane({
+      pane: makePane(),
+      tabId: 'tab-1',
+      worktreeId: 'repo::/worktree',
+      groupId: 'group-1',
+      workspacePath: '/worktree',
+      initialCwd: '/worktree'
+    })
+
+    expect(result?.forkSource?.sourceExecutionHostId).toBe('runtime:env-1')
+  })
+
+  it('leaves the source host unknown when two hosts publish the workspace', () => {
+    vi.mocked(resolveOwner).mockReturnValueOnce({ kind: 'ambiguous' })
+    const result = prepareAgentSessionContinuationFromPane({
+      pane: makePane(),
+      tabId: 'tab-1',
+      worktreeId: 'repo::/worktree',
+      groupId: 'group-1',
+      workspacePath: '/worktree',
+      initialCwd: '/worktree'
+    })
+
+    expect(result?.forkSource?.sourceExecutionHostId).toBeNull()
   })
 })

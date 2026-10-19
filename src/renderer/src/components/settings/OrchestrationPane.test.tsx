@@ -11,11 +11,11 @@ import { useAppStore } from '../../store'
 import { OrchestrationPane } from './OrchestrationPane'
 import { getOrchestrationPaneSearchEntries } from './orchestration-search'
 import { matchesSettingsSearch } from './settings-search'
+import { SKILLS_CLI_VERSION } from '../../../../shared/agent-feature-install-commands'
 import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
-const INSTALL_COMMAND = `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
-const UPDATE_COMMAND = INSTALL_COMMAND
-const WINDOWS_INSTALL_COMMAND = `cmd.exe /d /s /c "where.exe npx >nul 2>nul & if errorlevel 1 (echo ERROR: npx was not found. Install Node.js LTS from https://nodejs.org/ to get npx. & echo Then close this terminal and start skill setup again - a new terminal picks up the updated PATH. & exit /b 1) else (npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global)"`
+const INSTALL_COMMAND = `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orchestration --global`
+const WINDOWS_INSTALL_COMMAND = `cmd.exe /d /s /c "where.exe npx >nul 2>nul & if errorlevel 1 (echo ERROR: npx was not found. Install Node.js LTS from https://nodejs.org/ to get npx. & echo Then close this terminal and start skill setup again - a new terminal picks up the updated PATH. & exit /b 1) else (npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orchestration --global)"`
 
 const mocks = vi.hoisted(() => ({
   dialogProps: [] as Record<string, unknown>[],
@@ -68,7 +68,7 @@ vi.mock('@/hooks/useInstalledAgentSkills', () => ({
         description: null,
         providers: ['claude'],
         sourceKind: 'home',
-        sourceLabel: 'Claude home',
+        sourceLabel: 'Claude Code home',
         rootPath: '/Users/test/.claude/skills',
         directoryPath: '/Users/test/.claude/skills/orchestration',
         skillFilePath: '/Users/test/.claude/skills/orchestration/SKILL.md',
@@ -79,7 +79,7 @@ vi.mock('@/hooks/useInstalledAgentSkills', () => ({
     sources: [
       {
         id: 'home-claude',
-        label: 'Claude home',
+        label: 'Claude Code home',
         path: '/Users/test/.claude/skills',
         sourceKind: 'home',
         providers: ['claude'],
@@ -254,15 +254,13 @@ describe('OrchestrationPane', () => {
     ).toBe(false)
   })
 
-  it('passes update commands to the main panel without an installed manual-copy path', async () => {
+  it('passes the install command, which also updates, without a manual-copy path', async () => {
     const rendered = await renderPane()
 
     expect(mocks.panelProps.at(-1)).toEqual(
-      expect.objectContaining({
-        command: WINDOWS_INSTALL_COMMAND,
-        installedCommand: WINDOWS_INSTALL_COMMAND
-      })
+      expect.objectContaining({ command: WINDOWS_INSTALL_COMMAND })
     )
+    expect(mocks.panelProps.at(-1)?.installedCommand).toBeUndefined()
 
     expect(rendered.textContent).not.toContain('Prefer your own terminal?')
     expect(rendered.textContent).not.toContain('Copy update command')
@@ -270,7 +268,7 @@ describe('OrchestrationPane', () => {
     expect(mocks.dialogProps).not.toContainEqual(expect.objectContaining({ mode: 'update' }))
     expect(mocks.dialogProps).not.toContainEqual(
       expect.objectContaining({
-        command: UPDATE_COMMAND,
+        command: INSTALL_COMMAND,
         open: true
       })
     )

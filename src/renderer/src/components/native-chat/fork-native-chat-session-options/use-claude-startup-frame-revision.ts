@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { AgentType } from '../../../../../shared/agent-status-types'
-import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
 import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-stream'
 import { subscribeToPtyData } from '../../terminal-pane/pty-data-sidecar-subscriptions'
@@ -92,7 +91,6 @@ export function useClaudeStartupFrameRevision(args: {
     try {
       if (isRemoteRuntimePtyId(targetPtyId)) {
         void subscribeToRuntimeTerminalData(
-          getSettingsForAgentTabRuntimeOwner(terminalTabId),
           targetPtyId,
           `desktop:native-chat-startup-frame:${targetPtyId}`,
           observeData

@@ -4,12 +4,13 @@ import type { FolderWorkspace } from '../../../../../shared/folder-workspace-typ
 import type { ProjectGroup } from '../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
-import { buildRows } from '../worktree-list/grouping/build-rows'
-import { getGroupKeysForWorktree } from '../worktree-list/grouping/worktree-group-keys'
+import { getWorktreeHostIdentity } from '../../../../../shared/worktree/host-qualified-identity'
+import type { OccurrenceSectionPath } from '../../../../../shared/worktree-occurrence-plan'
 import {
   getLooseSectionProjectGroupId,
   isLooseProjectGroupTopRow
-} from './worktree-loose-group-membership'
+} from '../../../../../shared/fork-worktree-groups/worktree-loose-group-membership'
+import { buildRows, buildSidebarRowPlan } from '../worktree-list/grouping/build-rows.test-fixture'
 
 const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
 const repo: Repo = {
@@ -47,6 +48,37 @@ const worktree: Worktree = {
   lastActivityAt: 0
 }
 const repoMap = new Map([[repo.id, repo]])
+
+function getRevealSectionKeys(
+  target: Worktree,
+  repos: readonly Repo[],
+  projectGroups: readonly ProjectGroup[]
+): string[] {
+  const plan = buildSidebarRowPlan(
+    'repo',
+    [target],
+    new Map(repos.map((entry) => [entry.id, entry])),
+    null,
+    new Set(),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    false,
+    undefined,
+    projectGroups
+  )
+  const keys: string[] = []
+  let path: OccurrenceSectionPath | undefined = plan.occurrencePlan.preferredByIdentity.get(
+    getWorktreeHostIdentity(target)
+  )?.sectionPath
+  while (path) {
+    keys.unshift(path.key)
+    path = path.parent
+  }
+  return keys
+}
 
 describe('cross-repo worktree groups (loose worktrees)', () => {
   const crossGroup: ProjectGroup = {
@@ -607,7 +639,7 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
     )
   })
 
-  describe('getGroupKeysForWorktree with loose worktrees', () => {
+  describe('reveal path for loose worktrees', () => {
     it("reveals through the worktree's own group and its ancestors, not its repo's", () => {
       const ownParentGroup: ProjectGroup = {
         ...crossGroup,
@@ -629,13 +661,9 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
       const looseWorktree: Worktree = { ...worktree, projectGroupId: ownChildGroup.id }
 
       expect(
-        getGroupKeysForWorktree(
-          'repo',
+        getRevealSectionKeys(
           looseWorktree,
-          new Map([[groupedRepo.id, groupedRepo]]),
-          null,
-          undefined,
-          undefined,
+          [groupedRepo],
           [ownParentGroup, ownChildGroup, repoOwnGroup]
         )
       ).toEqual([
@@ -649,34 +677,20 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
       const groupedRepo: Repo = { ...repo, projectGroupId: crossGroup.id }
       const plainWorktree: Worktree = { ...worktree }
 
-      expect(
-        getGroupKeysForWorktree(
-          'repo',
-          plainWorktree,
-          new Map([[groupedRepo.id, groupedRepo]]),
-          null,
-          undefined,
-          undefined,
-          [crossGroup]
-        )
-      ).toEqual(['project-group:group-cross', 'repo:repo-1'])
+      expect(getRevealSectionKeys(plainWorktree, [groupedRepo], [crossGroup])).toEqual([
+        'project-group:group-cross',
+        'repo:repo-1'
+      ])
     })
 
     it('falls back to the repo-derived keys when the worktree names a group absent from projectGroups', () => {
       const groupedRepo: Repo = { ...repo, projectGroupId: crossGroup.id }
       const orphanWorktree: Worktree = { ...worktree, projectGroupId: 'missing-group-id' }
 
-      expect(
-        getGroupKeysForWorktree(
-          'repo',
-          orphanWorktree,
-          new Map([[groupedRepo.id, groupedRepo]]),
-          null,
-          undefined,
-          undefined,
-          [crossGroup]
-        )
-      ).toEqual(['project-group:group-cross', 'repo:repo-1'])
+      expect(getRevealSectionKeys(orphanWorktree, [groupedRepo], [crossGroup])).toEqual([
+        'project-group:group-cross',
+        'repo:repo-1'
+      ])
     })
   })
 })

@@ -50,8 +50,7 @@ function harness(storeOverrides: Partial<ObjectiveStore> = {}) {
     target: {
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath: '/workspace',
-      fileProvider: null
+      workspacePath: '/workspace'
     }
   })
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of ObjectiveStore, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.

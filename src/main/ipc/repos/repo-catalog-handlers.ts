@@ -2,18 +2,18 @@ import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
 import type { Store } from '../../persistence'
 import type { Project, ProjectUpdateArgs } from '../../../shared/project-types'
-import type {
-  HostRepoCatalogSnapshot,
-  ListReposForExecutionHostArgs
-} from '../../../shared/host-repo-catalog-contract'
 import { normalizeExecutionHostId } from '../../../shared/execution-host'
 import { enrichRepoGitUsernames } from '../../repo-git-username-enrichment'
 import { enrichMissingRepoGitRemoteIdentities } from '../../repo-git-remote-identity-enrichment'
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { notifyReposChanged } from './repos-changed-notification'
 import { ProjectUpdateIpcArgs, parseProjectGroupIpcArgs } from './repo-ipc-arg-schemas'
-import { listReposForExecutionHost } from './host-repo-catalog-snapshot'
 import { visibleRepos } from '../../ssh/orcad-retained-source'
+import {
+  assertWslMoveProjectWritable,
+  assertWslMoveReposWritable,
+  isWslMoveSourceHost
+} from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
 
 export function registerRepoCatalogHandlers(
@@ -32,12 +32,6 @@ export function registerRepoCatalogHandlers(
     return visibleRepos(store)
   })
 
-  ipcMain.handle(
-    'repos:listForExecutionHost',
-    (_event, args: ListReposForExecutionHostArgs): Promise<HostRepoCatalogSnapshot> =>
-      listReposForExecutionHost(store, args)
-  )
-
   ipcMain.handle('projects:list', () => {
     enrichMissingRepoGitRemoteIdentities(store, { onChanged: broadcastReposChanged })
     return store.getProjects()
@@ -49,6 +43,8 @@ export function registerRepoCatalogHandlers(
       rawArgs,
       'project_update_invalid_args'
     )
+    const project = store.getProjects().find((entry) => entry.id === args.projectId)
+    assertWslMoveReposWritable(store, project?.sourceRepoIds ?? [])
     return store.updateProject(args.projectId, args.updates)
   })
 
@@ -105,6 +101,9 @@ export function registerRepoCatalogHandlers(
       const hostId = normalizeExecutionHostId(args.hostId)
       if (!hostId) {
         throw new Error(`Invalid host ID: ${args.hostId}`)
+      }
+      if (isWslMoveSourceHost(hostId)) {
+        assertWslMoveProjectWritable(store, { repoId: args.repoId })
       }
       // Why: the runtime resolves a bare id and rejects one registered on two hosts, so only route
       // through it when the caller actually asked for the ledger retention guard.

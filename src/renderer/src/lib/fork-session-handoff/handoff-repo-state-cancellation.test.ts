@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
+import { runtimeTargetForWorkspaceOwner } from '@/lib/resolve-owner'
 import { clearRuntimeCompatibilityCacheForTests } from '@/runtime/runtime-rpc-client'
 import { createCompatibleRuntimeStatusResponse } from '@/runtime/runtime-compatibility-test-fixture'
-import { getRuntimeGitDiff } from '@/runtime/runtime-git-client'
+import { getRuntimeGitDiff } from '@/runtime/runtime-git-diff-client'
 import type { HandoffTargetResolution } from './handoff-target-resolution'
 import { fetchHandoffRepoState } from './handoff-repo-state'
 
-vi.mock('@/lib/worktree-runtime-owner', () => ({
-  getSettingsForWorktreeRuntimeOwner: vi.fn()
+vi.mock('@/lib/resolve-owner', () => ({
+  runtimeTargetForWorkspaceOwner: vi.fn()
 }))
 
 const gitStatus = vi.fn()
@@ -38,7 +38,7 @@ function target(overrides: Partial<HandoffTargetResolution> = {}): HandoffTarget
 
 beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
-  vi.mocked(getSettingsForWorktreeRuntimeOwner).mockReset()
+  vi.mocked(runtimeTargetForWorkspaceOwner).mockReset()
   gitStatus.mockReset()
   gitCancelStatus.mockReset()
   gitCancelStatus.mockResolvedValue(undefined)
@@ -74,7 +74,7 @@ describe('handoff repo-state diff cancellation', () => {
     await expect(
       getRuntimeGitDiff(
         {
-          settings: { activeRuntimeEnvironmentId: null },
+          target: { kind: 'local' },
           worktreeId: 'repo::/worktree',
           worktreePath: '/worktree',
           connectionId: 'ssh-dev'
@@ -99,7 +99,7 @@ describe('handoff repo-state diff cancellation', () => {
 
     await getRuntimeGitDiff(
       {
-        settings: { activeRuntimeEnvironmentId: null },
+        target: { kind: 'local' },
         worktreeId: 'repo::/worktree',
         worktreePath: '/worktree',
         connectionId: 'ssh-dev'
@@ -112,9 +112,7 @@ describe('handoff repo-state diff cancellation', () => {
   })
 
   it('aborts a pending SSH IPC diff and rejects the handoff promptly', async () => {
-    vi.mocked(getSettingsForWorktreeRuntimeOwner).mockReturnValue({
-      activeRuntimeEnvironmentId: null
-    })
+    vi.mocked(runtimeTargetForWorkspaceOwner).mockReturnValue({ kind: 'local' })
     gitStatus.mockResolvedValue(status)
     const diff = Promise.withResolvers<never>()
     gitDiff.mockReturnValue(diff.promise)
@@ -138,8 +136,9 @@ describe('handoff repo-state diff cancellation', () => {
   })
 
   it('aborts a pending remote-runtime diff without serializing the signal', async () => {
-    vi.mocked(getSettingsForWorktreeRuntimeOwner).mockReturnValue({
-      activeRuntimeEnvironmentId: 'env-1'
+    vi.mocked(runtimeTargetForWorkspaceOwner).mockReturnValue({
+      kind: 'environment',
+      environmentId: 'env-1'
     })
     const diffUnsubscribe = vi.fn()
     const stalledCall = Promise.withResolvers<never>()

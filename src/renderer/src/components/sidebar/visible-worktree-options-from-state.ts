@@ -6,10 +6,10 @@ import { getWorktreeIdsWithStructuredChat } from './visible-worktree-activity-in
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
-} from './workspace-creator-visibility'
-import type { VisibleWorktreeOptions } from './visible-worktrees'
-import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'
-import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/use-workspace-review-filter'
+} from '../../../../shared/workspace-creator-visibility'
+import type { VisibleWorktreeOptions } from './compute-visible-worktrees'
+import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter-context'
+import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/workspace-review-filter-context'
 
 /**
  * Read the store into the filter inputs `computeVisibleWorktrees` decides from.

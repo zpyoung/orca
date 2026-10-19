@@ -1,5 +1,5 @@
 import type { WorktreeDragGroup } from './worktree-manual-order'
-import { PINNED_GROUP_KEY } from './worktree-list/grouping/group-keys'
+import { PINNED_GROUP_KEY } from '../../../../shared/sidebar-list/group-keys'
 import { getNaturalWorktreeIds } from './natural-worktree-ids'
 import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'
 
@@ -45,7 +45,7 @@ export function getWorktreeDragUnitGroups(
     if (row.sectionKey === PINNED_GROUP_KEY && naturalWorktreeIds.has(row.worktree.id)) {
       continue
     }
-    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {
+    if (current === null || needsWorktreeDragGroup(current.key, row.sectionKey)) {
       current = { key: row.sectionKey, units: [] }
       groups.push({
         key: current.key,
@@ -53,12 +53,11 @@ export function getWorktreeDragUnitGroups(
         worktreeIds: current.units.map((unit) => unit.worktreeId)
       })
     }
-    const currentGroup = current!
-    if (row.depth > 0 && currentGroup.units.length > 0) {
-      currentGroup.units.at(-1)!.worktreeIds.push(row.worktree.id)
+    if (row.depth > 0 && current.units.length > 0) {
+      current.units.at(-1)!.worktreeIds.push(row.worktree.id)
       continue
     }
-    currentGroup.units.push({ worktreeId: row.worktree.id, worktreeIds: [row.worktree.id] })
+    current.units.push({ worktreeId: row.worktree.id, worktreeIds: [row.worktree.id] })
   }
 
   return groups

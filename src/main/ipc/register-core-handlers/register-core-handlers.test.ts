@@ -51,6 +51,7 @@ const {
   registerAppHandlersMock,
   registerLinearHandlersMock,
   registerJiraHandlersMock,
+  registerJiraIssueSummaryGenerationHandlersMock,
   registerBitbucketHandlersMock,
   registerGitLabHandlersMock,
   registerHostedReviewHandlersMock,
@@ -58,6 +59,7 @@ const {
   registerCodexConfigSyncHandlersMock,
   registerOnboardingHandlersMock,
   registerDashboardPopoutHandlersMock,
+  registerWorkspaceSpaceWindowHandlersMock,
   isDashboardPopoutRendererMock,
   registerTerminalPreviewHandlersMock,
   registerSpeechHandlersMock,
@@ -120,6 +122,7 @@ const {
   registerAppHandlersMock: vi.fn(),
   registerLinearHandlersMock: vi.fn(),
   registerJiraHandlersMock: vi.fn(),
+  registerJiraIssueSummaryGenerationHandlersMock: vi.fn(),
   registerBitbucketHandlersMock: vi.fn(),
   registerGitLabHandlersMock: vi.fn(),
   registerHostedReviewHandlersMock: vi.fn(),
@@ -127,6 +130,7 @@ const {
   registerCodexConfigSyncHandlersMock: vi.fn(),
   registerOnboardingHandlersMock: vi.fn(),
   registerDashboardPopoutHandlersMock: vi.fn(),
+  registerWorkspaceSpaceWindowHandlersMock: vi.fn(),
   isDashboardPopoutRendererMock: vi.fn(),
   registerTerminalPreviewHandlersMock: vi.fn(),
   registerSpeechHandlersMock: vi.fn(),
@@ -155,7 +159,7 @@ vi.mock('../../shared/runtime-environment-store', () => ({
   listEnvironments: listEnvironmentsMock
 }))
 
-vi.mock('../runtime-environment-transport-routing', () => ({
+vi.mock('../runtime-environments/runtime-environment-transport-routing', () => ({
   callRuntimeEnvironment: callRuntimeEnvironmentMock
 }))
 
@@ -169,6 +173,10 @@ vi.mock('../onboarding', () => ({
 
 vi.mock('../dashboard-popout', () => ({
   registerDashboardPopoutHandlers: registerDashboardPopoutHandlersMock
+}))
+
+vi.mock('../workspace-space-window', () => ({
+  registerWorkspaceSpaceWindowHandlers: registerWorkspaceSpaceWindowHandlersMock
 }))
 
 vi.mock('../../window/dashboard-popout-window', () => ({
@@ -304,7 +312,7 @@ vi.mock('../filesystem', () => ({
   registerFilesystemHandlers: registerFilesystemHandlersMock
 }))
 
-vi.mock('../filesystem-watcher', () => ({
+vi.mock('../filesystem-watcher-handlers', () => ({
   registerFilesystemWatcherHandlers: registerFilesystemWatcherHandlersMock
 }))
 
@@ -316,8 +324,17 @@ vi.mock('../runtime', () => ({
   registerRuntimeHandlers: registerRuntimeHandlersMock
 }))
 
-vi.mock('../runtime-environments', () => ({
+vi.mock('../runtime-environments/runtime-environments', () => ({
+  invalidateRuntimeEnvironmentTransport: vi.fn(),
   registerRuntimeEnvironmentHandlers: registerRuntimeEnvironmentHandlersMock
+}))
+
+vi.mock('../wsl-host-handlers', () => ({
+  registerWslHostHandlers: vi.fn()
+}))
+
+vi.mock('../wsl-move-handlers', () => ({
+  registerWslMoveHandlers: vi.fn()
 }))
 
 vi.mock('../ephemeral-vm', () => ({
@@ -402,6 +419,10 @@ vi.mock('../jira', () => ({
   registerJiraHandlers: registerJiraHandlersMock
 }))
 
+vi.mock('../jira-issue-summary-generation', () => ({
+  registerJiraIssueSummaryGenerationHandlers: registerJiraIssueSummaryGenerationHandlersMock
+}))
+
 vi.mock('../bitbucket', () => ({
   registerBitbucketHandlers: registerBitbucketHandlersMock
 }))
@@ -425,7 +446,13 @@ import { registerCoreHandlers } from './register-core-handlers'
 let registeredAiVaultOptions: {
   ensureStructuredSessionOwnership: () => Promise<void>
 }
-let registeredRuntime: { ensureStructuredAgentSessionHost: ReturnType<typeof vi.fn> } | undefined
+let registeredRuntime:
+  | {
+      ensureStructuredAgentSessionHost: ReturnType<typeof vi.fn>
+      closeNotificationDismissals: ReturnType<typeof vi.fn>
+    }
+  | undefined
+let registeredRelaunchExit: (() => Promise<void>) | undefined
 
 describe('registerCoreHandlers', () => {
   beforeEach(() => {
@@ -478,11 +505,13 @@ describe('registerCoreHandlers', () => {
     registerAppHandlersMock.mockReset()
     registerLinearHandlersMock.mockReset()
     registerJiraHandlersMock.mockReset()
+    registerJiraIssueSummaryGenerationHandlersMock.mockReset()
     registerBitbucketHandlersMock.mockReset()
     registerGitLabHandlersMock.mockReset()
     registerHostedReviewHandlersMock.mockReset()
     registerExportHandlersMock.mockReset()
     registerDashboardPopoutHandlersMock.mockReset()
+    registerWorkspaceSpaceWindowHandlersMock.mockReset()
     registerTerminalPreviewHandlersMock.mockReset()
     registerSpeechHandlersMock.mockReset()
     registerSkillsHandlersMock.mockReset()
@@ -500,7 +529,8 @@ describe('registerCoreHandlers', () => {
     const runtime = {
       marker: 'runtime',
       getAgentBrowserBridge: () => null,
-      ensureStructuredAgentSessionHost: vi.fn()
+      ensureStructuredAgentSessionHost: vi.fn(),
+      closeNotificationDismissals: vi.fn(async () => {})
     }
     const stats = { marker: 'stats' }
     const claudeUsage = { marker: 'claudeUsage' }
@@ -552,7 +582,13 @@ describe('registerCoreHandlers', () => {
       openCodeUsage,
       museUsage
     })
-    expect(registerAppHandlersMock).toHaveBeenCalledWith(store, { onBeforeRelaunch })
+    expect(registerAppHandlersMock).toHaveBeenCalledWith(store, {
+      onBeforeRelaunch,
+      onBeforeRelaunchExit: expect.any(Function)
+    })
+    registeredRelaunchExit = registerAppHandlersMock.mock.calls[0]?.[1]?.onBeforeRelaunchExit
+    await registeredRelaunchExit?.()
+    expect(runtime.closeNotificationDismissals).toHaveBeenCalledOnce()
     expect(registerCodexAccountHandlersMock).toHaveBeenCalledWith(
       codexAccounts,
       expect.any(Function)
@@ -574,6 +610,7 @@ describe('registerCoreHandlers', () => {
     expect(registerGitHubHandlersMock).toHaveBeenCalledWith(store, stats)
     expect(registerLinearHandlersMock).toHaveBeenCalled()
     expect(registerJiraHandlersMock).toHaveBeenCalled()
+    expect(registerJiraIssueSummaryGenerationHandlersMock).toHaveBeenCalledWith(store, undefined)
     expect(registerBitbucketHandlersMock).toHaveBeenCalled()
     expect(registerGitLabHandlersMock).toHaveBeenCalledWith(store)
     expect(registerHostedReviewHandlersMock).toHaveBeenCalledWith(store, stats)
@@ -585,6 +622,7 @@ describe('registerCoreHandlers', () => {
     expect(registerDeveloperPermissionHandlersMock).toHaveBeenCalled()
     expect(registerComputerUsePermissionHandlersMock).toHaveBeenCalled()
     expect(registerDashboardPopoutHandlersMock).toHaveBeenCalledWith(store, undefined)
+    expect(registerWorkspaceSpaceWindowHandlersMock).toHaveBeenCalledWith(store)
     expect(registerTerminalPreviewHandlersMock).toHaveBeenCalledWith(runtime)
     expect(registerSettingsHandlersMock).toHaveBeenCalledWith(store, agentAwakeService)
     expect(registerSkillsHandlersMock).toHaveBeenCalledWith(store, runtime)
@@ -703,6 +741,26 @@ describe('registerCoreHandlers', () => {
       )
     } finally {
       recordStructuredAgentSessionHostInstallRefusal(null)
+    }
+  })
+
+  it('lets relaunch exit after 2 s when the dismissal close never settles', async () => {
+    vi.useFakeTimers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      registeredRuntime?.closeNotificationDismissals.mockReturnValueOnce(new Promise(() => {}))
+      let exited = false
+      void registeredRelaunchExit?.().then(() => {
+        exited = true
+      })
+      await vi.advanceTimersByTimeAsync(1_999)
+      expect(exited).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(exited).toBe(true)
+      expect(warn).toHaveBeenCalledOnce()
+    } finally {
+      warn.mockRestore()
+      vi.useRealTimers()
     }
   })
 

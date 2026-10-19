@@ -40,7 +40,7 @@ export function sendNativeChatAskAnswer(
     groups.forEach((_group, index) => {
       timers.push(
         setTimeout(() => {
-          sendRuntimePtyInput(target.settings, target.ptyId, bytesAt(index), 'driving')
+          sendRuntimePtyInput(target.ptyId, bytesAt(index), 'driving')
         }, index * NATIVE_CHAT_QUESTION_STEP_MS)
       )
     })
@@ -56,7 +56,7 @@ export function sendNativeChatAskAnswer(
         timers.push(setTimeout(() => !cancelled && onSettled(true), NATIVE_CHAT_SUBMIT_DELAY_MS))
         return
       }
-      void sendRuntimePtyInputVerified(target.settings, target.ptyId, bytesAt(index), 'driving', {
+      void sendRuntimePtyInputVerified(target.ptyId, bytesAt(index), 'driving', {
         isCancelled: () => cancelled,
         requireWriteSettlement: true
       })

@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type {
   KernelAction,
   OwnerAdapter,
@@ -16,7 +16,6 @@ import {
   projection,
   snapshot
 } from '../../../shared/fork-heimdall-objective/decision-test-harness'
-import type { IFilesystemProvider } from '../../providers/types'
 import { createObjectiveOwnerAdapter } from '../../fork-heimdall-objective/owner-adapter'
 import type { LeaseWorkspaceTarget } from '../lease-store'
 import { ownerDeviationWakeToken, type OwnerDeviationEscalation } from './deviation-ledger'
@@ -75,8 +74,7 @@ describe('owner intervention submission preflight', () => {
       kind: 'folder',
       executionHostId: 'local',
       workspacePath,
-      watcherId: 'watcher-1',
-      fileProvider: null
+      watcherId: 'watcher-1'
     }
     const location = await resolveOwnerReportLocation(target)
     reportPath = await issueOwnerReportPath(location, ownerDeviationWakeToken(PENDING))
@@ -118,33 +116,5 @@ describe('owner intervention submission preflight', () => {
     await expect(preflightOwnerInterventionSubmission(args)).resolves.toEqual({
       status: 'accepted'
     })
-  })
-
-  it('propagates an unverifiable host read instead of mislabeling it as invalid input', async () => {
-    const hostFailure = new Error('remote host unavailable')
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only realpath (the rejecting call under test), lstat and readFile are exercised.
-    const fileProvider = {
-      realpath: vi.fn().mockRejectedValue(hostFailure),
-      lstat: vi.fn(),
-      readFile: vi.fn()
-    } as unknown as IFilesystemProvider
-    const remoteTarget: LeaseWorkspaceTarget = {
-      kind: 'folder',
-      executionHostId: 'ssh:host-1',
-      workspacePath: '/workspace',
-      watcherId: 'watcher-1',
-      fileProvider
-    }
-
-    await expect(
-      preflightOwnerInterventionSubmission({
-        target: remoteTarget,
-        pending: PENDING,
-        owner: OWNER,
-        snapshot: SNAPSHOT,
-        ledger: LEDGER,
-        enrollment: ENROLLMENT
-      })
-    ).rejects.toThrow('remote host unavailable')
   })
 })

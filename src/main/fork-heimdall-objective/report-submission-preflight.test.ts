@@ -8,12 +8,11 @@ import { attempt, CONTRACT } from '../../shared/fork-heimdall-objective/decision
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import { OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH } from '../../shared/fork-heimdall-objective/contract-types'
 import type { ObjectivePlanTask } from '../../shared/fork-heimdall-objective/plan-schema'
-import type { IFilesystemProvider } from '../providers/types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 import type { ObjectiveStore } from './objective-store'
 import { createObjectiveSubmissionAdapter } from './report-submission-preflight'
-import { issueObjectiveReportPath, resolveExpectedObjectiveReportPath } from './report-ingestion'
+import { issueObjectiveReportPath } from './report-ingestion'
 
 const { resolveWorkspaceTarget, validateWorkspaceChanges } = vi.hoisted(() => ({
   resolveWorkspaceTarget: vi.fn(),
@@ -109,8 +108,7 @@ describe('objective report submission preflight', () => {
     target = {
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath,
-      fileProvider: null
+      workspacePath
     }
     resolveWorkspaceTarget.mockReset()
     validateWorkspaceChanges.mockReset()
@@ -183,42 +181,6 @@ describe('objective report submission preflight', () => {
     await expect(adapter.preflightWorkerReport(submission, context)).resolves.toEqual({
       status: 'accepted'
     })
-  })
-
-  it('accepts an unverifiable host read instead of mislabeling it as invalid input', async () => {
-    const hostFailure = new Error('remote host unavailable')
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
-    const fileProvider = {
-      realpath: vi.fn().mockRejectedValue(hostFailure),
-      lstat: vi.fn(),
-      readFile: vi.fn()
-    } as unknown as IFilesystemProvider
-    const remoteTarget: ObjectiveWorkspaceTarget = {
-      kind: 'folder',
-      executionHostId: 'ssh:host-1',
-      workspacePath: '/workspace',
-      fileProvider
-    }
-    resolveWorkspaceTarget.mockResolvedValue(remoteTarget)
-    const remoteReportPath = await resolveExpectedObjectiveReportPath(
-      remoteTarget,
-      `fingerprint-${DISPATCH_ID}`
-    )
-    const adapter = createObjectiveSubmissionAdapter({
-      runtime: RUNTIME,
-      objectiveStore: OBJECTIVE_STORE
-    })
-
-    await expect(
-      adapter.preflightWorkerReport(
-        {
-          dispatchId: DISPATCH_ID,
-          payload: { reportPath: remoteReportPath, filesModified: ['src/core.ts'] }
-        },
-        { enrollment: ENROLLMENT, snapshot: null, ledger: LEDGER }
-      )
-    ).resolves.toEqual({ status: 'accepted' })
-    expect(fileProvider.realpath).toHaveBeenCalled()
   })
 
   it('accepts a real repair-shaped report for a repair dispatch-planner', async () => {

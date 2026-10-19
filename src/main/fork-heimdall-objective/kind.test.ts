@@ -144,10 +144,9 @@ async function workspaceFixture(kind: 'folder' | 'git'): Promise<WorkspaceFixtur
           kind,
           executionHostId: 'local',
           workspacePath: root,
-          fileProvider: null,
           gitTarget: runtimeTarget
         }
-      : { kind, executionHostId: 'local', workspacePath: root, fileProvider: null }
+      : { kind, executionHostId: 'local', workspacePath: root }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of OrcaRuntimeService, a class with private fields no object literal can structurally satisfy; only the methods below are exercised.
   const runtime = {
     resolveRuntimeFileTarget: vi.fn(async () => runtimeTarget),

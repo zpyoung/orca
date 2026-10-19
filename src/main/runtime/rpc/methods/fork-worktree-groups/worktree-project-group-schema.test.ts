@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WorktreeSet } from '../worktree-schemas'
+import { WorktreeSet } from '../../../../../shared/rpc-contract/worktree-params'
 
 describe('worktree.set projectGroupId schema', () => {
   it.each([

@@ -36,7 +36,7 @@ function send(
       disabled: false,
       isDispatchingSessionOption: false,
       launchDraftResolved: true,
-      resolveTarget: () => ({ terminalTabId: 'tab', ptyId: 'pty', settings: null }),
+      resolveTarget: () => ({ terminalTabId: 'tab', ptyId: 'pty' }),
       classifySend: () => classification,
       onOptimisticSend: () => 'pending-1',
       optimisticSendOutcome: { reject: callbacks.rejected, holdUnconfirmed: callbacks.unconfirmed },

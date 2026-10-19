@@ -183,7 +183,7 @@ describe('answerNativeChatLocalCommand', () => {
 })
 
 describe('host-answered /context in the composer', () => {
-  const target = { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} }
+  const target = { terminalTabId: 'tab-1', ptyId: 'pty-1' }
 
   function composerArgs(answerCommandLocally: NativeChatLocalCommandAnswer) {
     return {

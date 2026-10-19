@@ -55,8 +55,11 @@ vi.mock('../../../store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({ agentStatusByPaneKey: { 'pane-1': mocks.status } })
 }))
-vi.mock('../../native-chat/native-chat-runtime-owner', () => ({
-  selectNativeChatRuntimeEnvironmentId: () => null
+vi.mock('../../native-chat/native-chat-file-link', () => ({
+  findTerminalTabWorktreeId: () => null
+}))
+vi.mock('@/lib/resolve-owner', () => ({
+  runtimeEnvironmentIdUnlessTwin: () => null
 }))
 vi.mock('../../native-chat/use-native-chat-retained-session', () => ({
   useNativeChatRetainedSession: () => ({ messages: mocks.messages, readPhase: 'ready' })

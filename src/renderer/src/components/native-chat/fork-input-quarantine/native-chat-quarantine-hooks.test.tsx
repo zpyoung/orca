@@ -27,10 +27,6 @@ vi.mock('@/runtime/runtime-terminal-inspection', () => ({
   sendRuntimePtyInput: (...args: unknown[]) => mocks.sendRuntimePtyInput(...args)
 }))
 
-vi.mock('@/lib/agent-paste-draft', () => ({
-  getSettingsForAgentTabRuntimeOwner: (terminalTabId: string) => ({ terminalTabId })
-}))
-
 vi.mock('../native-chat-runtime-send', () => ({
   invalidateNativeChatPtySends: (...args: unknown[]) => mocks.invalidateNativeChatPtySends(...args),
   sendNativeChatAskAnswer: (...args: unknown[]) => mocks.sendNativeChatAskAnswer(...args),

@@ -6,7 +6,7 @@ import type { NativeChatAfterStopSend } from '../native-chat-composer-target'
 import type { NativeChatOptimisticSendOutcome } from '../native-chat-composer-types'
 
 export type AgentComposerCoreProps = {
-  /** Tab hosting the agent; used to resolve the live ptyId + runtime settings. */
+  /** Tab hosting the agent; used to resolve the live ptyId. */
   terminalTabId: string
   /** Stable split-leaf identity; unlike a PTY id, this survives reconnects. */
   paneKey: string
@@ -18,6 +18,9 @@ export type AgentComposerCoreProps = {
   agent: AgentType
   /** Guard desktop input while a mobile client owns the terminal input lease. */
   canSend?: boolean
+  /** The chat can't take input yet (a program it needs isn't installed): the composer is disabled
+   *  and this is its placeholder. */
+  unavailableHint?: string | undefined
   /** Host sends through its own transport rather than a PTY, so a null targetPtyId
    *  must not disable the composer. */
   allowWithoutTarget?: boolean

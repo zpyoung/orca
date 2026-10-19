@@ -26,6 +26,7 @@ import {
   type OnboardingFeatureSetupSelection
 } from './onboarding-feature-setup'
 import { getOnboardingFeatureSetupAgentRuntime } from './onboarding-feature-setup-runtime'
+import { SKILLS_CLI_VERSION } from '../../../../shared/agent-feature-install-commands'
 import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 const ALL_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand([
@@ -111,7 +112,7 @@ describe('onboarding feature setup runner', () => {
 
     expect(text).toBe(ALL_SKILL_INSTALL_COMMAND)
     expect(text).toBe(
-      `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orca-cli --skill computer-use --skill orchestration --skill orca-linear --global`
+      `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orca-cli --skill computer-use --skill orchestration --skill orca-linear --global`
     )
   })
 

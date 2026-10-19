@@ -7,7 +7,7 @@ import {
   sendRuntimePtyInputAcceptance,
   sendRuntimePtyInputDelivery
 } from '@/runtime/runtime-terminal-inspection'
-import type { NativeChatSendOptions, RuntimeSettings } from '../native-chat-runtime-send'
+import type { NativeChatSendOptions } from '../native-chat-runtime-send'
 import { NATIVE_CHAT_SUBMIT } from '../native-chat-send'
 
 /**
@@ -77,7 +77,6 @@ export function createDeliveryObserver(
 
 /** One observed write: true when the send may continue past it. */
 export async function sendObservedWrite(
-  settings: RuntimeSettings,
   ptyId: string,
   data: string,
   isCancelled: (() => boolean) | undefined,
@@ -86,10 +85,9 @@ export async function sendObservedWrite(
   // Why: the submit CR is never cancelled once its delay fires, so it carries no check.
   const cancelArgs = isCancelled ? ([isCancelled] as const) : ([] as const)
   if (!delivery) {
-    return sendRuntimePtyInputAcceptance(settings, ptyId, data, 'driving', ...cancelArgs)
+    return sendRuntimePtyInputAcceptance(ptyId, data, 'driving', ...cancelArgs)
   }
   const result = await sendRuntimePtyInputDelivery(
-    settings,
     ptyId,
     data,
     'driving',
@@ -199,7 +197,6 @@ function observeSendOutcome(
  * could otherwise upgrade it to 'observed-cleared'.
  */
 export async function submitAndObserve(
-  settings: RuntimeSettings,
   ptyId: string,
   markSubmitted: () => void,
   reportOutcome: (outcome: SendOutcome) => void,
@@ -208,7 +205,7 @@ export async function submitAndObserve(
 ): Promise<void> {
   let sent = true
   try {
-    sent = await sendObservedWrite(settings, ptyId, NATIVE_CHAT_SUBMIT, undefined, delivery)
+    sent = await sendObservedWrite(ptyId, NATIVE_CHAT_SUBMIT, undefined, delivery)
   } catch {
     sent = false
   } finally {

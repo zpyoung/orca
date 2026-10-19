@@ -103,12 +103,12 @@ Gemini and plain shells never qualify.
 
 `nativeChatRequiresLocalTranscript()` returns `true` for **`grok` and `omp`** —
 agents whose hook discloses no transcript path, so the file is only reachable by
-scanning a sessions root on a disk *this* process can read. Under Model-A SSH that
-disk is the wrong host, so the chat view stays closed rather than loading forever.
-`isNativeChatTranscriptLocalReadable()`
-(`src/renderer/src/lib/native-chat-transcript-readability.ts`) is what answers
-that per connection; it returns `false` for any plain `ssh:` id. See the caveat in
-§14 — this gate was not revisited when the SSH relay landed.
+scanning a sessions root on a disk *this* process can read. On a plain `ssh:`
+connection that disk is the wrong host, so the chat view stays closed rather than
+loading forever. `isNativeChatTranscriptLocalReadable()`
+(`src/renderer/src/lib/native-chat-transcript-readability.ts`) answers that per
+connection; it returns `false` for any plain `ssh:` id. Runtime-owned SSH targets
+stay readable because their transcripts are read on the runtime host (§14).
 
 ### Structured eligibility
 
@@ -178,13 +178,8 @@ visibility is derived separately from whether it still leads the transcript.
 ## 4. Architecture at a glance
 
 ```
-              ┌───────────── remote ssh: host ─────────────┐  fork-native-chat-relay
-              │  NativeChatHandler → same watcher engine   │
-              │  → byte-budgeted outbox → changed ping     │
-              └──────────▲──────────────────┬──────────────┘
-                         │ nativeChat.pull  │ nativeChat.changed (~100 B)
-┌────────────────────────┴──────────────────▼─── main process ─────────────────┐
-│  transcript-watch-subscription → resolve file → install watcher              │
+┌────────────────────────────────────────────────────────────── main process ──┐
+│  transcript-watch → resolve file → install watcher (transcript-watch-engine) │
 │  transcript-tail-reader → line decoder + session-option companion decoder    │
 │  ipc/native-chat.ts   (readSession / subscribe / unsubscribe)                │
 └───────────────▲───────────────────────────────────┬─────────────────────────┘
@@ -201,21 +196,20 @@ visibility is derived separately from whether it still leads the transcript.
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Code lives in four trees, each with fork subdirectories:
+Code lives in three trees, each with fork subdirectories:
 
 - `src/renderer/src/components/native-chat/` — UI and renderer data hooks. Fork
   subdirs: `fork-agent-composer/` (the composer core, by far the largest),
-  `fork-native-chat-relay/`, `fork-native-chat-session-options/`,
+  `fork-native-chat-relay/` (the live-session read window and tail, paging, and
+  the runtime-owner transport), `fork-native-chat-session-options/`,
   `fork-native-chat-width/`, `fork-native-chat-coloring/`.
 - `src/main/native-chat/` — transcript resolution, watching, per-agent decoding.
-  Fork subdirs: `fork-native-chat-relay/`, `fork-native-chat-session-options/`.
-  Related: `src/main/ipc/native-chat.ts` and `src/main/ipc/fork-native-chat-relay/`.
+  Fork subdir: `fork-native-chat-session-options/`. Related:
+  `src/main/ipc/native-chat.ts`.
 - `src/shared/native-chat-*.ts` — cross-process contracts: message model, merge,
   streaming, agent support/profiles, ask/answer, slash commands, session options.
-  Fork siblings sit in `src/shared/fork-native-chat-{relay,session-options,coloring,width}/`
+  Fork siblings sit in `src/shared/fork-native-chat-{session-options,coloring,width}/`
   and do **not** match the `native-chat-*.ts` glob.
-- `src/relay/fork-native-chat-relay/` — the handler that runs on a remote `ssh:`
-  host. A fourth process the old diagram omitted entirely.
 
 ## 5. Main-process side: producing messages
 
@@ -228,21 +222,17 @@ recent window is parsed so a huge transcript never stalls the main process or th
 list. Pagination raises `limit`.
 
 `NativeChatReadSessionArgs` is `{ agent, sessionId, limit?, transcriptPath?,
-sshConnectionId?, beforeOffset? }`:
+beforeOffset? }`:
 
 - `transcriptPath` (from the hook's providerSession) locates the file when the
   session id no longer names it (recent Claude Code),
-- `beforeOffset` pages backwards by byte offset,
-- `sshConnectionId` (`fork-native-chat-relay`) routes the whole read to
-  `readSshNativeChatTranscript` instead of the local tail reader — see §14.
+- `beforeOffset` pages backwards by byte offset.
 
 ### Watching (live tail)
 
 `nativeChat:subscribe` (an `ipcMain.on`) calls `subscribeNativeChatTranscript`.
-That name still lives in `src/main/native-chat/transcript-watch.ts`, but the file
-is now a **thin shim** (an `import-swap` seam) that resolves the per-agent decoder
-and hands off to `subscribeNativeChatTranscriptWithDecoder` in
-`fork-native-chat-relay/transcript-watch-subscription.ts`, which:
+It lives in `src/main/native-chat/transcript-watch.ts`, which resolves the
+per-agent decoder and then:
 
 1. resolves the session's file path (`resolveSessionFilePath`), translating WSL
    host paths on the way (`toHostReadableTranscriptPath`),
@@ -291,8 +281,6 @@ can watch several panes. Teardown is strict:
 - `sender.once('destroyed', …)` tears down **every** watcher a closed/reloaded
   window owns (fd-leak prevention).
 
-The SSH-relay subscribe branch reuses the same maps and the same teardown.
-
 ## 6. Renderer side: assembling the live session
 
 **The live path is a fork copy.** `use-native-chat-live-session.ts` still exists
@@ -334,8 +322,9 @@ Key internals:
   routes read/subscribe to the **remote host** for a runtime-owned pane, or keeps
   the local IPC path. An owner flip changes transport identity and re-subscribes
   against the new host. (The web RPC bridge returns a Promise unsubscribe, unlike
-  the desktop sync fn — the effect cleanup handles both.) What "the local path"
-  means for a plain `ssh:` pane has changed; see §14.
+  the desktop sync fn — the effect cleanup handles both.) A pane whose chat view
+  is hidden passes `enabled: false`, which suspends transcript IO and keeps the
+  last committed session until it is shown again.
 
 The final `useMemo` folds live hook state into a session status via
 `mergeNativeChatLiveSession`.
@@ -485,7 +474,7 @@ because changing models can reset effort and other modes.
 
 `fork-native-chat-session-options` decodes model and effort **out of the JSONL
 itself**, in the same drain loop as the message decoder, so every windowed read
-and every live tail — local or relayed — carries the values:
+and every live tail — local or runtime-owned — carries the values:
 
 - **Claude** — `decodeClaudeSessionOptions` reads `effort` off each
   `type: 'assistant'` row and the model from its `message`.
@@ -762,31 +751,20 @@ yet**; that is its own pass, not something to infer from the sections above.
 
 ## 14. Cross-cutting concerns & invariants
 
-- **Transport and ownership.** Three cases, and only the first two mean what the
-  names suggest:
+- **Transport and ownership.** Two cases:
   - **Runtime-owned (`runtime:`)** — the renderer's transport is the runtime RPC
-    bridge; reads and tails happen on the remote runtime host.
+    bridge (`nativeChat.readSession` / `.subscribe` / `.unsubscribe`, served by
+    upstream's orcad runtime); reads and tails happen on the remote runtime host.
+    This is how a remote or SSH-hosted workspace gets native chat.
   - **Local** — the local IPC path reads local disk.
-  - **Plain `ssh:` (`fork-native-chat-relay`)** — the renderer uses the *same*
-    transport object and the *same* IPC channel names as local, but passes an
-    `sshConnectionId`. Main branches on it into
-    `src/main/ipc/fork-native-chat-relay/native-chat-ssh-subscription.ts`, which
-    speaks `src/shared/fork-native-chat-relay/native-chat-relay-protocol.ts`
-    (`nativeChat.readSession` / `.subscribe` / `.pull` / `.unsubscribe`, plus a
-    `nativeChat.changed` notification) over the SSH relay channel to
-    `NativeChatHandler` **on the remote host**. That handler runs the same watcher
-    engine against local disk *there*, buffers frames into a byte-budgeted outbox,
-    and pushes only a ~100-byte `{subscriptionId, seq}` ping. The desktop pulls,
-    translates the relay frames into the identical
-    `snapshot`/`replacement`/`appended` shape, and re-emits them on the normal
-    `nativeChat:appended` channel — so the renderer genuinely cannot tell the
-    difference. **Never assume local disk access when adding a transport or
-    provider.**
-- **Grok and omp remain gated on plain `ssh:`.**
-  `isNativeChatTranscriptLocalReadable` still returns `false` for any `ssh:`
-  connection id. Worth knowing that this gate was *not* revisited when the relay
-  landed: the relay's remote-side resolver can now scan the correct host, so the
-  restriction is an unrevisited gate rather than a fundamental limit.
+
+  The fork's own SSH relay (a desktop-driven `sshConnectionId` read through a
+  remote handler) is retired. **Never assume local disk access when adding a
+  transport or provider.**
+- **Grok and omp stay closed on plain `ssh:`.**
+  `isNativeChatTranscriptLocalReadable` returns `false` for any plain `ssh:`
+  connection id, because their transcripts can only be found by scanning a disk
+  this process cannot see. Runtime-owned targets read them on the runtime host.
 - **Windowing everywhere:** base read, live-append tail, and pagination all share
   one window bound so a long run can't grow the list unbounded.
 - **Merger vs assembler drift:** the stateful merger's output is locked to equal
@@ -836,13 +814,10 @@ Cited by file and symbol; grep the symbol rather than trusting a line number.
 | Streaming-bubble derivation | `src/shared/native-chat-streaming.ts` | `deriveNativeChatStreamingText` |
 | Agent support / format mapping | `src/shared/native-chat-agent-support.ts` | `NATIVE_CHAT_SUPPORTED_AGENT_LIST`, `resolveNativeChatTranscriptAgent` |
 | IPC handlers + push payloads | `src/main/ipc/native-chat.ts` | `registerNativeChatHandlers`, `NativeChatAppendedPayload`, `DESKTOP_READ_WINDOW` |
-| Transcript resolve + subscribe | `src/main/native-chat/fork-native-chat-relay/transcript-watch-subscription.ts` | `subscribeNativeChatTranscriptWithDecoder` |
+| Transcript resolve + subscribe | `src/main/native-chat/transcript-watch.ts` | `subscribeNativeChatTranscript` |
 | Watcher engine | `src/main/native-chat/transcript-watch-engine.ts` | `installTranscriptWatcher` |
 | Windowed tail read + decoder dispatch | `src/main/native-chat/transcript-tail-reader.ts` | `nativeChatLineDecoderForAgent` |
 | Per-agent decoders | `src/main/native-chat/transcript-line-decoders-{claude,codex,grok,omp}.ts` | — |
-| SSH relay protocol | `src/shared/fork-native-chat-relay/native-chat-relay-protocol.ts` | `NATIVE_CHAT_CHANGED_METHOD` |
-| SSH relay desktop side | `src/main/ipc/fork-native-chat-relay/native-chat-ssh-subscription.ts` | `readSshNativeChatTranscript` |
-| SSH relay remote side | `src/relay/fork-native-chat-relay/native-chat-handler.ts` | `NativeChatHandler` |
 | Live session hook (the live one) | `src/renderer/src/components/native-chat/fork-native-chat-relay/use-native-chat-live-session.ts` | `useNativeChatLiveSession` |
 | notFound retry policy | `.../fork-native-chat-relay/native-chat-read-retry.ts` | `NOTFOUND_RETRY_WINDOW_MS` |
 | Hook status → session status | `.../native-chat/native-chat-live-status.ts` | `liveStatusOverride` |

@@ -3,12 +3,13 @@ import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-cha
 import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
 import { transcriptFallbackId } from './transcript-fallback-id'
 import { extendTranscriptBoundary } from './transcript-file-version'
+import {
+  MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES,
+  type NativeChatLineDecoder
+} from './transcript-tail-reader'
 import { openTranscriptReadStream, transcriptFileStat } from './wsl-transcript-fs-access'
 
 const APPEND_BATCH_MESSAGE_LIMIT = 40
-const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024
-
-type NativeChatLineDecoder = (line: string, fallbackId: string) => NativeChatMessage | null
 
 export type IncrementalTranscriptState = {
   offset: number

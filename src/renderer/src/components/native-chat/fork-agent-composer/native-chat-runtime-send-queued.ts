@@ -37,13 +37,9 @@ export function sendNativeChatMessageVerifiedQueued(
           markSubmitted()
           return
         }
-        sendRuntimePtyInputVerified(
-          target.settings,
-          target.ptyId,
-          buildNativeChatPasteBytes(text),
-          'driving',
-          { isCancelled: () => isCancelled() || signal?.aborted === true }
-        )
+        sendRuntimePtyInputVerified(target.ptyId, buildNativeChatPasteBytes(text), 'driving', {
+          isCancelled: () => isCancelled() || signal?.aborted === true
+        })
           .then((bodyAccepted) => {
             if (!bodyAccepted || isCancelled() || signal?.aborted) {
               markSubmitted()
@@ -54,13 +50,9 @@ export function sendNativeChatMessageVerifiedQueued(
                 markSubmitted()
                 return
               }
-              sendRuntimePtyInputVerified(
-                target.settings,
-                target.ptyId,
-                NATIVE_CHAT_SUBMIT,
-                'driving',
-                { isCancelled: () => isCancelled() || signal?.aborted === true }
-              )
+              sendRuntimePtyInputVerified(target.ptyId, NATIVE_CHAT_SUBMIT, 'driving', {
+                isCancelled: () => isCancelled() || signal?.aborted === true
+              })
                 .then((sent) => {
                   accepted = sent
                   markSubmitted()

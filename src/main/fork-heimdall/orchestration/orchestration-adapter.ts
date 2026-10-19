@@ -28,7 +28,7 @@ import type { EvidenceEntry, LedgerEntry } from '../../../shared/fork-heimdall/l
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { resolveWorkerStartReadinessTimeoutMs } from '../../../shared/orchestration-timing-budgets'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../shared/protocol-version'
-import { isStructuredWorkerHandle } from '../../runtime/structured-worker-identity'
+import { isStructuredWorkerHandle } from '../../../shared/structured-worker-handle'
 import { readAuthoritativeWorkerReportEvidence } from './authoritative-worker-report'
 import { coordinatorIdentityFingerprint } from './coordinator-identity'
 import { coordinatorRuntimeFacade } from './coordinator-runtime-facade'

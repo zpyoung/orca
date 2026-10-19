@@ -36,12 +36,6 @@ vi.mock('./wsl-transcript-running-observer', () => ({
 
 import { installTranscriptWatcher } from './transcript-watch-engine'
 
-// The fork's engine takes its tail reader by injection; this lifecycle suite never
-// reaches a windowed read, so the stub only has to satisfy the signature.
-const stubTailReader = (): never => {
-  throw new Error('unexpected tail read')
-}
-
 describe('installed WSL transcript watcher lifecycle', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -72,7 +66,6 @@ describe('installed WSL transcript watcher lifecycle', () => {
     const subscription = await installTranscriptWatcher(UNC_PATH, () => null, {
       agent: 'codex',
       sessionId: 'wsl-session',
-      tailReader: stubTailReader,
       reconciliationIntervalMs: 100,
       onAppend: () => {},
       onInitialSnapshot
@@ -93,7 +86,6 @@ describe('installed WSL transcript watcher lifecycle', () => {
     const subscription = await installTranscriptWatcher(UNC_PATH, () => null, {
       agent: 'codex',
       sessionId: 'wsl-session',
-      tailReader: stubTailReader,
       onAppend: () => {},
       onInitialSnapshot
     })
@@ -118,7 +110,6 @@ describe('installed WSL transcript watcher lifecycle', () => {
     const subscription = await installTranscriptWatcher(UNC_PATH, () => null, {
       agent: 'codex',
       sessionId: 'wsl-session',
-      tailReader: stubTailReader,
       reconciliationIntervalMs: 100,
       onAppend: () => {}
     })
@@ -142,7 +133,6 @@ describe('installed WSL transcript watcher lifecycle', () => {
     const subscription = await installTranscriptWatcher(UNC_PATH, () => null, {
       agent: 'codex',
       sessionId: 'wsl-session',
-      tailReader: stubTailReader,
       onAppend: () => {}
     })
     await vi.advanceTimersByTimeAsync(50)
@@ -166,7 +156,6 @@ describe('installed WSL transcript watcher lifecycle', () => {
     const subscription = await installTranscriptWatcher(UNC_PATH, () => null, {
       agent: 'codex',
       sessionId: 'wsl-session',
-      tailReader: stubTailReader,
       onAppend: () => {}
     })
     await vi.advanceTimersByTimeAsync(50)

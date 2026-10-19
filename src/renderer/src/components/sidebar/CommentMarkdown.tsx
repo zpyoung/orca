@@ -6,7 +6,6 @@ import {
 import Markdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from 'rehype-sanitize'
 import remend from 'remend'
@@ -21,6 +20,7 @@ import {
   remarkNativeChatFileLinks,
   type FileLinkExists
 } from './comment-markdown-native-chat-file-links'
+import { CommentMarkdownBlockLineContext } from './comment-markdown-code-renderers'
 import { rehypeWordFade } from './comment-markdown-word-fade'
 import { CommentMarkdownWords } from './CommentMarkdownWords'
 import {
@@ -195,7 +195,7 @@ const commentMarkdownSanitizeSchema = {
     // Why: native chat opts into file URI links after sanitize; the URL
     // transform below still strips them for all other markdown surfaces.
     href: [...(defaultSchema.protocols?.href ?? []), 'file'],
-    src: [...(defaultSchema.protocols?.src ?? []), 'data', 'blob']
+    src: [...(defaultSchema.protocols?.src ?? []), 'data', 'blob', 'orca-jira-image']
   }
 }
 
@@ -233,7 +233,6 @@ type CommentMarkdownProps = React.ComponentPropsWithoutRef<'div'> & {
   /** Turns detected file paths into links, keeping only those this confirms exist. */
   fileLinkExists?: FileLinkExists
   expandImages?: boolean
-  highlightCode?: boolean
   renderCodeBlock?: DocumentCodeBlockRenderer
   renderMermaid?: boolean
   keepMermaidSourceWhilePending?: boolean
@@ -254,7 +253,7 @@ const MemoizedMarkdown = React.memo(Markdown)
 function useMarkdownBlocks(content: string, growing: boolean): readonly MarkdownBlock[] {
   const [previous, setPrevious] = React.useState<MarkdownBlockSplit | null>(null)
   if (!growing && previous === null) {
-    return [{ start: 0, text: content }]
+    return [{ start: 0, line: 1, text: content }]
   }
   if (previous?.source === content) {
     return previous.blocks
@@ -278,7 +277,6 @@ const CommentMarkdown = React.memo(
       allowFileUriLinks = false,
       fileLinkExists,
       expandImages = false,
-      highlightCode = false,
       renderCodeBlock,
       renderMermaid = true,
       keepMermaidSourceWhilePending = false,
@@ -295,10 +293,9 @@ const CommentMarkdown = React.memo(
           variant,
           onLinkClick,
           renderCodeBlock,
-          expandImages,
-          highlightCode
+          expandImages
         }),
-      [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode]
+      [expandImages, renderCodeBlock, variant, onLinkClick]
     )
     const components = React.useMemo(
       () => (extension ? { ...baseComponents, ...extension.components } : baseComponents),
@@ -308,10 +305,10 @@ const CommentMarkdown = React.memo(
       () => ({ ...components, span: CommentMarkdownWords }),
       [components]
     )
-    const activeRehypePlugins = React.useMemo(() => {
-      const plugins = extension ? extensionRehypePlugins(extension) : rehypePlugins
-      return highlightCode ? [...plugins, rehypeHighlight] : plugins
-    }, [extension, highlightCode])
+    const activeRehypePlugins = React.useMemo(
+      () => (extension ? extensionRehypePlugins(extension) : rehypePlugins),
+      [extension]
+    )
     const activeRemarkPlugins = React.useMemo(() => {
       const plugins = fileLinkExists
         ? [...remarkPlugins, remarkNativeChatFileLinks(fileLinkExists)]
@@ -341,27 +338,27 @@ const CommentMarkdown = React.memo(
               // direct utility classes on <code>, so these overrides win reliably.
               '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none',
               'min-w-0 max-w-full [overflow-wrap:anywhere]',
-              highlightCode && 'native-chat-code [&_pre_code]:text-inherit',
               className
             )}
             {...rest}
           >
             {blocks.map((block, index) => (
-              <MemoizedMarkdown
-                key={block.start}
-                remarkPlugins={activeRemarkPlugins}
-                rehypePlugins={wrapsWords ? fadingRehypePlugins : activeRehypePlugins}
-                components={wrapsWords ? fadingComponents : components}
-                urlTransform={
-                  allowFileUriLinks
-                    ? commentMarkdownFileUriUrlTransform
-                    : commentMarkdownUrlTransform
-                }
-              >
-                {growing && index === blocks.length - 1
-                  ? remend(block.text, { linkMode: 'text-only' })
-                  : block.text}
-              </MemoizedMarkdown>
+              <CommentMarkdownBlockLineContext.Provider key={block.start} value={block.line}>
+                <MemoizedMarkdown
+                  remarkPlugins={activeRemarkPlugins}
+                  rehypePlugins={wrapsWords ? fadingRehypePlugins : activeRehypePlugins}
+                  components={wrapsWords ? fadingComponents : components}
+                  urlTransform={
+                    allowFileUriLinks
+                      ? commentMarkdownFileUriUrlTransform
+                      : commentMarkdownUrlTransform
+                  }
+                >
+                  {growing && index === blocks.length - 1
+                    ? remend(block.text, { linkMode: 'text-only' })
+                    : block.text}
+                </MemoizedMarkdown>
+              </CommentMarkdownBlockLineContext.Provider>
             ))}
           </div>
         </CommentMarkdownMermaidSourceContext.Provider>

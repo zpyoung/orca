@@ -27,16 +27,15 @@ import {
 import type { LocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
 import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
 import {
-  requireRuntimeGitProvider,
+  requireLocalRuntimeGitRoute,
   type RuntimeGitTarget
 } from '../runtime/runtime-git-command-target'
 import { runtimePathsEqual } from '../runtime/runtime-worktree-path-identity'
 import { resolveWorktreeHostRouting } from '../runtime/worktree-launch-host-repo'
-import { getLocalGitCapabilityCache, getSshGitCapabilityCache } from '../git/git-capability-state'
+import { getLocalGitCapabilityCache } from '../git/git-capability-state'
 import { gitExecFileAsync } from '../git/runner'
 import { getStatus, bulkStageFiles, commitChanges } from '../git/status'
 import { resolveHostedReviewSitterPushTarget } from './provider-push-target'
-import { HostedReviewSitterSshGitProvider } from './ssh-git-adapter'
 
 export type HostedReviewSitterExecutionContext = {
   executionHostId: ExecutionHostId
@@ -203,21 +202,13 @@ export async function resolveHostedReviewSitterGitExecution(
       ? getLocalProjectWorktreeGitOptions(store, repo)
       : {}
   const target: RuntimeGitTarget = { worktree, repo, executionHostId, localGitOptions }
-  const remoteProvider = requireRuntimeGitProvider(target)
-  const hostedRemoteProvider =
-    remoteProvider instanceof HostedReviewSitterSshGitProvider ? remoteProvider : null
-  if (remoteProvider && !hostedRemoteProvider) {
-    throw new Error('The SSH Git provider does not expose hosted review mutation capabilities.')
-  }
+  requireLocalRuntimeGitRoute(target)
   const connectionId = getSshTargetIdForExecutionHost(executionHostId)
   const exec = async (
     args: string[],
     signal?: AbortSignal
   ): Promise<{ stdout: string; stderr: string }> => {
     throwIfAborted(signal)
-    if (remoteProvider) {
-      return remoteProvider.exec(args, definition.repoPath, signal ? { signal } : undefined)
-    }
     return gitExecFileAsync(args, {
       cwd: definition.repoPath,
       ...localGitOptions,
@@ -226,13 +217,11 @@ export async function resolveHostedReviewSitterGitExecution(
   }
   const getHostedStatus = async (signal?: AbortSignal): Promise<GitStatusResult> => {
     throwIfAborted(signal)
-    return remoteProvider
-      ? remoteProvider.getStatus(definition.repoPath, signal ? { signal } : undefined)
-      : getStatus(definition.repoPath, {
-          ...localGitOptions,
-          sharedLinkPaths: repo.symlinkPaths,
-          ...(signal ? { signal } : {})
-        })
+    return getStatus(definition.repoPath, {
+      ...localGitOptions,
+      sharedLinkPaths: repo.symlinkPaths,
+      ...(signal ? { signal } : {})
+    })
   }
   const reviewPushTarget = (signal?: AbortSignal): Promise<GitPushTarget | null> =>
     resolveHostedReviewSitterPushTarget(definition, { connectionId, localGitOptions, exec }, signal)
@@ -249,15 +238,11 @@ export async function resolveHostedReviewSitterGitExecution(
     },
     stageFiles: async (paths, signal) => {
       throwIfAborted(signal)
-      return remoteProvider
-        ? remoteProvider.bulkStageFiles(definition.repoPath, paths)
-        : bulkStageFiles(definition.repoPath, paths, { ...localGitOptions, signal })
+      return bulkStageFiles(definition.repoPath, paths, { ...localGitOptions, signal })
     },
     commit: async (message, signal) => {
       throwIfAborted(signal)
-      return remoteProvider
-        ? remoteProvider.commit(definition.repoPath, message)
-        : commitChanges(definition.repoPath, message, { ...localGitOptions, signal })
+      return commitChanges(definition.repoPath, message, { ...localGitOptions, signal })
     },
     reviewPushTarget,
     pushCommit: async (commitSha, expectedHeadSha, signal, assertLeaseHeld) => {
@@ -277,17 +262,12 @@ export async function resolveHostedReviewSitterGitExecution(
           expectedHeadSha
         }
         await assertLeaseHeld?.()
-        if (hostedRemoteProvider) {
-          tracker.markDispatched()
-          await hostedRemoteProvider.hostedReviewSitter.pushCommit(input, signal)
-        } else {
-          await executeHostedReviewCommitPush(
-            (args) => exec(args, signal),
-            input,
-            () => tracker.markDispatched(),
-            assertLeaseHeld
-          )
-        }
+        await executeHostedReviewCommitPush(
+          (args) => exec(args, signal),
+          input,
+          () => tracker.markDispatched(),
+          assertLeaseHeld
+        )
       } catch (error) {
         if (!tracker.dispatched) {
           throw tagHostedReviewPreDispatchError(error)
@@ -367,11 +347,6 @@ export async function resolveHostedReviewSitterGitExecution(
         worktreePath: definition.repoPath,
         pushRemote: pushTarget.remoteUrl
       }
-      if (hostedRemoteProvider) {
-        await assertLeaseHeld?.()
-        onMutationDispatched?.()
-        return hostedRemoteProvider.hostedReviewSitter.updateBranch(completeInput, signal)
-      }
       const capabilities = getLocalGitCapabilityCache({
         cwd: definition.repoPath,
         wslDistro: localGitOptions.wslDistro
@@ -394,12 +369,10 @@ export async function resolveHostedReviewSitterGitExecution(
     },
     simulateConflicts: async (headSha, baseSha, signal) => {
       throwIfAborted(signal)
-      const capabilities = remoteProvider
-        ? getSshGitCapabilityCache(remoteProvider)
-        : getLocalGitCapabilityCache({
-            cwd: definition.repoPath,
-            wslDistro: localGitOptions.wslDistro
-          })
+      const capabilities = getLocalGitCapabilityCache({
+        cwd: definition.repoPath,
+        wslDistro: localGitOptions.wslDistro
+      })
       return loadConflicts((args) => exec(args, signal), capabilities, headSha, baseSha).catch(
         () => 'unknown'
       )

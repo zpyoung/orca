@@ -9,9 +9,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
-vi.mock('@/lib/agent-paste-draft', () => ({
-  getSettingsForAgentTabRuntimeOwner: () => ({})
-}))
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
   isRemoteRuntimePtyId: () => false,
   sendRuntimePtyInput: vi.fn()
@@ -67,7 +64,7 @@ describe('AgentComposer bare mount', () => {
     // mount still gets clearInput + an onOutcome, just no verified confirm.
     const options = mocks.sendNativeChatMessage.mock.calls[0]?.[2]
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       'hello there',
       expect.objectContaining({ onOutcome: expect.any(Function) })
     )

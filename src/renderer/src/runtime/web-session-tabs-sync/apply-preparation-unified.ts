@@ -1,7 +1,7 @@
 import type { prepareWebSessionTabsSnapshotBrowser } from './apply-preparation-browser'
 import { buildTerminalUnifiedTab } from './tab-builders'
 import { isAgentSessionTab } from './terminal-surfaces'
-import { toWebTerminalSurfaceTabId } from '../web-runtime-session'
+import { toWebTerminalSurfaceTabId } from '../../../../shared/terminal-surface-id'
 import {
   resolveWebSessionSiblingVisibleTabId,
   resolveWebSessionVisibleTabId
@@ -76,7 +76,7 @@ export function prepareWebSessionTabsSnapshotUnified(
     if (provisionalPendingMutations) {
       provisionalPendingMutationsByHostTabId.set(hostTabId, provisionalPendingMutations)
     }
-    // Why: this is the localStorage twin of the in-memory rekey above — old hosts that never
+    // Why: this is the browser-storage twin of the in-memory rekey above — old hosts that never
     // echo the dock field rely on it surviving under the pane's final identity after a reload.
     if (hostTerminalDockSyncEnabled) {
       rekeyTerminalDockPaneKeys(provisionalTabId, toWebTerminalSurfaceTabId(hostTabId))
@@ -312,7 +312,8 @@ export function prepareWebSessionTabsSnapshotUnified(
     terminalTabs: mirroredTerminalTabEntries,
     browserTabs: mirroredBrowserTabs,
     editorTabs: mirroredEditorTabs,
-    agentTabs: mirroredAgentTabs
+    agentTabs: mirroredAgentTabs,
+    hostGroupIdByTabId
   })
 
   return {

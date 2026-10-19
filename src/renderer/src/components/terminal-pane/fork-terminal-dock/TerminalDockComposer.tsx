@@ -10,7 +10,8 @@ import { NativeChatInteractiveCard } from '../../native-chat/NativeChatInteracti
 import { useNativeChatInteractivePromptCard } from '../../native-chat/use-native-chat-interactive-prompt-card'
 import { useNativeChatPromptCardPresentation } from '../../native-chat/use-native-chat-prompt-card-presentation'
 import { NativeChatPromptStrip } from '../../native-chat/NativeChatPromptCollapse'
-import { selectNativeChatRuntimeEnvironmentId } from '../../native-chat/native-chat-runtime-owner'
+import { findTerminalTabWorktreeId } from '../../native-chat/native-chat-file-link'
+import { runtimeEnvironmentIdUnlessTwin } from '@/lib/resolve-owner'
 import {
   useNativeChatInteractiveSend,
   type NativeChatInteractiveSend
@@ -75,7 +76,10 @@ function TerminalDockCardComposer({
 }): React.JSX.Element {
   const status = useAppStore((state) => state.agentStatusByPaneKey[props.paneKey])
   const runtimeEnvironmentId = useAppStore((state) =>
-    selectNativeChatRuntimeEnvironmentId(state, props.terminalTabId)
+    runtimeEnvironmentIdUnlessTwin(
+      state,
+      findTerminalTabWorktreeId(state.tabsByWorktree, props.terminalTabId)
+    )
   )
   const session = useNativeChatRetainedSession({
     paneKey: props.paneKey,

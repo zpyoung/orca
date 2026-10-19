@@ -38,8 +38,7 @@ function binding(gates: ObjectiveGate[] | undefined): ObjectiveSnapshotBinding {
     target: {
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath: '/workspace',
-      fileProvider: null
+      workspacePath: '/workspace'
     }
   }
 }

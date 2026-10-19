@@ -9,19 +9,15 @@ import {
   getCommitMessageModelDiscoveryHostKeyForScope,
   LOCAL_COMMIT_MESSAGE_HOST_KEY
 } from '../../../../shared/commit-message-host-key'
-import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
+import { runtimeTargetForWorkspaceOwner } from '@/lib/resolve-owner'
 import { hasExplicitTuiLaunchCommand } from '../../../../shared/tui-agent-launch-command-override'
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import {
   getLocalProjectExecutionRuntimeContext,
   getWslDistroFromPath
 } from '@/lib/local-preflight-context'
-import {
-  discoverRuntimeCommitMessageModels,
-  getRuntimeGitScope,
-  type RuntimeGitContext
-} from '@/runtime/runtime-git-client'
-import { getIndexedRepoMap } from '@/store/worktree-repo-index'
+import { discoverRuntimeCommitMessageModels } from '@/runtime/runtime-git-generation-client'
+import { getRuntimeGitScope, type RuntimeGitContext } from '@/runtime/runtime-git-client-context'
 import { callStructuredAgentSession } from '@/runtime/structured-agent-session-client'
 import type {
   AgentSessionModelCatalogResult,
@@ -29,8 +25,6 @@ import type {
 } from '../../../../shared/agent-session-wire'
 import { useAppStore } from '@/store'
 import { findKnownWorktreeById } from '@/store/slices/worktrees/listing/detected-worktree-meta'
-import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
-import type { Automation } from '../../../../shared/automations-types'
 
 export type NativeChatModelDiscoveryContext = {
   hostKey: string
@@ -66,31 +60,25 @@ export function resolveNativeChatModelDiscoveryContext(
   if (worktreeId && connectionId === undefined) {
     return null
   }
-  const settings = getSettingsForWorktreeRuntimeOwner(state, worktreeId)
+  // Why: discovery asks the worktree's owner; an owner the rows can't name gets no models.
+  const target = worktreeId
+    ? runtimeTargetForWorkspaceOwner(state, { workspaceId: worktreeId })
+    : ({ kind: 'local' } as const)
+  if (!target) {
+    return null
+  }
   const worktreePath = worktreeId ? (findKnownWorktreeById(state, worktreeId)?.path ?? '') : ''
-  const scope = getRuntimeGitScope(settings, connectionId)
+  const scope = getRuntimeGitScope(target, connectionId)
   return {
     hostKey: resolveNativeChatModelDiscoveryHostKey(state, worktreeId, worktreePath, scope),
     runtime: {
-      settings,
+      target,
+      prefs: state.settings,
       worktreeId,
       worktreePath,
       ...(connectionId ? { connectionId } : {})
     }
   }
-}
-
-/** Host key for an automation's own run target, or null when its repo is unknown. */
-export function resolveAutomationModelDiscoveryHostKey(
-  automation: Pick<Automation, 'projectId' | 'runContext'>
-): string | null {
-  const state = useAppStore.getState()
-  const repo = getIndexedRepoMap(state.repos).get(getAutomationRunRepoId(automation))
-  if (!repo) {
-    return null
-  }
-  const scope = getRuntimeGitScope(state.settings, repo.connectionId ?? null)
-  return resolveNativeChatModelDiscoveryHostKey(state, null, repo.path, scope)
 }
 
 function catalogModelsFromHostCatalog(
@@ -148,7 +136,7 @@ export async function discoverNativeChatCatalogModels(
   if (
     hostCatalogAgent &&
     hostKey === LOCAL_COMMIT_MESSAGE_HOST_KEY &&
-    !hasExplicitTuiLaunchCommand(context.settings, hostCatalogAgent)
+    !hasExplicitTuiLaunchCommand(context.prefs, hostCatalogAgent)
   ) {
     const fromHost = await readLocalHostCatalogModels(hostCatalogAgent)
     if (fromHost) {

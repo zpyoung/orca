@@ -16,7 +16,6 @@ import {
   invalidateNativeChatPtySends,
   resetNativeChatPtySendQueuesForTests
 } from '../native-chat-pty-send-queue'
-import type { RuntimeSettings } from '../native-chat-runtime-send'
 import {
   clearThenWrite,
   clearUnsubmittedAgentInput,
@@ -28,12 +27,11 @@ import {
 // the control bytes as literal text (measured against v2.1.280–2.1.283).
 const CLAUDE_PASTE_READ_BYTES = 64
 
-const SETTINGS: RuntimeSettings = {}
 const PTY = 'pty-clear'
 const LONG_DRAFT_CLEAR = buildAgentTuiClearInput(30)
 
 const acceptedWrites = (): string[] =>
-  sendRuntimePtyInputAcceptance.mock.calls.map((call) => String(call[2]))
+  sendRuntimePtyInputAcceptance.mock.calls.map((call) => String(call[1]))
 
 // A pty read can coalesce two back-to-back writes, so no adjacent pair may reach
 // the paste threshold either.
@@ -63,7 +61,7 @@ afterEach(() => {
 describe('clearThenWrite', () => {
   it('delivers a long-draft clear in sub-paste writes before the body', async () => {
     const writeBody = vi.fn()
-    clearThenWrite(SETTINGS, PTY, { clearInput: LONG_DRAFT_CLEAR }, delay, writeBody, vi.fn())
+    clearThenWrite(PTY, { clearInput: LONG_DRAFT_CLEAR }, delay, writeBody, vi.fn())
     await vi.runAllTimersAsync()
 
     expect(acceptedWrites().join('')).toBe(LONG_DRAFT_CLEAR)
@@ -74,14 +72,7 @@ describe('clearThenWrite', () => {
   it('delivers the maximal escalation in sub-paste writes when the line is not observed clear', async () => {
     const clearInput = buildAgentTuiClearInput(1)
     const writeBody = vi.fn()
-    clearThenWrite(
-      SETTINGS,
-      PTY,
-      { clearInput, confirmCleared: () => false },
-      delay,
-      writeBody,
-      vi.fn()
-    )
+    clearThenWrite(PTY, { clearInput, confirmCleared: () => false }, delay, writeBody, vi.fn())
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS)
     await vi.runAllTimersAsync()
 
@@ -92,7 +83,7 @@ describe('clearThenWrite', () => {
 
   it('holds the body until the last clear chunk is written', async () => {
     const writeBody = vi.fn()
-    clearThenWrite(SETTINGS, PTY, { clearInput: LONG_DRAFT_CLEAR }, delay, writeBody, vi.fn())
+    clearThenWrite(PTY, { clearInput: LONG_DRAFT_CLEAR }, delay, writeBody, vi.fn())
     await vi.advanceTimersByTimeAsync(0)
     expect(writeBody).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CHUNK_GAP_MS * 10)
@@ -103,7 +94,7 @@ describe('clearThenWrite', () => {
     sendRuntimePtyInputAcceptance.mockResolvedValueOnce(true).mockResolvedValue(false)
     const writeBody = vi.fn()
     const rejectSend = vi.fn()
-    clearThenWrite(SETTINGS, PTY, { clearInput: LONG_DRAFT_CLEAR }, delay, writeBody, rejectSend)
+    clearThenWrite(PTY, { clearInput: LONG_DRAFT_CLEAR }, delay, writeBody, rejectSend)
     await vi.runAllTimersAsync()
 
     expect(writeBody).not.toHaveBeenCalled()
@@ -111,16 +102,11 @@ describe('clearThenWrite', () => {
   })
 })
 
-const ptyWrites = (): string[] => sendRuntimePtyInput.mock.calls.map((call) => String(call[2]))
+const ptyWrites = (): string[] => sendRuntimePtyInput.mock.calls.map((call) => String(call[1]))
 
 describe('clearUnsubmittedAgentInput', () => {
   it('delivers a long-draft cleanup clear in sub-paste writes', async () => {
-    const cleared = clearUnsubmittedAgentInput(
-      SETTINGS,
-      PTY,
-      { clearInput: LONG_DRAFT_CLEAR },
-      delay
-    )
+    const cleared = clearUnsubmittedAgentInput(PTY, { clearInput: LONG_DRAFT_CLEAR }, delay)
     await vi.runAllTimersAsync()
     await cleared
 
@@ -130,11 +116,9 @@ describe('clearUnsubmittedAgentInput', () => {
 
   it('settles only once the last chunk is written', async () => {
     let settled = false
-    void clearUnsubmittedAgentInput(SETTINGS, PTY, { clearInput: LONG_DRAFT_CLEAR }, delay).then(
-      () => {
-        settled = true
-      }
-    )
+    void clearUnsubmittedAgentInput(PTY, { clearInput: LONG_DRAFT_CLEAR }, delay).then(() => {
+      settled = true
+    })
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CHUNK_GAP_MS)
     expect(settled).toBe(false)
     await vi.runAllTimersAsync()
@@ -150,12 +134,7 @@ describe('cancelled-send cleanup on the PTY send queue', () => {
     enqueueNativeChatPtySend(CANCEL_PTY, 60_000, () => {}, {
       terminalTabId: TAB,
       onCancelUnsubmitted: (cleanupDelay) =>
-        clearUnsubmittedAgentInput(
-          SETTINGS,
-          CANCEL_PTY,
-          { clearInput: LONG_DRAFT_CLEAR },
-          cleanupDelay
-        )
+        clearUnsubmittedAgentInput(CANCEL_PTY, { clearInput: LONG_DRAFT_CLEAR }, cleanupDelay)
     })
 
   it('finishes the cleanup clear before the next queued send writes its body', async () => {
@@ -164,7 +143,7 @@ describe('cancelled-send cleanup on the PTY send queue', () => {
       CANCEL_PTY,
       0,
       () => {
-        sendRuntimePtyInput(SETTINGS, CANCEL_PTY, 'NEXT-BODY')
+        sendRuntimePtyInput(CANCEL_PTY, 'NEXT-BODY')
       },
       { terminalTabId: TAB }
     )

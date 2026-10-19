@@ -11,6 +11,7 @@ import {
   type TerminalDockFocusState
 } from './terminal-pane-dock-focus-transition'
 import { trackPaneFocusOwnership } from './terminal-pane-dock-focus'
+import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './terminal-dock-remote-conpty'
 
 /** ManagedPane's public view drops the internal dockContainer field (pane-public-view.ts), so
  *  reach it the same way the pane DOM itself advertises it: the '.pane-dock-slot' class every
@@ -25,10 +26,7 @@ function findXtermContainer(pane: ManagedPane): HTMLElement | null {
   return pane.container.querySelector<HTMLElement>('.xterm-container')
 }
 
-/** Dataset key use-terminal-pane-lifecycle stamps on a non-local pane's container with
- *  its remote-host ConPTY verdict — windowsPty only ever installs for a local pane, so a
- *  remote/SSH pane needs this separate signal to reach the same demotion decision. */
-export const REMOTE_CONPTY_UNVERIFIED_DATASET_KEY = 'dockRemoteConptyUnverified'
+export { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY }
 
 export function terminalPaneUsesConptyBelowWrapMarkers(pane: ManagedPane): boolean {
   const windowsPty = pane.terminal.options?.windowsPty

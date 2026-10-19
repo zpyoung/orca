@@ -18,9 +18,6 @@ export function useNativeChatRetainedSession(
   const identity = encodeNativeChatTranscriptIdentity([
     args.paneKey,
     args.runtimeEnvironmentId ?? null,
-    // Part of the identity because two ssh hosts can hand back the same agent
-    // session id; without it a rebind would show the first host's turns.
-    args.sshConnectionId ?? null,
     args.agent,
     args.sessionId,
     args.transcriptPath ?? null

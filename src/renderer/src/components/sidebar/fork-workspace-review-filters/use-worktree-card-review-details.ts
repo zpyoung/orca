@@ -1,12 +1,13 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/use-worktree-card-review-details.ts
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
 import { useMemo } from 'react'
-import { getLinearReadScope, scopedLinearCacheKey } from '@/store/slices/linear/linear-slice-scope'
+import { getDetachedWorkspaceReviewRequest } from '../workspace-detached-review-request'
+import { getTaskSourceCacheScope } from '../../../../../shared/task-source-context'
 import { getWorkspaceAttachmentSourceContext } from '../workspace-attachment-source-result'
 import { getWorkspaceReferenceLinearWorkspaceId } from '../workspace-reference-details'
-import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
+import { getWorktreeGitIdentityDisplay } from '../../../../../shared/worktree/git-identity-display'
 import { useAppStore } from '@/store'
-import { getGitHubPRCacheKey } from '@/store/slices/github-cache-key'
+import { getGitHubPRCacheKey } from '../../../../../shared/github/github-cache-key'
 import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache-identity'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
 import { isFolderRepo } from '../../../../../shared/repo-kind'
@@ -44,8 +45,10 @@ export function useWorktreeCardReviewDetails({
   const folderMetaRowContent = newCardStyle
     ? hasPathIdentityEnabled && Boolean(folderPathIdentityDisplay)
     : isFolder
+  const hostedReviewExactKey = getDetachedWorkspaceReviewRequest(worktree, repo)?.key
   const hostedReviewCacheKey =
-    repo && branch
+    hostedReviewExactKey ??
+    (repo && branch
       ? getHostedReviewCacheKey(
           repo.path,
           branch,
@@ -55,7 +58,7 @@ export function useWorktreeCardReviewDetails({
           repo.executionHostId,
           true
         )
-      : ''
+      : '')
   const prCacheKey =
     repo && branch
       ? getGitHubPRCacheKey(
@@ -89,11 +92,16 @@ export function useWorktreeCardReviewDetails({
     worktree.linkedLinearIssueWorkspaceId,
     linearSourceContext
   )
+  // Why: a card only reads Linear data a saved source scopes; the row-less default scope adds no
+  // key prefix, so no focused-server lookup is needed.
+  const linearCachePrefix = linearSourceContext
+    ? getTaskSourceCacheScope(linearSourceContext)
+    : null
+  const linearIssueKey = `${linearWorkspaceId}::${worktree.linkedLinearIssue}`
   const linearIssueCacheKey = worktree.linkedLinearIssue
-    ? scopedLinearCacheKey(
-        getLinearReadScope(settings, linearSourceContext),
-        `${linearWorkspaceId}::${worktree.linkedLinearIssue}`
-      )
+    ? linearCachePrefix
+      ? `${linearCachePrefix}::${linearIssueKey}`
+      : linearIssueKey
     : ''
 
   // Subscribe to ONLY the specific cache entry, not entire review/issue caches.

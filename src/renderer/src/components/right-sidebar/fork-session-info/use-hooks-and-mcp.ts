@@ -75,7 +75,12 @@ export function useHooksAndMcp({
         : Promise.resolve(undefined)
     const mcpRequest =
       workspaceRoot && canInspectMcp
-        ? loadMcpConfigInspections(workspaceRoot, connectionId)
+        ? loadMcpConfigInspections(workspaceRoot, {
+            target: { kind: 'local' },
+            worktreeId: null,
+            worktreePath: workspaceRoot,
+            connectionId
+          })
         : Promise.resolve([])
     const statusLineRequest =
       api && canInspectClaudeStatusLine(agentType, isLocalExecution)

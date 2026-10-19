@@ -9,7 +9,7 @@ export async function createLocalFolderTarget(
 ): Promise<ObjectiveWorkspaceTarget> {
   const workspacePath = await mkdtemp(join(tmpdir(), prefix))
   temporaryDirectories.push(workspacePath)
-  return { kind: 'folder', executionHostId: 'local', workspacePath, fileProvider: null }
+  return { kind: 'folder', executionHostId: 'local', workspacePath }
 }
 
 export async function cleanupTemporaryDirectories(temporaryDirectories: string[]): Promise<void> {

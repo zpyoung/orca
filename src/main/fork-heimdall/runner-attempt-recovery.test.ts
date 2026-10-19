@@ -238,8 +238,7 @@ function buildHarness(): {
     target: {
       kind: 'folder',
       executionHostId: 'local',
-      workspacePath: '/workspace',
-      fileProvider: null
+      workspacePath: '/workspace'
     }
   })
 

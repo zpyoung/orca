@@ -9,13 +9,12 @@ import {
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
-import type { IFilesystemProvider } from '../providers/types'
 import {
   localGitOptionsForTarget,
-  requireRuntimeGitProvider,
+  requireLocalRuntimeGitRoute,
   type RuntimeGitTarget
 } from '../runtime/runtime-git-command-target'
-import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
 
 const HASH_CONCURRENCY = 8
@@ -24,7 +23,6 @@ export type ObjectiveWorkspaceTarget = {
   kind: 'git' | 'folder'
   executionHostId: ExecutionHostId
   workspacePath: string
-  fileProvider: IFilesystemProvider | null
   gitTarget?: RuntimeGitTarget
 }
 
@@ -183,10 +181,7 @@ export function objectiveGitCommandForTarget(
   if (gitTarget.executionHostId !== target.executionHostId) {
     throw new Error('Git and filesystem routes disagree on execution host')
   }
-  const provider = requireRuntimeGitProvider(gitTarget)
-  if (provider) {
-    return (args) => provider.exec(args, target.workspacePath)
-  }
+  requireLocalRuntimeGitRoute(gitTarget)
   const options = localGitOptionsForTarget(gitTarget)
   const cwd = resolveWorktreeHostPath(target.workspacePath, options) ?? target.workspacePath
   return (args) =>
@@ -198,7 +193,7 @@ export function objectiveGitCommandForTarget(
 }
 
 function workspaceFilesystemRoot(target: ObjectiveWorkspaceTarget): string {
-  if (target.fileProvider || !target.gitTarget) {
+  if (!target.gitTarget) {
     return target.workspacePath
   }
   return (
@@ -216,12 +211,6 @@ async function readWorkingTreeStat(
   const root = workspaceFilesystemRoot(target)
   const flavor = resolveLeasePathFlavor(target.executionHostId, root)
   const absolutePath = flavor.join(root, ...relativePath.split('/'))
-  if (target.fileProvider) {
-    if (!target.fileProvider.lstat) {
-      throw new Error('Remote untracked path identity requires lstat capability')
-    }
-    return await target.fileProvider.lstat(absolutePath)
-  }
   const stat = await lstat(absolutePath)
   return {
     type: stat.isDirectory()
@@ -412,9 +401,6 @@ async function computeFolderIdentity(target: ObjectiveWorkspaceTarget): Promise<
 export async function computeWorkspaceContentIdentity(
   target: ObjectiveWorkspaceTarget
 ): Promise<string> {
-  const routedFileProvider = requireRuntimeFileProvider(target)
-  if (routedFileProvider !== target.fileProvider) {
-    throw new Error('Objective filesystem route changed after target resolution')
-  }
+  requireLocalRuntimeFileRoute(target)
   return target.kind === 'git' ? computeGitIdentity(target) : computeFolderIdentity(target)
 }

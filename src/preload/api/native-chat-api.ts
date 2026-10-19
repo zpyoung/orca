@@ -59,9 +59,6 @@ export type NativeChatSubscribeArgs = {
   transcriptPath?: string
   /** First snapshot size; later readSession calls grow this for pagination. */
   limit?: number
-  /** Plain-`ssh:` owner of the pane, when it has one — the watcher then lives on
-   *  that host's relay and main forwards its frames. */
-  sshConnectionId?: string
 }
 
 export type NativeChatReadSessionArgs = {
@@ -71,9 +68,6 @@ export type NativeChatReadSessionArgs = {
   limit?: number
   /** Authoritative transcript path from the agent hook (providerSession). */
   transcriptPath?: string
-  /** Plain-`ssh:` owner of the pane, when it has one — the read then runs on
-   *  that host's relay, since this process cannot see its disk. */
-  sshConnectionId?: string
   /** Read the window ending at this byte offset instead of the file's tail —
    *  a prior result's `beforeOffset`, which pages older history. */
   beforeOffset?: number

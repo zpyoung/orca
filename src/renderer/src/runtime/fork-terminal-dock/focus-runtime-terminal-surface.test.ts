@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
-import { focusRuntimeTerminalSurface, registerRuntimeTerminalTab } from '../sync-runtime-graph'
+import {
+  focusRuntimeTerminalSurface,
+  registerRuntimeTerminalTab
+} from '../mounted-terminal-tab-registry'
 
 const FOCUS_LEAF_ID = '11111111-1111-4111-8111-111111111111'
 const runtimeFocusTabDisposers: (() => void)[] = []

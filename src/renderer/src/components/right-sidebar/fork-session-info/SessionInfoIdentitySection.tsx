@@ -196,7 +196,7 @@ export function SessionInfoIdentitySection({
             <ActionButton
               icon={FolderOpen}
               label={translate('fork.sessionInfo.revealTranscript', 'Reveal transcript')}
-              onClick={() => void window.api.shell.openInFileManager(localTranscript)}
+              onClick={() => void window.api.shell.openInFileManager(localTranscript, 'local')}
             />
           </>
         ) : null}

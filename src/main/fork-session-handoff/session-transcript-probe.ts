@@ -7,7 +7,6 @@ import type {
 } from '../../shared/fork-session-handoff/session-transcript-probe-types'
 import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
 import type { AgentType } from '../../shared/native-chat-types'
-import { encodeClaudeProjectPaths } from '../ai-vault/claude-project-dir-encoding'
 import { AI_VAULT_AGENT_SOURCES } from '../ai-vault/session-scanner-agent-sources'
 import { isENOENT } from '../ipc/filesystem-path-containment'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
@@ -53,9 +52,7 @@ type CandidateSet = {
  * Candidates are tried in descending order of authority — the agent's reported
  * path, the id-based lookup, the pane's earlier reports, then a project-bucket
  * scan — because Claude Code reports a rotated session id before writing a file
- * for it, leaving the live conversation under the previous id. The same chain
- * runs against an SSH target, where the host port swaps the filesystem and the
- * path flavor rather than the resolution strategy.
+ * for it, leaving the live conversation under the previous id.
  */
 export async function resolveHandoffTranscript(
   request: ForkHandoffTranscriptProbeRequest,
@@ -138,7 +135,7 @@ async function collectCandidates(
   }
 
   add(request.transcriptPath, 'reported')
-  for (const path of await resolveBySessionId(request, host, deps)) {
+  for (const path of await resolveBySessionId(request, deps)) {
     add(path, 'session-id')
   }
   for (const path of (deps.paneTranscriptPaths ?? getForkPaneTranscriptPaths)(request.paneKey)) {
@@ -149,20 +146,14 @@ async function collectCandidates(
   return { candidates, refusal: scan.ambiguous ? 'ambiguous-project-scan' : null }
 }
 
-/** Recovers a session whose hook-reported path has gone stale. A host with a
- *  session-id index answers directly; a remote one is asked for the same id
- *  beside the paths it already knows, which is where a rotation lands. */
+/** Recovers a session whose hook-reported path has gone stale. */
 async function resolveBySessionId(
   request: ForkHandoffTranscriptProbeRequest,
-  host: ForkTranscriptHost,
   deps: ResolveHandoffTranscriptDeps
 ): Promise<string[]> {
   const transcriptAgent = resolveNativeChatTranscriptAgent(request.agent)
   if (!transcriptAgent || !request.sessionId) {
     return []
-  }
-  if (!host.supportsSessionIdSearch) {
-    return siblingSessionIdPaths(request, host, deps)
   }
   const resolved = await (deps.resolveSessionFile ?? resolveSessionFilePath)(
     request.agent as AgentType,
@@ -170,35 +161,6 @@ async function resolveBySessionId(
     request.transcriptPath ? { transcriptPath: request.transcriptPath } : {}
   )
   return resolved ? [resolved] : []
-}
-
-/** `<id>.jsonl` in every directory this request already points at: the reported
- *  path's own directory, and the workspace's project buckets. */
-function siblingSessionIdPaths(
-  request: ForkHandoffTranscriptProbeRequest,
-  host: ForkTranscriptHost,
-  deps: ResolveHandoffTranscriptDeps
-): string[] {
-  const fileName = `${request.sessionId}.jsonl`
-  const directories = [
-    ...parentDirectories(request, host, deps),
-    ...projectBucketDirs(request.workspacePath, host)
-  ]
-  return directories.map((dirPath) => host.joinPath(dirPath, fileName))
-}
-
-function parentDirectories(
-  request: ForkHandoffTranscriptProbeRequest,
-  host: ForkTranscriptHost,
-  deps: ResolveHandoffTranscriptDeps
-): string[] {
-  const paneTranscriptPaths = deps.paneTranscriptPaths ?? getForkPaneTranscriptPaths
-  const known = [request.transcriptPath, ...paneTranscriptPaths(request.paneKey)]
-  return known.flatMap((filePath) => {
-    const normalized = filePath ? host.normalizePath(filePath) : ''
-    const cut = normalized.lastIndexOf('/')
-    return cut > 0 ? [normalized.slice(0, cut)] : []
-  })
 }
 
 /** Claude alone, because the bucket name is Claude's own cwd encoding. */
@@ -219,15 +181,6 @@ async function scanProjectBucket(
     readDirectory: host.readDirectory,
     statFile: host.statFile
   })
-}
-
-function projectBucketDirs(workspacePath: string | null, host: ForkTranscriptHost): string[] {
-  if (!workspacePath) {
-    return []
-  }
-  return encodeClaudeProjectPaths(workspacePath).flatMap((bucketName) =>
-    host.roots.map((rootDir) => host.joinPath(rootDir, bucketName))
-  )
 }
 
 function resolveVaultAgent(agent: string | null): AiVaultAgent | null {

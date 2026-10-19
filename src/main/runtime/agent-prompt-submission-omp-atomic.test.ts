@@ -38,18 +38,18 @@ const PTY_ID = 'pty-prompt'
 
 // Bundle the real writer and submit constant; external stubs avoid compiling the main-runtime graph.
 const BUNDLED_WRITER_PATH = normalizePath(
-  resolve(__dirname, 'orca-runtime-write-terminal-agent-prompt.ts')
+  resolve(__dirname, 'terminal/input/terminal-agent-prompt.ts')
 )
 const BUNDLED_WRITER_EXTERNALS: Record<string, object> = {
-  './orca-runtime-resolve-authoritative-terminal-wait-permission': {
+  '../wait/terminal-wait-permission': {
     OrcaRuntimeWithResolveAuthoritativeTerminalWaitPermission: class {}
   },
-  './orca-runtime-core': {
+  '../../orca-runtime-core': {
     assertAgentPromptRequestActive: () => {},
     waitForAgentPromptDelay: async () => {},
     waitForAgentPromptPromise: async (promise: Promise<unknown>) => await promise
   },
-  './agent-prompt-submission-verification': {
+  '../../agent-prompt-submission-verification': {
     isTerminalSendSettlementAgent: () => false,
     resolveAgentPromptEffectTimeoutMs: () => 0,
     verifyAgentPromptSubmission: async () => {}

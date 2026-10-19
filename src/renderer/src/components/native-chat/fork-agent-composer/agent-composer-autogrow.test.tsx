@@ -1,6 +1,6 @@
-// @vitest-environment happy-dom
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
+// @vitest-environment happy-dom
 
 /** The composer grows with the draft up to 8 lines, then scrolls internally.
  *  Sizing is layout-driven (field-sizing + an lh-relative cap) rather than a JS

@@ -14,12 +14,12 @@ import {
   readIncrementalTranscriptMessages,
   resetIncrementalTranscriptState
 } from './transcript-incremental-reader'
+import { readNativeChatTranscriptTailFile } from './transcript-tail-reader'
 import { emitTranscriptUnavailableSnapshot } from './transcript-unavailable-snapshot'
 import { transcriptWatcherPathIsInstallable } from './transcript-watcher-install-probe'
 import { nativeChatTranscriptCompanionDecoderForAgent } from './fork-native-chat-session-options/transcript-companion-decoder'
 import type {
   NativeChatTranscriptSubscription,
-  NativeChatTranscriptTailReader,
   SubscribeNativeChatTranscriptArgs
 } from './transcript-watch-contract'
 import { createTranscriptWatchScheduler } from './transcript-watch-scheduler'
@@ -36,15 +36,14 @@ import { trackActiveNativeChatWatcher } from './transcript-watcher-count'
 export async function installTranscriptWatcher(
   filePath: string,
   decode: (line: string, fallbackId: string) => NativeChatMessage | null,
-  args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },
+  args: SubscribeNativeChatTranscriptArgs,
   signal?: AbortSignal
 ): Promise<NativeChatTranscriptSubscription | null> {
   const isWslPath = isWslTranscriptWatcherPath(filePath)
   if (!(await transcriptWatcherPathIsInstallable(filePath, signal))) {
     return null
   }
-  const { onAppend, onInitialSnapshot, onReplace, initialLimit, initialMaxBytes } = args
-  const { tailReader } = args
+  const { onAppend, onInitialSnapshot, onReplace, initialLimit } = args
   const decodeCompanion = nativeChatTranscriptCompanionDecoderForAgent(args.agent)
 
   const state = createIncrementalTranscriptState()
@@ -94,17 +93,18 @@ export async function installTranscriptWatcher(
   }
 
   async function readSnapshot(limit: number) {
-    return tailReader({
+    return readNativeChatTranscriptTailFile(
       filePath,
       limit,
       decode,
+      false,
+      undefined,
       decodeCompanion,
-      maxBytes: initialMaxBytes,
-      signal: gateAbort.signal,
-      onConsumedBoundary: (boundary) => {
+      gateAbort.signal,
+      (boundary) => {
         state.boundary = boundary
       }
-    })
+    )
   }
 
   async function finishSuccessfulDrain(startVersion: TranscriptFileVersion): Promise<void> {

@@ -3,7 +3,7 @@ import {
   sendRuntimePtyInputAcceptance
 } from '@/runtime/runtime-terminal-inspection'
 import { AGENT_TUI_CLEAR_INPUT_MAX } from '../../../../../shared/agent-tui-input-clear'
-import type { NativeChatSendOptions, RuntimeSettings } from '../native-chat-runtime-send'
+import type { NativeChatSendOptions } from '../native-chat-runtime-send'
 
 export const NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT = '\x15'
 export const NATIVE_CHAT_CLEAR_CONFIRM_MS = 140
@@ -33,7 +33,6 @@ function splitClearBurst(clearBytes: string): string[] {
  * line; the promise settles once the last chunk is written.
  */
 export function clearUnsubmittedAgentInput(
-  settings: RuntimeSettings,
   ptyId: string,
   options: NativeChatSendOptions | undefined,
   delay: (ms: number, fn: () => void) => void
@@ -41,7 +40,7 @@ export function clearUnsubmittedAgentInput(
   const [first = '', ...rest] = splitClearBurst(
     options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
   )
-  sendRuntimePtyInput(settings, ptyId, first, 'driving')
+  sendRuntimePtyInput(ptyId, first, 'driving')
   return new Promise<void>((resolve) => {
     if (rest.length === 0) {
       resolve()
@@ -50,7 +49,7 @@ export function clearUnsubmittedAgentInput(
     rest.forEach((chunk, index) => {
       delay((index + 1) * NATIVE_CHAT_CLEAR_CHUNK_GAP_MS, () => {
         try {
-          sendRuntimePtyInput(settings, ptyId, chunk, 'driving')
+          sendRuntimePtyInput(ptyId, chunk, 'driving')
         } finally {
           if (index === rest.length - 1) {
             resolve()
@@ -63,7 +62,6 @@ export function clearUnsubmittedAgentInput(
 
 /** Resolves true only once every chunk of the burst is accepted, in order. */
 function sendClearBurstAccepted(
-  settings: RuntimeSettings,
   ptyId: string,
   clearBytes: string,
   delay: (ms: number, fn: () => void) => void
@@ -75,15 +73,12 @@ function sendClearBurstAccepted(
         accepted
           ? new Promise<boolean>((resolve, reject) => {
               delay(NATIVE_CHAT_CLEAR_CHUNK_GAP_MS, () => {
-                sendRuntimePtyInputAcceptance(settings, ptyId, chunk, 'driving').then(
-                  resolve,
-                  reject
-                )
+                sendRuntimePtyInputAcceptance(ptyId, chunk, 'driving').then(resolve, reject)
               })
             })
           : false
       ),
-    sendRuntimePtyInputAcceptance(settings, ptyId, first, 'driving')
+    sendRuntimePtyInputAcceptance(ptyId, first, 'driving')
   )
 }
 
@@ -94,19 +89,13 @@ function sendClearBurstAccepted(
  * a body that appends to residual text.
  */
 export function clearThenWrite(
-  settings: RuntimeSettings,
   ptyId: string,
   options: NativeChatSendOptions | undefined,
   delay: (ms: number, fn: () => void) => void,
   writeBody: () => void,
   rejectSend: () => void
 ): void {
-  sendClearBurstAccepted(
-    settings,
-    ptyId,
-    options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-    delay
-  )
+  sendClearBurstAccepted(ptyId, options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, delay)
     .then((cleared) => {
       if (!cleared) {
         rejectSend()
@@ -128,7 +117,7 @@ export function clearThenWrite(
           writeBody()
           return
         }
-        sendClearBurstAccepted(settings, ptyId, AGENT_TUI_CLEAR_INPUT_MAX, delay)
+        sendClearBurstAccepted(ptyId, AGENT_TUI_CLEAR_INPUT_MAX, delay)
           .then((escalated) => {
             if (!escalated) {
               rejectSend()

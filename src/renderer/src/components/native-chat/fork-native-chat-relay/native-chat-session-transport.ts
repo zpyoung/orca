@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-session-transport.ts
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
 import type {
   NativeChatApi,
   NativeChatAppendedMessages,
@@ -7,11 +7,9 @@ import type {
   NativeChatReadSessionResult
 } from '../../../../../preload/api-types'
 import { isWebClientLocation } from '@/lib/web-client-location'
-import {
-  callRuntimeRpc,
-  RuntimeRpcCallError,
-  type RuntimeClientTarget
-} from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
 import { isRuntimeCompatBlockError } from '@/runtime/runtime-protocol-compat'
 import {
   parseRuntimeNativeChatReadSessionResult,
@@ -311,7 +309,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
 
 /** Select the read/subscribe transport for a pane. Route to the remote runtime
  *  only for a `runtime:`-owned pane on a non-web client (KTD-2); web and
- *  local/`ssh:`-owned panes keep the local adapter. */
+ *  local panes keep the local adapter. */
 export function getNativeChatSessionTransport(
   runtimeEnvironmentId: string | null
 ): NativeChatSessionTransport {

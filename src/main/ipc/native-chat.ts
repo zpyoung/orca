@@ -16,10 +16,6 @@ import {
 import { abortWhenRendererGone } from './renderer-lifetime-abort'
 import { agentHookServer } from '../agent-hooks/server'
 import { nativeChatTranscriptPathOnExecutionHost } from '../native-chat/ssh-transcript-path'
-import {
-  readSshNativeChatTranscript,
-  subscribeSshNativeChatForSender
-} from './fork-native-chat-relay/native-chat-ssh-subscription'
 
 // Re-export so existing test imports of `clearNativeChatTranscriptCache` from
 // this module keep working after the cache moved to transcript-read-cache.ts.
@@ -34,7 +30,6 @@ export type NativeChatReadSessionArgs = {
   /** Authoritative transcript path from the agent hook (providerSession), used to
    *  locate the file when the session id no longer names it (recent Claude Code). */
   transcriptPath?: string
-  sshConnectionId?: string
   beforeOffset?: number
 }
 
@@ -45,16 +40,6 @@ async function readSession(args: NativeChatReadSessionArgs): Promise<ReadTranscr
   const { agent, sessionId } = args
   // Clamp to a positive window; default to the desktop window for the first page.
   const limit = args.limit && args.limit > 0 ? Math.floor(args.limit) : DESKTOP_READ_WINDOW
-  if (args.sshConnectionId) {
-    return readSshNativeChatTranscript({
-      sshConnectionId: args.sshConnectionId,
-      agent,
-      sessionId,
-      limit,
-      ...(args.transcriptPath ? { transcriptPath: args.transcriptPath } : {}),
-      ...(typeof args.beforeOffset === 'number' ? { beforeOffset: args.beforeOffset } : {})
-    })
-  }
   return readNativeChatTranscriptTail({
     agent,
     sessionId,
@@ -77,7 +62,6 @@ export type NativeChatSubscribeArgs = {
   /** Authoritative transcript path from the agent hook (providerSession). */
   transcriptPath?: string
   limit?: number
-  sshConnectionId?: string
 }
 
 export type NativeChatAppendedPayload = {
@@ -211,26 +195,6 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
   const rendererSignal = registerSenderCleanup(sender)
   const canPublish = (): boolean =>
     !sender.isDestroyed() && !rendererSignal.aborted && !pending.controller.signal.aborted
-  if (args.sshConnectionId) {
-    const subscription = subscribeSshNativeChatForSender({
-      sender,
-      subscriptionId,
-      sshConnectionId: args.sshConnectionId,
-      agent,
-      sessionId,
-      limit,
-      ...(transcriptPath ? { transcriptPath } : {})
-    })
-    if (!takePendingSubscription(sender.id, subscriptionId, pending) || sender.isDestroyed()) {
-      subscription.unsubscribe()
-      return
-    }
-    const bySubId = liveSubscriptions.get(sender.id) ?? new Map<string, LiveSubscription>()
-    bySubId.get(subscriptionId)?.subscription.unsubscribe()
-    bySubId.set(subscriptionId, { subscription })
-    liveSubscriptions.set(sender.id, bySubId)
-    return
-  }
 
   const subscribeArgs: SubscribeNativeChatTranscriptArgs = {
     agent,

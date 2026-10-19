@@ -4,9 +4,9 @@ import { getSessionInfoActivityItem } from './session-info-activity-item'
 
 describe('Session Info activity item', () => {
   it.each([
-    { isFolder: false, isFolderWorkspace: false, isSshRepo: false },
-    { isFolder: true, isFolderWorkspace: true, isSshRepo: false },
-    { isFolder: false, isFolderWorkspace: false, isSshRepo: true }
+    { isFolder: false, isFolderWorkspace: false, hasSshHost: false },
+    { isFolder: true, isFolderWorkspace: true, hasSshHost: false },
+    { isFolder: false, isFolderWorkspace: false, hasSshHost: true }
   ])('stays visible for every workspace kind', (visibility) => {
     expect(
       getVisibleRightSidebarActivityItems([getSessionInfoActivityItem()], visibility)

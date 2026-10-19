@@ -1,15 +1,14 @@
-import { randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { objectivePathMatchesTerritory } from '../../shared/fork-heimdall-objective/plan-schema'
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
 import { checkIgnoredPaths } from '../git/check-ignored-paths'
 import { isENOENT } from '../ipc/filesystem-path-containment'
-import type { IFilesystemProvider } from '../providers/types'
 import {
   localGitOptionsForTarget,
-  requireRuntimeGitProvider
+  requireLocalRuntimeGitRoute
 } from '../runtime/runtime-git-command-target'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
 import {
   filesystemErrorCode,
@@ -27,7 +26,6 @@ import {
   type WorkspaceBaseline
 } from './objective-workspace-baseline-schema'
 import {
-  objectiveFilesystemProviderForTarget,
   observeObjectiveWorkspaceManifest,
   type ObjectiveWorkspaceManifestEntry as ManifestEntry
 } from './objective-workspace-manifest'
@@ -51,32 +49,8 @@ async function baselinePath(
   return { directory, path: flavor.join(directory, flavor.basename(reportPath)) }
 }
 
-async function readStoredBaseline(
-  provider: IFilesystemProvider | null,
-  path: string
-): Promise<BaselineRead> {
+async function readStoredBaseline(path: string): Promise<BaselineRead> {
   try {
-    if (provider) {
-      if (!provider.lstat) {
-        return { state: 'unreadable' }
-      }
-      const stat = await provider.lstat(path)
-      if (stat.type !== 'file' || !Number.isSafeInteger(stat.size) || stat.size < 0) {
-        return { state: 'malformed' }
-      }
-      if (stat.size > MAX_BASELINE_BYTES) {
-        return { state: 'malformed' }
-      }
-      const read = await provider.readFile(path, {
-        maxTextBytes: MAX_BASELINE_BYTES,
-        maxBinaryBytes: MAX_BASELINE_BYTES
-      })
-      if (read.isBinary || Buffer.byteLength(read.content, 'utf8') !== stat.size) {
-        return { state: 'malformed' }
-      }
-      const parsed = parseBaseline(JSON.parse(read.content))
-      return parsed ? { state: 'ok', baseline: parsed } : { state: 'malformed' }
-    }
     const stat = await lstat(path)
     if (!stat.isFile() || stat.size > MAX_BASELINE_BYTES) {
       return { state: 'malformed' }
@@ -99,45 +73,21 @@ async function readStoredBaseline(
 }
 
 async function writeBaseline(
-  target: ObjectiveWorkspaceTarget,
   baseline: WorkspaceBaseline,
   directory: string,
   path: string
 ): Promise<void> {
-  const provider = objectiveFilesystemProviderForTarget(target)
-  const serialized = JSON.stringify(baseline)
-  if (!provider) {
-    await mkdir(directory, { recursive: true, mode: 0o700 })
-    await chmod(directory, 0o700)
-    try {
-      await writeFile(path, serialized, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
-      return
-    } catch (error) {
-      if (filesystemErrorCode(error) !== 'EEXIST') {
-        throw error
-      }
-    }
-  } else {
-    await provider.createDir(directory)
-    const temporaryPath = `${path}.${randomUUID()}.tmp`
-    await provider.writeFile(temporaryPath, serialized)
-    try {
-      await provider.renameNoClobber(temporaryPath, path)
-      return
-    } catch (error) {
-      await provider.deletePath(temporaryPath).catch(() => undefined)
-      const existing = await readStoredBaseline(provider, path)
-      if (
-        existing.state === 'ok' &&
-        existing.baseline.attemptFingerprint === baseline.attemptFingerprint &&
-        sameTarget(existing.baseline.target, baseline.target)
-      ) {
-        return
-      }
+  await mkdir(directory, { recursive: true, mode: 0o700 })
+  await chmod(directory, 0o700)
+  try {
+    await writeFile(path, JSON.stringify(baseline), { encoding: 'utf8', mode: 0o600, flag: 'wx' })
+    return
+  } catch (error) {
+    if (filesystemErrorCode(error) !== 'EEXIST') {
       throw error
     }
   }
-  const existing = await readStoredBaseline(provider, path)
+  const existing = await readStoredBaseline(path)
   if (
     existing.state !== 'ok' ||
     existing.baseline.attemptFingerprint !== baseline.attemptFingerprint ||
@@ -152,9 +102,9 @@ export async function captureObjectiveWorkspaceBaseline(
   attemptFingerprint: string,
   sourceTarget: ObjectiveWorkspaceTarget = target
 ): Promise<void> {
-  const provider = objectiveFilesystemProviderForTarget(target)
+  requireLocalRuntimeFileRoute(target)
   const location = await baselinePath(target, attemptFingerprint)
-  const existing = await readStoredBaseline(provider, location.path)
+  const existing = await readStoredBaseline(location.path)
   if (existing.state === 'ok') {
     if (
       existing.baseline.attemptFingerprint !== attemptFingerprint ||
@@ -184,7 +134,7 @@ export async function captureObjectiveWorkspaceBaseline(
           target: targetDescriptor(target),
           entries: await observeObjectiveWorkspaceManifest(sourceTarget)
         }
-  await writeBaseline(target, baseline, location.directory, location.path)
+  await writeBaseline(baseline, location.directory, location.path)
 }
 
 function changedPaths(before: readonly ManifestEntry[], after: readonly ManifestEntry[]): string[] {
@@ -209,13 +159,11 @@ async function ignoredReportedPaths(
   ) {
     throw new Error('Objective Git and filesystem authorities disagree')
   }
-  const provider = requireRuntimeGitProvider(gitTarget)
-  const ignored = provider
-    ? await provider.checkIgnoredPaths(target.workspacePath, [...paths])
-    : await checkIgnoredPaths(target.workspacePath, [...paths], {
-        ...localGitOptionsForTarget(gitTarget),
-        admissionTier: 'background'
-      })
+  requireLocalRuntimeGitRoute(gitTarget)
+  const ignored = await checkIgnoredPaths(target.workspacePath, [...paths], {
+    ...localGitOptionsForTarget(gitTarget),
+    admissionTier: 'background'
+  })
   const requested = new Set(paths)
   if (ignored.some((path) => !requested.has(path))) {
     throw new Error('Git returned an unrequested ignored path')
@@ -230,25 +178,19 @@ async function existingContainedPaths(
   if (paths.size === 0) {
     return new Set()
   }
-  const provider = objectiveFilesystemProviderForTarget(target)
-  const root =
-    target.fileProvider || !target.gitTarget
-      ? target.workspacePath
-      : (resolveWorktreeHostPath(
-          target.workspacePath,
-          localGitOptionsForTarget(target.gitTarget)
-        ) ?? target.workspacePath)
+  const root = target.gitTarget
+    ? (resolveWorktreeHostPath(target.workspacePath, localGitOptionsForTarget(target.gitTarget)) ??
+      target.workspacePath)
+    : target.workspacePath
   const flavor = resolveLeasePathFlavor(target.executionHostId, root)
-  const canonicalRoot = provider ? await provider.realpath(root) : await realpath(root)
+  const canonicalRoot = await realpath(root)
   const entries = await mapWithConcurrency(
     [...paths],
     REPORTED_PATH_PROBE_CONCURRENCY,
     async (path): Promise<[string, boolean]> => {
       try {
         const candidate = flavor.join(root, ...path.split('/'))
-        const canonicalCandidate = provider
-          ? await provider.realpath(candidate)
-          : await realpath(candidate)
+        const canonicalCandidate = await realpath(candidate)
         return [path, isPathInsideOrEqual(canonicalRoot, canonicalCandidate)]
       } catch (error) {
         if (isMissingFilesystemError(error) || isENOENT(error)) {
@@ -272,15 +214,14 @@ export async function validateObjectiveWorkspaceChanges(args: {
   reportedFiles: readonly string[]
   writeTerritory: readonly string[]
 }): Promise<ObjectiveWorkspaceChangesValidation> {
-  let provider: IFilesystemProvider | null
   let location: BaselineLocation
   try {
-    provider = objectiveFilesystemProviderForTarget(args.target)
+    requireLocalRuntimeFileRoute(args.target)
     location = await baselinePath(args.target, args.attemptFingerprint)
   } catch {
     return { ok: false, reason: 'objective-workspace-route-unavailable' }
   }
-  const stored = await readStoredBaseline(provider, location.path)
+  const stored = await readStoredBaseline(location.path)
   if (stored.state !== 'ok') {
     return { ok: false, reason: `objective-workspace-baseline-${stored.state}` }
   }

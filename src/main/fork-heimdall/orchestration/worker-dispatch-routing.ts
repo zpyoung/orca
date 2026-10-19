@@ -6,6 +6,7 @@ import type {
   DispatchWorkerInput
 } from '../../../shared/fork-heimdall/kind-contract'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
+import { composeWorktreeId } from '../../../shared/worktree/id'
 
 export function workerStartParams(input: DispatchWorkerInput) {
   const reuseTerminal = input.reuseTerminal?.trim()
@@ -47,5 +48,5 @@ export async function inspectHeimdallWorkerTerminal(
 }
 
 export function workspaceRuntimeId(enrollment: WatcherEnrollment): string {
-  return enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
+  return enrollment.worktreeId ?? composeWorktreeId(enrollment.repoId, enrollment.workspacePath)
 }
