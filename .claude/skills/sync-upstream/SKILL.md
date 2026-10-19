@@ -392,6 +392,19 @@ output lists — `checkout.txt`, `remove.txt`, `ours.txt`, `merge-review.txt`. `
 no shell command: those paths took a real three-way merge and must be read by hand against the
 manifest's declared lines.
 
+`-X ours` resolved every conflicting hunk in those files toward the fork, so re-merge each seam file
+without it (`git merge-file --diff3 -p` with `$MERGE_HEAD_PRE`, `$PREV_TAG`, `$UPSTREAM_TARGET`) and
+resolve every file that reports a conflict. Do this even where `--verify-residuals` passes: a
+discarded upstream hunk the same size as the fork's keeps the budget intact. v1.4.215 had two such
+files that the residual check never flagged: `pr-e2e-gate-contract.test.mjs`, still naming a job
+upstream had retired, and `NativeChatToolLine.tsx`, with a hover-group rename lost.
+
+The `ours.txt` three-way merge has a matching blind spot. A clean merge imports upstream's new
+assertions into an exception-owned contract test even when they name a workflow or job the fork
+deletes. v1.4.215 did this for `track-community-prs.yaml` and `package_windows`. Nothing flags it
+until PR CI, so grep every merged exception test for the paths the manifest marks `deleted: true`
+and for jobs missing from the fork's `pr.yml`.
+
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
 feature-collision review**. Each can surface a decision the reference routes to a human. Under
@@ -646,19 +659,21 @@ Order: `pnpm install --frozen-lockfile` (re-run it here — the merge may have t
 
 **Never run `pnpm typecheck` here.** `AGENTS.md` forbids it on this machine: it is
 `run-typecheck-projects-in-parallel.mjs`, which spawns a `tsc --noEmit` per project concurrently,
-and with several sync worktrees open that saturates every core. Run the same four projects one
-after another instead — same coverage, no concurrency — clearing the build cache before each, since
+and with several sync worktrees open that saturates every core. Run the projects it lists in
+`TYPECHECK_PROJECTS` one after another instead — same coverage, no concurrency — clearing the build cache before each, since
 composite projects cache errors across the `git checkout` swaps this step is full of:
 
 ```sh
 find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:node
 find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:web
 find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:cli
-find config -maxdepth 1 -name '*.tsbuildinfo' -delete && \
-  pnpm exec tsc --noEmit -p config/tsconfig.mobile-web.json
 ```
 
-Four separate commands on purpose, not a loop: under the sandboxed shell a command in a `for` body
+Read the project list from the tag's `config/scripts/run-typecheck-projects-in-parallel.mjs` rather
+than from here, because upstream edits it. v1.4.215 retired `config/tsconfig.mobile-web.json` in
+#22193, and a gate that still ran it failed with a missing-file error that names no type problem.
+
+Separate commands on purpose, not a loop: under the sandboxed shell a command in a `for` body
 can come back "command not found", which inverts the result silently, and a loop's `|| break` would
 swallow the exit code this gate turns on. Read each one's status before running the next. `zsh` has
 no `PIPESTATUS`, so do not pipe these into `tail` and expect `$?` to mean anything — redirect to a
