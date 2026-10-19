@@ -3606,7 +3606,7 @@
     "ko": "클라이언트"
   },
   "auto.components.settings.settingOwnership.agentLaunchDefaults": {
-    "ko": "기본 agent, 명령 재정의, CLI 인수 및 실행 환경은 선택한 호스트에 저장됩니다."
+    "ko": "기본 에이전트, 명령 재정의, CLI 인수 및 실행 환경은 선택한 호스트에 저장됩니다."
   },
   "auto.components.settings.settingOwnership.clientDefault": {
     "ko": "클라이언트 기본값"

@@ -63,53 +63,6 @@ describe('runtime git diff transport budget', () => {
     mocks.getCommitDiff.mockReset().mockResolvedValue(oversizedResult())
   })
 
-  it('caps an SSH-forwarded diff that exceeds the budget', async () => {
-    const provider = sshProvider()
-    mocks.getSshGitProvider.mockReturnValue(provider)
-
-    await expect(
-      commands('conn-1').getRuntimeGitDiff(
-        'id:wt-1',
-        'assets/logo.png',
-        false,
-        undefined,
-        REMOTE_RPC_MAX_CONTENT_BYTES
-      )
-    ).rejects.toMatchObject(TOO_LARGE)
-    expect(provider.getDiff).toHaveBeenCalledWith(
-      '/remote/repo',
-      'assets/logo.png',
-      false,
-      undefined,
-      undefined
-    )
-    expect(mocks.getDiff).not.toHaveBeenCalled()
-  })
-
-  it('leaves an SSH-forwarded diff uncapped when no budget is supplied', async () => {
-    const provider = sshProvider()
-    mocks.getSshGitProvider.mockReturnValue(provider)
-    const controller = new AbortController()
-
-    await expect(
-      commands('conn-1').getRuntimeGitDiff(
-        'id:wt-1',
-        'assets/logo.png',
-        false,
-        undefined,
-        undefined,
-        controller.signal
-      )
-    ).resolves.toMatchObject({ modifiedContent: OVERSIZED_BASE64 })
-    expect(provider.getDiff).toHaveBeenCalledWith(
-      '/remote/repo',
-      'assets/logo.png',
-      false,
-      undefined,
-      { signal: controller.signal }
-    )
-  })
-
   it('caps a local-repo diff that exceeds the budget', async () => {
     await expect(
       commands().getRuntimeGitDiff(
@@ -127,6 +80,27 @@ describe('runtime git diff transport budget', () => {
     await expect(
       commands().getRuntimeGitDiff('id:wt-1', 'assets/logo.png', false)
     ).resolves.toMatchObject({ modifiedContent: OVERSIZED_BASE64 })
+  })
+
+  it('forwards the request abort signal into local diff execution', async () => {
+    const controller = new AbortController()
+
+    await commands().getRuntimeGitDiff(
+      'id:wt-1',
+      'assets/logo.png',
+      false,
+      undefined,
+      undefined,
+      controller.signal
+    )
+
+    expect(mocks.getDiff).toHaveBeenCalledWith(
+      '/remote/repo',
+      'assets/logo.png',
+      false,
+      undefined,
+      expect.objectContaining({ signal: controller.signal })
+    )
   })
 
   it('caps a local-repo branch diff that exceeds the budget', async () => {

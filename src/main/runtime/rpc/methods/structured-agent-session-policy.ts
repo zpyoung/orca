@@ -7,9 +7,13 @@ import {
   type RuntimeCapability
 } from '../../../../shared/protocol-version'
 import { AGENT_SESSION_OPTIONAL_MODEL_CLIENT_CAPABILITY } from '../../../../shared/agent-session-optional-model-capability'
-import { isNativeChatEnabled } from '../../../../shared/structured-native-chat-launch-route'
+import {
+  isNativeChatDefaultFor,
+  isNativeChatEnabled
+} from '../../../../shared/structured-native-chat-launch-route'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
-import type { OrcaRuntimeService } from '../../orca-runtime'
+import { readAgentLaunchModeSettings } from '../../../agent-launch/agent-launch-mode'
 import type { RpcContext } from '../core'
 
 export function clientReadsOptionsWithoutModel(

@@ -252,10 +252,7 @@ function TerminalContextMenuItems({
           ) : null}
         </DropdownMenuItem>
       ) : null}
-      <DropdownMenuItem onSelect={onCopyAgentSessionContext}>
-        <ClipboardCopy />
-        {translate('auto.components.terminal.pane.TerminalContextMenu.cff67afad1', 'Copy Context')}
-      </DropdownMenuItem>
+      <AgentSessionContextCopyMenuItem onSelect={onCopyAgentSessionContext} />
       {canToggleNativeChat ? (
         <DropdownMenuItem onSelect={onToggleNativeChat}>
           {isNativeChatView ? <SquareTerminal /> : <MessageSquare />}

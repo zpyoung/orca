@@ -16,12 +16,16 @@ vi.mock('./AutomationPrecheckFields', () => ({ AutomationPrecheckFields: () => n
 vi.mock('./AutomationSetupDecisionField', () => ({ AutomationSetupDecisionField: () => null }))
 vi.mock('./AutomationDestinationField', () => ({ AutomationDestinationField: () => null }))
 vi.mock('./AutomationExtraAgentArgsField', () => ({ AutomationExtraAgentArgsField: () => null }))
+vi.mock('@/components/fork-automation-launch-settings/AgentLaunchOverridesFields', () => ({
+  AgentLaunchOverridesFields: () => null
+}))
 
 const DRAFT: AutomationDraft = {
   name: '',
   prompt: '',
   agentId: 'codex',
   extraAgentArgs: '',
+  launchOverrides: {},
   projectId: '',
   workspaceMode: 'existing',
   workspaceId: '',
@@ -50,6 +54,7 @@ function renderSidebar(onDraftChange: (updater: (d: AutomationDraft) => Automati
       settings={null}
       draft={DRAFT}
       visibleAgents={AGENT_CATALOG}
+      launchOverridesGate="supported"
       pickerTriggerClassName=""
       segmentedGroupClassName=""
       segmentedItemClassName=""

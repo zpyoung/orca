@@ -55,6 +55,10 @@ import {
 } from './settings-advanced-section-renderers'
 import { renderProjectSettingsSections } from './settings-project-section-renderer'
 import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'
+import {
+  SettingsHostScopePicker,
+  shouldShowSettingsHostScopePicker
+} from './SettingsHostScopePicker'
 
 export function renderSettingsLoading(
   interactions: SettingsInteractionController

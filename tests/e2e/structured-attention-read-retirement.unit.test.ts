@@ -367,22 +367,36 @@ describe('Accepted structured history read retirement', () => {
     expect(readCalls()).toBe(1)
   })
 
-it('retries a failed local desktop relay withdrawal on a later explicit read', async () => {
-  const relayDirectory = mkdtempSync(join(tmpdir(), 'orca-relay-read-retry-'))
-  const relay = new RuntimeMobileNotificationController()
-  try {
-    addPrompt('A')
-    const sent = fixture.events.find((event) => event.type === 'notification')
-    if (!sent?.notificationId || sent.type !== 'notification') {
-      throw new Error('prompt not sent')
-    }
-    relay.configureDismissalStore(relayDirectory)
-    relay.dispatch(sent)
-    const withdrawals: string[] = []
-    relay.onDispatched((event) => {
-      if (event.type === 'dismiss') {
-        withdrawals.push(event.notificationId)
-      }
+  it('reads B on return while A keeps the already-read row clock unchanged', async () => {
+    useAppStore.setState({ activeWorktreeId: 'elsewhere' })
+    useAppStore
+      .getState()
+      .setAgentStatus(
+        SUBJECT,
+        { state: 'blocked', prompt: 'Work', agentType: 'claude' },
+        'Chat',
+        { updatedAt: 1000, stateStartedAt: 1000 },
+        { tabId: TAB, worktreeId: WORKSPACE }
+      )
+    const screen = render(
+      createElement(
+        Fragment,
+        null,
+        createElement(StructuredAgentSessionAttentionBridge),
+        createElement(AttentionPolicy),
+        createElement(ReadSurface, { viewed: false })
+      )
+    )
+    await waitFor(() => expect(fixture.completion).toBeTypeOf('function'))
+    act(() => addPrompt('A'))
+    await act(async () => fixture.hydrate?.())
+    await waitFor(() => expect(fixture.journal).toBeTypeOf('function'))
+    act(() => useAppStore.getState().acknowledgeAgents([SUBJECT]))
+    await waitFor(() => expect(dismissIds()).toHaveLength(1))
+    const stamp = useAppStore.getState().acknowledgedAgentsByPaneKey[SUBJECT]
+    act(() => {
+      addPrompt('B')
+      publishView()
     })
     expect(dismissIds()).toHaveLength(1)
     expect(useAppStore.getState().unreadAgentCompletionPanes[SUBJECT]).toBe('agent-completion')
@@ -419,60 +433,25 @@ it('retries a failed local desktop relay withdrawal on a later explicit read', a
     )
     await waitFor(() => expect(fixture.hydrate).toBeTypeOf('function'))
     await act(async () => fixture.hydrate?.())
-    expect(dismissIds()).toHaveLength(1)
-    expect(withdrawals).toEqual([])
-    await act(async () => useAppStore.getState().acknowledgeAgents([SUBJECT]))
-    await waitFor(() => expect(withdrawals).toEqual([sent.notificationId]))
-    expect(transport.dismiss.mock.calls.filter(([, , reads]) => Array.isArray(reads))).toHaveLength(
-      2
-    )
-  } finally {
-    await relay.closeDismissals()
-    rmSync(relayDirectory, { recursive: true, force: true })
-  }
-})
-
-it('an older failed attempt cannot erase a newer success when the observation returns to A', async () => {
-  addPrompt('A')
-  const original = transport.call.getMockImplementation()
-  let release: (() => void) | undefined
-  let first = true
-  transport.call.mockImplementation(async (...args) => {
-    if (args[1] === 'agentSession.acknowledgeAttention' && first) {
-      first = false
-      return await new Promise((resolve) => {
-        release = () => resolve({ acknowledged: false })
-      })
-    }
-    return original?.(...args)
-  })
-  render(
-    createElement(
-      Fragment,
-      null,
-      createElement(StructuredAgentSessionAttentionBridge),
-      createElement(AttentionPolicy),
-      createElement(ReadSurface, { viewed: true })
-    )
-  )
-  await waitFor(() => expect(fixture.hydrate).toBeTypeOf('function'))
-  await act(async () => fixture.hydrate?.())
-  expect(readCalls()).toBe(1)
-  act(() => useAppStore.getState().acknowledgeAgents([SUBJECT]))
-  expect(readCalls()).toBe(1)
-  act(() => {
-    addPrompt('B')
-    publishView()
-  })
-  await waitFor(() => expect(readCalls()).toBe(2))
-  await act(async () => {})
-  act(() => {
-    fixture.items = fixture.items.map((item): AgentJournalRenderItem =>
-      item.itemId === 'B' && item.body.kind === 'approval'
-        ? {
-            ...item,
-            revision: item.revision + 1,
-            body: { ...item.body, resolution: { ...item.body.resolution, state: 'resolved' } }
+    await waitFor(() => expect(readCalls()).toBe(1))
+    act(() => {
+      addPrompt('B')
+      publishView()
+    })
+    await waitFor(() => expect(dismissIds()).toHaveLength(2))
+    const calls = readCalls()
+    act(() => {
+      fixture.items = [
+        ...fixture.items,
+        {
+          itemId: 'text',
+          revision: 1,
+          sequence: ++fixture.sequence,
+          observedAt: fixture.sequence,
+          body: {
+            kind: 'message',
+            role: 'assistant',
+            blocks: [{ type: 'text', text: 'More output' }]
           }
         }
       ]

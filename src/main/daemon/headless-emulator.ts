@@ -317,6 +317,10 @@ export class HeadlessEmulator {
     return readHeadlessTerminalRows(this.terminal, limit)
   }
 
+  get isSynchronizedOutput(): boolean {
+    return this.terminal.modes.synchronizedOutputMode
+  }
+
   getVisibleBufferRange(): { start: number; endExclusive: number; totalLength: number } {
     const buffer = this.terminal.buffer.active
     const start = buffer.viewportY

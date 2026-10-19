@@ -25,6 +25,7 @@ import {
 } from './windows-hook-files'
 
 export { getManagedScript }
+import { getManagedStatusLineCommand } from './statusline-script'
 import {
   finalizeManagedStatusLineRemoval,
   getManagedStatusLineScript,

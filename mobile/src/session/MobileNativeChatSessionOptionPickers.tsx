@@ -40,6 +40,15 @@ export type MobileNativeChatSessionOptionPickersProps = {
   pillsHidden?: boolean
 }
 
+type PresentationProps = {
+  presentation: MobileNativeChatPickerPresentation | null
+  onNavigate: (page: string | null) => void
+  /** A pill opened the drawer; fires before the keyboard is dismissed. */
+  onDrawerOpen: (page: string) => void
+  /** The drawer's sheet has fully left the screen, however it closed. */
+  onDrawerAfterClose?: () => void
+}
+
 /** Full access reads in the warning colour wherever it is shown. */
 function permissionChoiceColor(value: string | undefined): string | undefined {
   return value === 'full-access' ? colors.statusAmber : undefined
@@ -65,7 +74,7 @@ export function MobileNativeChatSessionOptionPickers({
   if (!model && !permission) {
     return null
   }
-  const activeDescriptor = snapshot.find((descriptor) => descriptor.id === openDescriptorId)
+  const activeDescriptor = snapshot.find((descriptor) => descriptor.id === presentation?.page)
   const permissionView = activeDescriptor !== undefined && activeDescriptor === permission
   // The permission mode applies from the next send, so a running turn never locks it.
   const disabled = (!permissionView && isWorking) || pendingId !== null || sendInFlight
@@ -79,7 +88,6 @@ export function MobileNativeChatSessionOptionPickers({
   const openPicker = (page: string): void => {
     onDrawerOpen(page)
     Keyboard.dismiss()
-    setOpenDescriptorId(model?.id ?? null)
   }
 
   const applyOption = (descriptor: SessionOptionDescriptor, value: SessionOptionValue): void => {
@@ -117,28 +125,30 @@ export function MobileNativeChatSessionOptionPickers({
   const pillsBusy = pendingId !== null || sendInFlight
 
   return (
-    <View style={styles.pills}>
-      {permission && permissionChoice ? (
+    // One tree in both modes: re-parenting the drawer would remount an open sheet.
+    <View style={pillsHidden ? styles.pillsHidden : styles.pills}>
+      {!pillsHidden && permission && permissionChoice ? (
         <Pill
           label={permissionChoice.label}
           accessibleName={`Permissions, ${permissionChoice.label}`}
           disabled={pillsBusy}
           labelColor={permissionChoiceColor(permissionChoice.value)}
-          onPress={() => {
-            Keyboard.dismiss()
-            setOpenDescriptorId(permission.id)
-          }}
+          onPress={() => openPicker(permission.id)}
         />
       ) : null}
-      {model ? (
+      {model && !pillsHidden ? (
         <Pill
           label={pillLabel}
           accessibleName={`Model, ${pillLabel}`}
           disabled={isWorking || pillsBusy}
-          onPress={openPicker}
+          onPress={() => openPicker(model.id)}
         />
       ) : null}
-      <BottomDrawer visible={activeDescriptor !== undefined} onClose={closePicker}>
+      <BottomDrawer
+        visible={activeDescriptor !== undefined}
+        onClose={closePicker}
+        onAfterClose={onDrawerAfterClose}
+      >
         {activeDescriptor ? (
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
@@ -146,7 +156,9 @@ export function MobileNativeChatSessionOptionPickers({
                 accessibilityLabel={modelView || permissionView ? 'Close picker' : 'Back to models'}
                 accessibilityRole="button"
                 style={({ pressed }) => [styles.sheetNav, pressed && styles.pressed]}
-                onPress={modelView || permissionView ? closePicker : openPicker}
+                onPress={
+                  modelView || permissionView ? closePicker : () => onNavigate(model?.id ?? null)
+                }
                 hitSlop={8}
               >
                 {modelView || permissionView ? (
@@ -211,6 +223,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
     gap: spacing.xs
+  },
+  // Out of the row's flow, so the collapsed composer spends no gap on an empty slot.
+  pillsHidden: {
+    position: 'absolute'
   },
   sheet: {
     paddingBottom: spacing.xs

@@ -156,34 +156,6 @@ export abstract class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithG
       if (!isTuiAgentEnabled(request.agent, settings.disabledTuiAgents)) {
         throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
       }
-      const startupArgs = {
-        ...resolveAgentStartupPlanInputs({
-          agent: request.agent,
-          settings,
-          platform: this.getAgentLaunchPlatformForWorkspace(workspace),
-          // Why: `workspace.repo` is display metadata and may be a row from another host; the launch
-          // shape must match the PTY route this scope already resolved.
-          isRemote: Boolean(workspace.connectionId),
-          ...(request.agentArgs !== undefined ? { agentArgs: request.agentArgs } : {}),
-          sessionOptions: this.toAgentSessionOptions(request.launchPreferences)
-        }),
-        includeSessionOptionCatalogDefaults:
-          request.launchPreferences?.optionValues === undefined ? undefined : false
-      }
-      const startup = await buildExecutionHostAgentStartupPlan({
-        inputs: startupArgs,
-        cwd: startupCwd ?? workspace.path,
-        prompt: request.prompt ?? '',
-        promptDelivery: request.promptDelivery,
-        hostIdentity: this.runtimeId,
-        signal: caller.signal
-      })
-      if (!startup) {
-        throw new Error('agent_session_identity_required')
-      }
-      if (caller.signal?.aborted) {
-        throw new Error('client_disconnected')
-      }
       let terminal: RuntimeTerminalCreate
       const executionOperationId = createHash('sha256')
         .update(this.runtimeId)

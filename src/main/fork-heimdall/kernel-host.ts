@@ -8,9 +8,9 @@ import { isFolderRepo } from '../../shared/repo-kind'
 import type { WorkspaceKey, WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import {
-  requireRuntimeFileProvider,
+  requireLocalRuntimeFileRoute,
   type ResolvedRuntimeFileTarget
-} from '../runtime/runtime-file-command-target'
+} from '../runtime/files/file-target'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { runtimePathsEqual } from '../runtime/runtime-worktree-path-identity'
@@ -112,12 +112,12 @@ export class HeimdallKernelHost {
     ) {
       throw new LeaseConfigurationError('Resolved Git authority changed after Heimdall enrollment')
     }
+    requireLocalRuntimeFileRoute(gitTarget)
     return {
       kind: 'git',
       executionHostId: enrollment.executionHostId,
       workspacePath: enrollment.workspacePath,
       watcherId: enrollment.watcherId,
-      fileProvider: requireRuntimeFileProvider(gitTarget),
       gitTarget
     }
   }
@@ -210,13 +210,12 @@ export class HeimdallKernelHost {
         'Resolved folder authority changed after Heimdall enrollment'
       )
     }
-    const fileProvider = requireRuntimeFileProvider(fileTarget)
+    requireLocalRuntimeFileRoute(fileTarget)
     return {
       kind: 'folder',
       executionHostId: enrollment.executionHostId,
       workspacePath: enrollment.workspacePath,
-      watcherId: enrollment.watcherId,
-      fileProvider
+      watcherId: enrollment.watcherId
     }
   }
 }

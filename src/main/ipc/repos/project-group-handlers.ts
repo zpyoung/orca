@@ -13,6 +13,7 @@ import {
   ProjectGroupUpdateArgs,
   parseProjectGroupIpcArgs
 } from './repo-ipc-arg-schemas'
+import { assertWslMoveProjectWritable } from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
 import { activeNestedRepoScans, runNestedRepoScanForIpc } from './nested-repo-scan-ipc'
 import { visibleProjectGroups } from '../../ssh/orcad-retained-source'

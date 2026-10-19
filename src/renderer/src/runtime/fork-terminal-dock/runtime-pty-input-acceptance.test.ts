@@ -60,12 +60,7 @@ describe('runtime terminal input acceptance', () => {
       runtimeCall.mockRejectedValue(new Error('terminal_handle_stale'))
 
       await expect(
-        sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: 'env-2' },
-          'remote:env-1@@terminal-stale',
-          'x',
-          'driving'
-        )
+        sendRuntimePtyInputAcceptance('remote:env-1@@terminal-stale', 'x', 'driving')
       ).resolves.toBe(false)
 
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey).toEqual({})
@@ -79,12 +74,7 @@ describe('runtime terminal input acceptance', () => {
       })
 
       await expect(
-        sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: 'env-2' },
-          'remote:env-1@@terminal-1',
-          'x',
-          'driving'
-        )
+        sendRuntimePtyInputAcceptance('remote:env-1@@terminal-1', 'x', 'driving')
       ).resolves.toBe(false)
 
       expect(runtimeCall).toHaveBeenCalledWith({
@@ -103,12 +93,7 @@ describe('runtime terminal input acceptance', () => {
       vi.useFakeTimers()
       try {
         const text = makeByteOversizedTerminalInput()
-        const accepted = sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: 'env-2' },
-          'remote:env-1@@terminal-1',
-          text,
-          'driving'
-        )
+        const accepted = sendRuntimePtyInputAcceptance('remote:env-1@@terminal-1', text, 'driving')
 
         await vi.runAllTimersAsync()
 
@@ -139,12 +124,7 @@ describe('runtime terminal input acceptance', () => {
       })
 
       await expect(
-        sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: 'env-2' },
-          'remote:env-1@@terminal-1',
-          'x',
-          'driving'
-        )
+        sendRuntimePtyInputAcceptance('remote:env-1@@terminal-1', 'x', 'driving')
       ).resolves.toBe(true)
 
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
@@ -166,14 +146,7 @@ describe('runtime terminal input acceptance', () => {
         }
       })
 
-      await expect(
-        sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: null },
-          'local-pty',
-          'x',
-          'driving'
-        )
-      ).resolves.toBe(true)
+      await expect(sendRuntimePtyInputAcceptance('local-pty', 'x', 'driving')).resolves.toBe(true)
 
       expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving', {
         requireWriteSettlement: true
@@ -187,14 +160,7 @@ describe('runtime terminal input acceptance', () => {
     it('resolves false without recording input when main rejects a local write', async () => {
       localWriteAccepted.mockResolvedValue(false)
 
-      await expect(
-        sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: null },
-          'local-pty',
-          'x',
-          'driving'
-        )
-      ).resolves.toBe(false)
+      await expect(sendRuntimePtyInputAcceptance('local-pty', 'x', 'driving')).resolves.toBe(false)
 
       expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving', {
         requireWriteSettlement: true
@@ -203,9 +169,7 @@ describe('runtime terminal input acceptance', () => {
     })
 
     it('leaves the fire-and-forget local write path untouched', async () => {
-      expect(
-        sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x', 'driving')
-      ).toBe(true)
+      expect(sendRuntimePtyInput('local-pty', 'x', 'driving')).toBe(true)
 
       expect(localWrite).toHaveBeenCalledWith('local-pty', 'x', 'driving')
       expect(localWriteAccepted).not.toHaveBeenCalled()
@@ -217,7 +181,6 @@ describe('runtime terminal input acceptance', () => {
         const text = 'a'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1)
         let cancelled = false
         const accepted = sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: null },
           'local-pty',
           text,
           'driving',
@@ -240,7 +203,6 @@ describe('runtime terminal input acceptance', () => {
         const text = 'a'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1)
         let cancelled = false
         const accepted = sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: 'env-2' },
           'remote:env-1@@terminal-1',
           text,
           'driving',
@@ -261,13 +223,7 @@ describe('runtime terminal input acceptance', () => {
       localWriteAccepted.mockResolvedValue(true)
 
       await expect(
-        sendRuntimePtyInputAcceptance(
-          { activeRuntimeEnvironmentId: null },
-          'local-pty',
-          'x',
-          'driving',
-          () => false
-        )
+        sendRuntimePtyInputAcceptance('local-pty', 'x', 'driving', () => false)
       ).resolves.toBe(true)
       expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving', {
         requireWriteSettlement: true

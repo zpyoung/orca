@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promi
 import { posix, win32 } from 'node:path'
 import { getSshTargetIdForExecutionHost, type ExecutionHostId } from '../../shared/execution-host'
 import type { DirEntry } from '../../shared/filesystem-entry-types'
-import type { IFilesystemProvider } from '../providers/types'
+import type { IFilesystemProvider } from '../providers/filesystem-provider-contract'
 import { getRegisteredSshState } from '../ssh/ssh-target-registry'
 
 export type LeaseHostFilesystem = Pick<

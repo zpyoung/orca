@@ -93,14 +93,4 @@ describe('useMobileStructuredNativeChatSendBridge', () => {
 
     expect(restoreRejectedDraft).toHaveBeenCalledWith(ORIGIN, 'hello')
   })
-
-  it("reads another agent's sends by that agent's commands, never Codex's", async () => {
-    sendStructured.mockResolvedValue('unknown')
-    mount('grok')
-
-    await expect(sendWithOutcome('/review')).resolves.toBe('unknown')
-
-    expect(holdUnconfirmedSend).toHaveBeenCalledWith(ORIGIN, '/review', expect.any(Function))
-    expect(restoreRejectedDraft).not.toHaveBeenCalled()
-  })
 })

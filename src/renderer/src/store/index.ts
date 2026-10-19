@@ -49,6 +49,7 @@ import { createTaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
 import { createStructuredSessionLaunchDirectorySlice } from './slices/structured-session-launch-directories'
+import { createWorkspaceAttentionSlice } from './slices/workspace-attention/workspace-attention-slice'
 import { createAsksSlice } from './slices/fork-ask-question-tool/asks'
 import { createLedgerSlice } from './slices/ledger'
 import { createHeimdallFleetSlice } from './slices/fork-heimdall/fleet'
@@ -132,6 +133,7 @@ export const useAppStore = create<AppState>()(
         ...createRemoteServerUpdatesSlice(...a),
         ...createTerminalQuickCommandHostsSlice(...a),
         ...createStructuredSessionLaunchDirectorySlice(...a),
+        ...createWorkspaceAttentionSlice(...a),
         ...createLedgerSlice(...a),
         ...createAsksSlice(...a),
         ...createHeimdallFleetSlice(...a)

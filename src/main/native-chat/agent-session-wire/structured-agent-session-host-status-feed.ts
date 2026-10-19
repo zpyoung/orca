@@ -8,7 +8,10 @@ import {
   type StructuredAgentSessionStatusFeedDeps,
   type StructuredAgentSessionStatusSink
 } from './structured-agent-session-status-feed'
-import { StructuredAgentSessionSubagentRows } from './structured-agent-session-subagent-rows'
+import {
+  StructuredAgentSessionSubagentRows,
+  type StructuredAgentSessionSubagentRowsDeps
+} from './structured-agent-session-subagent-rows'
 import { structuredAgentSessionConversationFence } from './structured-agent-session-provider-child'
 
 /** Wire the host's own deps into a feed, and each subagent's saved row onto its child records;
@@ -31,6 +34,7 @@ export function createStructuredAgentSessionHostStatusFeed(args: {
   const subagentRows = new StructuredAgentSessionSubagentRows({
     journal: (sessionId) => args.sessions.get(sessionId)?.journal,
     fence: (sessionId) => structuredAgentSessionConversationFence(args.deps().store, sessionId),
+    currentWork: args.currentWork,
     // The views, with the two host-only facts a saved row also keeps from their records.
     readChildWork: (sessionId) => {
       const records = new Map(
@@ -63,8 +67,8 @@ export function createStructuredAgentSessionHostStatusFeed(args: {
     // field initializer, before its constructor parameters are assigned.
     statusSink: () => args.deps().statusSink,
     ...(args.onAgentStarted ? { onAgentStarted: args.onAgentStarted } : {}),
-    onChildWorkChanged: (sessionId) => {
-      subagentRows.changed(sessionId)
+    onChildWorkChanged: (sessionId, producer) => {
+      subagentRows.changed(sessionId, producer)
       args.onChildWorkChanged?.(sessionId)
     }
   })

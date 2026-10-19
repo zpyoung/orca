@@ -20,7 +20,6 @@ import {
   sendNativeChatMessageWithImageAttachments
 } from './native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'
-import type { RuntimeSettings } from './native-chat-runtime-send'
 import {
   NATIVE_CHAT_CLEAR_CHUNK_GAP_MS,
   NATIVE_CHAT_CLEAR_CHUNK_MAX_BYTES,
@@ -39,11 +38,9 @@ import {
 
 const TAB = 'tab-launch-draft'
 const PTY = 'pty-launch-draft'
-const SETTINGS: RuntimeSettings = {}
 const TARGET: NativeChatResolvedTarget = {
   terminalTabId: TAB,
-  ptyId: PTY,
-  settings: SETTINGS
+  ptyId: PTY
 }
 const DRAFT = 'Linked Linear issue: ABC-123\nhttps://linear.app/x/issue/ABC-123'
 
@@ -54,8 +51,8 @@ const writes = (): string[] => {
   const entries: { order: number; bytes: string }[] = []
   for (const mock of [sendRuntimePtyInput, sendRuntimePtyInputAcceptance]) {
     mock.mock.calls.forEach((call, index) => {
-      if (typeof call[2] === 'string') {
-        entries.push({ order: mock.mock.invocationCallOrder[index], bytes: call[2] })
+      if (typeof call[1] === 'string') {
+        entries.push({ order: mock.mock.invocationCallOrder[index], bytes: call[1] })
       }
     })
   }
@@ -122,7 +119,7 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
       writeTimes.set(bytes, performance.now())
       return true
     })
-    sendRuntimePtyInputAcceptance.mockImplementation(async (_settings, _pty, bytes: string) => {
+    sendRuntimePtyInputAcceptance.mockImplementation(async (_pty, bytes: string) => {
       writeTimes.set(bytes, performance.now())
       return true
     })

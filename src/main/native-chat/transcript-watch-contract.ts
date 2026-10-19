@@ -4,25 +4,6 @@ export const UNFLUSHED_SETTLE_MS = 1_500
 import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
 import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { ResolveSessionFileOptions } from './session-file-resolver'
-import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
-
-export type NativeChatTranscriptTailReader = (args: {
-  filePath: string
-  limit: number
-  decode: (line: string, fallbackId: string) => NativeChatMessage | null
-  includeTrailingLine?: boolean
-  endOffset?: number
-  decodeCompanion?: NativeChatTranscriptCompanionDecoder | null
-  maxBytes?: number
-  signal?: AbortSignal
-  onConsumedBoundary?: (boundary: Buffer) => void
-}) => Promise<{
-  messages: NativeChatMessage[]
-  companion?: NativeChatTranscriptCompanion
-  consumedTo: number
-  hasMore: boolean
-  beforeOffset: number
-}>
 
 export type SubscribeNativeChatTranscriptArgs = ResolveSessionFileOptions & {
   agent: AgentType
@@ -48,11 +29,6 @@ export type SubscribeNativeChatTranscriptArgs = ResolveSessionFileOptions & {
     companion?: NativeChatTranscriptCompanion
   ) => void
   initialLimit?: number
-  tailReader?: NativeChatTranscriptTailReader
-  /** Byte ceiling for snapshot and replacement reads. Set by the relay, whose
-   *  frames have to fit a shared writer budget; a dropped older turn still
-   *  shows up as `hasMore` with a `beforeOffset` that can page back to it. */
-  initialMaxBytes?: number
   filePath?: string
   debounceMs?: number
   /** Test-only override for the production resolve-poll backoff. */

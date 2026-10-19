@@ -2,13 +2,22 @@ import { readFileSync } from 'node:fs'
 import { Evaluator, Lexer, Parser, data } from '@actions/expressions'
 import { parse } from 'yaml'
 import { PR_CHECK_JOBS } from './pr-code-change-scope.mjs'
+import {
+  aggregateJobWithoutForkGuard,
+  checkJobsForWorkflow,
+  forkGuardNeeds
+} from './fork-ownership-guard/aggregate-gate-jobs.mjs'
 
 export const aggregateWorkflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
-export const aggregateJob = aggregateWorkflow.jobs.verify
+export const aggregateJob = aggregateJobWithoutForkGuard(aggregateWorkflow.jobs.verify)
 export const aggregateShell = aggregateJob.steps.find(
   (step) => step.name === 'Require successful checks'
 )
-export const aggregateSelectors = PR_CHECK_JOBS.filter((job) => job !== 'orcad_browser')
+export const aggregateSelectors = checkJobsForWorkflow(
+  PR_CHECK_JOBS.filter((job) => job !== 'orcad_browser'),
+  aggregateWorkflow,
+  aggregateShell
+)
 export const aggregateRequiredJobs = aggregateJob.needs.filter((job) => job !== 'code_paths')
 export const aggregateVariable = (job) => job.replaceAll('-', '_').toUpperCase()
 
@@ -49,6 +58,7 @@ export function aggregateNeeds(selected = 'true', overrides = {}) {
   }
   const needs = {
     code_paths: { result: 'success', outputs },
+    ...forkGuardNeeds(),
     ...Object.fromEntries(
       aggregateRequiredJobs.map((job) => [
         job,

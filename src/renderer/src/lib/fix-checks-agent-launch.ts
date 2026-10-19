@@ -1,6 +1,10 @@
 import { toast } from 'sonner'
 import { agentLaunchOverridesToSessionOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import { getConnectionId } from '@/lib/connection-context'
+import {
+  ensureDetectedAgentsForRepo,
+  ensureDetectedAgentsForWorktree,
+  type RepoHostFields
+} from '@/lib/agent-detection-target-inventory'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'

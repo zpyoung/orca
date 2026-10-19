@@ -17,10 +17,10 @@ import type {
   LegacyWorkerRecoveryCandidate,
   LegacyWorkerRecoveryInventory,
   TerminalWorkspaceLaunchScope
-} from './runtime-legacy-worker-terminal-recovery-types'
-import { getLatestPtyTitle } from './runtime-worktree-status-projection'
-import type { AutomationService } from '../automations/service'
-import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
+} from '../../runtime-legacy-worker-terminal-recovery-types'
+import { getLatestPtyTitle } from '../../runtime-worktree-status-projection'
+import type { AutomationService } from '../../../automations/service'
+import type { ArtifactCloudService } from '../../../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
 import type {
   ArtifactCloudOperation,
   ArtifactCloudOptions,

@@ -14,7 +14,6 @@ import {
   requestSkillFreshnessUpdateDialog
 } from './skill-freshness-update-dialog'
 import { _resetSkillUpdateRunStore, SKILL_UPDATE_SUCCESS_LINGER_MS } from './skill-update-run-store'
-import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 const mocks = vi.hoisted(() => ({
   inventory: null as SkillFreshnessInventory | null,
@@ -515,29 +514,7 @@ describe('SkillFreshnessUpdateDialog', () => {
     expect(row?.textContent).toContain('/home/projects/work/.agents/skills/computer-use')
   })
 
-  it('names the skill in the stale-record remedy so the command is runnable as-is', async () => {
-    // Why: the reinstall advice only fires when the row hands its group name through
-    // to skippedReason — dropping that argument silently degrades every stale-record
-    // row to the generic sentence with no command to run.
-    mocks.inventory = {
-      schemaVersion: 1,
-      installations: [placement('orchestration')],
-      eligibleUpdateNames: [],
-      scanIssues: [],
-      scannedAt: 3
-    }
-    await renderDialog()
-    await openViaRequest()
-
-    expect(container?.textContent).toContain(
-      `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
-    )
-  })
-
-  it('keeps the stale-record remedy when a project copy is listed beside it', async () => {
-    // The same stale-record row as above, plus the user's own project copy. That copy is
-    // listed but was never judged, so letting it explain the skip replaced the only
-    // runnable command with advice about a copy the user never asked Orca to update.
+  it('preselects Orca-owned updates and leaves same-named skills from elsewhere unticked', async () => {
     mocks.inventory = {
       schemaVersion: 1,
       installations: [
@@ -553,9 +530,24 @@ describe('SkillFreshnessUpdateDialog', () => {
     await renderDialog()
     await openViaRequest()
 
-    const row = container?.querySelector('[data-skill-row="orchestration"]')
-    expect(row?.textContent).toContain(
-      `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
+    // Orca's own rows sort first, and only they are checked.
+    const rows = Array.from(container?.querySelectorAll('[data-skill-row]') ?? [])
+    expect(rows.map((row) => row.getAttribute('data-skill-row'))).toEqual([
+      'orca-cli',
+      'orchestration',
+      'computer-use',
+      'linear-tickets'
+    ])
+    const checked = (name: string): string | null | undefined =>
+      container
+        ?.querySelector(`[role="checkbox"][aria-label="Include ${name}"]`)
+        ?.getAttribute('aria-checked')
+    expect(checked('orca-cli')).toBe('true')
+    expect(checked('orchestration')).toBe('true')
+    expect(checked('computer-use')).toBe('false')
+    expect(checked('linear-tickets')).toBe('false')
+    expect(container?.querySelector('[data-skill-row="computer-use"]')?.textContent).toContain(
+      'Not from Orca'
     )
     expect(container?.querySelector('[data-skill-row="orca-cli"]')?.textContent).toContain(
       'Update available'

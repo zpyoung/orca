@@ -140,8 +140,7 @@ describe('objective landing execution', () => {
       const target = {
         kind: 'folder' as const,
         executionHostId: 'local' as const,
-        workspacePath,
-        fileProvider: null
+        workspacePath
       }
       const contentIdentity = await computeWorkspaceContentIdentity(target)
       seedCompletedCheck(fixture, contentIdentity)
@@ -183,8 +182,7 @@ describe('objective landing execution', () => {
       const target = {
         kind: 'folder' as const,
         executionHostId: 'local' as const,
-        workspacePath,
-        fileProvider: null
+        workspacePath
       }
       const contentIdentity = await computeWorkspaceContentIdentity(target)
       seedCompletedCheck(fixture, `other-${contentIdentity}`)
@@ -233,8 +231,7 @@ describe('objective check execution', () => {
     const target = {
       kind: 'folder' as const,
       executionHostId: 'local' as const,
-      workspacePath,
-      fileProvider: null
+      workspacePath
     }
     const contentIdentity = await computeWorkspaceContentIdentity(target)
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
@@ -336,8 +333,7 @@ describe('objective report ingestion execution', () => {
       const target = {
         kind: 'folder' as const,
         executionHostId: 'local' as const,
-        workspacePath,
-        fileProvider: null
+        workspacePath
       }
       const dispatchAction = {
         kind: 'dispatch-planner',
@@ -486,8 +482,7 @@ describe('objective report ingestion execution', () => {
       const target = {
         kind: 'folder' as const,
         executionHostId: 'local' as const,
-        workspacePath,
-        fileProvider: null
+        workspacePath
       }
       const originalAction = {
         kind: 'dispatch-node',
@@ -649,8 +644,7 @@ describe('objective gate execution', () => {
     const target = {
       kind: 'folder' as const,
       executionHostId: 'local' as const,
-      workspacePath,
-      fileProvider: null
+      workspacePath
     }
     const contentIdentity = await computeWorkspaceContentIdentity(target)
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large ObjectiveSnapshotBinding (WatcherEnrollment/ObjectiveEnrollmentPayload) types; only the fields below are read by the local action executor.
@@ -778,7 +772,7 @@ describe('objective gate execution', () => {
       const staleBinding = {
         enrollment: { watcherId: WATCHER_ID },
         contract: { gates: [{ ...declaredGate, command: 'pnpm test:changed' }] },
-        target: { kind: 'folder', executionHostId: 'local', workspacePath, fileProvider: null }
+        target: { kind: 'folder', executionHostId: 'local', workspacePath }
       } as unknown as ObjectiveSnapshotBinding
 
       const outcome = await executeObjectiveLocalAction({
@@ -951,8 +945,7 @@ describe('objective plan review execution', () => {
       const target = {
         kind: 'folder' as const,
         executionHostId: 'local' as const,
-        workspacePath,
-        fileProvider: null
+        workspacePath
       }
       const dispatchAction = {
         kind: 'dispatch-plan-review',

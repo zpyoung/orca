@@ -11,7 +11,6 @@ import {
 } from 'react'
 import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 import { useNativeChatComposerAppMenuSelection } from '../use-native-chat-composer-app-menu-selection'
-import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat-runtime-send'
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
 import { useNativeChatTypedInsertion } from '../use-native-chat-typed-insertion'
@@ -22,8 +21,6 @@ import { nativeChatImageSendBlock } from '../native-chat-image-reattach'
 import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
 import type { NativeChatComposerGoalMode } from '../use-native-chat-composer-submit'
 import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
-import type { NativeChatQueueResume } from '../native-chat-composer-primary-action'
-import type { NativeChatQueueSendConfirm } from '../use-native-chat-held-queue-composer-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 import { isTerminalInputQuarantined } from '../../terminal-pane/terminal-input-quarantine'
 import type {
@@ -97,6 +94,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     targetPtyId,
     canSend = true,
     allowWithoutTarget = false,
+    unavailableHint,
     isWorking = false,
     inputOwnedByCard = false,
     onStop,
@@ -141,17 +139,13 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
       return null
     }
-    return {
-      terminalTabId,
-      ptyId: targetPtyId,
-      settings: getSettingsForAgentTabRuntimeOwner(terminalTabId)
-    }
+    return { terminalTabId, ptyId: targetPtyId }
   }, [targetPtyId, terminalTabId])
 
   const hasPty = allowWithoutTarget || targetPtyId !== null
   // Why inputOwnedByCard: the hidden field can still hold keyboard focus for a frame.
   const disabled = allowWithoutTarget
-    ? !canSend
+    ? !canSend || unavailableHint !== undefined
     : targetPtyId === null || !canSend || inputOwnedByCard
 
   const syncCaret = useCallback((element: HTMLTextAreaElement) => {
@@ -254,8 +248,8 @@ export type AgentComposerHostBridges = {
   steerQueued?: () => boolean
   goalMode?: NativeChatComposerGoalMode
   contextUsage?: NativeChatContextUsageSummary | null
-  queueResume?: NativeChatQueueResume
-  queueSendConfirm?: NativeChatQueueSendConfirm | null
+  /** The host holds sends for this reason, which the disabled Send button says. */
+  sendBlockedReason?: string
 
   imageAttachments?: readonly AgentComposerImageAttachment[]
   onAttach?: () => void
@@ -413,6 +407,7 @@ export function useAgentComposerCompose(
     core.disabled ||
     props.sendDisabled ||
     bridges?.sendHeld === true ||
+    bridges?.sendBlockedReason !== undefined ||
     imageBlock.holdsSend ||
     (core.draft.trim() === '' && imageAttachments.length === 0)
 
@@ -424,6 +419,7 @@ export function useAgentComposerCompose(
     disabled: core.disabled,
     hasPty: core.hasPty,
     canSend,
+    unavailableHint: props.unavailableHint,
     layout: props.layout,
     autocomplete,
     mentionFiles,
@@ -431,7 +427,7 @@ export function useAgentComposerCompose(
     notices: core.notices,
     imageAttachments,
     sendButtonDisabled,
-    sendBlockedReason: imageBlock.reason,
+    sendBlockedReason: imageBlock.reason ?? bridges?.sendBlockedReason ?? null,
     isWorking,
     isStopping: props.isStopping,
     afterStop: props.afterStop,
@@ -469,8 +465,6 @@ export function useAgentComposerCompose(
     onDictationHoldEnd: bridges?.onDictationHoldEnd ?? noop,
     onSend: send,
     onStop: core.interrupt,
-    queueResume: bridges?.queueResume,
-    queueSendConfirm: bridges?.queueSendConfirm ?? null,
     sessionOptionsSurface: bridges?.sessionOptionsSurface ?? null,
     sessionOptionsSnapshot: bridges?.sessionOptionsSnapshot ?? EMPTY_SNAPSHOT,
     contextUsage: bridges?.contextUsage ?? null,

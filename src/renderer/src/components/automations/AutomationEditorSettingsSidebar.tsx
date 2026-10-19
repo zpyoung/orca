@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { isValidAutomationSchedule } from '../../../../shared/automation-schedule-parsing'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -69,36 +68,16 @@ export function AutomationEditorSettingsSidebar({
   return (
     <aside className="flex w-[320px] shrink-0 flex-col overflow-auto border-l border-border/50 bg-muted/20 px-5 py-5 scrollbar-sleek">
       <div className="flex flex-col">
-        {/* Why: Hermes keeps project/workspace/schedule only. Collapse the
-            Orca-only knobs so switching the create target does not jump. */}
-        <div
-          className={cn(
-            'grid overflow-hidden transition-[grid-template-rows,margin] duration-200 ease-out',
-            isHermesTarget ? 'mb-0 grid-rows-[0fr]' : 'mb-4 grid-rows-[1fr]'
-          )}
-          aria-hidden={isHermesTarget}
-          inert={isHermesTarget}
-        >
-          <div className="min-h-0">
-            <div
-              className={cn(
-                'flex flex-col gap-5 transition-[opacity,transform] duration-150 ease-out',
-                isHermesTarget
-                  ? '-translate-y-1 opacity-0 delay-0'
-                  : 'translate-y-0 opacity-100 delay-200'
-              )}
-            >
-              <AutomationAgentLaunchFields
-                draft={draft}
-                settings={settings}
-                visibleAgents={visibleAgents}
-                pickerTriggerClassName={pickerTriggerClassName}
-                launchOverridesGate={launchOverridesGate}
-                onDraftChange={onDraftChange}
-              />
-              <AutomationExtraAgentArgsField draft={draft} onDraftChange={onDraftChange} />
-            </div>
-          </div>
+        <div className="mb-4 flex flex-col gap-5">
+          <AutomationAgentLaunchFields
+            draft={draft}
+            settings={settings}
+            visibleAgents={visibleAgents}
+            pickerTriggerClassName={pickerTriggerClassName}
+            launchOverridesGate={launchOverridesGate}
+            onDraftChange={onDraftChange}
+          />
+          <AutomationExtraAgentArgsField draft={draft} onDraftChange={onDraftChange} />
         </div>
         {destination ? (
           <div className="mb-4">

@@ -129,7 +129,7 @@
     "chat": {
       "permissionsTitle": "Autorisations pour les nouveaux chats",
       "permissionsDescription": "S’applique uniquement aux nouveaux chats. Les agents ouverts dans un terminal utilisent Paramètres → Agents → Autorisations des agents.",
-      "description": "Choisissez l’apparence et le nom des chats.",
+      "description": "Choisissez l’apparence et le comportement des chats.",
       "names": {
         "title": "Noms des chats",
         "description": "Utilisez un agent pour nommer les nouveaux chats à partir de leur premier message. Sans nom généré, ils restent Claude Chat ou Codex Chat.",
@@ -18032,6 +18032,23 @@
         "resuming": "Reprise automatique après le redémarrage.",
         "resumed": "Reprises automatiquement après le redémarrage.",
         "changeInSettings": "Modifier dans les paramètres"
+      },
+      "TaskPageJiraSavedFilters": {
+        "6c381858a1": "Filtres enregistrés",
+        "d14121662d": "Aucun filtre enregistré.",
+        "af0dd8c528": "Modifier {{value0}}",
+        "bae9bd87bf": "Vous pouvez enregistrer jusqu’à {{value0}} filtres.",
+        "85506127a5": "Enregistrer le filtre actuel",
+        "7aef259c28": "Modifier le filtre Jira",
+        "4f0e55d2e5": "Enregistrer le filtre Jira",
+        "466c1b12ce": "Nommez cette requête JQL pour y accéder rapidement.",
+        "e4c2f52972": "Nom",
+        "0ab71bb840": "Un filtre enregistré porte déjà ce nom.",
+        "42ce360813": "JQL",
+        "7b21c59a26": "Supprimer le filtre",
+        "a62f9db53d": "Annuler",
+        "c77189bc0c": "Mettre à jour le filtre",
+        "19af906d12": "Enregistrer le filtre"
       }
     },
     "i18n": {
@@ -18384,6 +18401,7 @@
         "permissionAskSharedDescription": "Demande avant les modifications ou commandes qui ne sont pas déjà autorisées",
         "permissionAcceptEdits": "Accepter les modifications",
         "permissionAcceptEditsDescription": "Approuve les modifications et commandes de fichiers ; demande pour le reste",
+        "permissionAcceptEditsAntigravityDescription": "Approuve les modifications de fichiers ; demande pour le reste",
         "permissionAuto": "Approuver pour moi",
         "permissionAutoDescription": "Examine les demandes d’approbation pour vous",
         "permissionFullAccess": "Accès complet",
@@ -18624,7 +18642,8 @@
         "orcaStopQuit": "Orca sur {{machine}} a été fermé pendant que cette réponse était en cours.",
         "orcaStopCrash": "Orca sur {{machine}} s'est arrêté de manière inattendue pendant que cette réponse était en cours.",
         "orcaStopRemote": "Orca sur {{machine}} s'est arrêté pendant que cette réponse était en cours.",
-        "orcaStopCanContinue": "Vous pouvez continuer dans cette conversation."
+        "orcaStopCanContinue": "Vous pouvez continuer dans cette conversation.",
+        "orcaStopUnnamedServer": "le serveur distant"
       },
       "providerFrame": {
         "byteLength": "{{value0}} octets"
@@ -18836,7 +18855,10 @@
       },
       "visualUnavailable": "Visualisation indisponible",
       "visualLoading": "Chargement de la visualisation",
-      "visualOpenInNewTab": "Ouvrir dans un nouvel onglet"
+      "visualOpenInNewTab": "Ouvrir dans un nouvel onglet",
+      "claudeSignIn": {
+        "signingIn": "Connexion…"
+      }
     },
     "tab": {
       "bar": {
@@ -19898,6 +19920,50 @@
       "learnMore": "Apprendre encore plus",
       "dontShowAgain": "Ne plus montrer",
       "dismiss": "Rejeter"
+    },
+    "claudeOldTerminalBanner": {
+      "title": "Ce terminal a été ouvert avant la mise à jour des comptes Claude d'Orca ; claude y utilise donc la connexion de Système par défaut.",
+      "dialogTitle": "Pourquoi claude n'utilise pas ici le compte sélectionné",
+      "dialogDescription": "Orca conserve désormais chaque compte Claude dans son propre dossier, et claude dans un nouveau terminal suit le compte que vous sélectionnez.",
+      "dialogCause": "Les terminaux ouverts avant cette mise à jour ne le font pas, donc claude se connecte ici avec la connexion de Système par défaut. Ouvrez un nouveau terminal pour utiliser le compte sélectionné."
+    },
+    "newerDaemonBanner": {
+      "failedTitle": "Impossible de réouvrir ce terminal",
+      "title": "Ce terminal a été ouvert dans une version plus récente d'Orca",
+      "resumableBody": "Réouvrez-le ici pour continuer à travailler. Votre session d'agent reprendra.",
+      "reopening": "Réouverture…",
+      "tryAgain": "Réessayer",
+      "reopenTerminal": "Réouvrir {{count}} terminaux",
+      "reopenTerminal_one": "Réouvrir le terminal",
+      "reopenTerminal_other": "Réouvrir {{count}} terminaux",
+      "reopened": "{{count}} terminaux réouverts",
+      "reopened_one": "{{count}} terminal réouvert",
+      "reopened_other": "{{count}} terminaux réouverts",
+      "resumed": "{{count}} sessions d'agent reprises.",
+      "resumed_one": "{{count}} session d'agent reprise.",
+      "resumed_other": "{{count}} sessions d'agent reprises."
+    },
+    "severedDaemonBanner": {
+      "unknownCount": "ses terminaux en cours d'exécution",
+      "count": "{{count}} terminaux en cours d'exécution",
+      "unverifiable": "Orca n'a pas pu vérifier le processus du service de terminal, donc rien n'a été arrêté.",
+      "alreadyReplaced": "Le service de terminal a déjà été remplacé ; rien n'a été arrêté.",
+      "restarted": "Service de terminal redémarré.",
+      "failed": "Échec du redémarrage.",
+      "title": "Le service de terminal fonctionne sans ses fichiers de programme",
+      "body": "Le service de terminal de cet ordinateur a démarré depuis une AppImage qui n'est plus montée. Il exécute encore {{sessions}}, mais il peut planter à tout moment. Tant que vous ne le redémarrez pas, les nouveaux terminaux ne sont pas conservés à la fermeture d'Orca.",
+      "restart": "Redémarrer le daemon de terminal",
+      "dismiss": "Ignorer",
+      "confirmTitle": "Redémarrer le daemon de terminal ?",
+      "confirmBody": "Le redémarrage met fin à tous les processus en cours d'exécution dans {{sessions}}. Les agents qui prennent en charge la reprise peuvent être repris ensuite ; les shells et autres tâches ne le peuvent pas et doivent être redémarrés. Faites-le lorsque vos agents sont inactifs.",
+      "cancel": "Annuler",
+      "confirm": "Redémarrer et arrêter les processus"
+    },
+    "restartedInputNotSent": "Le terminal a redémarré pendant votre saisie, une partie ne lui est peut-être pas parvenue. Vérifiez le nouveau shell avant de la saisir à nouveau.",
+    "stalledDaemonBanner": {
+      "body": "Le travail en arrière-plan sur cet ordinateur est bloqué. La saisie et les nouveaux terminaux peuvent ne pas fonctionner. Le redémarrage du service de terminal met fin à ses terminaux et commandes en cours d'exécution.",
+      "review": "Vérifier les options de redémarrage",
+      "title": "Le service de terminal doit peut-être être redémarré"
     }
   },
   "fileSearch": {
@@ -19977,15 +20043,215 @@
   "projectField": {
     "updateFailed": "Échec de la mise à jour du champ du projet"
   },
-  "settings.agents.environmentName": "Nom de la variable d’environnement",
-  "settings.agents.environmentValue": "Valeur de {{name}}",
-  "settings.agents.savedEnvironment": "Valeur enregistrée · saisir pour remplacer",
-  "settings.agents.newEnvironment": "Valeur",
-  "settings.agents.removeEnvironment": "Supprimer",
-  "settings.agents.loadingHost": "Chargement des paramètres des agents…",
-  "settings.agents.updateHost": "Mettez ce serveur à jour pour modifier ses paramètres de lancement des agents.",
-  "settings.agents.readFailed": "Impossible de lire les paramètres des agents. Vérifiez la connexion à l’hôte et réessayez.",
-  "settings.agents.saveFailed": "Impossible d’enregistrer les paramètres des agents. Vérifiez la connexion à l’hôte et réessayez.",
-  "settings.agents.hostDefaults": "Paramètres par défaut des nouveaux agents sur l’hôte sélectionné.",
-  "settings.agents.save": "Enregistrer"
+  "workspaceDeletion": {
+    "preferenceSaveFailed": "Impossible d'enregistrer la préférence de suppression",
+    "alwaysForceDelete": "Toujours forcer la suppression",
+    "moreActions": "Plus d'options de suppression forcée",
+    "alwaysForceDeleteTooltip": "S'applique à toutes les futures suppressions d'espace de travail."
+  },
+  "workspace": {
+    "links": {
+      "foreignReview": "Cette revue appartient à un autre dépôt. Ajoutez des revues du dépôt de cet espace de travail.",
+      "repositoryLoading": "L'identité du dépôt est encore en cours de chargement. Réessayez dès qu'elle est disponible.",
+      "duplicate": "Ce lien est déjà joint.",
+      "title": "Travail lié",
+      "count": "{{count}} liés",
+      "empty": "Regroupez toutes les revues et tâches de cet espace de travail.",
+      "reviews": "Revues",
+      "tasks": "Issues et tâches",
+      "openItem": "Ouvrir {{label}}",
+      "open": "Ouvrir le lien",
+      "unlinkItem": "Dissocier {{label}}",
+      "unlink": "Dissocier de l'espace de travail",
+      "show": "Afficher {{count}} revues et tâches liées",
+      "manage": "Gérer les liens…",
+      "details": "Détails de l'espace de travail",
+      "description": "Joignez des revues et des tâches, et conservez des notes pour cet espace de travail.",
+      "commentHelp": "Markdown pris en charge. Entrée ou {{shortcut}} pour enregistrer · Maj+Entrée pour un retour à la ligne.",
+      "kind": {
+        "github_pr": "PR GitHub",
+        "github_issue": "Issue GitHub",
+        "linear_task": "Tâche Linear",
+        "gitlab_mr": "MR GitLab",
+        "gitlab_issue": "Issue GitLab",
+        "jira_task_url": "Tâche Jira (URL)",
+        "bitbucket_pr": "PR Bitbucket",
+        "azure_devops_pr": "PR Azure DevOps",
+        "gitea_pr": "PR Gitea"
+      },
+      "mrReference": "MR !{{number}}",
+      "prReference": "PR #{{number}}",
+      "issueReference": "Issue #{{number}}",
+      "foreignIssue": "Cette issue appartient à un autre dépôt. Ajoutez des issues du dépôt de cet espace de travail.",
+      "linkedResult": "Lié",
+      "addReference": "Ajouter une référence",
+      "searchLabel": "Rechercher des références",
+      "searchReferences": "Recherchez des revues et des tâches, ou collez un lien",
+      "noReferences": "Aucune référence correspondante. Essayez un titre, un numéro ou une URL.",
+      "addItem": "Ajouter {{label}}",
+      "referenceType": "Type de référence",
+      "clearSearch": "Effacer la recherche",
+      "inlineSearchHint": "Sélectionnez un résultat pour le joindre.",
+      "nameHelp": "Affiché dans la barre latérale. Le nom du dossier reste inchangé.",
+      "notes": "Notes",
+      "addNotes": "Ajouter des notes",
+      "notesOptional": "Facultatif · Markdown",
+      "saveHint": "Les modifications s'appliquent lorsque vous enregistrez",
+      "terminal": "Terminal",
+      "seenIn": "Vu dans {{label}}",
+      "unavailableTab": "Onglet indisponible",
+      "sessions": "Sessions et terminaux",
+      "jiraModeRequired": "Sélectionnez Smart ou Jira pour charger cette issue.",
+      "linearModeRequired": "Sélectionnez Smart ou Linear pour charger cette issue.",
+      "loadingLinear": "Chargement de l'issue Linear…",
+      "linearConnectRequired": "Connectez Linear dans Paramètres pour lier cette issue.",
+      "linearReadFailed": "Impossible de charger cette issue Linear. Vérifiez l'URL et l'espace de travail connecté.",
+      "retrySource": "Réessayer",
+      "lastKnownStatus": "Dernier statut connu",
+      "reviewTarget": "Cible : {{branch}}",
+      "reviewUrlRequired": "Collez l'URL de la revue pour vérifier son dépôt et son fournisseur.",
+      "stackSummary": "{{count}} liés : {{references}}",
+      "sessionsForItem": "Sessions et terminaux pour {{label}} · {{count}}",
+      "checksFailed": "Échec",
+      "checksPending": "En attente",
+      "checksPassing": "Réussi",
+      "checksUnknown": "Inconnu",
+      "checksNeutral": "Neutre",
+      "allReviewChecks": "Revues : {{count}} · Vérifications : {{status}}"
+    },
+    "attachments": {
+      "updateRuntime": "Mettez à jour le runtime distant pour modifier les liens de l'espace de travail",
+      "updateRuntimeSafely": "Mettez à jour le runtime distant pour modifier les liens de l'espace de travail en toute sécurité"
+    }
+  },
+  "tabHoverCard": {
+    "browser": "Navigateur",
+    "editor": "Éditeur",
+    "terminal": "Terminal"
+  },
+  "jira": {
+    "savedFilters": {
+      "retry": "Réessayer",
+      "find": "Rechercher un filtre enregistré",
+      "noMatch": "Aucun filtre correspondant.",
+      "loadFailed": "Impossible de charger les filtres Jira enregistrés.",
+      "saveFailed": "Impossible d’enregistrer les filtres Jira."
+    },
+    "statusFilters": {
+      "loadFailed": "Impossible de charger les filtres de statut Jira.",
+      "saveFailed": "Impossible d’enregistrer les filtres de statut Jira.",
+      "manualQuery": "Les filtres de statut s’appliquent aux vues prédéfinies. Effacez la recherche pour les utiliser.",
+      "label": "Filtrer les tickets Jira par statut",
+      "clear": "Effacer les statuts",
+      "jql": "JQL du filtre de statut",
+      "editJql": "Modifier en JQL",
+      "catalogHint": "Les statuts proviennent des tickets chargés. Effacez les statuts pour en découvrir d’autres dans cette vue."
+    },
+    "connect": {
+      "scopedTokenGuide": "Les jetons à portée limitée nécessitent read:jira-work, write:jira-work et read:jira-user. Laissez l'e-mail vide pour utiliser l'authentification Bearer.",
+      "oldHostGuide": "Ce runtime distant exige un e-mail et un jeton API non limité. Mettez à jour le runtime distant pour utiliser des jetons à portée limitée.",
+      "scopedDescription": "Utilisez l'URL d'un site Jira Cloud et un jeton API pour parcourir les issues. Les jetons à portée limitée peuvent omettre l'e-mail.",
+      "optionalEmail": "E-mail Atlassian (facultatif pour les jetons à portée limitée)"
+    },
+    "workspace": {
+      "open": "Ouvrir l'espace de travail lié à {{key}}",
+      "count": "{{count}} espaces de travail liés à {{key}}",
+      "startAnother": "Démarrer un nouvel espace de travail",
+      "empty": "Liez une issue Jira à un espace de travail, ou choisissez une autre vue.",
+      "openFailed": "Impossible d'ouvrir l'espace de travail lié à cette issue Jira.",
+      "mode": "Avec espace de travail",
+      "search": "Rechercher les issues liées",
+      "single": "1 espace de travail lié à {{key}}"
+    },
+    "prompt": {
+      "dialogTitle": "Copier le prompt depuis un modèle",
+      "template": "Modèle",
+      "custom": "Modèle personnalisé",
+      "templateText": "Texte du modèle",
+      "variables": "Utilisez $jira-issue pour le contexte de l'issue et $other-prompt pour vos instructions supplémentaires. Enregistré sur cet appareil.",
+      "other": "Instructions supplémentaires (facultatif)",
+      "preview": "Aperçu",
+      "implementation": "Lancer l'implémentation",
+      "bug": "Analyser le bug",
+      "testPlan": "Rédiger un plan de test",
+      "prSummary": "Rédiger un résumé de PR"
+    },
+    "copy": {
+      "context": "Copier le contexte pour {{key}}",
+      "actions": "Copier le contexte de l'issue"
+    },
+    "transitions": {
+      "changeStatus": "Changer le statut : {{status}}",
+      "loadError": "Impossible de charger les changements de statut.",
+      "retry": "Réessayer",
+      "loading": "Chargement des changements de statut…",
+      "completeInJira": "Terminez « {{name}} » dans Jira",
+      "unsupported": "Jira exige des champs qu'Orca ne peut pas encore collecter : {{fields}}.",
+      "chooseResolution": "Choisissez une résolution",
+      "comment": "Commentaire",
+      "back": "Retour",
+      "apply": "Changer le statut",
+      "empty": "Aucun changement de statut disponible."
+    },
+    "board": {
+      "currentSprint": "Sprint en cours",
+      "viewMode": "Vue Jira",
+      "list": "Liste",
+      "board": "Tableau",
+      "moveIssue": "Déplacer {{key}}",
+      "moveTitle": "Déplacer {{key}} vers {{column}}",
+      "moveDescription": "Jira contrôle les changements de statut disponibles et les champs qu'ils exigent.",
+      "chooseTransition": "Choisissez un changement de statut :",
+      "cancel": "Annuler",
+      "noTransition": "Aucun changement de statut vers {{column}} n'est disponible pour {{key}}.",
+      "queryTooLong": "La requête Jira est trop longue. Raccourcissez la requête ou effacez les filtres."
+    },
+    "favourites": {
+      "activeLabel": "Favoris Jira : {{name}}",
+      "applyFailed": "Impossible d'appliquer le favori Jira.",
+      "chooseSite": "Choisissez un site Jira connecté pour utiliser ses favoris.",
+      "clear": "Effacer le favori Jira",
+      "clearFailed": "Impossible d'effacer le filtre enregistré. Réessayez une fois le chargement ou l'enregistrement terminé.",
+      "empty": "Aucun favori Jira trouvé.",
+      "find": "Rechercher un favori Jira",
+      "label": "Favoris Jira",
+      "loadFailed": "Impossible de charger les favoris Jira.",
+      "loading": "Chargement des favoris…",
+      "refresh": "Actualiser",
+      "siteMismatch": "Choisissez un projet sur le site Jira du favori, ou effacez le filtre de projets.",
+      "truncated": "Certains favoris n'ont pas pu être listés. Gérez vos favoris dans Jira pour réduire la liste.",
+      "unsupported": "Mettez à jour l'hôte Jira pour utiliser les favoris."
+    }
+  },
+  "updates": {
+    "installBlock": {
+      "instancesLabel": "Instances utilisant Orca",
+      "browserLabel": "Navigateur en arrière-plan",
+      "serverLabel": "Serveur en arrière-plan",
+      "windowLabel": "Autre fenêtre Orca",
+      "instanceLabel": "Autre instance Orca",
+      "processId": "PID {{pid}}",
+      "preparingTitle": "Préparation de votre mise à jour",
+      "preparingSummary": "Vérification des instances Orca en cours d'exécution avant de redémarrer.",
+      "later": "Plus tard",
+      "retainedDownload": "Orca reste ouvert. Pas besoin de retélécharger.",
+      "retryInstallation": "Réessayer l'installation",
+      "waitingLabel": "Mise à jour en attente",
+      "busyTitle": "Un autre Orca est en cours de mise à jour",
+      "busySummary": "Une mise à jour est déjà en cours d'installation par une autre instance Orca.",
+      "busyGuidance": "Attendez un instant, puis réessayez. Votre mise à jour téléchargée est prête.",
+      "unresponsiveTitle": "En attente des serveurs en arrière-plan",
+      "unresponsiveSummary": "Orca n'a pas pu terminer la mise en pause de ses serveurs en arrière-plan pour la mise à jour.",
+      "unresponsiveGuidance": "Arrêtez-le depuis le terminal ou le service qui l'a démarré, puis réessayez. Les appareils connectés seront déconnectés.",
+      "readyTitle": "Votre mise à jour est prête",
+      "serverSummary": "Un serveur Orca en arrière-plan utilise encore cette app.",
+      "instanceSummary": "Une autre instance Orca utilise encore cette app.",
+      "serverGuidance": "Arrêtez le serveur depuis le terminal ou le service qui l'a démarré, puis réessayez. Les appareils connectés seront déconnectés.",
+      "mixedGuidance": "Fermez les autres fenêtres Orca et arrêtez le serveur depuis le terminal ou le service qui l'a démarré. Les appareils connectés seront déconnectés. Réessayez ensuite.",
+      "instanceGuidance": "Quittez les autres instances Orca, puis réessayez. Votre mise à jour téléchargée restera prête.",
+      "waitingAriaLabel": "Mise à jour en attente d'autres instances Orca. Cliquez pour développer.",
+      "preparingLabel": "Préparation de la mise à jour",
+      "preparingAriaLabel": "Préparation de la mise à jour. Cliquez pour développer."
+    }
+  }
 }

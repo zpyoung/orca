@@ -1,17 +1,10 @@
 import { translate } from '@/i18n/i18n'
 import { NATIVE_CHAT_TURN_STATUS_COPY } from '../../../../shared/native-chat-turn-status'
 import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
-
-export type NativeChatRuntimeSettings =
-  | Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
-  | null
-  | undefined
 
 export type NativeChatResolvedTarget = {
   terminalTabId: string
   ptyId: string
-  settings: NativeChatRuntimeSettings
 }
 
 /** Upper bound for clipboard text pulled into the composer via Cmd/Ctrl+V, so a

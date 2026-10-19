@@ -8,12 +8,12 @@ import {
   buildTerminalWaitBlockedResult,
   buildTerminalWaitResult,
   getTerminalState
-} from './terminal-wait-results'
-import { readsTrustedScreen } from './agent-state-rules/agent-state-rules-engine'
-import { showsScreenProbeBanner } from './agent-state-rules/agent-state-text-anchors'
-import { buildTerminalWaitText } from './terminal-wait-tail-state'
-import { tuiIdleNeedsVisibleScreenProbe } from './terminal-wait-detection'
-import { evaluateTuiIdle, type TuiIdleVerdict } from './tui-idle-evidence'
+} from '../../terminal-wait-results'
+import { readsTrustedScreen } from '../../agent-state-rules/agent-state-rules-engine'
+import { showsScreenProbeBanner } from '../../agent-state-rules/agent-state-text-anchors'
+import { buildTerminalWaitText } from '../../terminal-wait-tail-state'
+import { tuiIdleNeedsVisibleScreenProbe } from '../../terminal-wait-detection'
+import { evaluateTuiIdle, type TuiIdleVerdict } from '../../tui-idle-evidence'
 import {
   leafTuiIdleEvidence,
   ptyTuiIdleEvidence,

@@ -16,7 +16,9 @@ export type NativeChatOrcaStopView = {
 export const NativeChatOrcaStopContext = createContext<NativeChatOrcaStopView>({
   hostLabel: null,
   remoteHost: false,
-  continueAvailable: false
+  continueAvailable: false,
+  offeredTurnItemId: null,
+  continueNow: () => {}
 })
 
 export function useNativeChatOrcaStopView(): NativeChatOrcaStopView {

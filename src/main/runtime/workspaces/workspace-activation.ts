@@ -4,13 +4,13 @@ import {
   navigationTargetsClients,
   navigationTargetsHost,
   resolveRuntimeNavigationTarget
-} from '../../shared/runtime-navigation'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
-import { repoIsRemote } from '../../shared/agent-launch-remote'
-import type { Repo } from '../../shared/repo-types'
-import type { TuiAgent } from '../../shared/tui-agent'
-import type { RuntimeTerminalWait } from '../../shared/runtime-terminal-contracts'
-import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
+} from '../../../shared/runtime-navigation'
+import { getRepoExecutionHostId } from '../../../shared/execution-host'
+import { repoIsRemote } from '../../../shared/agent-launch-remote'
+import type { Repo } from '../../../shared/repo-types'
+import type { TerminalWorkspaceLaunchScope } from '../runtime-legacy-worker-terminal-recovery-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
+import type { RuntimeTerminalWait } from '../../../shared/runtime-terminal-contracts'
 import type {
   WorktreeStartupDraftPaste,
   WorktreeStartupFollowup
@@ -19,14 +19,15 @@ import {
   buildWorktreeStartupForAgent,
   buildWorktreeStartupForDraft,
   resolveWorktreeStartupDraftAgent
-} from './runtime-worktree-agent-startup'
-import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
-import type { AgentLaunchOverrides } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import type { Automation } from '../../shared/automations-types'
-import type { AutomationRunLaunchSettings } from '../../shared/fork-automation-launch-settings/automation-run-launch-settings'
-import { resolveAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'
-import type { Worktree } from '../../shared/worktree/types'
-import type { WorktreeLineageResolution } from './runtime-worktree-lineage-resolution'
+} from '../runtime-worktree-agent-startup'
+import type { AgentLaunchPreferences } from '../../../shared/agent-session-host-authority'
+import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
+import type { AgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { Automation } from '../../../shared/automations-types'
+import type { AutomationRunLaunchSettings } from '../../../shared/fork-automation-launch-settings/automation-run-launch-settings'
+import { resolveAutomationRunLaunchSettings } from '../fork-automation-launch-settings/automation-run-launch-settings'
+import type { Worktree } from '../../../shared/worktree/types'
+import type { WorktreeLineageResolution } from '../runtime-worktree-lineage-resolution'
 import type {
   WorkspaceLineage,
   WorktreeLineage,
@@ -55,7 +56,7 @@ import {
 export abstract class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListManagedWorktrees {
   protected abstract toAgentSessionOptions(
     preferences: AgentLaunchPreferences | undefined
-  ): Record<string, string> | undefined
+  ): Record<string, SessionOptionValue> | undefined
   protected abstract getWorktreeStartupReadinessHost(): WorktreeStartupReadinessHost
   protected abstract getWorktreeTerminalProvisioningHost(
     createdWorktree?: Worktree
@@ -224,11 +225,13 @@ export abstract class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntime
     if (!this.store) {
       throw new Error('runtime_unavailable')
     }
+    const { platform, shell } = this.resolveStartupAgentLaunchRuntime(repo, automation.agentId)
     return resolveAutomationRunLaunchSettings({
       automation,
       settings: this.store.getSettings(),
-      platform: this.getAgentLaunchPlatformForRepo(repo),
-      isRemote: repoIsRemote(repo)
+      platform,
+      isRemote: repoIsRemote(repo),
+      shell
     })
   }
 

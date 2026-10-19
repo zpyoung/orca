@@ -1,4 +1,5 @@
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
+import type { FederationRuntime } from '../../runtime/orchestration/federation-runtime'
 import type { MessageType, OrchestrationDb } from '../../runtime/orchestration/db'
 import type { RelayedMessage } from '../../runtime/orchestration/federation-sync-message'
 
@@ -20,7 +21,7 @@ export type OrchestrationSubmissionPreflight = (
   submission: OrchestrationSubmission
 ) => Promise<OrchestrationSubmissionPreflightResult>
 
-const preflights = new WeakMap<OrcaRuntimeService, OrchestrationSubmissionPreflight>()
+const preflights = new WeakMap<FederationRuntime, OrchestrationSubmissionPreflight>()
 
 export function bindOrchestrationSubmissionPreflight(
   runtime: OrcaRuntimeService,
@@ -30,7 +31,7 @@ export function bindOrchestrationSubmissionPreflight(
 }
 
 export async function preflightOrchestrationSubmission(
-  runtime: OrcaRuntimeService,
+  runtime: FederationRuntime,
   submission: OrchestrationSubmission
 ): Promise<OrchestrationSubmissionPreflightResult> {
   const preflight = preflights.get(runtime)
@@ -94,7 +95,7 @@ type FederatedLifecycle =
   | { kind: 'rejected'; code: string; reason: string; suppressMessage?: boolean }
 
 export async function preflightFederatedHeimdallSubmission(args: {
-  runtime: OrcaRuntimeService
+  runtime: FederationRuntime
   db: OrchestrationDb
   dispatch: {
     id: string

@@ -252,10 +252,7 @@ async function settleClaudeStartupSettings(
     reportedOptions: claudeStartedReportedOptions(session, readClaudeModels(facts.initialization))
       .reportedOptions,
     // The one report of what the config resolved: the readback just applied it.
-    ...claudeResolvedCatalogListing(session, readClaudeModels(facts.initialization)),
-    restoreSkippedOptions: [...session.restoreSkippedOptions],
-    ...claudeRetiredOptions(session),
-    optionRevision
+    ...claudeResolvedCatalogListing(session, readClaudeModels(facts.initialization))
   })
   if (startFastMode !== null) {
     void applyClaudeStartFastMode(session, facts, startFastMode)

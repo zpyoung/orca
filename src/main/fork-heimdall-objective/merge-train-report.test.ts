@@ -21,8 +21,7 @@ const leaseGuard: LeaseGuard = {
 const target: ObjectiveWorkspaceTarget = {
   kind: 'folder',
   executionHostId: 'local',
-  workspacePath: '/does-not-matter',
-  fileProvider: null
+  workspacePath: '/does-not-matter'
 }
 
 const TASK: ObjectivePlanTask = {

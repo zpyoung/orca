@@ -24,10 +24,57 @@ import {
 // Type-only side effect: keeps the schema/PersistedUIState parity assertions in
 // the typecheck graph so drift fails the build instead of a paired client.
 
-import { TerminalQuickCommandsUpdate } from './terminal-quick-command-rpc-schema'
+import { TerminalQuickCommandsUpdate } from '../../../../shared/rpc-contract/terminal-quick-command-params'
 import { AgentLaunchSettingsMutation } from '../../../../shared/rpc-contract/agent-launch-settings-params'
+import { projectTerminalQuickCommandsForClient } from './terminal-quick-command-long-prompt-capability'
+
+function uiForCaller(
+  state: PersistedUIState,
+  context: Pick<RpcContext, 'clientKind' | 'pairedDeviceParentId'>
+): PairedUiState & Pick<PersistedUIState, 'hideWorkspacesFromOtherDevices'> {
+  const ui = omitPairingLocalUiFields(state)
+  // Why always sent: its presence tells the phone this host shares the filter; an older host omits
+  // it, and the phone then keeps its local value.
+  return isHostOwnPhone(context)
+    ? { ...ui, hideWorkspacesFromOtherDevices: state.hideWorkspacesFromOtherDevices === true }
+    : ui
+}
 
 export const CLIENT_UI_METHODS = [
+  defineMethod({
+    name: 'ui.getJiraQuickFilters',
+    permission: 'workspace',
+    params: null,
+    handler: (_params, { runtime }) =>
+      normalizeJiraQuickFilterState(runtime.getUIState().jiraQuickFilterState)
+  }),
+  defineMethod({
+    name: 'ui.setJiraQuickFilters',
+    permission: 'workspace',
+    params: JiraQuickFilterStateParam,
+    handler: (params, { runtime }) => {
+      const state = normalizeJiraQuickFilterState(params)
+      runtime.updateUIState({ jiraQuickFilterState: state })
+      return state
+    }
+  }),
+  defineMethod({
+    name: 'ui.getJiraSavedFilters',
+    permission: 'workspace',
+    params: null,
+    handler: (_params, { runtime }) =>
+      normalizeJiraSavedFilterState(runtime.getUIState().jiraSavedFilterState)
+  }),
+  defineMethod({
+    name: 'ui.mutateJiraSavedFilters',
+    permission: 'workspace',
+    params: JiraSavedFilterMutationParam,
+    handler: (params, { runtime }) => {
+      const state = mutateJiraSavedFilterState(runtime.getUIState().jiraSavedFilterState, params)
+      runtime.updateUIState({ jiraSavedFilterState: state })
+      return state
+    }
+  }),
   defineMethod({
     name: 'settings.getAgentLaunch',
     permission: 'workspace',

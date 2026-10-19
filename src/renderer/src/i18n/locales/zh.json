@@ -25,7 +25,7 @@
     "chat": {
       "permissionsTitle": "新聊天的权限",
       "permissionsDescription": "仅适用于新聊天。在终端中打开的智能体使用设置 → 智能体 → 智能体权限。",
-      "description": "选择聊天的外观和命名方式。",
+      "description": "选择聊天的外观和行为方式。",
       "names": {
         "title": "聊天名称",
         "description": "使用智能体根据首条消息为新聊天生成名称。未生成名称时，聊天仍显示为 Claude Chat 或 Codex Chat。",
@@ -11277,7 +11277,7 @@
           "sourceControlAiDefaults": "方案、提示和托管评审默认值由此客户端共享；模型选择和发现则限定在智能体运行的主机内。",
           "projectOnThisHost": "此主机上的项目",
           "repositorySourceControlAi": "这些覆盖项应用于此项目设置，并继承客户端的源代码管理 AI 默认值，直至自定义。",
-          "agentLaunchDefaults": "默认代理、命令覆盖、CLI 参数和启动环境保存在所选主机上。",
+          "agentLaunchDefaults": "默认智能体、命令覆盖、CLI 参数和启动环境保存在所选主机上。",
           "clientDefaultProjectScopes": "客户端默认 + 项目范围",
           "terminalQuickCommands": "命令保存在此客户端，然后限定为全局或某项目设置，以便从所选终端上下文运行。",
           "hostOverride": "主机覆盖",
@@ -17928,6 +17928,23 @@
         "resuming": "重启后正在自动恢复。",
         "resumed": "重启后已自动恢复。",
         "changeInSettings": "在设置中更改"
+      },
+      "TaskPageJiraSavedFilters": {
+        "6c381858a1": "Saved filters",
+        "d14121662d": "No saved filters yet.",
+        "af0dd8c528": "Edit {{value0}}",
+        "bae9bd87bf": "You can save up to {{value0}} filters.",
+        "85506127a5": "Save current filter",
+        "7aef259c28": "Edit Jira filter",
+        "4f0e55d2e5": "Save Jira filter",
+        "466c1b12ce": "Give this JQL query a name for quick access.",
+        "e4c2f52972": "Name",
+        "0ab71bb840": "A saved filter with this name already exists.",
+        "42ce360813": "JQL",
+        "7b21c59a26": "Delete filter",
+        "a62f9db53d": "Cancel",
+        "c77189bc0c": "Update filter",
+        "19af906d12": "Save filter"
       }
     },
     "i18n": {
@@ -18280,6 +18297,7 @@
         "permissionAskSharedDescription": "在执行尚未获准的编辑或命令前询问",
         "permissionAcceptEdits": "接受编辑",
         "permissionAcceptEditsDescription": "批准文件编辑和文件命令；其余操作会询问",
+        "permissionAcceptEditsAntigravityDescription": "批准文件编辑；其余操作会询问",
         "permissionAuto": "替我批准",
         "permissionAutoDescription": "代你审核批准请求",
         "permissionFullAccess": "完全访问",
@@ -18520,7 +18538,8 @@
         "orcaStopQuit": "此回复进行期间，{{machine}} 上的 Orca 已关闭。",
         "orcaStopCrash": "此回复进行期间，{{machine}} 上的 Orca 意外停止。",
         "orcaStopRemote": "此回复进行期间，{{machine}} 上的 Orca 已停止。",
-        "orcaStopCanContinue": "你可以在此对话中继续。"
+        "orcaStopCanContinue": "你可以在此对话中继续。",
+        "orcaStopUnnamedServer": "远程服务器"
       },
       "providerFrame": {
         "byteLength": "{{value0}} 字节"
@@ -18732,7 +18751,10 @@
       },
       "visualUnavailable": "可视化不可用",
       "visualLoading": "正在加载可视化",
-      "visualOpenInNewTab": "在新标签页中打开"
+      "visualOpenInNewTab": "在新标签页中打开",
+      "claudeSignIn": {
+        "signingIn": "正在登录…"
+      }
     },
     "tab": {
       "bar": {
@@ -19898,6 +19920,50 @@
       "learnMore": "了解更多",
       "dontShowAgain": "不再显示",
       "dismiss": "关闭"
+    },
+    "claudeOldTerminalBanner": {
+      "title": "此终端是在 Orca 的 Claude 账户更新之前打开的，因此这里的 claude 使用系统默认的登录信息。",
+      "dialogTitle": "为何这里的 claude 不使用所选账户",
+      "dialogDescription": "Orca 现在将每个 Claude 账户保存在各自的文件夹中，新终端中的 claude 会遵循您选择的账户。",
+      "dialogCause": "在此更新之前打开的终端不会如此，因此这里的 claude 使用系统默认的登录信息登录。请打开新终端以使用所选账户。"
+    },
+    "newerDaemonBanner": {
+      "failedTitle": "无法重新打开此终端",
+      "title": "此终端是在较新版本的 Orca 中打开的",
+      "resumableBody": "在此重新打开以继续工作。您的智能体会话将会恢复。",
+      "reopening": "正在重新打开…",
+      "tryAgain": "重试",
+      "reopenTerminal": "重新打开 {{count}} 个终端",
+      "reopenTerminal_one": "重新打开终端",
+      "reopenTerminal_other": "重新打开 {{count}} 个终端",
+      "reopened": "已重新打开 {{count}} 个终端",
+      "reopened_one": "已重新打开 {{count}} 个终端",
+      "reopened_other": "已重新打开 {{count}} 个终端",
+      "resumed": "已恢复 {{count}} 个智能体会话。",
+      "resumed_one": "已恢复 {{count}} 个智能体会话。",
+      "resumed_other": "已恢复 {{count}} 个智能体会话。"
+    },
+    "severedDaemonBanner": {
+      "unknownCount": "其正在运行的终端",
+      "count": "{{count}} 个正在运行的终端",
+      "unverifiable": "Orca 无法验证终端服务进程，因此未停止任何内容。",
+      "alreadyReplaced": "终端服务已被替换；未停止任何内容。",
+      "restarted": "终端服务已重新启动。",
+      "failed": "重新启动失败。",
+      "title": "终端服务在缺少其程序文件的情况下运行",
+      "body": "此计算机上的终端服务是从一个已不再挂载的 AppImage 启动的。它仍在运行 {{sessions}}，但随时可能崩溃。在您重新启动它之前，Orca 退出时新终端不会被保留。",
+      "restart": "重新启动终端守护进程",
+      "dismiss": "关闭",
+      "confirmTitle": "重新启动终端守护进程？",
+      "confirmBody": "重新启动会结束 {{sessions}} 中运行的所有进程。支持恢复的智能体之后可以恢复；shell 和其他作业则不能，必须重新启动。请在智能体空闲时执行此操作。",
+      "cancel": "取消",
+      "confirm": "重新启动并结束进程"
+    },
+    "restartedInputNotSent": "终端在您输入时重新启动，部分输入可能未送达。请先查看新的 shell，再重新输入。",
+    "stalledDaemonBanner": {
+      "body": "此计算机上的后台工作已停滞。输入和新终端可能无法工作。重新启动终端服务会结束其正在运行的终端和命令。",
+      "review": "查看重新启动选项",
+      "title": "终端服务可能需要重新启动"
     }
   },
   "fileSearch": {
@@ -19977,15 +20043,215 @@
   "projectField": {
     "updateFailed": "无法更新项目字段"
   },
-  "settings.agents.environmentName": "环境变量名称",
-  "settings.agents.environmentValue": "{{name}} 的值",
-  "settings.agents.savedEnvironment": "已保存的值 · 输入以替换",
-  "settings.agents.newEnvironment": "值",
-  "settings.agents.removeEnvironment": "删除",
-  "settings.agents.loadingHost": "正在加载代理设置…",
-  "settings.agents.updateHost": "请更新此服务器以编辑其代理启动设置。",
-  "settings.agents.readFailed": "无法读取代理设置。请检查主机连接并重试。",
-  "settings.agents.saveFailed": "无法保存代理设置。请检查主机连接并重试。",
-  "settings.agents.hostDefaults": "所选主机上新代理的默认设置。",
-  "settings.agents.save": "保存"
+  "workspaceDeletion": {
+    "preferenceSaveFailed": "无法保存删除偏好设置",
+    "alwaysForceDelete": "始终强制删除",
+    "moreActions": "更多强制删除选项",
+    "alwaysForceDeleteTooltip": "适用于今后所有工作区删除操作。"
+  },
+  "workspace": {
+    "links": {
+      "foreignReview": "此评审属于另一个存储库。请添加来自此工作区存储库的评审。",
+      "repositoryLoading": "存储库身份仍在加载。待其可用后重试。",
+      "duplicate": "此链接已附加。",
+      "title": "已链接的工作",
+      "count": "已链接 {{count}} 项",
+      "empty": "将此工作区的所有评审和任务集中在一起。",
+      "reviews": "评审",
+      "tasks": "议题和任务",
+      "openItem": "打开 {{label}}",
+      "open": "打开链接",
+      "unlinkItem": "取消链接 {{label}}",
+      "unlink": "从工作区取消链接",
+      "show": "显示 {{count}} 个已链接的评审和任务",
+      "manage": "管理链接…",
+      "details": "工作区详情",
+      "description": "为此工作区关联评审和任务，并保留笔记。",
+      "commentHelp": "支持 Markdown。按 Enter 或 {{shortcut}} 保存 · Shift+Enter 换行。",
+      "kind": {
+        "github_pr": "GitHub PR",
+        "github_issue": "GitHub 议题",
+        "linear_task": "Linear 任务",
+        "gitlab_mr": "GitLab MR",
+        "gitlab_issue": "GitLab 议题",
+        "jira_task_url": "Jira 任务（URL）",
+        "bitbucket_pr": "Bitbucket PR",
+        "azure_devops_pr": "Azure DevOps PR",
+        "gitea_pr": "Gitea PR"
+      },
+      "mrReference": "MR !{{number}}",
+      "prReference": "PR #{{number}}",
+      "issueReference": "议题 #{{number}}",
+      "foreignIssue": "此议题属于另一个存储库。请添加来自此工作区存储库的议题。",
+      "linkedResult": "已链接",
+      "addReference": "添加引用",
+      "searchLabel": "搜索引用",
+      "searchReferences": "搜索评审和任务，或粘贴链接",
+      "noReferences": "没有匹配的引用。请尝试标题、编号或 URL。",
+      "addItem": "添加 {{label}}",
+      "referenceType": "引用类型",
+      "clearSearch": "清除搜索",
+      "inlineSearchHint": "选择结果以附加。",
+      "nameHelp": "显示在侧边栏中。文件夹名称保持不变。",
+      "notes": "笔记",
+      "addNotes": "添加笔记",
+      "notesOptional": "可选 · Markdown",
+      "saveHint": "保存后更改才会生效",
+      "terminal": "终端",
+      "seenIn": "出现于 {{label}}",
+      "unavailableTab": "标签页不可用",
+      "sessions": "会话和终端",
+      "jiraModeRequired": "选择 Smart 或 Jira 以加载此议题。",
+      "linearModeRequired": "选择 Smart 或 Linear 以加载此议题。",
+      "loadingLinear": "正在加载 Linear 议题…",
+      "linearConnectRequired": "在设置中连接 Linear 以链接此议题。",
+      "linearReadFailed": "无法加载此 Linear 议题。请检查 URL 和已连接的工作区。",
+      "retrySource": "重试",
+      "lastKnownStatus": "上次已知状态",
+      "reviewTarget": "目标：{{branch}}",
+      "reviewUrlRequired": "粘贴评审 URL 以验证其存储库和提供方。",
+      "stackSummary": "已链接 {{count}} 项：{{references}}",
+      "sessionsForItem": "{{label}} 的会话和终端 · {{count}}",
+      "checksFailed": "失败",
+      "checksPending": "待处理",
+      "checksPassing": "通过",
+      "checksUnknown": "未知",
+      "checksNeutral": "中性",
+      "allReviewChecks": "评审：{{count}} · 检查：{{status}}"
+    },
+    "attachments": {
+      "updateRuntime": "更新远程运行时以更改工作区链接",
+      "updateRuntimeSafely": "更新远程运行时以安全地更改工作区链接"
+    }
+  },
+  "tabHoverCard": {
+    "browser": "浏览器",
+    "editor": "编辑器",
+    "terminal": "终端"
+  },
+  "jira": {
+    "savedFilters": {
+      "retry": "重试",
+      "find": "查找已保存的筛选器",
+      "noMatch": "没有匹配的筛选器。",
+      "loadFailed": "无法加载已保存的 Jira 筛选器。",
+      "saveFailed": "无法保存 Jira 筛选器。"
+    },
+    "statusFilters": {
+      "loadFailed": "无法加载 Jira 状态筛选器。",
+      "saveFailed": "无法保存 Jira 状态筛选器。",
+      "manualQuery": "状态筛选器适用于预设视图。清除搜索后即可使用。",
+      "label": "按状态筛选 Jira 议题",
+      "clear": "清除状态",
+      "jql": "状态筛选器 JQL",
+      "editJql": "作为 JQL 编辑",
+      "catalogHint": "状态来自已加载的议题。清除状态选择以查看此视图中的其他状态。"
+    },
+    "connect": {
+      "scopedTokenGuide": "作用域令牌需要 read:jira-work、write:jira-work 和 read:jira-user。将邮箱留空以使用 Bearer 身份验证。",
+      "oldHostGuide": "此远程运行时需要邮箱和不带作用域的 API 令牌。请更新远程运行时以使用作用域令牌。",
+      "scopedDescription": "使用 Jira Cloud 站点 URL 和 API 令牌浏览议题。作用域令牌可以省略邮箱。",
+      "optionalEmail": "Atlassian 邮箱（作用域令牌可选）"
+    },
+    "workspace": {
+      "open": "打开关联到 {{key}} 的工作区",
+      "count": "{{count}} 个关联到 {{key}} 的工作区",
+      "startAnother": "启动新工作区",
+      "empty": "将 Jira 议题关联到工作区，或选择其他视图。",
+      "openFailed": "无法打开关联到此 Jira 议题的工作区。",
+      "mode": "有工作区",
+      "search": "搜索关联的议题",
+      "single": "1 个关联到 {{key}} 的工作区"
+    },
+    "prompt": {
+      "dialogTitle": "从模板复制提示词",
+      "template": "模板",
+      "custom": "自定义模板",
+      "templateText": "模板文本",
+      "variables": "使用 $jira-issue 表示议题上下文，使用 $other-prompt 表示你的附加说明。保存在此设备上。",
+      "other": "附加说明（可选）",
+      "preview": "预览",
+      "implementation": "开始实现",
+      "bug": "调查缺陷",
+      "testPlan": "编写测试计划",
+      "prSummary": "起草 PR 摘要"
+    },
+    "copy": {
+      "context": "复制 {{key}} 的上下文",
+      "actions": "复制议题上下文"
+    },
+    "transitions": {
+      "changeStatus": "更改状态：{{status}}",
+      "loadError": "无法加载状态更改。",
+      "retry": "重试",
+      "loading": "正在加载状态更改…",
+      "completeInJira": "在 Jira 中完成“{{name}}”",
+      "unsupported": "Jira 需要 Orca 目前无法收集的字段：{{fields}}。",
+      "chooseResolution": "选择解决结果",
+      "comment": "评论",
+      "back": "返回",
+      "apply": "更改状态",
+      "empty": "没有可用的状态更改。"
+    },
+    "board": {
+      "currentSprint": "当前冲刺",
+      "viewMode": "Jira 视图",
+      "list": "列表",
+      "board": "看板",
+      "moveIssue": "移动 {{key}}",
+      "moveTitle": "将 {{key}} 移动到 {{column}}",
+      "moveDescription": "Jira 控制哪些状态更改可用，以及这些更改需要哪些字段。",
+      "chooseTransition": "选择状态更改：",
+      "cancel": "取消",
+      "noTransition": "{{key}} 没有可转到 {{column}} 的状态更改。",
+      "queryTooLong": "Jira 查询过长。请缩短查询或清除筛选条件。"
+    },
+    "favourites": {
+      "activeLabel": "Jira 收藏夹：{{name}}",
+      "applyFailed": "无法应用 Jira 收藏夹。",
+      "chooseSite": "选择一个已连接的 Jira 站点以使用其收藏夹。",
+      "clear": "清除 Jira 收藏夹",
+      "clearFailed": "无法清除已保存的筛选器。待加载或保存完成后再重试。",
+      "empty": "未找到 Jira 收藏夹。",
+      "find": "查找 Jira 收藏夹",
+      "label": "Jira 收藏夹",
+      "loadFailed": "无法加载 Jira 收藏夹。",
+      "loading": "正在加载收藏夹…",
+      "refresh": "刷新",
+      "siteMismatch": "从收藏夹所在的 Jira 站点选择项目，或清除项目筛选器。",
+      "truncated": "部分收藏夹无法列出。请在 Jira 中管理收藏夹以缩小列表。",
+      "unsupported": "更新 Jira 主机以使用收藏夹。"
+    }
+  },
+  "updates": {
+    "installBlock": {
+      "instancesLabel": "正在使用 Orca 的实例",
+      "browserLabel": "后台浏览器",
+      "serverLabel": "后台服务器",
+      "windowLabel": "其他 Orca 窗口",
+      "instanceLabel": "其他 Orca 实例",
+      "processId": "PID {{pid}}",
+      "preparingTitle": "正在准备你的更新",
+      "preparingSummary": "重启前检查正在运行的 Orca 实例。",
+      "later": "稍后",
+      "retainedDownload": "Orca 保持打开。无需重新下载。",
+      "retryInstallation": "重试安装",
+      "waitingLabel": "更新等待中",
+      "busyTitle": "另一个 Orca 正在更新",
+      "busySummary": "另一个 Orca 实例已在安装更新。",
+      "busyGuidance": "请稍候片刻再重试。你下载的更新已就绪。",
+      "unresponsiveTitle": "正在等待后台服务器",
+      "unresponsiveSummary": "Orca 未能为更新暂停其后台服务器。",
+      "unresponsiveGuidance": "请从启动它的终端或服务中停止它，然后重试。已连接的设备将断开连接。",
+      "readyTitle": "你的更新已就绪",
+      "serverSummary": "某个后台 Orca 服务器仍在使用此应用。",
+      "instanceSummary": "另一个 Orca 实例仍在使用此应用。",
+      "serverGuidance": "请从启动服务器的终端或服务中停止它，然后重试。已连接的设备将断开连接。",
+      "mixedGuidance": "关闭所有其他 Orca 窗口，并从启动服务器的终端或服务中停止服务器。已连接的设备将断开连接。然后重试。",
+      "instanceGuidance": "退出其他 Orca 实例，然后重试。你下载的更新将保持就绪。",
+      "waitingAriaLabel": "更新正在等待其他 Orca 实例。点击展开。",
+      "preparingLabel": "正在准备更新",
+      "preparingAriaLabel": "正在准备更新。点击展开。"
+    }
+  }
 }

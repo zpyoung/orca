@@ -14,6 +14,7 @@ import {
   type TerminalMultiplexConnection
 } from './terminal-multiplex-connection'
 import type { TerminalMultiplexStream } from './terminal-stream-types'
+import { subscribeToPtyEndpointLoss } from '../../../terminal/pty-endpoint-loss-signal'
 import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export async function initializeMultiplexStream(

@@ -152,6 +152,7 @@ export type Worktree = {
   /** Durable sidebar-only cross-repo group membership, independent of the
    *  worktree's repo's own `projectGroupId`. Execution remains repo-scoped. */
   projectGroupId?: string | null
+  /** Recent's key, stamped by the owning host on events (and still by the window). */
   lastActivityAt: number
   /** Smart's tier, stamped by the owning host on agent transitions; absent is Rest. */
   smartTier?: SmartTier

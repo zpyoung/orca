@@ -19,8 +19,8 @@ import {
 import { buildFolderWorkspaceRow } from './row-builders'
 import {
   appendLooseWorktreeSectionRows,
-  type LooseWorktreesByProjectGroupId
-} from '../../fork-worktree-groups/loose-worktree-section-rows'
+  getLooseWorktreeCount
+} from '../fork-worktree-groups/loose-worktree-section-rows'
 
 export function appendProjectGroupSections(
   ctx: SectionAppendContext,
@@ -30,12 +30,9 @@ export function appendProjectGroupSections(
     folderWorkspaces: readonly RenderableFolderWorkspace[]
     projectOrderBy: ProjectOrderBy
     repoOrder: Map<string, number> | undefined
-    looseWorktreesByProjectGroupId?: LooseWorktreesByProjectGroupId
   }
 ): void {
   const { orderedGroups, projectGroups, folderWorkspaces, projectOrderBy, repoOrder } = args
-  const looseWorktreesByProjectGroupId: LooseWorktreesByProjectGroupId =
-    args.looseWorktreesByProjectGroupId ?? new Map()
   const { result, collapsedGroups } = ctx
 
   const groupByProjectGroupId = new Map<string | null, OrderedGroupEntry[]>()
@@ -104,7 +101,7 @@ export function appendProjectGroupSections(
   const getProjectGroupSubtreeCount = (groupId: string): number => {
     const directCount = groupByProjectGroupId.get(groupId)?.length ?? 0
     const folderWorkspaceCount = folderWorkspacesByProjectGroupId.get(groupId)?.length ?? 0
-    const looseWorktreeCount = looseWorktreesByProjectGroupId.get(groupId)?.length ?? 0
+    const looseWorktreeCount = getLooseWorktreeCount(ctx, groupId)
     const children = childGroupsByParentId.get(groupId) ?? []
     return children.reduce(
       (count, child) => count + getProjectGroupSubtreeCount(child.id),
@@ -129,13 +126,7 @@ export function appendProjectGroupSections(
       for (const pair of folderWorkspacesByProjectGroupId.get(projectGroup.id) ?? []) {
         result.push(buildFolderWorkspaceRow(pair, depth + 1))
       }
-      appendLooseWorktreeSectionRows(ctx, {
-        result,
-        projectGroup,
-        headerKey: key,
-        depth,
-        looseWorktrees: looseWorktreesByProjectGroupId.get(projectGroup.id) ?? []
-      })
+      appendLooseWorktreeSectionRows(ctx, { projectGroup, depth })
       appendOrderedGroups(ctx, withRepoSectionDisplayLabels(repoEntries), depth + 1)
       for (const childGroup of childGroups) {
         appendProjectGroup(childGroup, depth + 1)

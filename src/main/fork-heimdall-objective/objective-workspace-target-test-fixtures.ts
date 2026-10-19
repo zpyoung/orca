@@ -2,7 +2,7 @@ import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 
 export function folderTarget(workspacePath: string): ObjectiveWorkspaceTarget {
-  return { kind: 'folder', executionHostId: 'local', workspacePath, fileProvider: null }
+  return { kind: 'folder', executionHostId: 'local', workspacePath }
 }
 
 export function gitTarget(
@@ -40,7 +40,6 @@ export function gitTarget(
     kind: 'git',
     executionHostId: 'local',
     workspacePath,
-    fileProvider: null,
     gitTarget: runtimeTarget
   }
 }

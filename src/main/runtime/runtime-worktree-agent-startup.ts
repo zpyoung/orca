@@ -166,11 +166,13 @@ export function buildWorktreeStartupForAgent(
   if (!isTuiAgentEnabled(agent, settings.disabledTuiAgents)) {
     throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
   }
+  const { platform, shell, launchRuntime } = environment.getLaunchRuntime(agent)
   const planInputs = {
     ...resolveAgentStartupPlanInputs({
       agent,
       settings,
-      platform: environment.getLaunchPlatform(),
+      platform,
+      shell,
       isRemote: repoIsRemote(repo),
       ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {}),
       ...(environment.extraAgentArgs ? { extraAgentArgs: environment.extraAgentArgs } : {}),
@@ -178,7 +180,10 @@ export function buildWorktreeStartupForAgent(
         ? agentLaunchOverridesToSessionOptionValues(launchOverrides)
         : environment.toSessionOptions(environment.launchPreferences)
     }),
-    includeSessionOptionCatalogDefaults: launchOverrides ? false : undefined
+    includeSessionOptionCatalogDefaults:
+      launchOverrides || environment.launchPreferences?.optionValues !== undefined
+        ? false
+        : undefined
   }
   const prompt = environment.prompt ?? ''
   let startupPlan: ReturnType<typeof buildAgentStartupPlan>

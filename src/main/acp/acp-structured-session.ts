@@ -13,6 +13,7 @@ import {
 } from '../native-chat/agent-session-wire/structured-agent-session-stale-turn-verdict'
 import type { AcpLaunchSpec } from './acp-launch-specs'
 import type { AcpChildStops } from './acp-dialects/acp-dialect'
+import { acpAgentName } from './acp-structured-agent-definitions'
 import type { AcpSessionEvent } from './acp-session-runtime'
 import type { AcpStructuredConnection } from './acp-structured-connection'
 import type { AcpStructuredLane } from './acp-structured-lane'
@@ -92,6 +93,7 @@ export function asReattachHistory(params: unknown): unknown {
 export function closeAcpSessionJournal(
   session: AcpStructuredSession,
   reason: string,
+  cause?: Error,
   verdict: StructuredAgentSessionTurnVerdict = UNVERIFIABLE_TURN_VERDICT,
   endedAt: number = Date.now()
 ): void {
@@ -100,7 +102,7 @@ export function closeAcpSessionJournal(
   }
   session.journalClosed = reason
   session.prompts.clear()
-  session.turns.end(reason)
+  session.turns.end(reason, cause)
   session.lane.apply([{ type: 'session.ended', verdict, endedAt }])
   session.lane.flush()
   session.lane.dispose()

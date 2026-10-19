@@ -25,7 +25,7 @@
     "chat": {
       "permissionsTitle": "新しいチャットの権限",
       "permissionsDescription": "新しいチャットにのみ適用されます。ターミナルで開くAgentには、設定 → Agent → Agentの権限が適用されます。",
-      "description": "チャットの外観と名前の付け方を選びます。",
+      "description": "チャットの外観と動作を選びます。",
       "names": {
         "title": "チャット名",
         "description": "選択したツールが最初のメッセージから新規チャットの名前を生成します。名前が生成されない場合は、Claude Chat または Codex Chat のままです。",
@@ -17928,6 +17928,23 @@
         "resuming": "再起動後に自動で再開しています。",
         "resumed": "再起動後に自動で再開しました。",
         "changeInSettings": "設定で変更"
+      },
+      "TaskPageJiraSavedFilters": {
+        "6c381858a1": "Saved filters",
+        "d14121662d": "No saved filters yet.",
+        "af0dd8c528": "Edit {{value0}}",
+        "bae9bd87bf": "You can save up to {{value0}} filters.",
+        "85506127a5": "Save current filter",
+        "7aef259c28": "Edit Jira filter",
+        "4f0e55d2e5": "Save Jira filter",
+        "466c1b12ce": "Give this JQL query a name for quick access.",
+        "e4c2f52972": "Name",
+        "0ab71bb840": "A saved filter with this name already exists.",
+        "42ce360813": "JQL",
+        "7b21c59a26": "Delete filter",
+        "a62f9db53d": "Cancel",
+        "c77189bc0c": "Update filter",
+        "19af906d12": "Save filter"
       }
     },
     "i18n": {
@@ -18315,6 +18332,7 @@
         "permissionAskSharedDescription": "まだ許可されていない編集やコマンドの前に確認します",
         "permissionAcceptEdits": "編集を許可",
         "permissionAcceptEditsDescription": "ファイルの編集とファイル操作コマンドを承認し、それ以外は確認します",
+        "permissionAcceptEditsAntigravityDescription": "ファイルの編集を承認し、それ以外は確認します",
         "permissionAuto": "代わりに承認",
         "permissionAutoDescription": "承認リクエストを代わりに審査します",
         "permissionFullAccess": "フルアクセス",
@@ -18555,7 +18573,8 @@
         "orcaStopQuit": "この応答の途中で、{{machine}} の Orca が終了しました。",
         "orcaStopCrash": "この応答の途中で、{{machine}} の Orca が予期せず停止しました。",
         "orcaStopRemote": "この応答の途中で、{{machine}} の Orca が停止しました。",
-        "orcaStopCanContinue": "この会話で続行できます。"
+        "orcaStopCanContinue": "この会話で続行できます。",
+        "orcaStopUnnamedServer": "リモートサーバー"
       },
       "providerFrame": {
         "byteLength": "{{value0}}バイト"
@@ -18767,7 +18786,10 @@
       },
       "visualUnavailable": "ビジュアライゼーションを利用できません",
       "visualLoading": "ビジュアライゼーションを読み込み中",
-      "visualOpenInNewTab": "新しいタブで開く"
+      "visualOpenInNewTab": "新しいタブで開く",
+      "claudeSignIn": {
+        "signingIn": "サインイン中…"
+      }
     },
     "tab": {
       "bar": {
@@ -19898,6 +19920,50 @@
       "learnMore": "詳しく見る",
       "dontShowAgain": "二度と表示しないでください",
       "dismiss": "閉じる"
+    },
+    "claudeOldTerminalBanner": {
+      "title": "このターミナルは Orca の Claude アカウント更新より前に開かれたため、ここでの claude はシステムのデフォルトのログインを使用します。",
+      "dialogTitle": "ここでの claude が選択したアカウントを使用しない理由",
+      "dialogDescription": "Orca は現在、各 Claude アカウントをそれぞれのフォルダーに保持しており、新規ターミナルの claude は選択したアカウントに従います。",
+      "dialogCause": "この更新より前に開かれたターミナルは従わないため、ここでの claude はシステムのデフォルトのログインでサインインします。選択したアカウントを使用するには、新規ターミナルを開いてください。"
+    },
+    "newerDaemonBanner": {
+      "failedTitle": "このターミナルを再度開けませんでした",
+      "title": "このターミナルは新規バージョンの Orca で開かれました",
+      "resumableBody": "作業を続けるには、ここで再度開いてください。Agent セッションが再開されます。",
+      "reopening": "再度開いています…",
+      "tryAgain": "再試行",
+      "reopenTerminal": "{{count}} 個のターミナルを再度開く",
+      "reopenTerminal_one": "ターミナルを再度開く",
+      "reopenTerminal_other": "{{count}} 個のターミナルを再度開く",
+      "reopened": "{{count}} 個のターミナルを再度開きました",
+      "reopened_one": "{{count}} 個のターミナルを再度開きました",
+      "reopened_other": "{{count}} 個のターミナルを再度開きました",
+      "resumed": "{{count}} 個の Agent セッションを再開しました。",
+      "resumed_one": "{{count}} 個の Agent セッションを再開しました。",
+      "resumed_other": "{{count}} 個の Agent セッションを再開しました。"
+    },
+    "severedDaemonBanner": {
+      "unknownCount": "実行中のターミナル",
+      "count": "実行中のターミナル {{count}} 個",
+      "unverifiable": "Orca はターミナルサービスのプロセスを確認できなかったため、何も停止していません。",
+      "alreadyReplaced": "ターミナルサービスはすでに置き換えられていたため、何も停止していません。",
+      "restarted": "ターミナルサービスを再起動しました。",
+      "failed": "再起動に失敗しました。",
+      "title": "ターミナルサービスがプログラムファイルなしで実行されています",
+      "body": "このコンピュータのターミナルサービスは、マウントされなくなった AppImage から起動しました。現在も {{sessions}} を実行していますが、いつクラッシュしてもおかしくありません。再起動するまで、Orca を終了しても新規ターミナルは保持されません。",
+      "restart": "ターミナルデーモンを再起動",
+      "dismiss": "閉じる",
+      "confirmTitle": "ターミナルデーモンを再起動しますか?",
+      "confirmBody": "再起動すると、{{sessions}} で実行中のすべてのプロセスが終了します。再開に対応している Agent は後で再開できますが、シェルなどのジョブは再開できず、再度開始する必要があります。Agent がアイドル状態のときに行ってください。",
+      "cancel": "キャンセル",
+      "confirm": "再起動してプロセスを終了"
+    },
+    "restartedInputNotSent": "入力中にターミナルが再起動したため、一部の入力が届いていない可能性があります。もう一度入力する前に新しいシェルを確認してください。",
+    "stalledDaemonBanner": {
+      "body": "このコンピュータのバックグラウンド処理が停滞しています。入力と新規ターミナルが機能しない可能性があります。ターミナルサービスを再起動すると、実行中のターミナルとコマンドが終了します。",
+      "review": "再起動オプションを確認",
+      "title": "ターミナルサービスの再起動が必要になる可能性があります"
     }
   },
   "fileSearch": {
@@ -19977,15 +20043,215 @@
   "projectField": {
     "updateFailed": "プロジェクトフィールドを更新できませんでした"
   },
-  "settings.agents.environmentName": "環境変数名",
-  "settings.agents.environmentValue": "{{name}} の値",
-  "settings.agents.savedEnvironment": "保存済みの値 · 置き換えるには入力",
-  "settings.agents.newEnvironment": "値",
-  "settings.agents.removeEnvironment": "削除",
-  "settings.agents.loadingHost": "Agent設定を読み込み中…",
-  "settings.agents.updateHost": "Agentの起動設定を編集するには、このサーバーを更新してください。",
-  "settings.agents.readFailed": "Agent設定を読み込めませんでした。ホストへの接続を確認して再試行してください。",
-  "settings.agents.saveFailed": "Agent設定を保存できませんでした。ホストへの接続を確認して再試行してください。",
-  "settings.agents.hostDefaults": "選択したホストで起動する新しいAgentの既定値。",
-  "settings.agents.save": "保存"
+  "workspaceDeletion": {
+    "preferenceSaveFailed": "削除の設定を保存できませんでした",
+    "alwaysForceDelete": "常に強制削除",
+    "moreActions": "その他の強制削除オプション",
+    "alwaysForceDeleteTooltip": "今後のすべてのワークスペース削除に適用されます。"
+  },
+  "workspace": {
+    "links": {
+      "foreignReview": "このレビューは別のリポジトリに属しています。このワークスペースのリポジトリのレビューを追加してください。",
+      "repositoryLoading": "リポジトリの識別情報をまだ読み込んでいます。利用可能になってから再試行してください。",
+      "duplicate": "このリンクはすでに添付されています。",
+      "title": "リンクされた作業",
+      "count": "{{count}} 件リンク済み",
+      "empty": "このワークスペースのすべてのレビューとタスクをまとめて管理します。",
+      "reviews": "レビュー",
+      "tasks": "Issue とタスク",
+      "openItem": "{{label}} を開く",
+      "open": "リンクを開く",
+      "unlinkItem": "{{label}} のリンクを解除",
+      "unlink": "ワークスペースからリンクを解除",
+      "show": "リンク済みのレビューとタスク {{count}} 件を表示",
+      "manage": "リンクを管理…",
+      "details": "ワークスペースの詳細",
+      "description": "このワークスペースにレビューとタスクを添付し、ノートを保管します。",
+      "commentHelp": "Markdown に対応しています。保存するには Enter または {{shortcut}} を押します · 改行するには Shift+Enter を押します。",
+      "kind": {
+        "github_pr": "GitHub PR",
+        "github_issue": "GitHub Issue",
+        "linear_task": "Linear タスク",
+        "gitlab_mr": "GitLab MR",
+        "gitlab_issue": "GitLab Issue",
+        "jira_task_url": "Jira タスク (URL)",
+        "bitbucket_pr": "Bitbucket PR",
+        "azure_devops_pr": "Azure DevOps PR",
+        "gitea_pr": "Gitea PR"
+      },
+      "mrReference": "MR !{{number}}",
+      "prReference": "PR #{{number}}",
+      "issueReference": "Issue #{{number}}",
+      "foreignIssue": "この Issue は別のリポジトリに属しています。このワークスペースのリポジトリの Issue を追加してください。",
+      "linkedResult": "リンク済み",
+      "addReference": "参照を追加",
+      "searchLabel": "参照を検索",
+      "searchReferences": "レビューやタスクを検索、またはリンクを貼り付け",
+      "noReferences": "一致する参照がありません。タイトル、番号、または URL を試してください。",
+      "addItem": "{{label}} を追加",
+      "referenceType": "参照の種類",
+      "clearSearch": "検索をクリア",
+      "inlineSearchHint": "結果を選択すると添付されます。",
+      "nameHelp": "サイドバーに表示されます。フォルダー名は変わりません。",
+      "notes": "ノート",
+      "addNotes": "ノートを追加",
+      "notesOptional": "任意 · Markdown",
+      "saveHint": "変更は保存時に適用されます",
+      "terminal": "ターミナル",
+      "seenIn": "{{label}} で確認済み",
+      "unavailableTab": "タブを利用できません",
+      "sessions": "セッションとターミナル",
+      "jiraModeRequired": "この Issue を読み込むには Smart または Jira を選択してください。",
+      "linearModeRequired": "この Issue を読み込むには Smart または Linear を選択してください。",
+      "loadingLinear": "Linear Issue を読み込んでいます…",
+      "linearConnectRequired": "この Issue をリンクするには、設定で Linear に接続してください。",
+      "linearReadFailed": "この Linear Issue を読み込めませんでした。URL と接続されているワークスペースを確認してください。",
+      "retrySource": "再試行",
+      "lastKnownStatus": "最後に確認されたステータス",
+      "reviewTarget": "対象: {{branch}}",
+      "reviewUrlRequired": "レビューの URL を貼り付けて、リポジトリとプロバイダーを確認してください。",
+      "stackSummary": "{{count}} 件リンク済み: {{references}}",
+      "sessionsForItem": "{{label}} のセッションとターミナル · {{count}}",
+      "checksFailed": "失敗",
+      "checksPending": "保留中",
+      "checksPassing": "成功",
+      "checksUnknown": "不明",
+      "checksNeutral": "中立",
+      "allReviewChecks": "レビュー: {{count}} · チェック: {{status}}"
+    },
+    "attachments": {
+      "updateRuntime": "ワークスペースのリンクを変更するには、リモートランタイムを更新してください",
+      "updateRuntimeSafely": "ワークスペースのリンクを安全に変更するには、リモートランタイムを更新してください"
+    }
+  },
+  "tabHoverCard": {
+    "browser": "ブラウザ",
+    "editor": "エディター",
+    "terminal": "ターミナル"
+  },
+  "jira": {
+    "savedFilters": {
+      "retry": "再試行",
+      "find": "保存済みフィルターを検索",
+      "noMatch": "一致するフィルターはありません。",
+      "loadFailed": "Jiraの保存済みフィルターを読み込めませんでした。",
+      "saveFailed": "Jiraフィルターを保存できませんでした。"
+    },
+    "statusFilters": {
+      "loadFailed": "Jira ステータスフィルターを読み込めませんでした。",
+      "saveFailed": "Jira ステータスフィルターを保存できませんでした。",
+      "manualQuery": "ステータスフィルターはプリセットビューに適用されます。使用するには検索をクリアしてください。",
+      "label": "ステータスで Jira 課題を絞り込む",
+      "clear": "ステータスをクリア",
+      "jql": "ステータスフィルターの JQL",
+      "editJql": "JQL として編集",
+      "catalogHint": "ステータスは読み込まれた課題から取得されます。このビューで他のステータスを表示するには、選択をクリアしてください。"
+    },
+    "connect": {
+      "scopedTokenGuide": "スコープ付きトークンには read:jira-work、write:jira-work、read:jira-user が必要です。Bearer 認証を使用するには、メールアドレスを空のままにします。",
+      "oldHostGuide": "このリモートランタイムには、メールアドレスとスコープなしの API トークンが必要です。スコープ付きトークンを使用するには、リモートランタイムを更新してください。",
+      "scopedDescription": "Jira Cloud のサイト URL と API トークンを使って Issue を閲覧します。スコープ付きトークンではメールアドレスを省略できます。",
+      "optionalEmail": "Atlassian のメールアドレス (スコープ付きトークンではオプション)"
+    },
+    "workspace": {
+      "open": "{{key}} にリンクされたワークスペースを開く",
+      "count": "{{key}} にリンクされたワークスペース {{count}} 件",
+      "startAnother": "新規ワークスペースを開始",
+      "empty": "Jira Issue をワークスペースにリンクするか、別のビューを選択してください。",
+      "openFailed": "この Jira Issue にリンクされたワークスペースを開けませんでした。",
+      "mode": "ワークスペースあり",
+      "search": "リンクされた Issue を検索",
+      "single": "{{key}} にリンクされたワークスペース 1 件"
+    },
+    "prompt": {
+      "dialogTitle": "テンプレートからプロンプトをコピー",
+      "template": "テンプレート",
+      "custom": "カスタムテンプレート",
+      "templateText": "テンプレートテキスト",
+      "variables": "$jira-issue は Issue のコンテキストに、$other-prompt は追加の指示に使用します。このデバイスに保存されます。",
+      "other": "追加の指示 (オプション)",
+      "preview": "プレビュー",
+      "implementation": "実装を開始",
+      "bug": "バグを調査",
+      "testPlan": "テストプランを作成",
+      "prSummary": "PR サマリーの下書きを作成"
+    },
+    "copy": {
+      "context": "{{key}} のコンテキストをコピー",
+      "actions": "Issue のコンテキストをコピー"
+    },
+    "transitions": {
+      "changeStatus": "ステータスを変更: {{status}}",
+      "loadError": "ステータス変更を読み込めませんでした。",
+      "retry": "再試行",
+      "loading": "ステータス変更を読み込んでいます…",
+      "completeInJira": "Jira で「{{name}}」を完了",
+      "unsupported": "Jira には、Orca がまだ取得できないフィールドが必要です: {{fields}}。",
+      "chooseResolution": "解決策を選択",
+      "comment": "コメント",
+      "back": "戻る",
+      "apply": "ステータスを変更",
+      "empty": "利用可能なステータス変更はありません。"
+    },
+    "board": {
+      "currentSprint": "現在のスプリント",
+      "viewMode": "Jira ビュー",
+      "list": "リスト",
+      "board": "ボード",
+      "moveIssue": "{{key}} を移動",
+      "moveTitle": "{{key}} を {{column}} に移動",
+      "moveDescription": "利用できるステータス変更と必要なフィールドは Jira が制御します。",
+      "chooseTransition": "ステータス変更を選択:",
+      "cancel": "キャンセル",
+      "noTransition": "{{key}} では {{column}} へのステータス変更を利用できません。",
+      "queryTooLong": "Jira クエリが長すぎます。クエリを短くするか、フィルターをクリアしてください。"
+    },
+    "favourites": {
+      "activeLabel": "Jira のお気に入り: {{name}}",
+      "applyFailed": "Jira のお気に入りを適用できませんでした。",
+      "chooseSite": "お気に入りを使用するには、接続済みの Jira サイトを 1 つ選択してください。",
+      "clear": "Jira のお気に入りをクリア",
+      "clearFailed": "保存済みフィルターをクリアできませんでした。読み込みまたは保存が完了してから再試行してください。",
+      "empty": "Jira のお気に入りが見つかりません。",
+      "find": "Jira のお気に入りを検索",
+      "label": "Jira のお気に入り",
+      "loadFailed": "Jira のお気に入りを読み込めませんでした。",
+      "loading": "お気に入りを読み込んでいます…",
+      "refresh": "更新",
+      "siteMismatch": "お気に入りの Jira サイトのプロジェクトを選択するか、プロジェクトフィルターをクリアしてください。",
+      "truncated": "一部のお気に入りを表示できませんでした。リストを絞り込むには、Jira でお気に入りを管理してください。",
+      "unsupported": "お気に入りを使用するには Jira ホストを更新してください。"
+    }
+  },
+  "updates": {
+    "installBlock": {
+      "instancesLabel": "Orca を使用中のインスタンス",
+      "browserLabel": "バックグラウンドブラウザ",
+      "serverLabel": "バックグラウンドサーバー",
+      "windowLabel": "別の Orca ウィンドウ",
+      "instanceLabel": "別の Orca インスタンス",
+      "processId": "PID {{pid}}",
+      "preparingTitle": "更新を準備しています",
+      "preparingSummary": "再起動する前に、実行中の Orca インスタンスを確認しています。",
+      "later": "後で",
+      "retainedDownload": "Orca は開いたままです。再度ダウンロードする必要はありません。",
+      "retryInstallation": "インストールを再試行",
+      "waitingLabel": "更新を待機中",
+      "busyTitle": "別の Orca が更新中です",
+      "busySummary": "別の Orca インスタンスがすでに更新をインストールしています。",
+      "busyGuidance": "しばらく待ってから、再試行してください。ダウンロード済みの更新は準備できています。",
+      "unresponsiveTitle": "バックグラウンドサーバーを待機中",
+      "unresponsiveSummary": "Orca は更新のためにバックグラウンドサーバーを一時停止できませんでした。",
+      "unresponsiveGuidance": "起動元のターミナルまたはサービスから停止して、再試行してください。接続中のデバイスは切断されます。",
+      "readyTitle": "更新の準備ができました",
+      "serverSummary": "バックグラウンドの Orca サーバーがこのアプリをまだ使用しています。",
+      "instanceSummary": "別の Orca インスタンスがこのアプリをまだ使用しています。",
+      "serverGuidance": "起動元のターミナルまたはサービスから停止して、再試行してください。接続中のデバイスは切断されます。",
+      "mixedGuidance": "他の Orca ウィンドウをすべて閉じ、起動元のターミナルまたはサービスからサーバーを停止してください。接続中のデバイスは切断されます。その後、再試行してください。",
+      "instanceGuidance": "他の Orca インスタンスを終了してから、再試行してください。ダウンロード済みの更新は準備されたままになります。",
+      "waitingAriaLabel": "他の Orca インスタンスを待機中の更新。クリックして展開します。",
+      "preparingLabel": "更新を準備中",
+      "preparingAriaLabel": "更新を準備中。クリックして展開します。"
+    }
+  }
 }

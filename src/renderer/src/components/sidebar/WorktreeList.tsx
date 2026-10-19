@@ -142,27 +142,6 @@ const WorktreeList = React.memo(function WorktreeList({
     folderWorkspaces,
     pairedDeviceIdsByEnvironment
   })
-  const effectiveCollapsedGroups = useEffectiveCollapsedGroups({
-    hostScopedGroups:
-      filterState.workspaceHostScope !== 'all' || filterState.visibleWorkspaceHostIds !== null,
-    collapsedGroups,
-    agentSendTargetWorktreeId,
-    groupBy,
-    pinnedDisplayPolicy,
-    worktrees: allWorktrees,
-    visibleWorktrees,
-    repoMap,
-    worktreeMap,
-    worktreeLineageById,
-    prCache,
-    workspaceStatuses,
-    settings,
-    projectGroups,
-    visibleProjectGroupsForRows: visibleScope.visibleProjectGroupsForRows,
-    projectGrouping,
-    folderWorkspaces,
-    defaultHostId
-  })
   const externalWorktreeCards = useSidebarExternalWorktreeCards({
     repos,
     visibleReposForRows: visibleScope.visibleReposForRows,
@@ -392,7 +371,7 @@ const WorktreeList = React.memo(function WorktreeList({
         workspaceStatuses={workspaceStatuses}
         projectGrouping={projectGrouping}
         projectGroups={projectGroups}
-        visibleProjectGroupsForRows={visibleScope.visibleProjectGroupsForRows}
+        visibleProjectGroups={visibleScope.visibleProjectGroupsForRows}
         onMoveWorktreeToStatus={statusMutations.moveWorktreeToStatus}
         onMoveWorktreesToStatus={statusMutations.moveWorktreesToStatus}
         onMoveWorktreesToStatusAtIndex={statusMutations.moveWorktreesToStatusAtIndex}

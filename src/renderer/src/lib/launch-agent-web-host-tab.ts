@@ -53,9 +53,6 @@ export async function launchAgentInWebHostTab(args: {
     onPromptDelivered
   } = args
   const hasPrompt = prompt.length > 0
-  // Why: local agent rows cannot be closed once the host owns the tab, so prune
-  // them before the capability probe rather than after its round trip.
-  removeStaleLocalAgentTabsForWebHostLaunch(worktreeId)
   const includeOptionValues = useLaunchOverrides
     ? environmentId === null ||
       (await runtimeEnvironmentSupportsCapability(

@@ -61,11 +61,14 @@ export function useSourceControlCreatePrIntentCommitMessage({
       setGenerateInFlightByWorktree((prev) => ({ ...prev, [target.worktreeId]: true }))
       setGenerateErrors((prev) => ({ ...prev, [target.worktreeId]: null }))
       try {
-        const result = await generateRuntimeCommitMessage(target, {
-          sourceControlAiResolvedParams: materializeSourceControlTextGenerationParams(
-            resolvedCommitMessageAi.value.params
-          )
-        })
+        const result = await generateRuntimeCommitMessage(
+          operationGitContext(target, useAppStore.getState().settings),
+          {
+            sourceControlAiResolvedParams: materializeSourceControlTextGenerationParams(
+              resolvedCommitMessageAi.value.params
+            )
+          }
+        )
         if (!result.success) {
           if (!result.canceled) {
             setGenerateErrors((prev) => ({ ...prev, [target.worktreeId]: result.error }))

@@ -20,6 +20,7 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HeadlessAutomationDispatchLaunch } from './headless-dispatch'
 import { buildHeadlessAutomationWorktreeCreateArgs } from './headless-workspace-create'
 import type { AutomationRunTargetResult } from './run-target-resolution'
+import { automationRunLaunchSettingsFor } from './fork-automation-launch-settings/run-launch-settings-for-dispatch'
 
 const TERMINAL_ONLY_MESSAGE = 'An automation starts a terminal agent only.'
 
@@ -43,6 +44,7 @@ export async function launchHeadlessAutomationAgent(
   }
 ): Promise<HeadlessAutomationAgentLaunch> {
   const { automation, run, target } = request
+  const launchSettings = automationRunLaunchSettingsFor(runtime, automation, target.repo)
   const agent = automation.agentId
   // The startup plan trims the prompt for every agent; a blank one launches the agent bare.
   const text = automation.prompt?.trim()
@@ -105,7 +107,8 @@ export async function launchHeadlessAutomationAgent(
           agent,
           prompt: startupPrompt ?? '',
           title: run.title,
-          ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {})
+          ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
+          launchOverrides: automation.launchOverrides ?? undefined
         })
         terminal = launched
         const shown = await runtime.showManagedWorktree(`id:${launched.worktreeId}`)
@@ -134,7 +137,8 @@ export async function launchHeadlessAutomationAgent(
     terminalHandle: terminal.handle,
     terminalSessionId: terminal.tabId ?? null,
     terminalPaneKey: terminal.paneKey ?? null,
-    terminalPtyId: terminal.ptyId ?? null
+    terminalPtyId: terminal.ptyId ?? null,
+    launchSettings
   }
 }
 

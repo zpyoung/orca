@@ -14,7 +14,7 @@ import {
   type SendOutcome
 } from './native-chat-send-outcome'
 import { clearThenWrite, clearUnsubmittedAgentInput } from './native-chat-runtime-clear'
-import type { NativeChatSendOptions, RuntimeSettings } from '../native-chat-runtime-send'
+import type { NativeChatSendOptions } from '../native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 
 // The queue only reports `onCancelUnsubmitted` once `start` has run — a send
@@ -42,7 +42,6 @@ const withQueuedCancelOutcome = (
 // Isolates the best-effort cleanup clear from outcome reporting (r5-2): a
 // synchronous throw from the preload write must not swallow the outcome.
 function bestEffortCancelClear(
-  settings: RuntimeSettings,
   ptyId: string,
   options: NativeChatSendOptions | undefined,
   reportOutcome: (outcome: SendOutcome) => void,
@@ -50,7 +49,7 @@ function bestEffortCancelClear(
 ): Promise<void> | undefined {
   let cleared: Promise<void> | undefined
   try {
-    cleared = clearUnsubmittedAgentInput(settings, ptyId, options, delay)
+    cleared = clearUnsubmittedAgentInput(ptyId, options, delay)
   } catch {
     // Cleanup only — the outcome report below must still fire.
   }
@@ -88,7 +87,7 @@ export function enqueueNativeChatBodySend(args: {
   afterAccepted?: (context: NativeChatBodySendContext) => void
 }): NativeChatPtySendQueueHandle {
   const {
-    target: { terminalTabId, settings, ptyId },
+    target: { terminalTabId, ptyId },
     options,
     durationMs,
     chunks,
@@ -108,7 +107,6 @@ export function enqueueNativeChatBodySend(args: {
       const submit = (): void => {
         delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
           void submitAndObserve(
-            settings,
             ptyId,
             markSubmitted,
             reportOutcome,
@@ -119,7 +117,6 @@ export function enqueueNativeChatBodySend(args: {
       }
       runOutcomeGuarded(markSubmitted, reportOutcome, () => {
         clearThenWrite(
-          settings,
           ptyId,
           options,
           delayGuarded,
@@ -129,7 +126,6 @@ export function enqueueNativeChatBodySend(args: {
               return
             }
             runBodyAcceptedThen(
-              settings,
               ptyId,
               chunks,
               isCancelled,
@@ -162,7 +158,7 @@ export function enqueueNativeChatBodySend(args: {
     {
       terminalTabId,
       onCancelUnsubmitted: (cleanupDelay) =>
-        bestEffortCancelClear(settings, ptyId, options, reportOutcome, cleanupDelay),
+        bestEffortCancelClear(ptyId, options, reportOutcome, cleanupDelay),
       // Quarantine owns the replacement shell: report for draft restoration,
       // but never send the ordinary Ctrl+U cleanup into that new endpoint.
       onInvalidate: () => {

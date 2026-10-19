@@ -181,9 +181,6 @@ export function installPanePtyVisibilityBind(session: ConnectPanePtySession): vo
     if (session.deps.paneTransportsRef.current.get(session.pane.id) !== session.transport) {
       return
     }
-    if (!session.canAdoptCapturedDirectSshRetryPty(ptyId)) {
-      return
-    }
     const previousIncarnationId = session.remotePtyIncarnationId ?? null
     const nextIncarnationId = incarnationId ?? null
     if (

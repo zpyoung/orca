@@ -88,6 +88,7 @@ async function startHost(): Promise<void> {
     },
     modelCatalog: {
       read: vi.fn(async () => ({ origin: 'unknown' as const })),
+      retainedLiveModelIds: vi.fn(() => []),
       recordLiveListing: vi.fn(),
       prewarm: vi.fn(async () => {}),
       stop: vi.fn(),
@@ -491,7 +492,7 @@ describe('a chat after startup permission backfill', () => {
       await heldBehindStart('hello')
       expect(acquire.mock.calls.at(-1)![0].permissionMode).toBe(mode)
       await host.handleAdapterEvent(startedEvent())
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      await vi.advanceTimersByTimeAsync(50)
       await host.flushStreamedEvents(SESSION)
       expect(store.getRecord(SESSION)?.permissionMode).toBe(mode)
       await store.backfillChatPermissionModes(() => mode === 'ask')

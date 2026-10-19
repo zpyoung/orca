@@ -234,37 +234,6 @@ describe('bundled skill guide generator', () => {
     }
   })
 
-  it('keeps CLI guide examples safe across shells and Linux command names', async () => {
-    for (const name of [
-      'orca-cli',
-      'computer-use',
-      'orca-emulator',
-      'orca-emulator-android',
-      'orca-ledger'
-    ]) {
-      const source = await readFile(path.join(projectDir, 'skill-guides', `${name}.md`), 'utf8')
-
-      expect(source).toMatch(/^ORCA .+--json$/mu)
-      // Why: bare command lines can launch GNOME Orca, while shell variables make
-      // the same guide unusable from PowerShell and cmd.exe.
-      expect(source).not.toMatch(/^orca /mu)
-      expect(source).not.toMatch(/\$ORCA(?:_|\b)/u)
-    }
-  })
-
-  // Why: `skills get` already ran on a resolved executable, so guide bodies point back at the
-  // stub's resolution instead of carrying another copy of the ladder the stubs own.
-  it('points every guide at the executable the stub resolved', async () => {
-    // orchestration.md is rewritten to this contract by its own PR (#16904).
-    for (const name of CANONICAL_GUIDE_NAMES.filter((name) => name !== 'orchestration')) {
-      const source = await readFile(path.join(projectDir, 'skill-guides', `${name}.md`), 'utf8')
-
-      expect(source.replace(/\s+/gu, ' '), name).toContain(
-        'the executable you resolved in the stub'
-      )
-    }
-  })
-
   it('builds deterministic artifacts and verifies the checked-in outputs', async () => {
     const first = await buildArtifacts(projectDir)
     const second = await buildArtifacts(projectDir)

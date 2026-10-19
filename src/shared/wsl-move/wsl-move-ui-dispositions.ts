@@ -166,6 +166,10 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'contextualToursSeenIds',
   'contextualToursAutoEligible',
   'osc52ClipboardDefaultOnNoticePending',
+  'workspaceActivityWindow',
+  'workspaceActivityCustomDays',
+  'hideCompletedReviewWorkspaces',
+  'hidePassingCheckWorkspaces',
   // One-shot migration flags.
   '_antigravityStatusBarDefaultAdded',
   '_cursorStatusBarDefaultAdded',

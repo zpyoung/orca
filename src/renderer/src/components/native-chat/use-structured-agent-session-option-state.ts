@@ -124,10 +124,15 @@ export function useStructuredAgentSessionOptionState(args: {
       seedsModel: launch.seedsModel,
       ...(launch.worktree ? { worktree: launch.worktree } : {})
     })
-    // A host answer is the account's, not the fence's: keep it rather than blank the default.
+    // The chat's next runtime starts with the picks the host saved, which this view last showed,
+    // and a starting agent is not read: keep them, and the account's list, until a read replaces them.
     const kept =
-      sameSession && (previous.catalogSource === 'host' || previous.catalogSource === 'builtin')
-        ? { ...seeded, catalog: previous.catalog, catalogSource: previous.catalogSource }
+      sameSession && previous.catalogSource !== 'seed' && previous.catalogSource !== null
+        ? {
+            ...previous,
+            record: cloneNativeChatSessionOptionRecord(previous.record),
+            pendingId: null
+          }
         : seeded
     // The chat's own, which a restart for a new mode keeps: the picker never blanks between them.
     const next = sameSession ? { ...kept, permissionMode: previous.permissionMode } : kept
@@ -204,6 +209,10 @@ export function useStructuredAgentSessionOptionState(args: {
 
   // An options answer made before the account's listing landed listed none of it.
   const rereadOptions = useCallback(() => optionsReadRef.current?.run(), [])
+  const takesSendOptions = useStructuredAgentSessionHostCapability(
+    target,
+    AGENT_SESSION_SEND_OPTIONS_RUNTIME_CAPABILITY
+  )
 
   return {
     // What the picker shows and a send carries.

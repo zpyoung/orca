@@ -4,6 +4,7 @@ export const SQLITE_DATABASE_RUNTIME_INCLUDE = [
   'src/main/ai-vault-search/session-search-file-write.test.ts',
   'src/main/ai-vault-search/session-search-live-transcript.test.ts',
   'src/main/ai-vault-search/session-search-list-reparse.test.ts',
+  'src/main/ai-vault-search/session-search-transcript-dependencies.test.ts',
   'src/main/ai-vault/session-scanner-devin-contention.test.ts',
   'src/main/ai-vault/session-scanner-opencode-native-worker.test.ts',
   'src/main/ai-vault/session-scanner-opencode-sqlite-bounds.test.ts',
@@ -204,8 +205,6 @@ export const SQLITE_DATABASE_RUNTIME_INCLUDE = [
   'src/main/runtime/worker-terminal-archive-release.test.ts',
   'src/main/runtime/worker-terminal-archive-screen.test.ts',
   'src/main/runtime/worker-terminal-wrap-provenance.test.ts',
-  'src/main/ssh/ssh-remote-orca-cli.test.ts',
-  'src/main/ssh/ssh-remote-orchestration-compatibility.test.ts',
   'tests/e2e/completed-worker-retirement-resume.unit.test.ts',
   'tests/e2e/cross-version-wire/agent-session-clear-old-client.unit.test.ts',
   'tests/e2e/cross-version-wire/agent-session-clear-old-tab-mirror.unit.test.ts'

@@ -14,8 +14,10 @@ import {
   sameProviderChild,
   structuredAgentSessionConversationFence
 } from './structured-agent-session-provider-child'
-import type { StructuredAgentSessionOptionRevisions } from './structured-agent-session-option-revisions'
-import type { AgentModelCatalogLiveListing } from '../agent-model-catalog/agent-model-catalog-entry'
+import {
+  saveStructuredAgentSessionListing,
+  saveStructuredAgentSessionStartReadbackListing
+} from './structured-agent-session-start-listing'
 import type { StructuredAgentSessionStartupAttempts } from './structured-agent-session-startup-attempt'
 import type { StructuredAgentSessionAcquireAborts } from './structured-agent-session-acquire-aborts'
 import { recordAgentSessionProviderHandle } from '../../runtime/agent-session-provider-handle-transition'
@@ -163,90 +165,11 @@ export async function settleStructuredAgentSessionOptionsReported(
   context: StructuredAgentSessionProviderStartedContext,
   event: StructuredAgentSessionOptionsReportedEvent
 ): Promise<void> {
-  const admitted = admitReportedOptions(context, event)
-  if (event.catalogListing) {
-    void saveStartReadbackListing(context, event, event.catalogListing)
-  }
-  return persistReportedOptions(context, event, admitted)
-}
-
-/** A start's late readback (Claude's settings) says once what the config resolved. Serialized
- *  behind the attach that published the child, which may still be indexing it. */
-function saveStartReadbackListing(
-  context: StructuredAgentSessionProviderStartedContext,
-  event: ReportedOptions,
-  listing: AgentModelCatalogLiveListing
-): Promise<void> {
-  return context
-    .serialize(event.sessionId, async () => {
-      const child = context.sessions.get(event.sessionId)?.child
-      const reporter = { generation: event.acquisitionGeneration, fence: event.fence }
-      if (child && sameProviderChild(child, reporter)) {
-        context.deps.modelCatalog?.recordLiveListing(event.sessionId, listing)
-      }
-    })
-    .catch((error: unknown) => {
-      context.deps.logger.warn('saving what a started provider resolved failed', {
-        scope: 'provider-started-catalog',
-        sessionId: event.sessionId,
-        error
-      })
-    })
-}
-
-function admitReportedOptions(
-  context: StructuredAgentSessionProviderStartedContext,
-  event: ReportedOptions
-): number | null {
-  return context.runtimeState.optionRevisions.admitReport(event.sessionId, event.optionRevision)
-}
-
-/** Non-fatal, and only for the child that reported, while its report is still the newest word: a
- *  pick or a later report since it was admitted is newer than what it read. */
-function persistReportedOptions(
-  context: StructuredAgentSessionProviderStartedContext,
-  event: ReportedOptions,
-  admitted: number | null
-): Promise<void> {
-  if (admitted === null) {
-    return Promise.resolve()
-  }
-  return context
-    .serialize(event.sessionId, async () => {
-      const child = context.sessions.get(event.sessionId)?.child
-      const record = context.deps.store.getRecord(event.sessionId)
-      if (
-        !child ||
-        !sameProviderChild(child, {
-          generation: event.acquisitionGeneration,
-          fence: event.fence
-        }) ||
-        !record ||
-        record.lease.runtimeFence !== event.fence ||
-        !agentSessionLeaseAdmitsWriter(record.lease) ||
-        !context.runtimeState.optionRevisions.isNewest(
-          event.sessionId,
-          event.optionRevision,
-          admitted
-        )
-      ) {
-        return
-      }
-      try {
-        await context.deps.store.replaceSessionOptions({
-          sessionId: event.sessionId,
-          fence: event.fence,
-          options: nativeSessionOptionsFromReport({
-            reported: event.reportedOptions,
-            restoreSkipped: event.restoreSkippedOptions,
-            ...(event.retiredOptions ? { retired: event.retiredOptions } : {}),
-            ...(record.options ? { priorOptions: record.options } : {})
-          }),
-          now: context.now()
-        })
-      } finally {
-        context.publishStatus?.(event.sessionId)
-      }
+  const child = context.sessions.get(event.sessionId)?.child
+  if (child?.phase === 'starting') {
+    const readiness = context.runtimeState.startupAttempts.readiness(event.sessionId, {
+      generation: event.acquisitionGeneration,
+      fence: event.fence
     })
     if (!readiness || (await readiness.wait()) !== 'ready') {
       return

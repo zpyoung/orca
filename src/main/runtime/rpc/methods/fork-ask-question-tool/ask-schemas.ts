@@ -2,7 +2,10 @@
 // re-run server-side by the handlers via the shared validators — these schemas only police wire
 // shape, matching the loosely-typed-CLI-JSON convention in ../schemas.
 import { z } from 'zod'
-import { OptionalFiniteNumber, OptionalString } from '../../schemas'
+import {
+  OptionalFiniteNumber,
+  OptionalString
+} from '../../../../../shared/rpc-contract/rpc-param-primitives'
 
 const UnknownRecord = z.record(z.string(), z.unknown())
 

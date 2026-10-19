@@ -124,8 +124,7 @@ function fixture(records: ObjectiveDispatchRecord[], cap: number) {
     target: {
       kind: 'git',
       executionHostId: 'local',
-      workspacePath: '/enrolled',
-      fileProvider: null
+      workspacePath: '/enrolled'
     }
   })
   const policy = createObjectiveConcurrencyPolicy({

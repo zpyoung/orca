@@ -56,6 +56,8 @@ import type { AgentSessionJournal } from '../agent-session-journal/journal-store
 import type { StructuredAgentSessionLogger } from './structured-agent-session-logger'
 import type { AgentModelCatalogLiveListing } from '../agent-model-catalog/agent-model-catalog-entry'
 
+export type AttachedOwner = 'acquired' | 'kept'
+
 export type AttachFlowInput = {
   store: AgentSessionRecordStore
   adapter: StructuredAgentSessionAdapter
@@ -74,17 +76,14 @@ export type AttachFlowInput = {
   onStartupAttempt?: (
     attempt: StructuredAgentSessionStartupAttempt
   ) => StructuredAgentSessionStartupProgress
-  /** A `ready` child's start listing, handed over once its owner is proven. */
+  /** A completed acquisition's start listing. */
   onStartCatalogListing?: (listing: AgentModelCatalogLiveListing) => void
-  /** The conversation's option revision, which the child's reports are stamped with. */
-  optionRevision: () => number
   /** The permission mode a start of this record launches with; absent or undefined for none. */
   launchPermissionMode?: (
     record: AgentSessionRecord
   ) => Promise<AgentChatPermissionMode | undefined>
-  /** Publishes the journal before clients can send against the new owner. `acquiredOwner` is
-   *  true only when this attach spawned the provider child, so a re-attach to a live one is not
-   *  mistaken for a cold acquire. */
+  /** Publishes the journal before clients can send against the new owner. `owner` says whether
+   *  this attach spawned the child or kept a live one. */
   onAttached: (
     attached: AttachedJournal,
     acquisitionGeneration: string | null,

@@ -303,8 +303,6 @@ describe('registerFilesystemHandlers', () => {
       return pending.promise
     }
     getDiffMock.mockImplementation(cancellableDiff)
-    const sshProvider = { getDiff: vi.fn(cancellableDiff) }
-    getSshGitProviderMock.mockReturnValue(sshProvider)
     registerFilesystemHandlers(store as never)
 
     const firstEvent = { sender: Object.assign(new EventEmitter(), { id: 7 }) }
@@ -319,10 +317,9 @@ describe('registerFilesystemHandlers', () => {
     )
     const secondRequest = Promise.resolve(
       handlers.get('git:diff')!(secondEvent, {
-        worktreePath: '/remote/repo',
+        worktreePath: REPO_PATH,
         filePath: 'src/file.ts',
         staged: false,
-        connectionId: 'ssh-1',
         requestToken: 'diff-1'
       })
     )
@@ -330,7 +327,7 @@ describe('registerFilesystemHandlers', () => {
 
     await handlers.get('git:cancelDiff')!(firstEvent, { requestToken: 'diff-1' })
     expect(signals.get(WORKTREE_FEATURE_PATH)?.aborted).toBe(true)
-    expect(signals.get('/remote/repo')?.aborted).toBe(false)
+    expect(signals.get(REPO_PATH)?.aborted).toBe(false)
     await expect(firstRequest).rejects.toThrow('aborted')
 
     await handlers.get('git:cancelDiff')!(secondEvent, { requestToken: 'diff-1' })
@@ -372,7 +369,7 @@ describe('registerFilesystemHandlers', () => {
     expect(settledSignal?.aborted).toBe(false)
   })
 
-  it('checks ignored paths through local and SSH git providers', async () => {
+  it('checks ignored paths through the local git provider', async () => {
     registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
     checkIgnoredPathsMock.mockResolvedValue(['dist/bundle.js'])
 

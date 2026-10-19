@@ -3,13 +3,14 @@ import { isAiVaultOwnershipRefusal } from '@/lib/ai-vault-resume-refusal'
 import { aiVaultCliForkHostTooOldMessage } from '@/lib/ai-vault-session-resume-preparation'
 import type { AiVaultSession } from '../../../../shared/ai-vault-types'
 import { getAgentForkArgv, isResumableTuiAgent } from '../../../../shared/agent-session-resume'
+import { agentForksThroughChat } from '../../../../shared/agent-resume-argv'
 import { getAiVaultAgentProviderSession } from '@/lib/ai-vault-resume-command'
 
 /**
  * Where "Resume in New CLI" opens its copy of a conversation native chat owns, or null when the row
- * does not offer it. A row no chat owns already resumes in the CLI through plain Resume, and a row
- * offers it only when its CLI's copy command can be built (Pi's needs the session file, which a
- * remote search hit doesn't carry).
+ * does not offer it. A row no chat owns already resumes in the CLI through plain Resume. A row offers
+ * it when its chat makes the copy (OpenCode, OMP), or when its CLI's copy command can be built (Pi's
+ * needs the session file, which a remote search hit doesn't carry).
  */
 export function aiVaultSessionCliForkWorktreeId(
   session: Pick<AiVaultSession, 'agent' | 'sessionId' | 'filePath' | 'structuredSession'>,
@@ -21,7 +22,7 @@ export function aiVaultSessionCliForkWorktreeId(
   const providerSession = getAiVaultAgentProviderSession(session)
   return providerSession &&
     isResumableTuiAgent(session.agent) &&
-    getAgentForkArgv(session.agent, providerSession)
+    (agentForksThroughChat(session.agent) || getAgentForkArgv(session.agent, providerSession))
     ? resume.worktreeId
     : null
 }

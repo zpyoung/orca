@@ -8,6 +8,9 @@ import { selectVisibleSidebarWorktrees } from '../../../../shared/sidebar-list/v
 import { buildDesktopWorkspaceRowFactReader } from './desktop-workspace-row-facts'
 import { sidebarWorkspaceRowFilters } from './sidebar-filter-actions'
 import { getLineageAncestorIndex, getSortedWorktreeRankIndex } from './visible-worktree-indexes'
+import { withForkWorkspaceRowFacts } from './fork-workspace-activity-window/fork-workspace-row-facts'
+import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'
+import type { WorkspaceReviewFilterContext } from './fork-workspace-review-filters/workspace-review-filter'
 
 // Why its own module: the store's attention slice asks it without an import cycle. The filter
 // rules live in the shared builder; this binds them to the window's store index and activity facts.
@@ -35,6 +38,8 @@ export type VisibleWorktreeOptions = {
   injectLineageAncestors?: boolean
   preserveLineageParentOrder?: boolean
   forcedVisibleWorktreeIds?: readonly string[]
+  workspaceActivity?: WorkspaceActivityFilterContext
+  workspaceReview?: WorkspaceReviewFilterContext
   /** Exempt from the sleeping sweep only; unlike forcedVisibleWorktreeIds, every other filter still applies. */
   sleepingSweepExemptWorktreeIds?: ReadonlySet<string>
 }
@@ -49,7 +54,7 @@ export function computeVisibleWorktrees(
     ancestorById: getLineageAncestorIndex(worktreesByRepo),
     rankById: getSortedWorktreeRankIndex(sortedIds),
     filters: sidebarWorkspaceRowFilters(opts),
-    facts: buildDesktopWorkspaceRowFactReader(opts),
+    facts: withForkWorkspaceRowFacts(buildDesktopWorkspaceRowFactReader(opts), opts),
     worktreeLineageById: opts.worktreeLineageById,
     filterRepoIds: opts.filterRepoIds,
     injectLineageAncestors: opts.injectLineageAncestors,

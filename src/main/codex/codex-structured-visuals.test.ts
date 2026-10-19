@@ -215,7 +215,7 @@ describe('a Codex chat acquisition with visuals', () => {
 
   it('opens the thread exactly as before for a chat without visuals', async () => {
     const codex = fakeCodex()
-    await acquired(codex, { env: { [NATIVE_CHAT_VISUALS_DIR_ENV]: '/other' } })
+    await acquired(codex, { env: { [NATIVE_CHAT_SCRATCH_DIR_ENV]: '/other' } })
     const connection = codex.connections[0]!
     const methods = connection.calls.map((call) => call.method)
     expect(methods[0]).toBe('thread/start')

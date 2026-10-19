@@ -35,9 +35,10 @@ it('keeps a skipped compaction warning truthful instead of showing the success s
 function orcaStopView(
   hostLabel: string | null,
   continueAvailable: boolean,
-  remoteHost: boolean
+  remoteHost: boolean,
+  offer: Pick<NativeChatOrcaStopView, 'offeredTurnItemId' | 'continueNow'>
 ): NativeChatOrcaStopView {
-  return { hostLabel, remoteHost, continueAvailable }
+  return { hostLabel, remoteHost, continueAvailable, ...offer }
 }
 
 const NO_OFFER = { offeredTurnItemId: null, continueNow: () => {} }
@@ -47,7 +48,8 @@ function renderStatus(
   hostLabel: string | null = null,
   continueAvailable = false,
   remoteHost = false,
-  agentName?: string
+  agentName?: string,
+  offer: Pick<NativeChatOrcaStopView, 'offeredTurnItemId' | 'continueNow'> = NO_OFFER
 ) {
   const [message] = projectStructuredItemsToNativeChat([
     {
@@ -59,7 +61,7 @@ function renderStatus(
       turnScope: { kind: 'turn', turnItemId: 'cut-turn' }
     }
   ])
-  const view = orcaStopView(hostLabel, continueAvailable, remoteHost)
+  const view = orcaStopView(hostLabel, continueAvailable, remoteHost, offer)
   return render(
     <TooltipProvider>
       <NativeChatOrcaStopContext.Provider value={view}>
@@ -108,12 +110,35 @@ describe('the row an Orca stop leaves', () => {
     ).toBeInTheDocument()
   })
 
+  it('carries Continue on the cut it is offered for, and only there', () => {
+    const continueNow = vi.fn()
+    renderStatus(orcaStopRow('quit'), 'studio-mac', true, false, undefined, {
+      offeredTurnItemId: 'cut-turn',
+      continueNow
+    })
+    const sentence = screen.getByText(
+      'Orca on studio-mac was closed while this response was in progress.'
+    )
+    const button = screen.getByRole('button', { name: 'Continue' })
+    // Beside the words that say why, in the same card.
+    expect(sentence.parentElement).toContainElement(button)
+    fireEvent.click(button)
+    expect(continueNow).toHaveBeenCalledOnce()
+    cleanup()
+
+    renderStatus(orcaStopRow('quit'), 'studio-mac', true, false, undefined, {
+      offeredTurnItemId: 'another-turn',
+      continueNow
+    })
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
+  })
+
   it("says a remote host's Orca stopped, not that it was closed", () => {
     renderStatus(orcaStopRow('quit'), 'QA SSH', true, true)
     expect(
       screen.getByText('Orca on QA SSH stopped while this response was in progress.').parentElement
         ?.parentElement
-    ).toHaveClass('text-muted-foreground')
+    ).toHaveClass('text-chat-foreground-faint')
     expect(screen.queryByText(/was closed/)).toBeNull()
   })
 

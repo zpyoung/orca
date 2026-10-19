@@ -28,8 +28,7 @@ type ProbeApi = AttachmentApi & { adoptDraft: (draft: string) => void }
 
 const target: NativeChatResolvedTarget = {
   terminalTabId: 'tab-1',
-  ptyId: 'pty-1',
-  settings: { activeRuntimeEnvironmentId: null }
+  ptyId: 'pty-1'
 }
 
 function Probe({

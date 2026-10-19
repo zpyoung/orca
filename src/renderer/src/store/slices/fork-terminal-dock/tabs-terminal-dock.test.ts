@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Tab } from '../../../../../shared/tab-types'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
-import type * as WebRuntimeSessionModule from '@/runtime/web-runtime-session'
-import { toWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
+import type * as WebRuntimeTerminalActionsModule from '@/runtime/web-runtime-terminal-actions'
+import { toWebTerminalSurfaceTabId } from '../../../../../shared/terminal-surface-id'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
 import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '@/runtime/fork-terminal-dock/web-session-terminal-dock-reconcile'
 
@@ -38,8 +38,8 @@ vi.mock('@/lib/worktree-runtime-owner', async (importOriginal) => {
 vi.mock('@/store', () => ({ useAppStore: { getState: vi.fn(() => ({})), setState: vi.fn() } }))
 
 const setWebRuntimeTabPropsMock = vi.fn()
-vi.mock('@/runtime/web-runtime-session', async (importOriginal) => {
-  const actual = await importOriginal<typeof WebRuntimeSessionModule>()
+vi.mock('@/runtime/web-runtime-terminal-actions', async (importOriginal) => {
+  const actual = await importOriginal<typeof WebRuntimeTerminalActionsModule>()
   return {
     ...actual,
     setWebRuntimeTabProps: (...args: unknown[]) => setWebRuntimeTabPropsMock(...args)
@@ -287,8 +287,8 @@ describe('TabsSlice terminal dock state', () => {
         .mockResolvedValue({ id: 'p', ok: true, result: { updated: true } })
       vi.stubGlobal('window', { api: { runtimeEnvironments: { call: runtimeCall } } })
 
-      const real = await vi.importActual<typeof WebRuntimeSessionModule>(
-        '@/runtime/web-runtime-session'
+      const real = await vi.importActual<typeof WebRuntimeTerminalActionsModule>(
+        '@/runtime/web-runtime-terminal-actions'
       )
 
       expect(

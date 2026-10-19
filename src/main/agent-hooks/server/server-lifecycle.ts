@@ -251,6 +251,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
   /** `keepStatus`: quit only. The chat teardown after it still reads each chat's subagents and
    *  background tasks from the status store to decide what to offer to resume; exit frees it. */
   stop(options?: { keepStatus?: boolean }): void {
+    this.startup.stop()
     // Terminal status may still have a pending write while hook ingress is disabled.
     if (this.statusHooksEnabled || this.statusPersistTimer) {
       this.flushStatusPersistSync()

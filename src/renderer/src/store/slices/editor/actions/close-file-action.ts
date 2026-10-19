@@ -251,8 +251,7 @@ export function createCloseFileAction(
           wtRecent &&
           opts?.captureRecentlyClosed !== false &&
           !shouldDeleteFromDisk &&
-          closedFile.mode !== 'markdown-preview' &&
-          closedFile.mode !== 'chat-visual'
+          closedFile.mode !== 'markdown-preview'
         ) {
           const {
             id: _id,

@@ -241,19 +241,7 @@ export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerCo
     ): Promise<GitDiffResult> => {
       const controller = gitDiffCancellations.begin(event, args.requestToken)
       try {
-        if (args.connectionId) {
-          const provider = getSshGitProvider(args.connectionId)
-          if (!provider) {
-            throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
-          }
-          return await provider.getDiff(
-            args.worktreePath,
-            args.filePath,
-            args.staged,
-            args.compareAgainstHead,
-            controller ? { signal: controller.signal } : undefined
-          )
-        }
+        requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
         const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
         const filePath = validateGitRelativeFilePath(worktreePath, args.filePath)
         const gitOptions = getLocalGitOptionsForRegisteredWorktree(

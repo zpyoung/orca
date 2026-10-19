@@ -351,6 +351,10 @@ afterEach(async () => {
   resetStructuredAgentSessionStatusFeedsForTests()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
-  await fixture.controller.closeDismissals()
+  await Promise.all(
+    [fixture.controller, ...fixture.relayControllers].map((controller) =>
+      controller.closeDismissals()
+    )
+  )
   rmSync(fixture.directory, { recursive: true, force: true })
 })

@@ -1,6 +1,18 @@
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import { callRuntimeRpc, RuntimeRpcCallError } from '@/runtime/runtime-rpc-client'
+import {
+  callRuntimeRpc,
+  getRuntimeEnvironmentStatus,
+  runtimeEnvironmentSupportsCapability
+} from '@/runtime/runtime-rpc-client'
+import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
 import { captureRuntimeEnvironmentRequestRevision } from '@/runtime/runtime-environment-revision'
+import { PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import {
+  getRuntimeAgentInventoryEnvironmentId,
+  getRuntimeAgentInventoryKey
+} from './runtime-agent-inventory-key'
 
 // Why: remote runtime hosts are not SSH connections, but their launch surfaces
 // (tab bar, quick launch, Settings → Agents under an Active Server) still have
@@ -137,134 +149,6 @@ export const createRuntimeDetectedAgentsSlice: (
         if (dropKey(key)) {
           promises.delete(key)
         }
-        return typed
-      })
-      .catch(() => {
-        // Why: a remote runtime may be disconnected or version-incompatible.
-        // Keep the menu retryable instead of pinning a failed probe forever.
-        // Same in-flight guard as the .then() above: if the environment was
-        // retained out mid-detect, don't re-add the isDetecting entry that
-        // retainRuntimeDetectedAgents just pruned (and don't clobber a freshly
-        // started detect's spinner).
-        if (runtimeDetectPromises.get(environmentId) === pending) {
-          set((s) => ({
-            isDetectingRuntimeAgents: { ...s.isDetectingRuntimeAgents, [environmentId]: false }
-          }))
-        }
-        return [] as TuiAgent[]
-      })
-      .finally(() => {
-        if (runtimeDetectPromises.get(environmentId) === pending) {
-          runtimeDetectPromises.delete(environmentId)
-        }
-      })
-
-    runtimeDetectPromises.set(environmentId, pending)
-    return pending
-  },
-
-  refreshRuntimeDetectedAgents: (environmentId: string) => {
-    const inflight = runtimeRefreshPromises.get(environmentId)
-    if (inflight) {
-      return inflight
-    }
-
-    // Why: a refresh is newer and authoritative; detach an older detect so its
-    // late result cannot overwrite the freshly hydrated PATH result.
-    runtimeDetectPromises.delete(environmentId)
-    set((s) => ({
-      isRefreshingRuntimeAgents: { ...s.isRefreshingRuntimeAgents, [environmentId]: true }
-    }))
-
-    // Why: captured before the refresh, so a re-pair before the fallback cannot retarget it.
-    const fence = {
-      expectedEnvironmentPairingRevision: captureRuntimeEnvironmentRequestRevision(environmentId)
-    }
-    const pending = callRuntimeRpc<{ agents: TuiAgent[] }>(
-      { kind: 'environment', environmentId },
-      'preflight.refreshAgents',
-      undefined,
-      fence
-    )
-      .then((result) => result.agents)
-      .catch((error) => {
-        if (!isRuntimeMethodNotFoundError(error)) {
-          throw error
-        }
-        // Why: only older servers need the fallback; retrying disconnects and
-        // runtime failures doubles remote work without any chance of recovery.
-        return callRuntimeRpc<TuiAgent[]>(
-          { kind: 'environment', environmentId },
-          'preflight.detectAgents',
-          undefined,
-          fence
-        )
-      })
-      .then((ids) => {
-        const typed = ids as TuiAgent[]
-        // Why: same guard as ensureRuntimeDetectedAgents — if the environment
-        // was retained out mid-refresh, don't re-add a pruned entry.
-        if (runtimeRefreshPromises.get(environmentId) === pending) {
-          set((s) => ({
-            runtimeDetectedAgentIds: { ...s.runtimeDetectedAgentIds, [environmentId]: typed },
-            isDetectingRuntimeAgents: {
-              ...s.isDetectingRuntimeAgents,
-              [environmentId]: false
-            },
-            isRefreshingRuntimeAgents: { ...s.isRefreshingRuntimeAgents, [environmentId]: false }
-          }))
-        }
-        return typed
-      })
-      .catch(() => {
-        // Why: a disconnected runtime must keep Refresh retryable and must not
-        // wipe the last known agent list.
-        if (runtimeRefreshPromises.get(environmentId) === pending) {
-          set((s) => ({
-            isDetectingRuntimeAgents: {
-              ...s.isDetectingRuntimeAgents,
-              [environmentId]: false
-            },
-            isRefreshingRuntimeAgents: { ...s.isRefreshingRuntimeAgents, [environmentId]: false }
-          }))
-        }
-        return get().runtimeDetectedAgentIds[environmentId] ?? []
-      })
-      .finally(() => {
-        if (runtimeRefreshPromises.get(environmentId) === pending) {
-          runtimeRefreshPromises.delete(environmentId)
-        }
-      })
-
-    runtimeRefreshPromises.set(environmentId, pending)
-    return pending
-  },
-
-  clearRuntimeDetectedAgents: (environmentId: string) => {
-    runtimeDetectPromises.delete(environmentId)
-    runtimeRefreshPromises.delete(environmentId)
-    set((s) => {
-      const { [environmentId]: _, ...restAgents } = s.runtimeDetectedAgentIds
-      const { [environmentId]: __, ...restLoading } = s.isDetectingRuntimeAgents
-      const { [environmentId]: ___, ...restRefreshing } = s.isRefreshingRuntimeAgents
-      return {
-        runtimeDetectedAgentIds: restAgents,
-        isDetectingRuntimeAgents: restLoading,
-        isRefreshingRuntimeAgents: restRefreshing
-      }
-    })
-  },
-
-  retainRuntimeDetectedAgents: (environmentIds: Iterable<string>) => {
-    const keep = new Set(environmentIds)
-    for (const id of runtimeDetectPromises.keys()) {
-      if (!keep.has(id)) {
-        runtimeDetectPromises.delete(id)
-      }
-    }
-    for (const id of runtimeRefreshPromises.keys()) {
-      if (!keep.has(id)) {
-        runtimeRefreshPromises.delete(id)
       }
     }
     set((s) => {

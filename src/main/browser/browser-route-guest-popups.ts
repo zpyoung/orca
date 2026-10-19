@@ -16,6 +16,7 @@ import {
 } from './browser-route-guest-popup-window-options'
 import { openPopupWithOriginBar, type PopupChildWindowOptions } from './popup-origin-bar-window'
 import { allowNativeBrowserPopup, isNativeBrowserPopupRequest } from './browser-popup-native-window'
+import { allowPageUnload } from './browser-guest-unload-policy'
 
 /** Bounded so a page holding a real gesture stream cannot paper the desktop in windows. */
 export const MAX_BROWSER_ROUTE_GUEST_POPUPS = 4

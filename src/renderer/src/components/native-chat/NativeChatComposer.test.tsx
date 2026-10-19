@@ -445,7 +445,7 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.sendNativeChatMessageWithImageAttachments).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       'hello',
       ['/tmp/pasted.png'],
       expect.anything()
@@ -466,7 +466,7 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.sendNativeChatTypedCommand).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '/status'
     )
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
@@ -486,7 +486,7 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '$ref-oss',
       expect.anything()
     )
@@ -507,7 +507,7 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '/clear',
       expect.anything()
     )
@@ -749,7 +749,7 @@ describe('NativeChatComposer', () => {
     })
 
     expect(mocks.sendNativeChatMessageVerified).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '/model opus',
       expect.any(AbortSignal)
     )
@@ -780,7 +780,7 @@ describe('NativeChatComposer', () => {
     })
 
     expect(mocks.sendNativeChatMessageVerified).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '/model fable',
       expect.any(AbortSignal)
     )
@@ -818,7 +818,7 @@ describe('NativeChatComposer', () => {
     })
 
     expect(mocks.typeNativeChatCommand).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
       '/model',
       expect.any(AbortSignal)
     )

@@ -153,8 +153,6 @@ export function AutomationsPageSurface({
         isEditing={editingAutomationId !== null}
         isSaving={isSaving}
         canSave={presentation.canSaveDraft}
-        isEditingExternal={editingExternalTarget !== null}
-        createTarget={createTarget}
         launchOverridesGate={launchOverridesGate}
         createDestination={destination.createDestination.control}
         editDestination={destinationForm.editDestinationControl}

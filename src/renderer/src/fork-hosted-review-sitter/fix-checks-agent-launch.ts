@@ -1,22 +1,24 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
-// FORK-COPY-SHA: f51e82c4c26745f6a15e215e4391f533327697e2
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
 // Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
 import { toast } from 'sonner'
-import { getConnectionId } from '@/lib/connection-context'
+import {
+  ensureDetectedAgentsForRepo,
+  ensureDetectedAgentsForWorktree,
+  type RepoHostFields
+} from '@/lib/agent-detection-target-inventory'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { launchWorkItemDirect } from '@/lib/launch-work-item-direct'
-import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
-import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { planAgentCliArgsSuffix } from '@/lib/tui-agent-startup'
 import {
   pickSourceControlLaunchAgent,
   readSourceControlLaunchRecipeAgentId
 } from '../../../shared/source-control-launch-agent-selection'
-import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-platform'
+import { resolveRepoWorktreeLaunchPlatform } from '@/lib/execution-host-facts'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { useAppStore } from '@/store'
 import { resolveSourceControlActionRecipe } from '../../../shared/source-control-ai'
@@ -49,15 +51,6 @@ type SavedAgentOverrideResult =
   | { kind: 'launch-default' }
   | { kind: 'blocked' }
 
-async function detectAgentsForConnection(
-  connectionId: string | null | undefined
-): Promise<TuiAgent[]> {
-  const store = useAppStore.getState()
-  return typeof connectionId === 'string'
-    ? await store.ensureRemoteDetectedAgents(connectionId)
-    : await store.ensureDetectedAgents()
-}
-
 function isAgentAvailable(agent: TuiAgent, detectedAgents: TuiAgent[]): boolean {
   return (
     detectedAgents.includes(agent) &&
@@ -67,13 +60,18 @@ function isAgentAvailable(agent: TuiAgent, detectedAgents: TuiAgent[]): boolean 
 
 async function resolveSavedAgentOverride(
   savedAgent: TuiAgent | null | undefined,
-  connectionId: string | null | undefined
+  repo: RepoHostFields | null
 ): Promise<SavedAgentOverrideResult> {
   if (!savedAgent) {
     return { kind: 'launch-default' }
   }
-  const detectedAgents = await detectAgentsForConnection(connectionId)
-  if (!isAgentAvailable(savedAgent, detectedAgents)) {
+  const pendingAgents = ensureDetectedAgentsForRepo(useAppStore.getState(), repo ?? {})
+  // Why: a paired server answers per workspace, so only the enabled check can run before it exists;
+  // the direct launch checks installation on the new workspace.
+  const available = pendingAgents
+    ? isAgentAvailable(savedAgent, await pendingAgents)
+    : isTuiAgentEnabled(savedAgent, useAppStore.getState().settings?.disabledTuiAgents)
+  if (!available) {
     toast.error(
       translate(
         'auto.lib.fix.checks.agent.launch.4c7f783a7a',
@@ -87,11 +85,9 @@ async function resolveSavedAgentOverride(
 
 async function pickExistingWorktreeAgent(
   worktreeId: string,
-  savedAgent: TuiAgent | null | undefined,
-  repoConnectionId: string | null | undefined
+  savedAgent: TuiAgent | null | undefined
 ): Promise<TuiAgent | null> {
-  const connectionId = getConnectionId(worktreeId) ?? repoConnectionId ?? null
-  const detectedAgents = await detectAgentsForConnection(connectionId)
+  const detectedAgents = await ensureDetectedAgentsForWorktree(useAppStore.getState(), worktreeId)
   if (savedAgent) {
     if (isAgentAvailable(savedAgent, detectedAgents)) {
       return savedAgent
@@ -168,11 +164,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     // Agent selection stays renderer-owned so manual host detection and saved recipes retain their
     // existing behavior. Desktop-owned workspaces use the shared main entry; web and paired-runtime
     // workspaces keep their owning-runtime launch and use the exact same mandatory policy builder.
-    const agent = await pickExistingWorktreeAgent(
-      targetWorktreeId,
-      savedAgentId,
-      repo?.connectionId
-    )
+    const agent = await pickExistingWorktreeAgent(targetWorktreeId, savedAgentId)
     if (!agent) {
       return false
     }
@@ -217,14 +209,13 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       return true
     }
 
-    const targetConnectionId = getConnectionId(targetWorktreeId) ?? repo?.connectionId ?? null
-    const launchPlatform = resolveSourceControlLaunchPlatform({
-      connectionId: targetConnectionId,
-      worktreePath: targetWorktree.path,
-      projectRuntime: targetConnectionId
-        ? undefined
-        : getLocalProjectExecutionRuntimeContext(store, targetWorktreeId, CLIENT_PLATFORM)
-    })
+    // Why: the agent runs on the workspace's execution host, so its OS decides quoting (#27971).
+    const latestStore = useAppStore.getState()
+    const targetRepo =
+      latestStore.repos.find((candidate) => candidate.id === targetWorktree.repoId) ?? repo
+    const launchPlatform = targetRepo
+      ? resolveRepoWorktreeLaunchPlatform(latestStore, targetRepo, targetWorktree)
+      : undefined
     if (!launchPlatform) {
       toast.error(
         translate(
@@ -289,7 +280,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     return false
   }
 
-  const agentOverride = await resolveSavedAgentOverride(savedAgentId, repo?.connectionId)
+  const agentOverride = await resolveSavedAgentOverride(savedAgentId, repo)
   if (agentOverride.kind === 'blocked') {
     return false
   }

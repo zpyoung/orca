@@ -133,6 +133,8 @@
     "../src/main/claude/claude-profile-hook-target.ts",
     "../src/main/claude/statusline-script.ts",
     "../src/main/claude/windows-hook-files.ts",
+    "../src/main/agent-hooks/windows-native-hook-executable.ts",
+    "../src/main/agent-hooks/locked-executable-rename.ts",
     "../src/main/fork-session-info/session-info-statusline-chain-script.ts",
     "../src/main/fork-session-info/session-info-statusline-chaining.ts",
     "../src/main/claude-accounts/keychain.ts",

@@ -24,9 +24,13 @@ export type AcpStructuredSessionAdapterDeps = {
   resolveLaunch: (input: {
     identity: AgentSessionJournalIdentity
     spawnToken: string
+    /** The mode the host decided this start runs with; absent asks. */
+    permissionMode?: AgentChatPermissionMode
   }) => Promise<AcpStructuredLaunch>
   /** The same launch for a read that starts no child (restart recovery): the agent's env, unsealed. */
   readLaunch: (identity: AgentSessionJournalIdentity) => Promise<AcpStructuredLaunch>
+  /** Current host arguments before protocol-specific filtering; copies open through the CLI. */
+  resolveLaunchArgs?: () => Promise<string[]> | string[]
   /** The chat's journal as it stands, read without opening it; null when it has none. */
   readJournal?: (sessionId: string) => JournalLoad | null
   /** Orca's data folder on this host, under its instance lock. */

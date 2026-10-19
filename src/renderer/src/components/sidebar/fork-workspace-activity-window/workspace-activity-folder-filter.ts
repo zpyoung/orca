@@ -1,7 +1,7 @@
 import type { FolderWorkspace } from '../../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../../shared/project-group-types'
 import { folderWorkspaceKey } from '../../../../../shared/workspace-scope'
-import { getFolderWorkspaceExecutionHostIdForRows } from '../worktree-list/listing/host-filtering'
+import { getFolderWorkspaceExecutionHostIdForRows } from '../../../../../shared/sidebar-list/host-filtering'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import { getWorktreeVisitTimestamp } from '@/lib/worktree-visit-recency'
 import type { WorkspaceActivityFilterContext } from './workspace-activity-filter'
@@ -9,7 +9,7 @@ import {
   isSelectedActivityWorkspace,
   workspaceActivityWindowDays
 } from './workspace-activity-filter'
-import { getRenderableFolderWorkspaces } from '../worktree-list/grouping/folder-workspace-lanes'
+import { getRenderableFolderWorkspaces } from '../../../../../shared/sidebar-list/folder-workspace-lanes'
 
 function activityTime(
   folder: FolderWorkspace,

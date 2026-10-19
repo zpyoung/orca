@@ -31,7 +31,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
   ...createTabsGroupActions(set, get),
   ...createTabsMoveActions(set, get),
   ...createTabsDropActions(set, get),
-  ...createTabsSecondaryActions(set, get),
+  ...createTabsSplitRatioActions(set),
+  ...createTabsDragPreviewActions(set),
   ...createTabsSessionActions(set, get),
   ...createTabTerminalDockActions(set, get)
 })

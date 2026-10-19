@@ -9,10 +9,7 @@ import {
   recoverFreshSpawnProviderRouting,
   routesFreshSpawnsToLocalProvider
 } from '../host-env/fresh-spawn-routing'
-import { stripRemotePaneEnvWhenHooksDisabled } from '../provider/liveness'
-import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import {
-  isSafePtySessionId,
   mintPtySessionId,
   ptySessionIdForAgentCreateOperation
 } from '../../../daemon/pty-session-id'
@@ -45,31 +42,7 @@ export async function prepareRuntimePtySpawn(
   if (freshSpawnRecovery) {
     await freshSpawnRecovery
   }
-  ctx.isClaudeLaunch =
-    !ctx.preAdoptedStablePane && !args.connectionId && isClaudeLaunchCommand(args.command)
-  // Why: runtime-created terminals carry no renderer-computed projectRuntime; resolve from worktreeId to honor the project's Windows runtime.
-  // `args.shellOverride` is the per-request pick (`terminal create --shell`), read here the way
-  // the renderer twin (ipc/spawn-preflight.ts) reads a tab's override. Without it a runtime create
-  // could only ever get the host default shell, so a caller asking for cmd/PowerShell got the
-  // default shell with the request typed into it. Still Windows-only: the override names a
-  // Windows shell, and spawn-options applies it under the same platform gate.
-  ctx.terminalRuntimeOptions =
-    process.platform === 'win32' && !args.connectionId
-      ? resolveLocalWindowsTerminalRuntimeOptions({
-          requestedShellOverride: args.shellOverride,
-          settings: ctx.deps.getSettings?.(),
-          projectRuntime: resolveLocalProjectRuntimeForWorktreeId(ctx.deps.store, args.worktreeId),
-          fallbackHostShell: process.env.COMSPEC || 'powershell.exe'
-        })
-      : {
-          shellOverride:
-            args.shellOverride ??
-            (process.platform === 'win32'
-              ? undefined
-              : ctx.deps.getSettings?.()?.terminalDefaultShell || undefined),
-          terminalWindowsWslDistro: null
-        }
-  ctx.daemonShellOverride = ctx.terminalRuntimeOptions.shellOverride
+  ctx.isClaudeLaunch = !ctx.preAdoptedStablePane && isClaudeLaunchCommand(args.command)
   ctx.isDaemonHostSpawn =
     !(ctx.provider instanceof LocalPtyProvider) && !routesFreshSpawnsToLocalProvider(ctx.provider)
   ctx.callerRequestedSessionId = args.sessionId?.trim()

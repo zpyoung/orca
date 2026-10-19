@@ -144,6 +144,7 @@ export function useResumeRunPanel({
       />
     ),
     rows: view.rows,
+    finishedRowsVisible: run.entries.every((entry) => visibleIds.has(entry.candidate.sessionId)),
     // Current selection ignores the filter, so changing tabs never moves the layout.
     choosing: [...selectableIds].some((sessionId) => !view.statusBySession.has(sessionId)),
     startedBy: run.startedBy,

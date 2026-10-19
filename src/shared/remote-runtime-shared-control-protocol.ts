@@ -1,5 +1,5 @@
+import type { PairedE2EEClientHandshake } from './paired-e2ee-client-handshake'
 import { getHeimdallSubscriptionCleanupRequest } from './fork-heimdall/subscription-routing'
-import { decrypt, encrypt } from './e2ee-crypto'
 import type WebSocket from 'ws'
 import { RemoteRuntimeClientError } from './remote-runtime-client'
 import { serializeRemoteRuntimePayload } from './remote-runtime-memory-limits'

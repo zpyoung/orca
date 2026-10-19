@@ -1,15 +1,25 @@
 import { execFileSync } from 'node:child_process'
 import { copyFile, mkdir, rename } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { lock } from 'proper-lockfile'
-import {
-  extractReleaseCheckoutTree,
-  scavengeReleaseCheckoutStaging
-} from './release-checkout-tree.ts'
 import {
   compareReleaseTags,
   selectLatestStableReleaseTag
 } from '../../../config/scripts/stable-release-tags.mjs'
+import {
+  populateReleaseCheckoutSource,
+  resolveSharedReleaseCacheRoot
+} from './release-source-cache.ts'
+import {
+  CHECKOUT_FORMAT,
+  publishReleaseCheckout,
+  type MaterializeReleaseCheckoutTestHooks
+} from './release-checkout-publication.ts'
+export type {
+  CheckoutLockOptions,
+  CheckoutLifecycleContext,
+  CheckoutStagingContext,
+  MaterializeReleaseCheckoutTestHooks
+} from './release-checkout-publication.ts'
 
 export { selectLatestStableReleaseTag }
 

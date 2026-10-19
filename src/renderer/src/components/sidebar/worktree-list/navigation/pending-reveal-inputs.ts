@@ -44,7 +44,6 @@ export type PendingSidebarRevealArgs = {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   settings: AppState['settings']
   projectGroups: readonly ProjectGroup[]
-  visibleProjectGroupsForRows?: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
   flashRevealedRow: (rowKey: string) => void
   markRevealScroll: (targetTop: number) => void
@@ -91,8 +90,6 @@ export function expandGroupsForWorktreeReveal(
   }
   for (const groupKey of getWorktreeRevealCollapsedGroupKeys({
     ...args,
-    // Why: must be the host-filtered set buildRows used, or reveal expands a filtered-out group.
-    projectGroups: args.visibleProjectGroupsForRows ?? args.projectGroups,
     worktree: targetWorktree,
     hostScopedGroups
   })) {

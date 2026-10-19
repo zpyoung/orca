@@ -43,6 +43,37 @@ import {
 } from './structured-agent-session-runtime'
 import { scriptedCodexTransport } from './scripted-codex-transport.test-fixture'
 
+const openWaits = vi.hoisted(() => {
+  const state: {
+    turnIds: string[]
+    ended: string[]
+    began: (() => void) | null
+    releaseAll: (() => void) | null
+  } = { turnIds: [], ended: [], began: null, releaseAll: null }
+  return state
+})
+vi.mock('../codex/codex-structured-turn-open-wait', async (importOriginal) => {
+  const actual = await importOriginal<typeof CodexTurnOpenWait>()
+  return {
+    ...actual,
+    createCodexTurnOpenWaits: () => {
+      const waits = actual.createCodexTurnOpenWaits()
+      openWaits.releaseAll = waits.releaseAll
+      return {
+        ...waits,
+        wait: (turnId: string, withinMs: number) => {
+          openWaits.turnIds.push(turnId)
+          const pending = waits.wait(turnId, withinMs)
+          openWaits.began?.()
+          return pending.then(() => {
+            openWaits.ended.push(turnId)
+          })
+        }
+      }
+    }
+  }
+})
+
 const CALLER = { callerKey: 'codex-stopped-send-resume-test' }
 const MODEL = {
   model: 'gpt-test',

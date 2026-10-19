@@ -65,6 +65,14 @@ import {
   findStructuredAgentSessionReadOwner,
   resetStructuredAgentSessionReadOwnersForTests
 } from '@/components/native-chat/structured-agent-session-read-owner'
+import {
+  isWebSessionCloseIntentPending,
+  reconcileWebSessionCloseIntents,
+  resetWebSessionCloseIntentForTests
+} from './web-session-close-intent'
+import { LOCAL_STRUCTURED_SESSION_OWNER } from './local-structured-session-owner'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
 
 const target: RuntimeClientTarget = { kind: 'local' }
 
@@ -99,6 +107,8 @@ function snapshot(): RuntimeMobileSessionTabsResult {
 beforeEach(() => {
   vi.clearAllMocks()
   resetStructuredAgentSessionReadOwnersForTests()
+  resetWebSessionCloseIntentForTests()
+  replaceRuntimeEnvironmentRevisions([])
   mocks.closeSession.mockResolvedValue('closed')
   mocks.callRuntime.mockResolvedValue(undefined)
   mocks.hasTombstone.mockReturnValue(false)

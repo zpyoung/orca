@@ -129,7 +129,6 @@ export type NativeChatComposerHandle = AgentComposerHandle & {
   /** Adds text after the draft, a blank line apart, and leaves the caret at its end. Text the
    *  draft already ends with is not added again. */
   appendText: (text: string) => void
-  /** Whether a node is inside the composer's own input, not merely the chat pane.
-   *  Absent on a dock composer, whose field handles its own paste. */
-  contains?: (node: Node | null) => boolean
+  /** Whether a node is inside the composer's own input, not merely the chat pane. */
+  contains: (node: Node | null) => boolean
 }

@@ -30,12 +30,22 @@ import {
   resumeInterruptedWorktreeRemovals,
   retryFailedWorktreeRemoval,
   waitForPendingWorktreeRemoval
-} from '../worktree-background-removal'
-import { interruptedLocalWorktreeRemovalJob } from './runtime-interrupted-local-worktree-removal'
-import { retryFailedRemovalUnlessRegistered } from '../worktree-removal-leftover'
-import type { GitWorktreeInfo } from '../../shared/worktree/types'
-import { resolveQoderTerminalCommandForWorkspace } from './qoder-terminal-command-resolution'
-import { buildRuntimeAgentTerminalStartupOptions } from './runtime-agent-terminal-startup'
+} from '../../worktree-background-removal'
+import { interruptedLocalWorktreeRemovalJob } from '../runtime-interrupted-local-worktree-removal'
+import { retryFailedRemovalUnlessRegistered } from '../../worktree-removal-leftover'
+import type { GitWorktreeInfo } from '../../../shared/worktree/types'
+import {
+  resolveAgentTerminalCreateOptions,
+  withHostAccountLaunchEnv
+} from '../runtime-agent-terminal-startup'
+
+export abstract class OrcaRuntimeWithResolveWorktreeRemovalTarget extends OrcaRuntimeWithRemoveManagedWorktree {
+  protected abstract resolveExplicitWorktreeIdScoped(
+    worktreeId: string,
+    requiredHostId?: ExecutionHostId
+  ): Promise<ResolvedWorktree | null>
+  protected abstract cancelScheduledMobileSessionTabsChanged(worktreeId: string): void
+  protected abstract notifyMobileSessionTabsRemoved(worktreeId: string): void
 
   protected async resolveWorktreeRemovalTarget(
     worktreeSelector: string,

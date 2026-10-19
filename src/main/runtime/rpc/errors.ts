@@ -38,6 +38,10 @@ import { AGENT_LAUNCH_PANE_ALREADY_LIVE_CODE } from '../../../shared/agent-launc
 import { AGENT_LAUNCH_SESSION_ALREADY_EXISTS_CODE } from '../../../shared/agent-launch-session-already-exists'
 import { AGENT_LAUNCH_TAB_CLOSED_CODE } from '../../../shared/agent-launch-tab-closed'
 import { AGENT_LAUNCH_TARGET_FORBIDDEN_CODE } from '../../../shared/agent-launch-target-forbidden'
+import {
+  parseTerminalSpawnDeferral,
+  TERMINAL_SPAWN_DEFERRED_CODE
+} from '../../../shared/host-spawn-admission'
 import { HEIMDALL_ENROLLMENT_REFUSAL_ERROR_CODE } from '../../../shared/fork-heimdall/enrollment-refusal-error'
 
 export function successResponse(id: string, meta: RpcEnvelopeMeta, result: unknown): RpcSuccess {

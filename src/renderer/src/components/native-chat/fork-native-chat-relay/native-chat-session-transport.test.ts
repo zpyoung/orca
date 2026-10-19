@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
 import {
   clearRuntimeCompatibilityCacheForTests,
-  markRuntimeEnvironmentCompatible,
-  RuntimeRpcCallError
+  markRuntimeEnvironmentCompatible
 } from '@/runtime/runtime-rpc-client'
+import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
 import { RUNTIME_COMPAT_BLOCK_CODE } from '@/runtime/runtime-protocol-compat'
 import {
   getNativeChatSessionTransport,
@@ -56,8 +56,7 @@ beforeEach(() => {
 })
 
 describe('getNativeChatSessionTransport — selection', () => {
-  // The adapter has dropped an argument before (an ssh read silently ran against
-  // local disk), so this asserts the whole object reaches the bridge.
+  // The adapter has dropped an argument before, so this asserts the whole object reaches the bridge.
   it('returns the local adapter for a null owner and forwards every readSession arg', async () => {
     nativeChatReadSession.mockResolvedValue({ messages: [] })
     const transport = getNativeChatSessionTransport(null)
@@ -67,7 +66,6 @@ describe('getNativeChatSessionTransport — selection', () => {
       sessionId: 'sess-1',
       limit: 40,
       transcriptPath: '/t/path',
-      sshConnectionId: 'ssh:host-1',
       beforeOffset: 4_096
     }
     await transport.readSession(args)

@@ -1,7 +1,7 @@
 import type { AutomationSchedulerOwner } from '../../shared/automations-types'
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
-import type { ResolvedRuntimeFileTarget } from '../runtime/runtime-file-command-target'
+import type { ResolvedRuntimeFileTarget } from '../runtime/files/file-target'
 import {
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
@@ -303,7 +303,6 @@ export async function authorizeObjectiveEnrollment(
           kind: 'git',
           executionHostId: workspace.executionHostId,
           workspacePath: workspace.workspacePath,
-          fileProvider: null,
           gitTarget: workspace.gitTarget
         })
       )

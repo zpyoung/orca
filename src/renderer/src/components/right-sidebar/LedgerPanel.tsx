@@ -12,12 +12,14 @@ import { LedgerEntryDetail } from '../ledger/LedgerEntryDetail'
 import { LedgerEntryForm } from '../ledger/LedgerEntryForm'
 import { LedgerTriagePanel } from '../ledger/LedgerTriagePanel'
 import { useLedgerRequest } from '../ledger/use-ledger-request'
-import { getRightSidebarWorktreeRuntimeSettings } from './file-explorer-runtime-owner'
+import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
 import {
   getLedgerPanelFilters,
   getLedgerPanelScope,
   getLedgerPanelTarget,
   getLedgerPanelTiers,
+  ledgerPanelOwnerFromKey,
+  ledgerPanelOwnerKey,
   isLedgerEntryFiledHere,
   type LedgerPanelScope,
   type LedgerPanelTier
@@ -62,22 +64,27 @@ export default function LedgerPanel({ isVisible }: { isVisible: boolean }): Reac
   const workspaceId = useAppStore((state) =>
     getActiveSidebarWorkspaceId(state.activeWorkspaceKey, state.activeWorktreeId)
   )
-  const environmentId = useAppStore(
-    (state) =>
-      getRightSidebarWorktreeRuntimeSettings(
-        getActiveSidebarWorkspaceId(state.activeWorkspaceKey, state.activeWorktreeId)
-      ).activeRuntimeEnvironmentId
-  )
+  const ownerKey = useAppStore((state) => {
+    const ownedWorkspaceId = getActiveSidebarWorkspaceId(
+      state.activeWorkspaceKey,
+      state.activeWorktreeId
+    )
+    return ledgerPanelOwnerKey(
+      ownedWorkspaceId
+        ? runtimeEnvironmentIdForWorkspaceOwner(state, { workspaceId: ownedWorkspaceId })
+        : { kind: 'resolved', environmentId: null }
+    )
+  })
   const { name: workspaceName, hasGroup } = useAppStore(
     useShallow((state) => getLedgerPanelWorkspaceIdentity(workspaceId, state))
   )
   const scope = useMemo(
-    () => getLedgerPanelScope(workspaceId, { activeRuntimeEnvironmentId: environmentId }, hasGroup),
-    [workspaceId, environmentId, hasGroup]
+    () => getLedgerPanelScope(workspaceId, ledgerPanelOwnerFromKey(ownerKey), hasGroup),
+    [workspaceId, ownerKey, hasGroup]
   )
   return (
     <ScopedLedgerPanel
-      key={JSON.stringify([workspaceId, environmentId])}
+      key={JSON.stringify([workspaceId, ownerKey])}
       scope={scope}
       workspaceName={workspaceName}
       isVisible={isVisible}
@@ -107,7 +114,10 @@ function ScopedLedgerPanel({
   const tiers = getLedgerPanelTiers(scope)
   // Why: group membership arrives after hydration, so a selected tier can stop being offered.
   const tier = tiers.includes(selectedTier) ? selectedTier : 'workspace'
-  const target = useMemo(() => (scope ? getLedgerPanelTarget(scope, tier) : null), [scope, tier])
+  const target = useMemo(
+    () => (scope && !scope.ownerAmbiguous ? getLedgerPanelTarget(scope, tier) : null),
+    [scope, tier]
+  )
   const scopedFilters = useMemo(
     () => (scope ? getLedgerPanelFilters(scope, tier, filters) : filters),
     [scope, tier, filters]
@@ -139,12 +149,9 @@ function ScopedLedgerPanel({
       .toLocaleLowerCase()
       .includes(query.trim().toLocaleLowerCase())
   )
-  const state = getLedgerPanelState({
-    loading,
-    error,
-    entries: matches,
-    hasWorkspace: Boolean(scope)
-  })
+  const state: LedgerPanelState = scope?.ownerAmbiguous
+    ? { kind: 'owner-ambiguous' }
+    : getLedgerPanelState({ loading, error, entries: matches, hasWorkspace: Boolean(scope) })
   const message = stateMessage(state)
   const failed = !['no-workspace', 'loading', 'empty', 'entries'].includes(state.kind)
   const busy = loading || pending

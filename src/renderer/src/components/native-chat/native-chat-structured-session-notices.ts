@@ -78,7 +78,8 @@ export function structuredSessionNotices({
   sessionError,
   composerError,
   claudeSignIn = null,
-  availability = null
+  availability = null,
+  hostPermission = null
 }: {
   launch: {
     lifecycle: StructuredAgentSessionLaunchLifecycle | null

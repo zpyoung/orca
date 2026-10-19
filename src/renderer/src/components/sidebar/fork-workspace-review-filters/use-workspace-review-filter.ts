@@ -11,8 +11,7 @@ export function getWorkspaceReviewFilterContext(state: AppState): WorkspaceRevie
     hideCompletedReviewWorkspaces,
     hidePassingCheckWorkspaces,
     prCache: active ? state.prCache : null,
-    hostedReviewCache: active ? state.hostedReviewCache : null,
-    activeRuntimeEnvironmentId: state.settings?.activeRuntimeEnvironmentId ?? null
+    hostedReviewCache: active ? state.hostedReviewCache : null
   }
 }
 

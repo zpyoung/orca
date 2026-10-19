@@ -119,7 +119,7 @@ describe('preparing a chat for visuals', () => {
   })
 
   it("never hands a chat another chat's folder that Orca itself inherited", async () => {
-    const inherited = { PATH: '/bin', [NATIVE_CHAT_VISUALS_DIR_ENV]: '/parent-chat' }
+    const inherited = { PATH: '/bin', [NATIVE_CHAT_SCRATCH_DIR_ENV]: '/parent-chat' }
     const visuals = { folder: '/mine', skill: SKILL }
     for (const platform of ['darwin', 'win32'] as const) {
       const claude = (configured: Record<string, string>) =>
@@ -148,8 +148,8 @@ describe('preparing a chat for visuals', () => {
         }),
         inherited
       )
-    expect(await codex(false)).not.toHaveProperty(NATIVE_CHAT_VISUALS_DIR_ENV)
-    expect((await codex(true))[NATIVE_CHAT_VISUALS_DIR_ENV]).toBe('/mine')
+    expect(await codex(false)).not.toHaveProperty(NATIVE_CHAT_SCRATCH_DIR_ENV)
+    expect((await codex(true))[NATIVE_CHAT_SCRATCH_DIR_ENV]).toBe('/mine')
   })
 
   it('names only this chat folder to the agent', () => {

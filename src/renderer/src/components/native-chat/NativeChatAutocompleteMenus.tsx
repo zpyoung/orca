@@ -216,7 +216,7 @@ function PickerOption({
         ) : null}
       </span>
       {item.kind === 'skill' ? (
-        <span className="max-w-[9rem] shrink-0 truncate pt-0.5 text-[11px] text-muted-foreground">
+        <span className="max-w-[9rem] shrink-0 truncate pt-0.5 text-2xs text-muted-foreground">
           {item.pluginName ?? scopeLabel(item.sources[0]?.sourceKind)}
         </span>
       ) : null}

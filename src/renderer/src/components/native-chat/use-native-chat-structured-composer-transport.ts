@@ -29,7 +29,8 @@ export function useNativeChatStructuredComposerTransport(args: {
   sendBlockedReason?: string | null
 }): NativeChatStructuredComposerTransport {
   const { props, controller, sendThroughLaunch, starting, worktreeId, optionPickerRequest } = args
-  const { setOptionPickerRequest, onError, onSubmitted, queuedMessages } = args
+  const { setOptionPickerRequest, onError, onSubmitted } = args
+  const sendBlockedReason = args.sendBlockedReason ?? null
   const acceptsImages = useStructuredAgentAcceptsImages(
     props.target,
     props.agent,

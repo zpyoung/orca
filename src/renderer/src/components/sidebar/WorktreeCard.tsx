@@ -67,6 +67,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     nativeDragEnabled,
     hideRepoBadge,
     hostContextLabel,
+    showProjectName,
     inPinnedSection: inPinnedSection || inProjectGroupLooseSection,
     activationRowKey,
     renameRowKey,

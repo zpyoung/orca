@@ -13,9 +13,9 @@ import {
   isKnownReadyPromptBody,
   isKnownReadyPromptSettled,
   tuiIdleNeedsVisibleScreenProbe
-} from './terminal-wait-detection'
-import { readsTrustedScreen } from './agent-state-rules/agent-state-rules-engine'
-import { restoreProjectedComposerDraft } from './orca-runtime-terminal-projection'
+} from '../../terminal-wait-detection'
+import { readsTrustedScreen } from '../../agent-state-rules/agent-state-rules-engine'
+import { restoreProjectedComposerDraft } from '../../orca-runtime-terminal-projection'
 import type {
   RuntimeTerminalWait,
   RuntimeTerminalWaitBlockedReason
@@ -25,16 +25,16 @@ import {
   buildPtyTerminalWaitResult,
   buildTerminalWaitBlockedResult,
   buildTerminalWaitResult
-} from './terminal-wait-results'
-import { createSetupCompletionScanner } from './orchestration/setup-completion-signal'
-import { buildTerminalWaitText } from './terminal-wait-tail-state'
-import type { TuiAgent } from '../../shared/tui-agent'
+} from '../../terminal-wait-results'
+import { createSetupCompletionScanner } from '../../orchestration/setup-completion-signal'
+import { buildTerminalWaitText } from '../../terminal-wait-tail-state'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 
 // Why re-probe: a TUI that paints with cursor moves (Claude Code) never reaches the newline tail the
 // poll reads, and its first frame lands after the wait starts, so a single look sees a blank screen.
 const TUI_IDLE_VISIBLE_PROBE_RETRY_MS = 1_000
 
-export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWithCreateAgentPromptRenderGate {
+export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWithCreateAgentPromptRenderGate {
   /** One bounded look at the provider's screen for an adopted PTY whose retained
    *  readiness metadata was lost. Deliberately single-shot: it answers "is the
    *  screen already showing a settled prompt", and the poll above owns every

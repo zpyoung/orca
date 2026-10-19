@@ -169,13 +169,6 @@ export function createSetActiveWorktree(
         rightSidebarExplorerView: restoredRightSidebarExplorerView,
         activeTabId,
         everActivatedWorktreeIds: nextEverActivated,
-        ...(nextWorktrees !== s.worktreesByRepo ? { worktreesByRepo: nextWorktrees } : {}),
-        ...(nextDetectedWorktrees !== s.detectedWorktreesByRepo
-          ? { detectedWorktreesByRepo: nextDetectedWorktrees }
-          : {}),
-        ...(nextFolderWorkspaces !== s.folderWorkspaces
-          ? { folderWorkspaces: nextFolderWorkspaces }
-          : {}),
         ...tabsByWorktreeUpdate,
         ...workspaceActivityExitPatchForActivation(
           s,

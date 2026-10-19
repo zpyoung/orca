@@ -1,6 +1,12 @@
 import type { RuntimeLinearCommandSurface } from './runtime-linear-command-surface'
 import { installRuntimeLinearCommandSurface } from './runtime-linear-command-surface'
-import { OrcaRuntimeWithLedger } from './orca-runtime-ledger'
+import { publishWorkspaceViewChanges } from './runtime-workspace-view-change-events'
+import {
+  OrcaRuntimeWithSidebarTemporal,
+  sidebarFactsRuntime
+} from './sidebar-inputs/orca-runtime-sidebar-temporal'
+import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from './orca-runtime-ledger'
+import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-inputs-switch'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import type {
   AgentLaunchTabPublished,
@@ -161,8 +167,7 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
     })
   }
 
-class OrcaRuntimeService extends OrcaRuntimeWithLedger {
-  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithLedger>) {
+  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithMigrationCatalog>) {
     super(...args)
     // Why: the runtime listing re-runs a scan the worktree-change generation overtook and re-lists
     // through this runtime's scan cache, so a worktree change must reach both. The desktop IPC

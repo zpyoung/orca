@@ -10,7 +10,7 @@ vi.mock('electron', () => ({
 }))
 
 import { normalizeRightSidebarTab } from '../persistence'
-import { UiUpdate } from '../runtime/rpc/methods/client-ui-schemas'
+import { UiUpdate } from '../../shared/rpc-contract/client-ui-params'
 
 describe('Session Info tab main-process integration', () => {
   it('survives persisted UI normalization', () => {

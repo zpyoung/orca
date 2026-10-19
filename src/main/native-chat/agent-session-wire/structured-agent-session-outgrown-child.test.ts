@@ -288,9 +288,9 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
 
     it('is kept while it owes work, as a signed-out one is', async () => {
       for (const kept of [
-        await retire({ ...askChild, activeTurnId: 'turn-1' }, {}, undefined, now('auto')),
-        await retire(askChild, { childWork: () => [liveChildWork] }, undefined, now('auto')),
-        await retire({ ...askChild, items: [pendingPrompt] }, {}, undefined, now('auto'))
+        await retire(askChild, owing('turn-1', false), undefined, now('auto')),
+        await retire(askChild, { childWorkOpen: () => true }, undefined, now('auto')),
+        await retire(askChild, owing(null, true), undefined, now('auto'))
       ]) {
         expect(kept.stopAgent).not.toHaveBeenCalled()
       }
@@ -319,6 +319,7 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
           fetchedAt: 1,
           models: rows.map((row) => ({ ...row, label: row.id, efforts: [] }))
         })),
+        retainedLiveModelIds: vi.fn(() => []),
         recordLiveListing: vi.fn(),
         prewarm: vi.fn(async () => undefined),
         stop: vi.fn(),
@@ -392,15 +393,3 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
     })
   })
 })
-
-const pendingPrompt: Row = {
-  itemId: 'approval-1',
-  fence: 2,
-  body: {
-    kind: 'approval',
-    title: 'Run a command',
-    detail: null,
-    options: [],
-    resolution: { state: 'pending', selectedOptionId: null, resolvedBy: null, resolvedAt: null }
-  }
-}

@@ -1,12 +1,12 @@
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { OrchestrationDb, RunRow } from '../../runtime/orchestration/db'
-import { redactWorkerTerminalLines } from '../../runtime/orchestration/worker-transcript-payload'
+import { redactWorkerTerminalLines } from '../../runtime/orchestration/worker-terminal-redaction'
 import {
   inspectWorkerTerminal,
   projectFleetWorker
 } from '../../runtime/rpc/methods/orchestration/worker/worker-observation'
 import { readExactWorkerOutput } from '../../runtime/rpc/methods/orchestration/worker/worker-output'
-import { isStructuredWorkerHandle } from '../../runtime/structured-worker-identity'
+import { isStructuredWorkerHandle } from '../../../shared/structured-worker-handle'
 import type { OrchestrationWorkerReadResult } from '../../../shared/orchestration-worker-output'
 import { clipWorkerLastMessage } from '../../../shared/fork-heimdall/owner/worker-last-message'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'

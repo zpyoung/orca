@@ -18,8 +18,9 @@ function catalogListsSeedModel(
 /**
  * What the picker shows before the host has confirmed this session's values:
  * `seed` (the selection a launch seeds) stands in until the record names a
- * model, and `held` picks outrank both until the host settles them. Both show
- * as `dispatched`; derived on every read, never written into the record.
+ * model, and `held` picks outrank both until the host settles them. All show as `dispatched`;
+ * derived on every read, never written into the record. A model the list lacks is kept: a list
+ * is no evidence the chat's own model cannot run.
  *
  * The permission mode reads its own way: the held pick, else what the host stated, else the seed.
  */
@@ -33,6 +34,15 @@ export function structuredAgentSessionOptionView(
   const permissionMode =
     heldPermission ?? state.permissionMode ?? seed?.[AGENT_CHAT_PERMISSION_MODE_OPTION_ID] ?? null
   return view.permissionMode === permissionMode ? view : { ...view, permissionMode }
+}
+
+/** The picker of a client that holds no launch selection, such as the phone. */
+export function structuredAgentSessionShownSnapshot(
+  state: StructuredAgentSessionOptionState
+): SessionOptionDescriptor[] {
+  return structuredAgentSessionOptionSnapshot(
+    structuredAgentSessionOptionView(state, undefined, {})
+  )
 }
 
 function modelOptionView(

@@ -12,6 +12,19 @@ import type { TabTerminalDockSlice } from '../fork-terminal-dock/tab-terminal-do
 
 export type TabSplitDirection = 'left' | 'right' | 'up' | 'down'
 
+/** A new group beside `sourceGroupId`, created in the same update as the tab that fills it. */
+export type TabSplitTarget = {
+  sourceGroupId: string
+  splitDirection: TabSplitDirection
+  /** false leaves the worktree's active group where it was. */
+  activate?: boolean
+}
+
+export type TabDragActivationSnapshot = {
+  activeGroupId: string | null
+  activeTabIdByGroup: Record<string, string | null>
+}
+
 export type TabsSlice = TabTerminalDockSlice & {
   unifiedTabsByWorktree: Record<string, Tab[]>
   groupsByWorktree: Record<string, TabGroup[]>

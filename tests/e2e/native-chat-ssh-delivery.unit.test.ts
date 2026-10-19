@@ -19,8 +19,7 @@ import { TERMINAL_METHODS } from '../../src/main/runtime/rpc/methods/terminal'
 import { sendAgentDraftPasteContentNow } from '../../src/renderer/src/lib/agent-draft-paste-content'
 import type { RpcClient } from '../../mobile/src/transport/rpc-client'
 
-// The fork's send path is keyed by a quarantine-scoped target rather than (settings, ptyId).
-const chatTarget = (ptyId: string) => ({ terminalTabId: 'tab-ssh', ptyId, settings: null })
+const chatTarget = (ptyId: string) => ({ terminalTabId: 'tab-ssh', ptyId })
 let close: (() => void) | undefined
 afterEach(() => {
   resetNativeChatPtySendQueuesForTests()
@@ -144,14 +143,11 @@ describe('prompt delivery through production IPC, provider and paired host', () 
         requireWriteSettlement: true
       })
     ).resolves.toBe(true)
-    await expect(sendNativeChatMessageVerified('remote:owner@@terminal', 'body')).resolves.toBe(
-      true
-    )
     await expect(
       sendNativeChatMessageVerified(chatTarget('remote:owner@@terminal'), 'body')
     ).resolves.toBe(true)
     await expect(
-      sendAgentDraftPasteContentNow(null, 'remote:owner@@terminal', 'launch', 'launch')
+      sendAgentDraftPasteContentNow('remote:owner@@terminal', 'launch', 'launch')
     ).resolves.toBe(true)
     expect(ssh.bytes).toEqual(['answer', 'body', '\r', '\x1b[200~launch\x1b[201~'])
     expect(ssh.settlement).not.toHaveBeenCalled()

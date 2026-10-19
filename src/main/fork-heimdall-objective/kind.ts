@@ -31,7 +31,6 @@ import {
 import { paceObjective } from '../../shared/fork-heimdall-objective/pacing'
 import { OBJECTIVE_STOP_PREDICATES } from '../../shared/fork-heimdall-objective/stop-policy'
 import type { Store } from '../persistence'
-import { runtimeFileSshTargetId } from '../runtime/runtime-file-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { JudgmentAuthority, JudgmentService } from '../fork-heimdall/judgment/service'
 import { readObjectiveJudgmentReports } from '../fork-heimdall/judgment/report-projection'
@@ -98,17 +97,9 @@ export function paceObjectiveForEnrollment(
 }
 
 function checkTargetAvailable(target: ObjectiveWorkspaceTarget): boolean {
-  if (target.fileProvider === null) {
-    return (
-      target.executionHostId === 'local' &&
-      target.gitTarget?.localGitOptions?.wslDistro === undefined
-    )
-  }
-  try {
-    return runtimeFileSshTargetId(target) !== undefined
-  } catch {
-    return false
-  }
+  return (
+    target.executionHostId === 'local' && target.gitTarget?.localGitOptions?.wslDistro === undefined
+  )
 }
 
 function judgmentAuthority(
@@ -118,17 +109,10 @@ function judgmentAuthority(
   if (storageAuthority !== 'desktop') {
     return 'remote-storage-authority'
   }
-  if (
-    target.executionHostId !== 'local' ||
+  return target.executionHostId !== 'local' ||
     target.gitTarget?.localGitOptions?.wslDistro !== undefined
-  ) {
-    return 'remote-execution-host'
-  }
-  try {
-    return runtimeFileSshTargetId(target) === undefined ? 'local-desktop' : 'remote-execution-host'
-  } catch {
-    return 'remote-execution-host'
-  }
+    ? 'remote-execution-host'
+    : 'local-desktop'
 }
 
 function objectivePreflight(args: {

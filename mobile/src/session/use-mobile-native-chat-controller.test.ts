@@ -192,19 +192,6 @@ function structuredTab(agent: string) {
   return { tab, activeHandle: null, inputLeaseReady: false }
 }
 
-/** Harness props for a structured chat tab running `agent`. */
-function structuredTab(agent: string) {
-  const tab = {
-    type: 'agent-session',
-    id: 'agent-tab-1',
-    title: 'Chat',
-    sessionId: 'session-structured',
-    agent,
-    isActive: true
-  }
-  return { tab, activeHandle: null, inputLeaseReady: false }
-}
-
 describe('useMobileNativeChatController handleNativeChatSend', () => {
   let renderer: ReactTestRenderer | null = null
   let controller: MobileNativeChatController | null = null
@@ -371,7 +358,7 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
     expect(clientStub.sendRequest).not.toHaveBeenCalled()
   })
 
-  it("echoes a command the chat's own agent runs, though Codex's host claims it", async () => {
+  it("leaves a command the chat's own agent runs to its session, though Codex's host claims it", async () => {
     await act(async () => {
       renderer?.update(createElement(Harness, structuredTab('opencode')))
     })
@@ -379,7 +366,9 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
       await controller!.handleNativeChatSend('/review')
     })
     expect(structuredSendWithOutcome).toHaveBeenCalledWith('/review')
-    expect(acceptSend).toHaveBeenCalledWith(ORIGIN, '/review', undefined)
+    // The structured session draws it; the drafts' text-matched echo is the terminal lane's.
+    expect(acceptSend).not.toHaveBeenCalled()
+    expect(restoreRejectedDraft).not.toHaveBeenCalled()
     // Its options report decides attach, not the built-in answer.
     expect(controller!.nativeChatAcceptsImages).toBe(false)
   })
@@ -401,6 +390,12 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
       })
       expect(controller?.nativeChatCanStop).toBe(true)
       expect(controller?.handleNativeChatCancelPrompt).toEqual(expect.any(Function))
+      // A host that stops what the chat has in flight takes Stop before a turn; a card still can't.
+      structuredActivity.turnId = null
+      harnessHostSupport = structuredAgentSessionHostSupport(['agent-session.conversation-stop.v1'])
+      await act(async () => renderer?.update(createElement(Harness, props)))
+      expect(controller?.nativeChatCanStop).toBe(true)
+      expect(controller?.handleNativeChatCancelPrompt).toBeUndefined()
     } finally {
       harnessHostSupport = null
       structuredActivity.isWorking = false

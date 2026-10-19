@@ -2,25 +2,47 @@ import { OrcaRuntimeWithStateFields } from '../construction/runtime-construction
 import {
   persistClientHostedBrowserPages,
   rehydrateClientHostedBrowserPages
-} from './client-hosted-browser-page-persistence'
-import { getRuntimeBrowserPageRegistry } from './runtime-browser-page-registry'
-import { splitWorktreeIdForFilesystem } from '../../shared/worktree/id'
-import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
-import type { ExecutionHostId } from '../../shared/execution-host'
-import { LOCAL_EXECUTION_HOST_ID, getRepoExecutionHostId } from '../../shared/execution-host'
-import type { IPtyProvider } from '../providers/types'
-import { killAllProcessesForWorktree } from './worktree-teardown'
-import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
-import type { MemorySnapshot, StatsSummary } from '../../shared/process-stats-types'
-import { collectMemorySnapshot } from '../memory/collector'
-import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
-import type { FeatureInteractionId } from '../../shared/feature-interactions'
-import type { RuntimeClientSettingsUpdate } from './runtime-client-settings-shape'
-import type { AgentLaunchSettingsMutation } from '../../shared/agent-launch-settings'
-import type { TerminalQuickCommand } from '../../shared/terminal-quick-command-types'
-import type { TerminalQuickCommandMutation } from '../../shared/terminal-quick-commands'
-import type { NativeChatSessionOptionSettingsMutation } from '../../shared/native-chat-session-options'
-import type { Automation } from '../../shared/automations-types'
+} from '../client-hosted-browser-page-persistence'
+import { getRuntimeBrowserPageRegistry } from '../runtime-browser-page-registry'
+import { splitWorktreeIdForFilesystem } from '../../../shared/worktree/id'
+import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
+import type { ExecutionHostId } from '../../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID, getRepoExecutionHostId } from '../../../shared/execution-host'
+import type { IPtyProvider } from '../../providers/pty-provider-contract'
+import { killAllProcessesForWorktree } from '../worktree-teardown'
+import type { MemorySnapshot, StatsSummary } from '../../../shared/process-stats-types'
+import { collectMemorySnapshot } from '../../memory/collector'
+import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
+import type { FeatureInteractionId } from '../../../shared/feature-interactions'
+import type { RuntimeClientSettingsUpdate } from '../runtime-client-settings-shape'
+import type { AgentLaunchSettingsMutation } from '../../../shared/agent-launch-settings'
+import type { TerminalQuickCommand } from '../../../shared/terminal-quick-command-types'
+import type { TerminalQuickCommandMutation } from '../../../shared/terminal-quick-commands'
+import type { NativeChatSessionOptionSettingsMutation } from '../../../shared/native-chat-session-options'
+import type { WorktreeTerminalStopOptions } from '../terminal/stop/worktree-terminal-stop-options'
+import type { PtyLivenessVerdict } from '../../../shared/pty-liveness-verdict'
+import type { Automation } from '../../../shared/automations-types'
+
+export abstract class OrcaRuntimeWithPtyForegroundProcessReads extends OrcaRuntimeWithStateFields {
+  abstract retireStructuredAgentSessionTabFromSnapshot(sessionId: string): boolean
+
+  abstract getPtyLivenessVerdict(ptyId: string): PtyLivenessVerdict | null
+
+  abstract forgetStructuredSessionMail(sessionId: string): void
+
+  abstract stopTerminalsForWorktree(
+    worktreeSelector: string,
+    options?: WorktreeTerminalStopOptions
+  ): Promise<{ stopped: number }>
+
+  protected abstract setWorkspaceSessionForWorktree(
+    worktreeId: string,
+    session: WorkspaceSessionState
+  ): void
+
+  protected abstract getWorkspaceSessionForWorktree(
+    worktreeId: string
+  ): WorkspaceSessionState | null
 
   get ptyForegroundProcessReads() {
     return this.ptyForegroundAgent.getReads()

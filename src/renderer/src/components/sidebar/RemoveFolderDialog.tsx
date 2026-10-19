@@ -24,6 +24,8 @@ import {
   retentionSummary,
   retentionTitle
 } from '../ledger/ledger-retention-notice-copy'
+import { countOpenRepoTerminalTabs } from '@/store/repos/repo-removal'
+import { getRecipeVmSshTargetForHost } from '@/lib/recipe-vm-managed-host'
 
 // Why: interpolated into the sentence so locales control where the name sits;
 // U+0000 cannot appear in a real project name, so the split is unambiguous.

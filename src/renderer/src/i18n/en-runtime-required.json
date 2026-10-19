@@ -1,9 +1,4 @@
 {
-  "accounts": {
-    "claude": {
-      "profileSwitching": "Switching applies to the next Claude you start in any tab."
-    }
-  },
   "agentsSidebarIntro": {
     "migrated": {
       "action": "Open Agents"
@@ -1224,20 +1219,6 @@
           "a05bcdaf57": "Agents View",
           "f63ea281e3": "Threaded left-sidebar feed for agent completions and blocking states.",
           "fb82ea1d7a": "Automatically materialize configured files or folders into newly created worktrees.",
-          "nativeChat": {
-            "resumeCopy": "When Orca quits or installs an update, chats that were working are automatically resumed when Orca is reopened.",
-            "resumeTitle": "Resume working chats automatically after a restart",
-            "resumeToggleLabel": "Toggle automatic resume after a restart",
-            "shellEnvCopy": "Codex and Claude chats start with every variable your login shell exports, the same as a terminal. Turn off to choose which ones they get.",
-            "shellEnvNameAdd": "Add",
-            "shellEnvNamePlaceholder": "Variable name",
-            "shellEnvNameRemove": "Remove {{value0}}",
-            "shellEnvNamesAlwaysPassed": "PATH, locale, and SSH_AUTH_SOCK are always passed. Applies the next time a chat starts or resumes.",
-            "shellEnvNamesEmpty": "No variables added yet.",
-            "shellEnvNamesLabel": "Variables to pass from your shell",
-            "shellEnvTitle": "Use your shell environment",
-            "shellEnvToggleLabel": "Toggle using your shell environment"
-          },
           "newWorktreeCardStyle": {
             "copy": "Preview updated worktree-card layout, metadata placement, card-display menu options, and status presentation."
           }
@@ -1526,7 +1507,6 @@
           "fac59213fc": "Search builtin themes"
         },
         "SourceControlAiActionRecipeDefaults": {
-          "2cb4bb7e5d": "CLI arguments",
           "a9359c8aa9": "Unknown error"
         },
         "SparsePresetSettingsSection": {
@@ -2030,9 +2010,6 @@
         "SidebarToolbar": {
           "19e32d0e5f": "Open folder picker to add a project",
           "abc62b6328": "Add Project"
-        },
-        "SidebarWorkspaceFilterSection": {
-          "ed1611b65b": "Hide sleeping"
         },
         "SidebarWorkspaceOptionsMenu": {
           "2d4f0eb933": "Default",
@@ -2926,8 +2903,7 @@
       },
       "composer": {
         "effort": "Effort",
-        "imageUnsupported": "Image paste is not supported for this agent.",
-        "permissions": "Permissions"
+        "imageUnsupported": "Image paste is not supported for this agent."
       },
       "failureWords": {
         "accountSwitchInProgress": "{{agent}}'s setup is changing on this host. Try again after it finishes.",
@@ -2970,6 +2946,7 @@
         "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}.",
         "commandRefused": "This command didn't run.",
         "commandRefusedTryAgain": "This command didn't run. Try it again.",
+        "commandUnavailable": "This command isn't available in {{agent}} chats, so it was not sent.",
         "compactionFailed": "Compaction failed.",
         "compactionFailedQuoted": "Compaction failed: {{detail}}.",
         "compactionUnconfirmed": "Compaction completion is unconfirmed.",
@@ -2979,7 +2956,6 @@
         "couldNotStopTheAgent": "Couldn't stop the agent.",
         "editSavedArguments": "Edit them in Settings > Agents > Arguments.",
         "emptyMessage": "This message is empty, so it was not sent.",
-        "commandUnavailable": "This command isn't available in {{agent}} chats, so it was not sent.",
         "historyInOtherAccount": "This chat's history is in another Claude account. Switch back to that account to continue it.",
         "historyTooLarge": "This conversation's history is too large to restore here.",
         "hostFault": "Orca ran into a problem, so this didn't go through.",
@@ -3248,6 +3224,11 @@
       "omittedFiles": "Files omitted by sparse checkout are not searched.",
       "viewOnly": "Sparse checkout · View changes do not change checked-out files.",
       "viewing": "Viewing: {{path}}"
+    }
+  },
+  "jira": {
+    "workspace": {
+      "open": "Open workspace linked to {{key}}"
     }
   },
   "ledger": {

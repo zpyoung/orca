@@ -9,6 +9,11 @@ import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cac
 import { notifyReposChanged } from './repos-changed-notification'
 import { ProjectUpdateIpcArgs, parseProjectGroupIpcArgs } from './repo-ipc-arg-schemas'
 import { visibleRepos } from '../../ssh/orcad-retained-source'
+import {
+  assertWslMoveProjectWritable,
+  assertWslMoveReposWritable,
+  isWslMoveSourceHost
+} from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
 
 export function registerRepoCatalogHandlers(
@@ -96,6 +101,9 @@ export function registerRepoCatalogHandlers(
       const hostId = normalizeExecutionHostId(args.hostId)
       if (!hostId) {
         throw new Error(`Invalid host ID: ${args.hostId}`)
+      }
+      if (isWslMoveSourceHost(hostId)) {
+        assertWslMoveProjectWritable(store, { repoId: args.repoId })
       }
       // Why: the runtime resolves a bare id and rejects one registered on two hosts, so only route
       // through it when the caller actually asked for the ledger retention guard.

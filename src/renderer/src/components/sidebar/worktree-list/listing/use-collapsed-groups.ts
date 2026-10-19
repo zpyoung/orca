@@ -32,9 +32,6 @@ export function useEffectiveCollapsedGroups(args: {
   prCache: AppState['prCache'] | null
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGroups: readonly ProjectGroup[]
-  // Why: must be the host-filtered set buildRows uses, or the agent send picker
-  // force-opens a group key the rendered tree never built.
-  visibleProjectGroupsForRows?: readonly ProjectGroup[]
   projectGrouping: ProjectGroupingModel
   folderWorkspaces: readonly FolderWorkspace[]
   defaultHostId: ExecutionHostId
@@ -55,7 +52,6 @@ export function useEffectiveCollapsedGroups(args: {
     prCache,
     workspaceStatuses,
     projectGroups,
-    visibleProjectGroupsForRows = projectGroups,
     projectGrouping,
     folderWorkspaces,
     defaultHostId
@@ -71,7 +67,7 @@ export function useEffectiveCollapsedGroups(args: {
       const folderKeys = getFolderWorkspaceRevealGroupKeys(
         agentSendTargetWorktreeId,
         folderWorkspaces,
-        visibleProjectGroupsForRows,
+        projectGroups,
         { groupBy, workspaceStatuses, defaultHostId, hostScopedGroups }
       )
       if (folderKeys.length === 0) {
@@ -99,8 +95,7 @@ export function useEffectiveCollapsedGroups(args: {
       pinnedDisplayPolicy,
       prCache,
       workspaceStatuses,
-      settings,
-      projectGroups: visibleProjectGroupsForRows,
+      projectGroups,
       projectGrouping
     })) {
       next.delete(groupKey)
@@ -117,7 +112,7 @@ export function useEffectiveCollapsedGroups(args: {
     visibleWorktrees,
     filterRepoIds,
     prCache,
-    visibleProjectGroupsForRows,
+    projectGroups,
     projectGrouping,
     repoMap,
     workspaceStatuses,

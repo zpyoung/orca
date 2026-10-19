@@ -18,7 +18,7 @@ export type AgentLaunchModelPreferenceRefusal = {
 }
 
 export type AgentLaunchModelPreferenceCheck =
-  | { preferences: AgentLaunchPreferences | undefined }
+  | { preferences: Pick<AgentLaunchPreferences, 'model' | 'effort'> | undefined }
   | { refusal: AgentLaunchModelPreferenceRefusal }
 
 export function checkAgentLaunchModelPreferences(args: {
@@ -74,7 +74,7 @@ export function checkAgentLaunchModelPreferences(args: {
     }
   }
 
-  const requested: AgentLaunchPreferences = {
+  const requested: Pick<AgentLaunchPreferences, 'model' | 'effort'> = {
     model: args.model,
     ...(args.effort ? { effort: args.effort } : {})
   }

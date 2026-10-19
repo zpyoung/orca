@@ -49,6 +49,8 @@ import type {
 import { orderMainWorktreeFirst, getRenderedNaturalAnchorRepoIds } from './section-order'
 import { withRepoSectionDisplayLabels } from '../project-section-order'
 import { buildOrderedGroups } from './worktree-grouping'
+import { splitLooseWorktreeSections } from '../fork-worktree-groups/loose-worktree-section-rows'
+import { isLooseWorktreeSectionKey } from '../fork-worktree-groups/worktree-loose-group-membership'
 
 type SidebarOccurrenceSection = WorktreeOccurrenceSection<Worktree> & { group: WorktreeGroupEntry }
 
@@ -126,7 +128,12 @@ export function planSidebarRows(inputs: SidebarRowPlanInputs) {
     owningSectionOf: (worktree) =>
       getProjectGroupingForRepo(worktree.repoId, repoMap, projectIndex),
     projectIdOf: (worktree) => worktree.repoId,
-    sectionsOf: ({ pinned, natural, displayRootByIdentity }) => {
+    sectionsOf: ({ pinned, natural: placedNatural, displayRootByIdentity }) => {
+      const { natural, looseSections } = splitLooseWorktreeSections(placedNatural, {
+        groupBy,
+        projectGroups,
+        projectGroupPaths
+      })
       const groups: OrderedGroupEntry[] =
         groupBy === 'none'
           ? [[ALL_GROUP_KEY, { label: '', items: [...natural], repoIds: new Set() }]]
@@ -149,7 +156,7 @@ export function planSidebarRows(inputs: SidebarRowPlanInputs) {
       if (pinned.length > 0) {
         groups.unshift([PINNED_GROUP_KEY, { label: '', items: pinned, repoIds: new Set() }])
       }
-      return groups.map(([key, group]): SidebarOccurrenceSection => {
+      const sections = groups.map(([key, group]): SidebarOccurrenceSection => {
         const revealPath =
           groupBy === 'repo' && key !== PINNED_GROUP_KEY && group.repo?.projectGroupId
             ? projectGroupPaths.get(group.repo.projectGroupId)
@@ -165,14 +172,19 @@ export function planSidebarRows(inputs: SidebarRowPlanInputs) {
           revealPath: { key, parent: revealPath }
         }
       })
+      return [...sections, ...looseSections]
     }
   })
   const pinnedSectionWorktrees =
     occurrencePlan.sections.find((section) => section.key === PINNED_GROUP_KEY)?.group.items ?? []
   const orderedGroups: OrderedGroupEntry[] = occurrencePlan.sections
-    .filter((section) => section.key !== PINNED_GROUP_KEY)
+    .filter(
+      (section) => section.key !== PINNED_GROUP_KEY && !isLooseWorktreeSectionKey(section.key)
+    )
     .map((section) => [section.key, section.group])
-  const naturalWorktrees = orderedGroups.flatMap(([, group]) => group.items)
+  const naturalWorktrees = occurrencePlan.sections
+    .filter((section) => section.key !== PINNED_GROUP_KEY)
+    .flatMap((section) => section.group.items)
   const render = (collapsedGroups: Set<string>): Row[] => {
     const result: Row[] = []
     if (groupBy !== 'repo') {

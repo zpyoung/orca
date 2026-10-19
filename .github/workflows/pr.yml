@@ -28,7 +28,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     name: detect changes and check repository guards
     # Start routing without waiting behind the GitHub-hosted test queue.
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
       contents: read
@@ -52,6 +52,8 @@ jobs:
       cross-version-wire: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.cross-version-wire }}
       managed_hook_node18: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.managed_hook_node18 }}
       package: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.package }}
+      layout_oracle: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.layout_oracle }}
+      dependency_isolation: ${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.dependency_isolation }}
       e2e_should_run: ${{ steps.e2e_filter.outputs.should_run }}
       test_files: ${{ steps.e2e_filter.outputs.test_files }}
       e2e_run_changed: ${{ steps.e2e_filter.outputs.e2e_run_changed }}
@@ -136,7 +138,11 @@ jobs:
           # thousands of paths (~330KB), so the pipe form fails every time on those.
           CHANGED_COUNT="$(wc -l < "$RUNNER_TEMP/changed-paths.txt")"
           echo "changed_count=$((CHANGED_COUNT))" >> "$GITHUB_OUTPUT"
-          node config/scripts/pr-code-change-scope.mjs \
+          MOBILE_CI_ARGS=()
+          if git diff --quiet --no-renames --diff-filter=ACDRTUXB "$DIFF_BASE" HEAD; then
+            MOBILE_CI_ARGS=(--mobile-ci-tools --daemon-init-test-support)
+          fi
+          node config/scripts/pr-code-change-scope.mjs "${MOBILE_CI_ARGS[@]}" \
             < "$RUNNER_TEMP/changed-paths.txt" | tee -a "$GITHUB_OUTPUT"
 
       # Reuse the path-detector checkout instead of queuing another runner.
@@ -150,22 +156,21 @@ jobs:
           # Use a file here too so sync-sized diffs cannot exhaust Node's stdin pipe buffer.
           git diff --name-only --diff-filter=AMCR "$DIFF_BASE" HEAD \
             > "$RUNNER_TEMP/e2e-changed-paths.txt"
+          E2E_SCOPE_ARGS=()
+          if git diff --quiet --no-renames --diff-filter=ACDRTUXB "$DIFF_BASE" HEAD; then
+            E2E_SCOPE_ARGS=(--daemon-init-test-support)
+          fi
           # Source routes are executable contracts so a test can prove exact
           # authorities, exclusions, and sentinels without evaluating workflow shell.
-          TEST_FILES_JSON="$(node config/scripts/pr-e2e-source-routing.mjs < "$RUNNER_TEMP/e2e-changed-paths.txt")"
+          TEST_FILES_JSON="$(node config/scripts/pr-e2e-source-routing.mjs "${E2E_SCOPE_ARGS[@]}" < "$RUNNER_TEMP/e2e-changed-paths.txt")"
           echo "test_files=$TEST_FILES_JSON" >> "$GITHUB_OUTPUT"
-          # Why a separate signal: the Docker-SSH lane must trigger on SSH source, not on a
-          # spec name surviving in a route's list. Same routes, so the two cannot drift.
-          SSH_SOURCE_CHANGED="$(node config/scripts/pr-e2e-source-routing.mjs --ssh-source < "$RUNNER_TEMP/e2e-changed-paths.txt")"
-          echo "ssh_source_changed=$SSH_SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
-          echo "SSH source changed: $SSH_SOURCE_CHANGED"
-          printf '%s\n' "$TEST_FILES_JSON" | E2E_SSH_SOURCE_CHANGED="$SSH_SOURCE_CHANGED" node config/scripts/ci-e2e-job-selection.mjs --job-outputs >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$TEST_FILES_JSON" | node config/scripts/ci-e2e-job-selection.mjs --job-outputs >> "$GITHUB_OUTPUT"
           # Why its own signal: the real-IME lane is a whole ibus session, not a spec, so it must
           # trigger on IME source rather than on a spec name in some route's list.
           NATIVE_IME_SOURCE_CHANGED="$(node config/scripts/pr-e2e-source-routing.mjs --native-ime-source < "$RUNNER_TEMP/e2e-changed-paths.txt")"
           echo "native_ime_source_changed=$NATIVE_IME_SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "Native IME source changed: $NATIVE_IME_SOURCE_CHANGED"
-          SHOULD_RUN="$(node config/scripts/pr-e2e-source-routing.mjs --reusable-workflow < "$RUNNER_TEMP/e2e-changed-paths.txt")"
+          SHOULD_RUN="$(node config/scripts/pr-e2e-source-routing.mjs --reusable-workflow "${E2E_SCOPE_ARGS[@]}" < "$RUNNER_TEMP/e2e-changed-paths.txt")"
           TEST_FILE_COUNT="$(jq 'length' <<< "$TEST_FILES_JSON")"
           if [ "$TEST_FILE_COUNT" -gt 25 ]; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -183,7 +188,7 @@ jobs:
     needs: [code_paths]
     if: needs.code_paths.outputs.static_analysis == 'true' || needs.code_paths.outputs.typecheck == 'true'
     # Leave headroom for typechecking and overlapping checks.
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04-arm
     outputs:
       shards: ${{ steps.unit-plan.outputs.shards }}
       managed_hook_node18: ${{ steps.managed_hook_node18.outcome }}
@@ -315,26 +320,19 @@ jobs:
         env:
           PREFLIGHT_PHASE_SELECTED: ${{ needs.code_paths.outputs.static_analysis == 'true' }}
           PREFLIGHT_PRIOR_SUCCESS: ${{ job.status == 'success' }}
-          CHANGED_COUNT: ${{ needs.code_paths.outputs.changed_count }}
         run: |
           if [ "$PREFLIGHT_PHASE_SELECTED" != true ] || [ "$PREFLIGHT_PRIOR_SUCCESS" != true ]; then exit 0; fi
-          # Strict changed-line scans cannot finish on a sync-sized diff; baseline checks still run.
-          if [ "$CHANGED_COUNT" -gt 500 ]; then
-            echo "Skipping changed-code quality: $CHANGED_COUNT changed files exceeds the 500-file limit for strict changed-line scans. Baseline checks remain enabled."
-            exit 0
-          fi
-          pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha }}"
+          node config/scripts/check-changed-code-quality.mjs "${{ github.event.pull_request.base.sha }}"
+
+      - name: Verify locked audit tools
+        if: needs.code_paths.outputs.static_analysis == 'true'
+        env:
+          ORCA_BACKGROUND_LAUNCH: '1'
+        run: node config/scripts/verify-locked-audit-tools.mjs
 
       - name: Enforce React Doctor on changed lines
         if: needs.code_paths.outputs.static_analysis == 'true'
-        env:
-          CHANGED_COUNT: ${{ needs.code_paths.outputs.changed_count }}
-        run: |
-          if [ "$CHANGED_COUNT" -gt 500 ]; then
-            echo "Skipping React Doctor: $CHANGED_COUNT changed files exceeds the 500-file limit for strict changed-line scans. Baseline checks remain enabled."
-            exit 0
-          fi
-          pnpm run check:react-doctor:changed -- "${{ github.event.pull_request.base.sha }}"
+        run: node config/scripts/check-react-doctor-changed.mjs "${{ github.event.pull_request.base.sha }}"
 
       - wait: changed-code-quality
 
@@ -574,7 +572,36 @@ jobs:
           path: ci-shards/unit-selection.json
           retention-days: 14
 
+      - name: Test Mobile CI tools and runtime routing
+        if: needs.code_paths.outputs.mobile_ci_tools == 'true'
+        env:
+          ORCA_BACKGROUND_LAUNCH: '1'
+          ORCA_BALANCE_UNIT_SHARDS: '1'
+        run: >-
+          node config/scripts/run-vitest.mjs run --config config/vitest.config.ts
+          --maxWorkers=4 --isolate --retry=0 --bail=0
+          config/scripts/mobile-release-check-scope.test.mjs
+          config/scripts/mobile-test-change-scope.test.mjs
+          config/scripts/pr-ready-check-reuse.test.mjs
+          config/scripts/ci-dependency-download-cache.test.mjs
+          config/scripts/win32-test-lane-registration.test.mjs
+          config/scripts/vitest-node-runtime-boundary.test.ts
+          config/scripts/vitest-sqlite-runtime-boundary.test.ts
+
+      # Report failure through the separate required check without blocking unrelated consumers.
+      - name: Smoke process-host package on Node 18
+        id: managed_hook_node18
+        if: success() && needs.code_paths.outputs.managed_hook_node18 == 'true'
+        continue-on-error: true
+        env:
+          NODE18_EXECUTABLE: ${{ steps.node18_executable.outputs.executable }}
+          ORCA_BACKGROUND_LAUNCH: '1'
+        run: |
+          test -n "$NODE18_EXECUTABLE"
+          "$NODE18_EXECUTABLE" config/scripts/smoke-process-host-node18.mjs
+
   fork_ownership_guard:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     name: fork ownership guard
     runs-on: ubuntu-latest
 
@@ -723,6 +750,35 @@ jobs:
           ORCA_CODEX_NO_DAEMON_CONTRACT_BINARY="$RUNNER_TEMP/codex-cli-no-daemon/node_modules/.bin/codex" \
             pnpm exec vitest run --config config/vitest.config.ts \
             src/main/pty/codex-no-daemon-binary-contract.test.ts
+
+      # Why both pins and latest: Orca approves its managed-home hook entry with a hash
+      # Codex computes, so a release that changes it must redden here before users
+      # meet a review screen.
+      - name: Verify Codex hook file-entry contract (pinned)
+        env:
+          ORCA_CODEX_HOOK_CONTRACT_REQUIRED: '1'
+        run: |
+          set -euo pipefail
+          for install in codex-cli:"$CODEX_CLI_VERSION" codex-cli-no-daemon:"$CODEX_NO_DAEMON_CLI_VERSION"; do
+            ORCA_CODEX_HOOK_CONTRACT_BINARY="$RUNNER_TEMP/${install%%:*}/node_modules/.bin/codex" \
+              ORCA_CODEX_HOOK_CONTRACT_VERSION="${install#*:}" \
+              pnpm exec vitest run --config config/vitest.config.ts \
+              src/main/codex/codex-hook-file-entry-binary-contract.test.ts
+          done
+
+      - name: Install latest Codex CLI
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/codex-cli-latest" "@openai/codex@latest"
+
+      - name: Verify Codex hook file-entry contract (latest)
+        env:
+          ORCA_CODEX_HOOK_CONTRACT_REQUIRED: '1'
+        run: |
+          set -euo pipefail
+          ORCA_CODEX_HOOK_CONTRACT_BINARY="$RUNNER_TEMP/codex-cli-latest/node_modules/.bin/codex" \
+            pnpm exec vitest run --config config/vitest.config.ts \
+            src/main/codex/codex-hook-file-entry-binary-contract.test.ts
 
       # Why the no-daemon install: it is the newest pinned Codex, and its project
       # lookup decides whether a worktree launch stops at the trust prompt.
@@ -914,7 +970,7 @@ jobs:
     uses: ./.github/workflows/unit-tests.yml
     with:
       node_versions: '["24"]'
-      runner: blacksmith-4vcpu-ubuntu-2404
+      runner: ubuntu-latest
       phase_diagnostics: true
       shards: ${{ needs.preflight.outputs.shards }}
       run_shards: ${{ needs.code_paths.outputs.mobile_ci_tools != 'true' }}
@@ -1144,6 +1200,16 @@ jobs:
           src/main/browser/browser-route-webrtc-egress.electron.test.ts
           src/main/browser/browser-route-h3-egress.electron.test.ts
           src/main/browser/browser-route-dns-prefetch.electron.test.ts
+          src/main/persistence/profile-state/profile-state-writer-stall.electron.test.ts
+          src/main/browser/browser-popup-compatibility.electron.test.ts
+          src/main/browser/browser-popup-native-compatibility.electron.test.ts
+          src/main/browser/browser-popup-background-compatibility.electron.test.ts
+
+      # The isolated glibc-floor build writes only the Wayland helper, so JavaScript can overlap.
+      - name: Build native components
+        id: linux-native
+        background: true
+        uses: ./.github/actions/prepare-wayland-clipboard
 
       # Restore independent fixtures during builds; keep native lifecycle probes serial.
       - uses: ./.github/actions/prepare-linux-package-fixture
@@ -1335,6 +1401,66 @@ jobs:
       contents: read
     uses: ./.github/workflows/terminal-ime-e2e.yml
 
+  # Why: pnpm's global virtual store links each package to only its declared dependencies, which
+  # is how developers install. Hoisting hides an undeclared one everywhere else, so install that way
+  # here with HOME and the store in an empty temp dir, where no stray node_modules can mask it.
+  dependency_isolation:
+    name: dependency isolation under the global virtual store
+    needs: [code_paths]
+    if: >-
+      !cancelled() &&
+      needs.code_paths.result == 'success' &&
+      needs.code_paths.outputs.dependency_isolation == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ORCA_PNPM_FORCE_GLOBAL_VIRTUAL_STORE_IN_CI: '1'
+
+    steps:
+      # Job-wide (via GITHUB_ENV, since job env cannot read runner.temp) so every pnpm command,
+      # including pnpm run's own install check, keeps this layout.
+      - name: Point HOME and the pnpm store at empty temp dirs
+        run: |
+          mkdir -p "$RUNNER_TEMP/empty-home"
+          {
+            echo "HOME=$RUNNER_TEMP/empty-home"
+            echo "pnpm_config_store_dir=$RUNNER_TEMP/isolated-store"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - name: Install with every package isolated in its own store slot
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --ignore-scripts
+          if [ -d node_modules/bun ]; then
+            pnpm rebuild bun
+          fi
+
+      - name: Typecheck and check undeclared dependency resolution
+        run: |
+          set -euo pipefail
+          pnpm tc
+          pnpm exec vitest run --config config/vitest.config.ts config/scripts/undeclared-dependency-resolution.test.ts
+          # Pointless if any pnpm command above fell back to the hoisted layout or another store.
+          case "$(realpath node_modules/zod)" in
+            "$(realpath "$pnpm_config_store_dir")"/*) ;;
+            *) echo "node_modules/zod is not in the isolated store"; exit 1 ;;
+          esac
+
   verify:
     name: PR checks passed
     # Publish an explicit result after every required dependency settles.
@@ -1352,6 +1478,8 @@ jobs:
       - cross-version-wire
       - managed_hook_node18
       - package
+      - layout_oracle
+      - dependency_isolation
     # Evaluating job results only needs the lightweight container runner.
     runs-on: ubuntu-slim
     timeout-minutes: 5
@@ -1392,6 +1520,10 @@ jobs:
           MANAGED_HOOK_NODE18_SHOULD_RUN: ${{ needs.code_paths.outputs.managed_hook_node18 }}
           PACKAGE: ${{ needs.package.result }}
           PACKAGE_SHOULD_RUN: ${{ needs.code_paths.outputs.package }}
+          LAYOUT_ORACLE: ${{ needs.layout_oracle.result }}
+          LAYOUT_ORACLE_SHOULD_RUN: ${{ needs.code_paths.outputs.layout_oracle }}
+          DEPENDENCY_ISOLATION: ${{ needs.dependency_isolation.result }}
+          DEPENDENCY_ISOLATION_SHOULD_RUN: ${{ needs.code_paths.outputs.dependency_isolation }}
         run: |
           if [ "$CODE_PATHS" != "success" ]; then
             exit 1
@@ -1402,6 +1534,10 @@ jobs:
           if [ "$FORK_OWNERSHIP_GUARD" != "success" ]; then
             exit 1
           fi
+          case "$STATIC_ANALYSIS_SHOULD_RUN:$TYPECHECK_SHOULD_RUN" in
+            true:true|true:false|false:true|false:false) ;;
+            *) echo "preflight: missing or invalid selection"; exit 1 ;;
+          esac
           if [ "$SHOULD_RUN" != "true" ]; then
             echo "Docs-only change; expensive PR checks skipped."
           fi
@@ -1434,4 +1570,6 @@ jobs:
           check_job cross-version-wire "$CROSS_VERSION_WIRE" "$CROSS_VERSION_WIRE_SHOULD_RUN"
           check_job managed_hook_node18 "$MANAGED_HOOK_NODE18" "$MANAGED_HOOK_NODE18_SHOULD_RUN"
           check_job package "$PACKAGE" "$PACKAGE_SHOULD_RUN"
+          check_job layout_oracle "$LAYOUT_ORACLE" "$LAYOUT_ORACLE_SHOULD_RUN"
+          check_job dependency_isolation "$DEPENDENCY_ISOLATION" "$DEPENDENCY_ISOLATION_SHOULD_RUN"
           exit "$failed"

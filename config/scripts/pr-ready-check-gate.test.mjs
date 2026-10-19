@@ -2,41 +2,22 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { parse } from 'yaml'
-import { runProcess } from '../../src/shared/child-process/run-process'
-import { PR_CHECK_JOBS as CLASSIFIED_JOBS } from './pr-code-change-scope.mjs'
+import { runProcess } from '@orca/process-host'
+import {
+  aggregateEnvironment,
+  aggregateNeeds,
+  aggregateRequiredJobs as requiredJobs,
+  aggregateSelectors,
+  aggregateShell as gate
+} from './pr-aggregate-gate-context.mjs'
 
-const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
-const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)
-const gate = workflow.jobs.verify.steps.find((step) => step.name === 'Require successful checks')
-const variable = (job) => job.replaceAll('-', '_').toUpperCase()
-const requiredJobs = [
-  'preflight',
-  ...PR_CHECK_JOBS.filter((job) => job !== 'static_analysis' && job !== 'typecheck')
-]
-
-function requiredResults(shouldRun) {
-  return Object.fromEntries(
-    requiredJobs.flatMap((job) => [
-      [variable(job), shouldRun ? 'success' : 'skipped'],
-      [`${variable(job)}_SHOULD_RUN`, String(shouldRun)]
-    ])
-  )
-}
-
-async function verify(results) {
-  return runProcess({
-    program: 'bash',
-    args: ['-c', gate.run],
-    env: {
-      ...process.env,
-      ORCA_BACKGROUND_LAUNCH: '1',
-      CODE_PATHS: 'success',
-      FORK_OWNERSHIP_GUARD: 'success',
-      SHOULD_RUN: 'true',
-      ...results
-    },
-    timeoutMs: 10_000
+async function verifyCases(environments, script, env = {}) {
+  const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`
+  const cases = environments.map((environment, index) => {
+    const exports = Object.entries(environment)
+      .map(([name, value]) => `export ${name}=${quote(value)}`)
+      .join('\n')
+    return `(\n${exports}\n${script}\n)\nprintf 'AGGREGATE_CASE_${index}=%s\\n' "$?"`
   })
   const directory = mkdtempSync(join(tmpdir(), 'orca-aggregate-cases-'))
   const file = join(directory, 'cases.sh')

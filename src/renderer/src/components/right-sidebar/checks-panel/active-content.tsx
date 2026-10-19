@@ -19,8 +19,6 @@ import { ChecksList } from './checks-list'
 import { PRCommentsList } from './comments-list'
 import { translate } from '@/i18n/i18n'
 import { HostedReviewSitterPanel } from '@/fork-hosted-review-sitter/HostedReviewSitterPanel'
-import type { ChecksPanelReview } from '../checks-panel-review'
-import type { ChecksPanelHostedReviewModifierDestination } from '../checks-panel-hosted-review-click-routing'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
 import { ChecksPanelReviewHeader } from './review-header'
 

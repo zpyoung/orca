@@ -25,10 +25,12 @@ export type StructuredClaudeRuntimeAdapterDeps = {
   /** The registration's composed launch: the shared launch path with Claude's part. */
   resolveLaunch: ClaudeStructuredSessionAdapterDeps['resolveLaunch']
   /** The binary and env the startup version prewarm asks, as a launch would. */
-  resolveClaudeCommand?: () => string
+  resolveClaudeCommand?: typeof resolveClaudeCommand
   resolveClaudeLaunchEnv?: () => Promise<Record<string, string>> | Record<string, string>
   /** The env a Claude child inherits before auth stripping; absent inherits Orca's own. */
   resolveClaudeInheritedEnv?: () => Promise<Record<string, string>>
+  /** Asks Claude for a chat's `/` menu while it isn't running; absent reads the folders. */
+  atRestCommandProbe?: ClaudeCommandCatalogProbe
   /** Which version-gated flags a Claude CLI takes; absent never passes one. */
   claudeCliFlags?: ClaudeCliFlagSupport
   openClaudeConnection?: ClaudeStructuredSessionAdapterDeps['openConnection']
@@ -87,7 +89,8 @@ export function createStructuredClaudeRuntimeAdapter(
   }
   return new ClaudeStructuredSessionAdapter({
     atRestCommands: new ClaudeAtRestCommandCatalog({
-      resolveWorkspacePath: deps.resolveWorkspacePath
+      resolveWorkspacePath: deps.resolveWorkspacePath,
+      ...(deps.atRestCommandProbe ? { probe: deps.atRestCommandProbe } : {})
     }),
     resolveLaunch: deps.resolveLaunch,
     persistHandle: async ({ sessionId, providerSessionId, leafUuid, fence }) => {

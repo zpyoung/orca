@@ -2,9 +2,9 @@ import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import {
-  requireRuntimeFileProvider,
+  requireLocalRuntimeFileRoute,
   type ResolvedRuntimeFileTarget
-} from '../runtime/runtime-file-command-target'
+} from '../runtime/files/file-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 
@@ -44,11 +44,11 @@ export async function resolveObjectiveWorkspaceTarget(
     if (folderWorktreeId && target.worktree.id !== folderWorktreeId) {
       throw new Error('Resolved objective folder workspace identity changed after enrollment')
     }
+    requireLocalRuntimeFileRoute(target)
     return {
       kind: 'folder',
       executionHostId: enrollment.executionHostId,
-      workspacePath: enrollment.workspacePath,
-      fileProvider: requireRuntimeFileProvider(target)
+      workspacePath: enrollment.workspacePath
     }
   }
 
@@ -57,11 +57,11 @@ export async function resolveObjectiveWorkspaceTarget(
   if (target.worktree.id !== enrollment.worktreeId) {
     throw new Error('Resolved objective Git worktree identity changed after enrollment')
   }
+  requireLocalRuntimeFileRoute(target)
   return {
     kind: 'git',
     executionHostId: enrollment.executionHostId,
     workspacePath: enrollment.workspacePath,
-    fileProvider: requireRuntimeFileProvider(target),
     gitTarget: target
   }
 }

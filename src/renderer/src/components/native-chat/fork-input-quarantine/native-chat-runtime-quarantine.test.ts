@@ -30,19 +30,18 @@ const TAB = 'tab-quarantine'
 const PTY = 'pty-quarantine'
 const TARGET: NativeChatResolvedTarget = {
   terminalTabId: TAB,
-  ptyId: PTY,
-  settings: undefined
+  ptyId: PTY
 }
 
 function acceptedWriteBytes(): string[] {
   return sendRuntimePtyInputAcceptance.mock.calls.flatMap((call) =>
-    typeof call[2] === 'string' ? [call[2]] : []
+    typeof call[1] === 'string' ? [call[1]] : []
   )
 }
 
 function verifiedWriteBytes(): string[] {
   return sendRuntimePtyInputVerified.mock.calls.flatMap((call) =>
-    typeof call[2] === 'string' ? [call[2]] : []
+    typeof call[1] === 'string' ? [call[1]] : []
   )
 }
 

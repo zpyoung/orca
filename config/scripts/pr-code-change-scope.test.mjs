@@ -280,7 +280,8 @@ describe('per-job path classification', () => {
     )
     for (const file of [
       'src/main/runtime/structured-session-login-shell-test-harness.ts',
-      'src/main/runtime/structured-session-child-env.ts'
+      'src/main/runtime/structured-session-child-env.ts',
+      'src/main/runtime/structured-session-child-env.test-support.ts'
     ]) {
       expectClassification([file], {
         shell_contracts: true,
@@ -577,7 +578,9 @@ describe('PR Checks skip wiring', () => {
 
   it('keeps the root and README guards on docs-only PRs without another runner', () => {
     const detector = prWorkflow.jobs.code_paths
-    expect(detector.if).toBeUndefined()
+    expect(detector.if).toBe(
+      "github.event_name != 'pull_request' || github.event.pull_request.draft != true"
+    )
     expect(detector.needs).toBeUndefined()
     for (const name of ['Reject new root-level files and folders', 'Check README local links']) {
       const step = detector.steps.find((candidate) => candidate.name === name)

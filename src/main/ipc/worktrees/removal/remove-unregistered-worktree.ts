@@ -104,7 +104,7 @@ export async function removeUnregisteredWorktree(
     notifyWorktreesChanged(mainWindow, repoId)
     return {}
   }
-  if (await isAlreadyRemovedWorktreePath(repo, worktreePath, localWorktreeGitOptions)) {
+  if (await isAlreadyRemovedWorktreePath(worktreePath, localWorktreeGitOptions)) {
     if (!args.force && !removedMeta) {
       // Why: without persisted metadata, require the renderer recovery path before deleting Orca-only state for an unregistered path.
       throw new Error(UNREGISTERED_MISSING_WORKTREE_MESSAGE)

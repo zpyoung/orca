@@ -9,7 +9,8 @@ import {
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from './electron-remote-runtime-client-capabilities'
 import {
   structuredAgentSessionCreateParams,
-  type StructuredAgentSessionFirstMessage
+  type StructuredAgentSessionFirstMessage,
+  type StructuredAgentSessionResumeSource
 } from './structured-agent-session-create'
 import {
   structuredAgentSessionCreateFingerprint,
@@ -28,7 +29,7 @@ function nextUuid(): string {
 
 function createParams(
   overrides: {
-    resumeFrom?: { providerSessionId: string }
+    resumeFrom?: StructuredAgentSessionResumeSource
     tabId?: string
     firstMessage?: StructuredAgentSessionFirstMessage
     options?: Record<string, string>

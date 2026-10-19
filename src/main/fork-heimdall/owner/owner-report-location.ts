@@ -1,7 +1,6 @@
 import type { ExecutionHostId } from '../../../shared/execution-host'
-import { requireRuntimeGitProvider } from '../../runtime/runtime-git-command-target'
+import { requireLocalRuntimeGitRoute } from '../../runtime/runtime-git-command-target'
 import { resolveGitDir } from '../../git/source-control/resolve-git-dir'
-import type { IFilesystemProvider } from '../../providers/types'
 import { resolveLeasePathFlavor } from '../lease-host-filesystem'
 import type { LeaseWorkspaceTarget } from '../lease-store'
 
@@ -10,8 +9,6 @@ export type OwnerReportLocation = {
   /** The path a report must resolve inside, canonicalized before every read. */
   authorityRoot: string
   directory: string
-  /** Null means genuinely local, mirroring `LeaseWorkspaceTarget.fileProvider`. */
-  fileProvider: IFilesystemProvider | null
 }
 
 /**
@@ -28,19 +25,14 @@ export async function resolveOwnerReportLocation(
     return {
       executionHostId: target.executionHostId,
       authorityRoot: target.workspacePath,
-      directory: pathFlavor.join(target.workspacePath, '.orca', 'heimdall', 'owner-reports'),
-      fileProvider: target.fileProvider
+      directory: pathFlavor.join(target.workspacePath, '.orca', 'heimdall', 'owner-reports')
     }
   }
   if (!target.gitTarget) {
     throw new Error('Git owner report target has no runtime Git target')
   }
-  const provider = requireRuntimeGitProvider(target.gitTarget)
-  const gitDirectory = provider
-    ? (
-        await provider.exec(['rev-parse', '--absolute-git-dir'], target.workspacePath)
-      ).stdout.replace(/\r?\n$/u, '')
-    : await resolveGitDir(target.workspacePath, target.gitTarget.localGitOptions)
+  requireLocalRuntimeGitRoute(target.gitTarget)
+  const gitDirectory = await resolveGitDir(target.workspacePath, target.gitTarget.localGitOptions)
   if (!gitDirectory) {
     throw new Error('Git did not return an absolute git directory for the owner report location')
   }
@@ -48,7 +40,6 @@ export async function resolveOwnerReportLocation(
   return {
     executionHostId: target.executionHostId,
     authorityRoot: gitDirectory,
-    directory: pathFlavor.join(gitDirectory, 'orca-heimdall', 'owner-reports'),
-    fileProvider: target.fileProvider
+    directory: pathFlavor.join(gitDirectory, 'orca-heimdall', 'owner-reports')
   }
 }

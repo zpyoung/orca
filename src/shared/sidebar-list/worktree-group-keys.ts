@@ -1,17 +1,15 @@
-import type { ProjectGroup } from '../../../../../../shared/project-group-types'
-import type { Repo } from '../../../../../../shared/repo-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
-import { getWorkspaceStatus, getWorkspaceStatusGroupKey } from '../../workspace-status'
-import { cloneDefaultWorkspaceStatuses } from '../../../../../../shared/workspace-statuses'
-import type { AppState } from '../../../../store/types'
-import { ALL_GROUP_KEY, getPRGroupKey, getProjectGroupHeaderKey } from './group-keys'
-import { buildProjectGroupingIndex, getProjectGroupingForRepo } from './project-grouping'
-import type { ProjectGroupingModel } from './project-grouping'
-import type { WorktreeGroupBy } from './row-types'
+import type { ProjectGroup } from '../project-group-types'
+import type { Repo } from '../repo-types'
+import type { WorkspaceStatusDefinition, Worktree } from '../worktree/types'
 import {
-  getDivertedWorktreeProjectGroupId,
-  getWorktreeGroupRevealSectionKey
-} from '../../fork-worktree-groups/worktree-loose-group-membership'
+  cloneDefaultWorkspaceStatuses,
+  getWorkspaceStatus,
+  getWorkspaceStatusGroupKey
+} from '../workspace-statuses'
+import { ALL_GROUP_KEY, getPRLaneKey, getProjectGroupHeaderKey } from './group-keys'
+import { buildProjectGroupingIndex, getProjectGroupingForRepo } from '../project-section-grouping'
+import type { ProjectGroupingModel } from '../project-section-grouping'
+import type { SidebarPRGroupReader, WorktreeGroupBy } from './row-types'
 
 export function getGroupKeyForWorktree(
   groupBy: WorktreeGroupBy,
@@ -65,8 +63,7 @@ export function getGroupKeysForWorktree(
   const groupIds: string[] = []
   const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const visited = new Set<string>()
-  const divertedGroupId = getDivertedWorktreeProjectGroupId(worktree, groupsById)
-  let currentGroupId = divertedGroupId ?? repo?.projectGroupId ?? null
+  let currentGroupId = repo?.projectGroupId ?? null
   while (currentGroupId && !visited.has(currentGroupId)) {
     const group = groupsById.get(currentGroupId)
     if (!group) {
@@ -79,8 +76,5 @@ export function getGroupKeysForWorktree(
     const parentId = group.parentGroupId ?? null
     currentGroupId = parentId && groupsById.has(parentId) ? parentId : null
   }
-  return [
-    ...groupIds.map((id) => getProjectGroupHeaderKey(id)),
-    getWorktreeGroupRevealSectionKey(divertedGroupId, groupKey)
-  ]
+  return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), groupKey]
 }

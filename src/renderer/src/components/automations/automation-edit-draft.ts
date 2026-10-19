@@ -5,7 +5,6 @@ import {
   normalizeAutomationLaunchOverrides
 } from '../../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
 import {
-  isRunnableAutomationCronSchedule,
   isRunnableAutomationSchedule,
   tryParseAutomationRrule
 } from '../../../../shared/automation-schedule-parsing'
@@ -43,37 +42,5 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
       schedule || hasCustomSchedule
         ? null
         : 'This automation has an unsupported saved schedule. Pick a supported schedule before saving changes.'
-  }
-}
-
-export function buildExternalAutomationEditDraft(
-  job: ExternalAutomationJob,
-  placement: { projectId: string; workspaceId: string }
-): AutomationDraft {
-  const rawSchedule = job.rawSchedule?.trim() ?? ''
-  const hasCustomSchedule = isRunnableAutomationCronSchedule(rawSchedule)
-  return {
-    name: job.name,
-    prompt: job.prompt ?? job.promptPreview,
-    agentId: 'hermes',
-    extraAgentArgs: '',
-    launchOverrides: {},
-    projectId: placement.projectId,
-    workspaceMode: 'existing',
-    workspaceId: placement.workspaceId,
-    baseBranch: '',
-    setupDecision: undefined,
-    reuseSession: false,
-    precheckCommand: '',
-    precheckTimeoutSeconds: '60',
-    preset: hasCustomSchedule ? 'custom' : 'weekdays',
-    time: AUTOMATION_DEFAULT_TIME,
-    dayOfWeek: '1',
-    customSchedule: hasCustomSchedule ? rawSchedule : '',
-    savedSchedule: rawSchedule || null,
-    missedRunGraceMinutes: '720',
-    scheduleWarning: hasCustomSchedule
-      ? null
-      : 'This Hermes automation has an unsupported saved schedule. Pick a supported schedule before saving changes.'
   }
 }

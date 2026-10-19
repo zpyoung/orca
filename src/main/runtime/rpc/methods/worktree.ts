@@ -155,8 +155,8 @@ export const WORKTREE_METHODS = [
     name: 'worktree.set',
     permission: 'workspace',
     params: WorktreeSet,
-    handler: async (params, { runtime, clientKind }) => ({
-      worktree: await runtime.updateManagedWorktreeMeta(params.worktree, {
+    handler: async (params, { runtime, clientKind }) => {
+      const worktree = await runtime.updateManagedWorktreeMeta(params.worktree, {
         displayName: params.displayName,
         ...(params.displayName !== undefined
           ? { displayNameIsPinned: displayNameUpdatePinsLabel(params.displayName) }

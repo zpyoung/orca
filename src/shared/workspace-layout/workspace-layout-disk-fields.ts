@@ -150,7 +150,9 @@ const ENTRY_FIELDS = {
   sortOrder: TAB_ORDER,
   isPreview: tab('isPreview'),
   agentSessionAgent: tab('agentSessionAgent'),
-  lastFocusedAt: own('view', 'lastFocusedAt')
+  lastFocusedAt: own('view', 'lastFocusedAt'),
+  // fork terminal dock state: the layout model has no field for it yet
+  terminalDockByPaneKey: 'unwritten'
 } as const
 
 const TERMINAL_ENTRY = {

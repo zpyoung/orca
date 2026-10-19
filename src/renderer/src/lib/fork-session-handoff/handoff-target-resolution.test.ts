@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
@@ -15,8 +15,8 @@ import {
 vi.mock('@/lib/connection-owner-resolution', () => ({
   getConnectionIdFromState: vi.fn(() => null)
 }))
-vi.mock('@/lib/worktree-runtime-owner', () => ({
-  getRuntimeEnvironmentIdForWorktree: vi.fn(() => null)
+vi.mock('@/lib/resolve-owner', () => ({
+  runtimeEnvironmentIdForWorkspaceOwner: vi.fn(() => ({ kind: 'resolved', environmentId: null }))
 }))
 
 type TargetState = Parameters<typeof listHandoffTargetCandidates>[0]
@@ -94,8 +94,12 @@ describe('handoff target host resolution', () => {
     vi.mocked(getConnectionIdFromState).mockImplementation((_state, worktreeId) =>
       worktreeId?.includes('feature') ? 'dev-box' : null
     )
-    vi.mocked(getRuntimeEnvironmentIdForWorktree).mockImplementation((_state, worktreeId) =>
-      worktreeId?.includes('/repo') && !worktreeId.includes('feature') ? 'env-1' : null
+    vi.mocked(runtimeEnvironmentIdForWorkspaceOwner).mockImplementation(
+      (_state, { workspaceId }) => ({
+        kind: 'resolved',
+        environmentId:
+          workspaceId.includes('/repo') && !workspaceId.includes('feature') ? 'env-1' : null
+      })
     )
     const state = makeState()
     const runtime = resolveHandoffTarget(state, 'repo-1::/repo')
@@ -111,6 +115,11 @@ describe('handoff target host resolution', () => {
     })
     expect(resolveHandoffTargetExecutionHostId(runtime!)).toBe('runtime:env-1')
     expect(resolveHandoffTargetExecutionHostId(ssh!)).toBe('ssh:dev-box')
+  })
+
+  it('rejects a workspace that two hosts publish', () => {
+    vi.mocked(runtimeEnvironmentIdForWorkspaceOwner).mockReturnValue({ kind: 'ambiguous' })
+    expect(resolveHandoffTarget(makeState(), 'repo-1::/repo')).toBeNull()
   })
 
   it('rejects an unresolved mixed-host route', () => {

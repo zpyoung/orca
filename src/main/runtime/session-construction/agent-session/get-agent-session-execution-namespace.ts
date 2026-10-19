@@ -7,13 +7,17 @@ import type {
   RuntimeAgentSessionRpcCaller,
   RuntimeEnsureAgentSessionRequest,
   RuntimeEnsureAgentSessionResult
-} from '../../shared/agent-session-host-authority'
-import type { SessionOptionValue } from '../../shared/native-chat-session-options'
-import { canonicalizeAgentSessionIdentity } from './agent-session-claim-identity'
-import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
-import { resolveLocalWindowsAgentStartupShell } from '../../shared/windows-terminal-shell'
-import { buildAgentResumeStartupPlan } from '../../shared/tui-agent-startup'
-import { OrchestrationError } from './orchestration/orchestration-error'
+} from '../../../../shared/agent-session-host-authority'
+import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
+import {
+  canonicalizeAgentSessionIdentity,
+  type ProviderExecutionNamespace
+} from '../../agent-session-claim-identity'
+import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
+import { buildAgentResumeStartupPlan } from '../../../../shared/tui-agent-startup'
+import { agentLaunchQuotingShell } from '../../../../shared/agent-launch-runtime'
+import { OrchestrationError } from '../../orchestration/orchestration-error'
+import { withAgentSessionAccountEnv } from '../../agent-session-account-env'
 import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv

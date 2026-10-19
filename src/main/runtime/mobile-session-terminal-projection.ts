@@ -47,6 +47,7 @@ export function buildHeadlessMobileSessionTerminalTabs(
   persistedTabs: readonly TerminalTab[],
   session: WorkspaceSessionState
 ): RuntimeMobileSessionTerminalTab[] {
+  const { rows, selection } = withoutAbsorbedLegacyRows(worktreeId, persistedTabs, session)
   // Why: the dock record lives only on the unified Tab, not the legacy
   // TerminalTab this hydration path otherwise rebuilds from.
   const terminalDockByPaneKeyByTabId = new Map<string, Record<string, TerminalDockPaneState>>()
@@ -56,7 +57,7 @@ export function buildHeadlessMobileSessionTerminalTabs(
       terminalDockByPaneKeyByTabId.set(unifiedTab.entityId, unifiedTab.terminalDockByPaneKey)
     }
   }
-  return [...persistedTabs]
+  return rows
     .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
     .flatMap((tab, index) => {
       const layout = session.terminalLayoutsByTabId?.[tab.id]
@@ -89,7 +90,7 @@ export function buildHeadlessMobileSessionTerminalTabs(
             ...(tab.isPinned ? { isPinned: true } : {}),
             ...(tab.viewMode ? { viewMode: tab.viewMode } : {}),
             ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {}),
-            isActive: isPersistedTerminalLeafActive(session, worktreeId, tab.id, leafId, layout)
+            isActive: isPersistedTerminalLeafActive(selection, worktreeId, tab.id, leafId, layout)
           }
         ]
       })

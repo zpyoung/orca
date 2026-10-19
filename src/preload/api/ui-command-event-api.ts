@@ -192,6 +192,9 @@ export type UiCommandEventApi = {
       launchToken?: string
       launchAgent?: TuiAgent
       viewMode?: 'terminal' | 'chat'
+      targetGroupId?: string
+      afterTabId?: string
+      shellOverride?: string
       terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
       title?: string
       ptyId?: string

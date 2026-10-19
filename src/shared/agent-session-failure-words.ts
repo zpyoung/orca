@@ -211,8 +211,8 @@ const FAILURE_SENTENCES = {
   historyInOtherAccount: (_context, _fact, _surface, say) => say('historyInOtherAccount'),
   claudeAccountFolderMissing: (_context, _fact, _surface, say) => say('claudeAccountFolderMissing'),
   claudeAccountSetupFailed: (_context, _fact, _surface, say) => say('claudeAccountSetupFailed'),
-  agentCommandNotRunnable: (context, _fact, _surface, say) =>
-    say('agentCommandNotRunnable', agent(say, context)),
+  agentCommandNotRunnable: namingAgent('agentCommandNotRunnable'),
+  runtimeNotInstalled: namingAgent('runtimeNotInstalled'),
   managedAccountUnsupported: (context, _fact, _surface, say) =>
     joinSentences([
       say('managedAccountUnsupported'),

@@ -4,7 +4,6 @@ import type { CommitMessageDraftContext } from '../../shared/commit-message-gene
 import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from '../../shared/commit-message-host-key'
 import type { CommandTemplateBackslash } from '../../shared/commit-message-prompt'
 import { materializeSourceControlTextGenerationParams } from '../../shared/fork-automation-launch-settings/source-control-text-launch-args'
-import type { GlobalSettings } from '../../shared/global-settings-types'
 import type {
   GeneratedPullRequestFields,
   PullRequestDraftContext

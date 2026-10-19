@@ -238,11 +238,11 @@ describe('resolveHandoffTranscript', () => {
     ).resolves.toEqual({ outcome: 'unverifiable', reason: 'ambiguous-project-scan' })
   })
 
-  it('reports an SSH target with no live host info as unverifiable', async () => {
+  it('reports an SSH target as unverifiable', async () => {
     await expect(
       resolveHandoffTranscript(
         request({ connectionId: 'build-box' }),
-        deps({ sshHostInfo: () => null })
+        deps()
       )
     ).resolves.toEqual({ outcome: 'unverifiable', reason: 'host-unavailable' })
   })

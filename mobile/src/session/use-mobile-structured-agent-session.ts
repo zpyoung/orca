@@ -100,7 +100,8 @@ export function useMobileStructuredAgentSession(
     enabled,
     fence: state.fence,
     mutate,
-    optionStamp
+    optionStamp,
+    hostSupport
   })
   const { conversationCommands, invokeStructuredOption, optionSnapshot, setStructuredOption } =
     options

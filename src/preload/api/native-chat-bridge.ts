@@ -31,7 +31,6 @@ export const nativeChatApi = {
       sessionId: string
       transcriptPath?: string
       limit?: number
-      sshConnectionId?: string
     },
     onFrame: (frame: NativeChatSubscriptionFrame) => void
   ): (() => void) => {

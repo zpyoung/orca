@@ -35,21 +35,9 @@ import {
 import { restorePersistedStructuredLaunchState } from './structured-agent-session-launch-reload'
 import { getJoinableStructuredLaunchState } from './structured-agent-session-launch-holders'
 import {
-  claimableStructuredLaunchAttempt,
-  getJoinableStructuredLaunchState
-} from './structured-agent-session-launch-holders'
-import {
   prepareStructuredLaunchCreateMessage,
   publishStructuredLaunchCreateOptions
 } from './structured-agent-session-launch-create-message'
-import {
-  maybeCleanupLaunchState,
-  trackLaunchSettlement
-} from './structured-agent-session-launch-outcome-tracking'
-import {
-  trackStructuredLaunchPromptOutcome,
-  trackStructuredLaunchConfirmationDeadline
-} from './structured-agent-session-launch-prompt-outcome'
 import {
   maybeCleanupLaunchState,
   trackLaunchSettlement

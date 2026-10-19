@@ -18,25 +18,18 @@ import {
   mergeRuntimeFolderWorkspace
 } from './runtime-folder-workspace'
 import type { RuntimeStore } from './runtime-store-contract'
+import { isWslMoveRepoBlocked } from '../persistence/moving-wsl-projects/wsl-move-background-backoff'
 
 /** Callers hold a local removal route; an `ssh:` or `runtime:` host is refused before this. */
 export async function isLocalRuntimeWorktreePathMissing(
   worktreePath: string,
   localWorktreeGitOptions: { wslDistro?: string } = {}
 ): Promise<boolean> {
-  const route = resolveFilesystemRouteForHost(hostId)
-  if (route.kind === 'runtime') {
-    throw new ExecutionHostNotDispatchableError(route.hostId)
-  }
-  if (route.kind === 'local') {
-    const access = getLocalWorktreePathAccess(localWorktreeGitOptions)
-    return isWorktreePathMissing(
-      toLocalWorktreeRuntimePath(worktreePath, localWorktreeGitOptions),
-      access.statPath
-    )
-  }
-  const fsProvider = route.provider
-  return fsProvider ? isWorktreePathMissing(worktreePath, (path) => fsProvider.stat(path)) : false
+  const access = getLocalWorktreePathAccess(localWorktreeGitOptions)
+  return isWorktreePathMissing(
+    toLocalWorktreeRuntimePath(worktreePath, localWorktreeGitOptions),
+    access.statPath
+  )
 }
 
 function getRuntimeFolderWorkspaceInstanceIdentity(repo: Repo, worktreeId: string): string {

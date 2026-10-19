@@ -12,7 +12,7 @@ import { OrchestrationError } from '../../runtime/orchestration/orchestration-er
 import { ORCHESTRATION_WORKER_LIST_METHOD } from '../../runtime/rpc/methods/orchestration/worker/worker-list-method'
 import { ORCHESTRATION_WORKER_RELEASE_METHODS } from '../../runtime/rpc/methods/orchestration/worker/worker-release'
 import type { WorkerReleaseReceipt } from '../../runtime/rpc/methods/orchestration/worker/worker-release-completion'
-import { WorkerDispatchParams } from '../../runtime/rpc/methods/orchestration/worker/worker-release-schemas'
+import { WorkerDispatchParams } from '../../../shared/rpc-contract/orchestration-worker-release-schemas-params'
 import { ORCHESTRATION_WORKER_STOP_METHODS } from '../../runtime/rpc/methods/orchestration/worker/worker-stop'
 import { getOrchestrationMutationExecutor } from '../../runtime/rpc/orchestration-mutation-executor'
 import type { RpcRequest } from '../../runtime/rpc/core'

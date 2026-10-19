@@ -1,8 +1,12 @@
 import type { StateCreator } from 'zustand'
-import type { setWebRuntimeTabProps } from '@/runtime/web-runtime-session'
-import type { remapPaneKeyTabId } from '@/runtime/web-session-tabs-sync'
+import type { setWebRuntimeTabProps } from '@/runtime/web-runtime-terminal-actions'
+import type { remapPaneKeyTabId } from '@/runtime/fork-terminal-dock/web-session-terminal-dock-reconcile'
 import type { AppState } from '../../types'
 import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import {
+  isWebTerminalSurfaceTabId,
+  toHostSessionTabId
+} from '../../../../../shared/terminal-surface-id'
 import {
   clampGutterRows,
   DEFAULT_GUTTER_ROWS
@@ -12,7 +16,7 @@ import {
   writeTerminalDockPaneState
 } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
 import { findTabAndWorktree, patchTab } from '../tab-group-state'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
 import { pruneExpiredTerminalDockPendingMutations } from '@/runtime/fork-terminal-dock/web-session-terminal-dock-reconcile'
 
 /** The docked-composer state the tabs slice tracks per tab pane, plus the two
@@ -107,8 +111,11 @@ function resolveDockMirrorContext(state: AppState, tabId: string): DockMirrorCon
   if (!found || found.tab.contentType !== 'terminal') {
     return null
   }
-  const environmentId = getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
-  return environmentId ? { environmentId, worktreeId: found.worktreeId } : null
+  // Why: a twin owner is refused, since mirroring the dock to the wrong host would write its state there.
+  const owner = runtimeEnvironmentIdForWorkspaceOwner(state, { workspaceId: found.worktreeId })
+  return owner.kind === 'resolved' && owner.environmentId
+    ? { environmentId: owner.environmentId, worktreeId: found.worktreeId }
+    : null
 }
 
 function withDockMirrorModules(
@@ -121,17 +128,16 @@ function withDockMirrorModules(
     return
   }
   void Promise.all([
-    import('@/runtime/web-runtime-session'),
-    import('@/runtime/web-session-tabs-sync')
-  ]).then(([runtimeSession, sessionTabsSync]) => {
+    import('@/runtime/web-runtime-terminal-actions'),
+    import('@/runtime/web-session-tabs-sync/tracking-mappings'),
+    import('@/runtime/fork-terminal-dock/web-session-terminal-dock-reconcile')
+  ]).then(([terminalActions, trackingMappings, dockReconcile]) => {
     const hostTabId =
-      sessionTabsSync.resolveHostSessionTabIdForWebSessionTab(state, { ...context, tabId }) ??
-      (runtimeSession.isWebTerminalSurfaceTabId(tabId)
-        ? runtimeSession.toHostSessionTabId(tabId)
-        : tabId)
-    const terminalDock = mirror(hostTabId, sessionTabsSync.remapPaneKeyTabId)
+      trackingMappings.resolveHostSessionTabIdForWebSessionTab(state, { ...context, tabId }) ??
+      (isWebTerminalSurfaceTabId(tabId) ? toHostSessionTabId(tabId) : tabId)
+    const terminalDock = mirror(hostTabId, dockReconcile.remapPaneKeyTabId)
     if (terminalDock) {
-      runtimeSession.setWebRuntimeTabProps({
+      terminalActions.setWebRuntimeTabProps({
         worktreeId: context.worktreeId,
         tabId,
         terminalDock

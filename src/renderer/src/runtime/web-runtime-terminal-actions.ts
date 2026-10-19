@@ -247,6 +247,7 @@ export function setWebRuntimeTabProps(args: {
   color?: string | null
   isPinned?: boolean
   viewMode?: 'terminal' | 'chat'
+  customTitle?: string | null
   terminalDock?: { paneKey?: string; docked?: boolean; gutterRows?: number; remove?: string[] }
 }): boolean {
   const environmentId = runtimeEnvironmentIdUnlessTwin(
@@ -275,6 +276,7 @@ export function setWebRuntimeTabProps(args: {
           ...(args.color !== undefined ? { color: args.color } : {}),
           ...(args.isPinned !== undefined ? { isPinned: args.isPinned } : {}),
           ...(args.viewMode !== undefined ? { viewMode: args.viewMode } : {}),
+          ...(args.customTitle !== undefined ? { customTitle: args.customTitle } : {}),
           ...(args.terminalDock !== undefined ? { terminalDock: args.terminalDock } : {})
         },
         timeoutMs: 15_000

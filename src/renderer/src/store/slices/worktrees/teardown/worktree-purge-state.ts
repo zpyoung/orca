@@ -13,19 +13,12 @@ import { forgetAmbiguousOwnerWarnings } from '@/lib/ambiguous-owner-warning'
 import { forgetWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import { removeWorktreeLayout } from '../../tabs/worktree-layout-lifecycle'
 import {
-  getStructuredAgentSessionLaunchOwner,
-  markStructuredAgentSessionLaunchCancelledSilently,
-  shouldRetainStructuredAgentSessionLaunchTab,
-  structuredLaunchStates
-} from '@/lib/structured-agent-session-launch-registry'
-import { discardStructuredAgentSessionChatSends } from '@/lib/structured-agent-session-launch-prompt'
-import { retireStructuredAgentSessionReadOwner } from '@/components/native-chat/structured-agent-session-read-owner-registry'
-import { clearWebSessionFocusIntentIfMatches } from '@/runtime/web-session-focus-intent'
-import {
-  structuredAgentSessionFocusOwner,
-  structuredAgentSessionTargetForTab,
-  structuredAgentSessionTargetForHost
-} from '@/runtime/structured-agent-session-owner'
+  cancelStructuredLaunchesForWorktrees,
+  retirePurgedTabLaunches
+} from './purged-structured-launch-retirement'
+import { buildWorktreePurgeSurfacePatch } from './worktree-purge-surface-patch'
+import { buildHostTwinPurgeState, collectHostTwinPurgeScopes } from './host-twin-worktree-purge'
+import { composeWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 
 /**
  * Builds a bulk cleanup patch and clears auxiliary warning records without requiring individual
@@ -77,56 +70,15 @@ export function buildFullWorktreePurgeState(
 ): Partial<AppState> {
   const worktreeIdSet = new Set(normalizedTargets.map((target) => target.id))
   // Why: bulk purges bypass close actions, so provisional ownership must die before tab state does.
-  const cancelledSessionIds = new Set<string>()
-  for (const launch of structuredLaunchStates()) {
-    const worktreeId = launch.intent.worktreeId
-    if (
-      worktreeIdSet.has(worktreeId) &&
-      shouldRetainStructuredAgentSessionLaunchTab(worktreeId, launch.intent.sessionId)
-    ) {
-      markStructuredAgentSessionLaunchCancelledSilently(
-        worktreeId,
-        launch.intent.sessionId,
-        launch.intent.executionHostId
-      )
-      discardStructuredAgentSessionChatSends(launch.intent.sessionId)
-      retireStructuredAgentSessionReadOwner(launch.intent.sessionId, launch.intent.target)
-      clearWebSessionFocusIntentIfMatches(
-        structuredAgentSessionFocusOwner(launch.intent.target),
-        worktreeId,
-        `agent-session:${launch.intent.sessionId}`
-      )
-      cancelledSessionIds.add(launch.intent.sessionId)
-    }
-  }
+  const cancelledSessionIds = cancelStructuredLaunchesForWorktrees(worktreeIdSet)
   for (const worktreeId of worktreeIdSet) {
-    for (const tab of s.unifiedTabsByWorktree[worktreeId] ?? []) {
-      if (tab.contentType === 'agent-session') {
-        const target = structuredAgentSessionTargetForTab(s, tab)
-        if (target) {
-          retireStructuredAgentSessionReadOwner(tab.entityId, target)
-        }
-      }
-      // A retained launch here survived a reload, so its persisted record names its host.
-      const owner =
-        tab.contentType === 'agent-session' && !cancelledSessionIds.has(tab.entityId)
-          ? getStructuredAgentSessionLaunchOwner(tab.entityId)
-          : undefined
-      const target = structuredAgentSessionTargetForHost(owner)
-      if (
-        owner &&
-        target &&
-        shouldRetainStructuredAgentSessionLaunchTab(worktreeId, tab.entityId)
-      ) {
-        markStructuredAgentSessionLaunchCancelledSilently(worktreeId, tab.entityId, owner)
-        discardStructuredAgentSessionChatSends(tab.entityId)
-        clearWebSessionFocusIntentIfMatches(
-          structuredAgentSessionFocusOwner(target),
-          worktreeId,
-          `agent-session:${tab.entityId}`
-        )
-      }
-    }
+    retirePurgedTabLaunches(
+      s,
+      worktreeId,
+      s.tabsByWorktree[worktreeId] ?? [],
+      s.unifiedTabsByWorktree[worktreeId] ?? [],
+      cancelledSessionIds
+    )
   }
   pruneHostedReviewLinkMutationGenerations(worktreeIdSet)
   // Why: ids are repo::path, so a worktree recreated at the same path must not inherit a stale sleep.

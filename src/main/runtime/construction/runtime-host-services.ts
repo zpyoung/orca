@@ -16,50 +16,8 @@ import { RuntimePreservedBranchCleanup } from '../runtime-preserved-branch-clean
 import type {
   AgentSessionCreateOperation,
   OrchestrationCompatibilitySshAttachmentAuthority,
-  RestoredOrchestrationAuthorityReceipt,
-  RuntimeTerminalAgentStatusEvent
-} from './runtime-terminal-contracts'
-import type { TerminalSideEffectBatch } from '../../shared/terminal-side-effect-facts'
-import type { ClaudeTerminalEvidence } from '../../shared/claude-terminal-interrupt'
-import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
-import type { StructuredAgentSessionStatusSink } from '../native-chat/agent-session-wire/structured-agent-session-status-feed'
-import type { ObservedAgentStatusPaneIdentity } from '../ipc/agent-status-ipc-boundary'
-import type { AgentHookAuthorityAttestation } from '../agent-hooks/server'
-import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
-import type {
-  AiVaultPrepareSessionResumeArgs,
-  AiVaultPrepareSessionResumeResult
-} from '../../shared/ai-vault-resume-preparation'
-import type { AgentSessionClaimSigner } from './agent-session-claim-identity'
-import type { AgentStatus } from '../../shared/agent-detection'
-import { RuntimeLegacyWorkerTerminalRecoveryPersistence } from './runtime-legacy-worker-terminal-recovery-persistence'
-import { RuntimeLegacyWorkerTerminalRecoveryController } from './runtime-legacy-worker-terminal-recovery-controller'
-import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
-import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
-import { RuntimeAccountController } from './runtime-account-controller'
-import { RuntimeMobileSpeechCatalog } from './runtime-mobile-speech-catalog'
-import { RuntimeMobileDictationController } from './runtime-mobile-dictation-controller'
-import { RuntimeProjectHostSetupController } from './runtime-project-host-setup-controller'
-import { addRemoteRepoFromPath } from '../ipc/repos/remote-repo-registration'
-import type { Store } from '../persistence'
-import { RuntimeProjectGroupController } from './runtime-project-group-controller'
-import { RuntimeNestedRepoImport } from './runtime-nested-repo-import'
-import { RuntimeRepositoryRegistrationController } from './runtime-repository-registration-controller'
-import { RuntimeRepositoryCloneController } from './runtime-repository-clone-controller'
-import { RuntimeRepositorySettingsController } from './runtime-repository-settings-controller'
-import { RuntimeRepositorySparsePresets } from './runtime-repository-sparse-presets'
-import { RuntimeRepositoryRefQueries } from './runtime-repository-ref-queries'
-import { RuntimeServerEnvironmentCommands } from './runtime-server-environment-commands'
-import { RuntimeRepositoryForkBackfill } from './runtime-repository-fork-backfill'
-import type {
-  ExpectedLedgerRevision,
-  LedgerCatalogRemovalResult,
-  LedgerCatalogRemovalTarget
-} from './runtime-ledger-catalog-removal'
-import { RuntimeWorkspaceSessionController } from './runtime-workspace-session-controller'
-import { RuntimeAiVaultCommands } from './runtime-ai-vault-commands'
-import { ClaudeAgentTeamsService } from './claude-agent-teams-service'
-import { teardownFolderWorkspacePtys } from './folder-workspace-pty-teardown'
+  RestoredOrchestrationAuthorityReceipt
+} from '../runtime-terminal-contracts'
 
 import type { AgentStatusIpcPayload } from '../../../shared/agent-status-types'
 
@@ -81,6 +39,11 @@ import { RuntimeRepositorySparsePresets } from '../runtime-repository-sparse-pre
 import { RuntimeRepositoryRefQueries } from '../runtime-repository-ref-queries'
 import { RuntimeServerEnvironmentCommands } from '../runtime-server-environment-commands'
 import { RuntimeRepositoryForkBackfill } from '../runtime-repository-fork-backfill'
+import type {
+  ExpectedLedgerRevision,
+  LedgerCatalogRemovalResult,
+  LedgerCatalogRemovalTarget
+} from '../runtime-ledger-catalog-removal'
 import { RuntimeWorkspaceSessionController } from '../runtime-workspace-session-controller'
 import { RuntimeAiVaultCommands } from '../runtime-ai-vault-commands'
 import { ClaudeAgentTeamsService } from '../claude-agent-teams-service'

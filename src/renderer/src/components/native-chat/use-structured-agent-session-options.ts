@@ -89,7 +89,7 @@ export function useStructuredAgentSessionOptions(args: {
     ...(launch?.worktree ? { worktree: launch.worktree } : {}),
     seedsModel: launchSeedOptions?.model !== undefined,
     providerVisible,
-    providerStarting: args.providerStarting ?? false,
+    providerStarting,
     hostOptionStamp: args.hostOptionStamp ?? '',
     // A new chat's host knows nothing of its model before the provider starts; a resumed one's
     // holds the model it ran, so only the former waits rather than show the host's guess.
@@ -136,18 +136,16 @@ export function useStructuredAgentSessionOptions(args: {
       const mutationGeneration = ++optionMutationGeneration.current
       const sameRecord = (): boolean => activeOptionRecordRef.current === targetRecord
       const isCurrent = (): boolean =>
-        activeOptionRecordRef.current === targetRecord &&
-        optionMutationGeneration.current === mutationGeneration
+        sameRecord() && optionMutationGeneration.current === mutationGeneration
+      const currentPick = (): boolean => isCurrent() || pendingOptionsRef.current[id] === encoded
       // Record-only: shown at once, so the picker stays usable while the write waits behind a start.
-      const shownAtOnce = id === AGENT_CHAT_PERMISSION_MODE_OPTION_ID
+      const shownAtOnce = providerStarting || id === AGENT_CHAT_PERMISSION_MODE_OPTION_ID
       if (shownAtOnce) {
         updateOptionState((current) =>
-          current.record === targetRecord
-            ? commitStructuredAgentSessionOptionValues(current, { [id]: encoded })
-            : current
+          commitStructuredAgentSessionOptionValues(current, { [id]: encoded })
         )
       } else {
-        pendingOptionRef.current = id
+        pendingOptionsRef.current[id] = encoded
         updateOptionState((current) => ({ ...current, pendingId: id }))
       }
       let result: AgentSessionOptionResult | null = null
@@ -173,6 +171,9 @@ export function useStructuredAgentSessionOptions(args: {
         }
         return Boolean(result)
       } finally {
+        if (sameRecord() && pendingOptionsRef.current[id] === encoded) {
+          delete pendingOptionsRef.current[id]
+        }
         // A settled write, or a shown one that failed, reads back what the host now holds.
         if (isCurrent() && (result || shownAtOnce)) {
           void callStructuredAgentSession<AgentSessionOptionsResult>(

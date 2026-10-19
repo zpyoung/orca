@@ -242,7 +242,7 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcMobileDevices {
         clientKind: device.scope,
         callerScope,
         clientCapabilities: authenticatedSocket?.clientCapabilities,
-        authenticatedCredential: token,
+        authenticatedCredential: token ?? undefined,
         updateClientCapabilities:
           authenticatedSocket && device.scope === 'mobile'
             ? (clientCapabilities) => {

@@ -154,12 +154,8 @@ export async function writePlanReviewInputFile(
         `exceeding the ${PLAN_REVIEW_INPUT_MAX_BYTES}-byte cap`
     )
   }
-  if (target.fileProvider) {
-    await target.fileProvider.writeFile(inputPath, serialized)
-    return inputPath
-  }
   if (target.executionHostId !== 'local') {
-    throw new Error('Remote objective target has no filesystem provider')
+    throw new Error('Remote objective target is not served by this host')
   }
   await writeFile(inputPath, serialized, { encoding: 'utf8', mode: 0o600 })
   return inputPath

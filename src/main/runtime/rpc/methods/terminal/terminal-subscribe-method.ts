@@ -5,8 +5,8 @@ import { runTerminalBinarySubscription } from './terminal-subscribe-binary'
 import {
   runTerminalJsonSubscription,
   runTerminalLeaseSubscription
-} from './terminal-legacy-simple-subscriptions'
-import type { TerminalSubscriptionArgs } from './terminal-legacy-subscription-types'
+} from './terminal-subscribe-json-and-lease'
+import type { TerminalSubscriptionArgs } from './terminal-subscribe-types'
 import {
   trackAskSurfacePaneSubscription,
   untrackAskSurfacePaneSubscription

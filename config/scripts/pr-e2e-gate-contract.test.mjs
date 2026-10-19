@@ -68,55 +68,6 @@ describe('restart-survival E2E routing', () => {
 })
 
 describe('PR E2E gate contract', () => {
-  it('keeps E2E advisory while the suite is red on main', () => {
-    // Why: pin the deliberate choice so it reads as intentional rather than as
-    // the "forgot to wire the gate" bug this file originally caught. Gating on a
-    // suite that fails every scheduled run would block the PRs that fix it.
-    // Flipping to blocking means updating this expectation too — see the comment
-    // on verify's Require-successful-checks step for the exact wiring.
-    expect(prWorkflow.jobs.verify.needs).not.toContain('e2e')
-    expect(verifyStep.env.E2E).toBeUndefined()
-    expect(verifyStep.run).not.toContain('$E2E')
-  })
-
-  it('passes only changed specs to the reusable E2E workflow', () => {
-    // Why: without this the job could lose its filter and run on every PR — the
-    // cost the path filter exists to avoid — while the gate assertions above
-    // stay green.
-    expect(prWorkflow.jobs.e2e.needs).toEqual(['code_paths', 'preflight'])
-    expect(prWorkflow.jobs.e2e.if).toContain("needs.code_paths.outputs.e2e_should_run == 'true'")
-    expect(prWorkflow.jobs.code_paths.outputs.e2e_should_run).toBe(
-      '${{ steps.e2e_filter.outputs.should_run }}'
-    )
-    expect(prWorkflow.jobs.code_paths.outputs.test_files).toBe(
-      '${{ steps.e2e_filter.outputs.test_files }}'
-    )
-    expect(prWorkflow.jobs.e2e.with.ref).toBe('${{ github.event.pull_request.head.sha }}')
-    expect(prWorkflow.jobs.e2e.with.test_files).toBe('${{ needs.code_paths.outputs.test_files }}')
-  })
-
-  it('enforces every job verify depends on', () => {
-    // Why: derive from verify.needs rather than hardcoding, so adding a required
-    // job without adding it to the strict loop fails here instead of silently
-    // leaving that job unenforced. This is what caught GIT_COMPATIBILITY and
-    // SHELL_CONTRACTS being absent from an earlier hardcoded list.
-    const successMarker = '# Require success when the PR has code-relevant changes'
-    const successLoop = verifyStep.run.slice(verifyStep.run.indexOf(successMarker))
-    expect(successLoop.length).toBeGreaterThan(0)
-    expect(verifyStep.run).toContain('"$CODE_PATHS" != "success"')
-    for (const job of prWorkflow.jobs.verify.needs) {
-      const envVar = job.replaceAll('-', '_').toUpperCase()
-      expect(verifyStep.env[envVar]).toBe(`\${{ needs.${job}.result }}`)
-      // fork_ownership_guard is ungated: it runs on every PR, so it is checked
-      // unconditionally above rather than through the SHOULD_RUN loop.
-      if (job === 'code_paths' || job === 'preflight' || job === 'fork_ownership_guard') {
-        continue
-      }
-      expect(successLoop).toContain(`"$${envVar}"`)
-      expect(verifyStep.env[`${envVar}_SHOULD_RUN`]).toBe(`\${{ needs.code_paths.outputs.${job} }}`)
-    }
-  })
-
   it('selects modified Playwright specs without running deleted tests', () => {
     expect(filterStep.run).toContain('--diff-filter=AMCR')
     expect(filterStep.run).toContain('config/scripts/pr-e2e-source-routing.mjs')

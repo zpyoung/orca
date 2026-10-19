@@ -2,12 +2,7 @@ import type { AgentSessionOwnerBinding } from '../../../../shared/agent-session-
 import { agentSessionOwnerBindingsEqual } from '../../../../shared/claimed-agent-pty-owner'
 import { addNodePtyRecoveryHint } from '../../../daemon/node-pty-error-hints'
 import type { Store } from '../../../persistence'
-import {
-  isSshPtyAbsentFromRelayError,
-  isSshPtyNotFoundError,
-  isSshPtyProvenExitedOnRelayError
-} from '../../../providers/ssh-pty-errors'
-import type { IPtyProvider } from '../../../providers/types'
+import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import { ptyIncarnationById, ptyOwnership } from './ownership-state'
 import { getRelayPtyId } from './registry'
 import {

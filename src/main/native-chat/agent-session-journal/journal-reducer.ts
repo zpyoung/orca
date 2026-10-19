@@ -55,6 +55,8 @@ export type JournalReducerState = {
   /** Each item's execution provenance (`JournalItemRow.ownerFence`): the generation whose work it
    *  is, which decides whether it is current. */
   itemFences: Map<string, number>
+  /** The run executing a reusable child's item now (`JournalItemRow.executionOwner`), when one said. */
+  itemExecutionOwners: Map<string, number>
   /** Latest saved output per owner, rebuilt during the existing row fold. */
   providerActivityAt: Map<number, number>
   /** Revision of a removed item, so a late lower revision cannot resurrect it. */
@@ -87,6 +89,7 @@ export function createJournalReducerState(sessionId: string, epoch: string): Jou
     highestFence: 0,
     items: new Map(),
     itemFences: new Map(),
+    itemExecutionOwners: new Map(),
     providerActivityAt: new Map(),
     tombstones: new Map(),
     removedTurnIds: new Set(),
@@ -117,7 +120,6 @@ export function applyJournalRow(
       return
     }
     const itemId = resolveJournalItemId(state, row.itemId, row.body)
-    observeJournalProviderActivity(state, row, row.itemId, row.body, savedAt)
     acceptSubmissionFromProviderItem(state, row.itemId, itemId, row)
     upsertJournalItem(
       state,
@@ -151,7 +153,6 @@ export function applyJournalRow(
           continue
         }
         const { revision, body } = mutation
-        observeJournalProviderActivity(state, row, mutation.itemId, body, savedAt)
         const itemId = resolveJournalItemId(state, mutation.itemId, body)
         acceptSubmissionFromProviderItem(state, mutation.itemId, itemId, row)
         const producer = journalBatchMutationProducer(row, mutation)

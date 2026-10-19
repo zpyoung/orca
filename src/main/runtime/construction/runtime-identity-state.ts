@@ -52,10 +52,10 @@ import {
   TUI_IDLE_DEFAULT_TIMEOUT_MS,
   TUI_IDLE_POLL_INTERVAL_MS,
   TUI_IDLE_QUIESCENCE_MS
-} from './orca-runtime-postlude'
-import { RuntimeTerminalWait as RuntimeTerminalWaitController } from './runtime-terminal-wait'
-import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
-import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'
+} from '../orca-runtime-postlude'
+import { RuntimeTerminalWait as RuntimeTerminalWaitController } from '../terminal/wait/terminal-wait'
+import type { PtyLivenessVerdict } from '../../../shared/pty-liveness-verdict'
+import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 import { RuntimeConstructionServices } from './runtime-construction-services'
 

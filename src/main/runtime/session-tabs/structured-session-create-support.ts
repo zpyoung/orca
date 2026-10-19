@@ -8,30 +8,40 @@ import { OrcaRuntimeWithGetWorktreePs } from '../workspaces/workspace-process-li
 import { getStructuredAgentSessionHost } from '../../native-chat/agent-session-wire/structured-agent-session-registry'
 import {
   resolveCommittedStructuredAgentSessionAdoptionIntent,
-  resolveStructuredAgentSessionAdoptionForCreate
-} from './structured-agent-session-create-adoption'
-import { isNativeLocalLocation, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
-import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
-import type { AgentSessionAttachParams } from '../native-chat/agent-session-wire/structured-agent-session-attach'
-import { resolveTuiAgentLaunchEnv } from '../../shared/tui-agent-launch-defaults'
-import { resolveHostStructuredAgentCreateSupport } from './structured-agent-launch-support'
-import { structuredAgentRuntimeRegistration } from './structured-agent-runtime-registrations'
-import { structuredLaunchSeedOptions } from '../../shared/native-chat-session-option-defaults'
-import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk } from './structured-agent-session-runtime'
-import { ensureStructuredAgentSessionHostUnlessRefused } from './structured-agent-session-host-refusal'
-import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
-import { parseWslUncPath } from '../../shared/wsl-paths'
+  requireUnownedStructuredAgentSessionAdoption,
+  resolveStructuredAgentSessionAdoptionForCreate,
+  structuredAgentSessionAdoptAttach,
+  type StructuredAgentSessionCreateIntentInput
+} from '../structured-agent-session-create-adoption'
+import { isNativeLocalLocation, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import { getLocalProjectWorktreeGitOptions } from '../../project-runtime-git-options'
+import type { AgentSessionAttachParams } from '../../native-chat/agent-session-wire/structured-agent-session-attach'
+import {
+  resolveHostStructuredAgentCreateSupport,
+  resolveHostStructuredAgentLaunchEnvironment
+} from '../structured-agent-launch-support'
+import { structuredAgentRuntimeMetadata } from '../structured-agent-runtime-metadata'
+import { structuredLaunchSeedOptions } from '../../../shared/native-chat-session-option-defaults'
+import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk } from '../structured-agent-session-runtime'
+import { ensureStructuredAgentSessionHostUnlessRefused } from '../structured-agent-session-host-refusal'
+import { getProfileUserDataPath } from '../../orca-profiles/profile-storage-paths'
+import { parseWslUncPath } from '../../../shared/wsl-paths'
 import {
   isFloatingWorkspaceId,
   isFloatingWorkspaceSelector
-} from '../../shared/floating-workspace-worktree'
-import { parseWorkspaceKey } from '../../shared/workspace-scope'
-import {
-  isLegacyAgentSessionAccountHome,
-  type AgentSessionAccountHome
-} from '../../shared/agent-session-account-home'
-import type { StructuredAgentId } from '../../shared/agent-session-provider-handle'
-import { agentSessionWireProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
+} from '../../../shared/floating-workspace-worktree'
+import { parseWorkspaceKey } from '../../../shared/workspace-scope'
+import type { AgentSessionAccountHome } from '../../../shared/agent-session-account-home'
+import type { StructuredAgentId } from '../../../shared/agent-session-provider-handle'
+
+export abstract class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaRuntimeWithGetWorktreePs {
+  protected abstract restoreStructuredAgentSessionTabsOnce(
+    ...args: Parameters<
+      RestoreStructuredAgentSessionTabsOnceMethods['restoreStructuredAgentSessionTabsOnce']
+    >
+  ): ReturnType<
+    RestoreStructuredAgentSessionTabsOnceMethods['restoreStructuredAgentSessionTabsOnce']
+  >
 
   async getStructuredAgentSessionCreateSupport(
     worktreeSelector: string,
@@ -211,7 +221,7 @@ import { agentSessionWireProviderHandle } from '../../shared/agent-session-provi
     const support = await this.getStructuredAgentSessionCreateSupport(input.worktree, input.agent)
     // Adopting a conversation reads the agent's own transcript, so only an agent registered with an
     // importer adopts.
-    const transcriptImport = structuredAgentRuntimeRegistration(input.agent)?.transcriptImport
+    const transcriptImport = structuredAgentRuntimeMetadata(input.agent)?.transcriptImport
     if (!support.supported || (input.resumeFrom && !transcriptImport)) {
       throw agentSessionRefusalError('structured_agent_session_unsupported', {
         reason: 'hostUnsupported'
@@ -242,14 +252,23 @@ import { agentSessionWireProviderHandle } from '../../shared/agent-session-provi
     // `accountHome.path`, and Claude reads its transcript under `<home>/projects`. Resuming under
     // the wrong home finds nothing and lands the user in a blank chat wearing the old chat's name.
     const adoption =
-      input.resumeFrom && transcriptImport && isLegacyAgentSessionAccountHome(selectedAccountHome)
+      resumeFrom && transcriptImport
         ? await resolveStructuredAgentSessionAdoptionForCreate({
             settings,
             agent: input.agent,
             transcriptImport,
-            providerSessionId: input.resumeFrom.providerSessionId,
-            selfSessionId: input.envelope.sessionId,
-            selectedAccountHomePath: selectedAccountHome.path
+            providerSessionId: resumeFrom.providerSessionId,
+            resolveTranscriptPath: () =>
+              structuredAgentCliSourcePathFromEvidence({
+                agent: input.agent,
+                resumeFrom,
+                workspaceId: location.workspaceId,
+                evidence: input.structuredAgentCliSourceEvidence
+              }),
+            prepareCodexResume: this.prepareAiVaultSessionResumeFn ?? undefined,
+            selectedAccountHome,
+            launchEnv: await resolveHostStructuredAgentLaunchEnvironment(input.agent, settings),
+            workspaceCwd: workspaceCwd
           })
         : null
     return {

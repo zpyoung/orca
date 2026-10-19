@@ -5,6 +5,7 @@ import { getDaemonRuntimeDir as getRuntimeDir } from './daemon-launch-paths'
 import { readDaemonPidRecord as readDaemonPidRecordAt } from './daemon-endpoint-incarnation'
 import type { ParsedDaemonPid } from './daemon-pid-file-parse'
 import {
+  getCurrentDaemonAdapter,
   getLegacyDaemonAdapters,
   listEveryDaemonGeneration,
   type DaemonProvider

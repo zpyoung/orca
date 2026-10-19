@@ -34,7 +34,6 @@ import {
   sendPreparation,
   structuredAgentSessionSendBlock
 } from './structured-agent-session-send-preparation'
-import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from '../../../shared/agent-chat-permission-mode'
 import {
   cancelPlan,
   promptPlan,
@@ -56,7 +55,6 @@ import type { StructuredAgentSessionCaller } from './structured-agent-session-ho
 import {
   readStructuredAgentSessionOptions,
   IN_PROCESS_OPTIONS_READER,
-  recordStructuredAgentSessionOptionIntent,
   type StructuredAgentSessionOptionsReader
 } from './structured-agent-session-options-read'
 import { writeStructuredAgentSessionOption } from './structured-agent-session-message-options'
@@ -131,6 +129,11 @@ export function cancelStructuredAgentSessionTurn(
         ...params,
         childWork: () => context.readChildWork(sessionId),
         acknowledgeStops: (evidence) => context.publishChildWork(sessionId, evidence),
+        captureStops: (targets) =>
+          context.captureChildWorkStops(
+            sessionId,
+            targets.map((target) => target.providerId)
+          ),
         // Untargeted, with work no record lists: the idle sweep's stop ends it with the agent.
         ...(params.taskId === undefined
           ? {
@@ -207,15 +210,13 @@ export async function setStructuredAgentSessionOption(
   caller: StructuredAgentSessionCaller,
   params: { envelope: AgentSessionMutationEnvelope; key: string; value: string }
 ): Promise<AgentSessionMutationResult<AgentSessionOptionResult>> {
-  // The permission mode is only ever the record's: the next start launches with it.
   const recordOnly = params.key === AGENT_CHAT_PERMISSION_MODE_OPTION_ID
-  if (!recordOnly) {
-    // Outside the queue: a pick made while the provider starts then queues behind what its start persists.
-    await context.deps.adapter.awaitOptionWritable?.(params.envelope.sessionId)
-  }
   const plan = setOptionPlan(params)
-  const atRest = () => recordOnly || !context.sessions.get(params.envelope.sessionId)?.child
-  return mutateStructuredAgentSession(
+  const atRest = () => {
+    const child = context.sessions.get(params.envelope.sessionId)?.child
+    return recordOnly || !child || child.phase === 'starting' || child.close !== undefined
+  }
+  return runWithReadyStructuredAgentSessionOperation(
     context,
     caller.callerKey,
     params.envelope,
@@ -299,6 +300,11 @@ export function structuredAgentSessionMutationDelegates(
     readOptions: (
       sessionId: string,
       reader: StructuredAgentSessionOptionsReader = IN_PROCESS_OPTIONS_READER
-    ) => readStructuredAgentSessionOptions(context(), sessionId, reader)
+    ) => readStructuredAgentSessionOptions(context(), sessionId, reader),
+    settleLateDispatch: (input: Parameters<typeof settleStructuredAgentSessionLateDispatch>[1]) =>
+      settleStructuredAgentSessionLateDispatch(context(), input),
+    releaseUnansweredDispatches: (
+      input: Parameters<typeof releaseStructuredAgentSessionUnansweredDispatches>[1]
+    ) => releaseStructuredAgentSessionUnansweredDispatches(context(), input)
   }
 }

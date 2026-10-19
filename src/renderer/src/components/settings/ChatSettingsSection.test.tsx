@@ -6,6 +6,7 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { decodeAgentSessionAgentsResult } from '../../../../shared/agent-session-registered-agents'
 import { ChatSettingsSection } from './ChatSettingsSection'
+import { NativeChatProvidersSetting } from './NativeChatProvidersSetting'
 import { TooltipProvider } from '../ui/tooltip'
 import { ActiveSettingsSectionProvider } from './SettingsSection'
 import { getChatAppearanceSearchEntries } from './chat-appearance-search'
@@ -15,6 +16,7 @@ import { getChatBehaviorSearchEntries } from './chat-behavior-search'
 import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import { setLocalRuntimeCapabilitiesForTests } from '@/runtime/local-runtime-capabilities'
 import { useStructuredAgentSessionHostQueuesMessages } from '@/runtime/structured-agent-session-host-capability'
+import type * as HostStructuredAgentsModule from '@/runtime/host-structured-agents'
 import { i18n } from '@/i18n/i18n'
 import { buildSettingsNavigationMetadata } from '@/hooks/useSettingsNavigationMetadata'
 import { buildCmdJSettingsResults } from '../cmd-j/palette-results'
@@ -48,6 +50,7 @@ afterEach(async () => {
 beforeEach(() => {
   state.settingsSearchQuery = ''
   state.settings = null
+  state.localDetectedAgentIdsByContext = {}
   setLocalRuntimeCapabilitiesForTests([AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY])
 })
 

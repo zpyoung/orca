@@ -6,8 +6,8 @@ import { getWorktreeIdsWithStructuredChat } from './visible-worktree-activity-in
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
-} from './workspace-creator-visibility'
-import type { VisibleWorktreeOptions } from './visible-worktrees'
+} from '../../../../shared/workspace-creator-visibility'
+import type { VisibleWorktreeOptions } from './compute-visible-worktrees'
 import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'
 import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/use-workspace-review-filter'
 

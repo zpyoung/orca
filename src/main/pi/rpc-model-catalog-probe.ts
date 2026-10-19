@@ -10,7 +10,7 @@ import type {
 import { runAgentModelCatalogListing } from '../native-chat/agent-model-catalog/agent-model-catalog-probe-runner'
 import type { StructuredAgentCommandSettings } from '../native-chat/structured-agent-command-resolution'
 import { buildPiRpcLaunch, piRpcSessionlessEnvironment } from './rpc-launch'
-import { piRpcVersionSupported, resolvePiRpcCommand } from './rpc-launch-resolution'
+import { piRpcVersionSupported, resolvePiRpcInvocation } from './rpc-launch-resolution'
 import { PI_UNMAPPED_THINKING_LEVELS } from './rpc-options'
 
 export type PiModelCatalogProbeDeps = {

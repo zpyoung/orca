@@ -2,7 +2,7 @@ import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/electr
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import { listEnvironments, resolveEnvironment } from '../../shared/runtime-environment-store'
-import { getPreferredPairingOffer } from '../../shared/runtime-environments'
+import { getPreferredPairedRuntimeConnection } from '../../shared/runtime-environments'
 import {
   RemoteRuntimeClientError,
   sendRemoteRuntimeRequestWithStatusPreflight,
@@ -14,12 +14,12 @@ import {
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
-import { isRuntimeEnvironmentManuallyDisconnected } from '../ipc/runtime-environment-manual-disconnect'
+import { isRuntimeEnvironmentManuallyDisconnected } from '../ipc/runtime-environments/runtime-environment-manual-disconnect'
+import { getRuntimeEnvironmentStatus } from '../ipc/runtime-environments/runtime-environment-status-probe'
 import {
   callRuntimeEnvironment,
-  getRuntimeEnvironmentStatus,
   subscribeRuntimeEnvironment
-} from '../ipc/runtime-environment-transport-routing'
+} from '../ipc/runtime-environments/runtime-environment-transport-routing'
 
 const REMOTE_FLEET_TIMEOUT_MS = 15_000
 
@@ -167,7 +167,7 @@ export function createFleetEnvironmentTransport(
       requiredCapability = HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
     ) => {
       const environment = assertAvailable(identity)
-      const pairing = getPreferredPairingOffer(environment)
+      const pairing = getPreferredPairedRuntimeConnection(environment)
       return sendRemoteRuntimeRequestWithStatusPreflight(
         pairing,
         method,

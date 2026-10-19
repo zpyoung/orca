@@ -176,6 +176,8 @@ type AgentSessionRefusalFactsByCode = {
   agent_session_operation_invalid: RewindFacts & {
     account?: AgentSessionAccountKind
     argumentProblem?: AgentSessionArgumentProblem
+    /** The chat's agent a `stopFailed` Stop could not stop. */
+    agent?: TuiAgent
     codexInstallation?: CodexInstallationProblem
   }
   agent_session_operation_unknown: RewindFacts
@@ -307,6 +309,16 @@ export function readAgentSessionRefusalDetails<C extends AgentSessionWireRefusal
     code === 'agent_session_operation_invalid'
       ? readCodexInstallationProblem(value.codexInstallation)
       : undefined
+  const owner =
+    (code === 'agent_session_conflict' || code === 'agent_session_ownership_unknown') &&
+    value.reason === 'conversationHeldElsewhere' &&
+    isRecord(value.owner) &&
+    typeof value.owner.sessionId === 'string' &&
+    value.owner.sessionId.trim().length > 0 &&
+    typeof value.owner.workspaceId === 'string' &&
+    value.owner.workspaceId.trim().length > 0
+      ? { sessionId: value.owner.sessionId, workspaceId: value.owner.workspaceId }
+      : undefined
   const read = {
     ...(isAgentSessionRefusalReason(code, value.reason) ? { reason: value.reason } : {}),
     ...facts,
@@ -317,6 +329,11 @@ export function readAgentSessionRefusalDetails<C extends AgentSessionWireRefusal
       ? { account: value.account }
       : {}),
     ...(argumentProblem ? { argumentProblem } : {}),
+    ...(code === 'agent_session_operation_invalid' &&
+    value.reason === 'stopFailed' &&
+    isNamedAgent(value.agent)
+      ? { agent: value.agent }
+      : {}),
     ...(codexInstallation ? { codexInstallation } : {})
   }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the reason was checked against `code`'s list and only the facts `code` lists (plus the verdict every code may carry) were kept.

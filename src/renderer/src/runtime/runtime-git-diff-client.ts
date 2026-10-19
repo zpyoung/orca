@@ -20,7 +20,7 @@ export async function getRuntimeGitDiff(
   if (signal?.aborted) {
     throw createGitDiffAbortError()
   }
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind === 'local' || !context.worktreeId) {
     return callLocalGitDiff(
       {

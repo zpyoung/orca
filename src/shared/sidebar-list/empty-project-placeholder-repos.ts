@@ -1,8 +1,8 @@
-import type { ProjectGroup } from '../../../../shared/project-group-types'
-import type { Repo } from '../../../../shared/repo-types'
-import type { Worktree } from '../../../../shared/worktree/types'
-import type { WorktreeGroupBy } from './worktree-list/grouping/row-types'
-import { hasOnlyWorktreesGroupedElsewhere } from './fork-worktree-groups/empty-project-placeholder-membership'
+import type { ProjectGroup } from '../project-group-types'
+import type { Repo } from '../repo-types'
+import type { Worktree } from '../worktree/types'
+import type { WorktreeGroupBy } from './row-types'
+import { hasOnlyWorktreesGroupedElsewhere } from '../fork-worktree-groups/empty-project-placeholder-membership'
 
 export function getEmptyProjectPlaceholderRepoIds(args: {
   groupBy: WorktreeGroupBy

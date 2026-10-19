@@ -416,13 +416,12 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
   )
 
   // The contract a chat's first message depends on: saved options and the chat's permission mode
-  // ride the launch, and the message is written as soon as the child is published, before the CLI
-  // answers initialize.
+  // ride the launch, and the message is written after open answers initialize.
   it.skipIf(!realClaudeAuthenticated).each([
     ['accept-edits', 'acceptEdits'],
     ['full-access', 'bypassPermissions']
   ] as const)(
-    'runs a message written before initialize answers, launched with saved options and %s',
+    'runs a message after open with saved options and %s',
     async (permissionMode, cliPermissionMode) => {
       const providerSessionId = randomUUID()
       const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')

@@ -1,16 +1,19 @@
-// @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
-import { OrcaRuntimeWithCreateAgentSession } from './orca-runtime-create-agent-session'
-import type { RuntimeTerminalCreate } from '../../shared/runtime-types'
-import { WORKTREE_CREATE_RESULT_TTL_MS } from './orca-runtime-core'
-import { deriveRemoteRuntimeTerminalCreateHandle } from './remote-runtime-terminal-create-identity'
-import { withTimeoutResult } from './runtime-async-boundaries'
-import { PTY_CONTROLLER_LIST_TIMEOUT_MS } from './orca-runtime-postlude'
-import { inferWorktreeIdFromPtyId } from './runtime-worktree-path-identity'
-import { getRegisteredSshState } from '../ssh/ssh-target-registry'
-import { LOCAL_EXECUTION_HOST_ID, toSshExecutionHostId } from '../../shared/execution-host'
-import { resolveWorktreeLaunchHost } from './worktree-launch-host-repo'
-import type { TuiAgent } from '../../shared/tui-agent'
-import type { AgentLaunchOverrides } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { OrcaRuntimeWithCreateAgentSession } from '../../orca-runtime-create-agent-session'
+import type { RuntimeTerminalCreate } from '../../../../shared/runtime-types'
+import { WORKTREE_CREATE_RESULT_TTL_MS } from '../../orca-runtime-core'
+import { deriveRemoteRuntimeTerminalCreateHandle } from '../../remote-runtime-terminal-create-identity'
+import { withTimeoutResult } from '../../runtime-async-boundaries'
+import { PTY_CONTROLLER_LIST_TIMEOUT_MS } from '../../orca-runtime-postlude'
+import { inferWorktreeIdFromPtyId } from '../../runtime-worktree-path-identity'
+import { getRegisteredSshState } from '../../../ssh/ssh-target-registry'
+import {
+  getConnectionExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID,
+  toSshExecutionHostId
+} from '../../../../shared/execution-host'
+import { resolveWorktreeLaunchHost } from '../../worktree-launch-host-repo'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 
 export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRuntimeWithCreateAgentSession {
   async dedupeTerminalCreate(
@@ -169,18 +172,14 @@ export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRun
     if (!repo) {
       throw new Error('Repository for the selected workspace is no longer available.')
     }
-    const startup = this.buildStartupForAgent(
-      repo,
-      opts.agent,
-      opts.prompt,
-      undefined,
-      opts.extraAgentArgs || opts.launchOverrides
-        ? {
-            ...(opts.extraAgentArgs ? { extraAgentArgs: opts.extraAgentArgs } : {}),
-            ...(opts.launchOverrides ? { launchOverrides: opts.launchOverrides } : {})
-          }
-        : undefined
-    )
+    const startup = this.buildStartupForAgent(repo, opts.agent, opts.prompt, undefined, {
+      ...(opts.extraAgentArgs ? { extraAgentArgs: opts.extraAgentArgs } : {}),
+      ...(opts.launchOverrides ? { launchOverrides: opts.launchOverrides } : {}),
+      launchScope: await this.resolveTerminalWorkspaceLaunchScope(`id:${worktree.id}`)
+    })
+    if (startup.launchRuntime instanceof Error) {
+      throw startup.launchRuntime
+    }
     const terminal = await this.createTerminal(`id:${worktree.id}`, {
       command: startup.startup.command,
       env: startup.startup.env,

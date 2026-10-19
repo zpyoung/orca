@@ -1,10 +1,7 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
-import type { IFilesystemProvider } from '../providers/types'
-import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 import {
   MAX_OBJECTIVE_REPORT_BYTES,
@@ -23,17 +20,15 @@ async function localFolderTarget(): Promise<ObjectiveWorkspaceTarget> {
   return createLocalFolderTarget(temporaryDirectories, 'orca-objective-report-')
 }
 
-function remoteFolderTarget(provider: IFilesystemProvider): ObjectiveWorkspaceTarget {
+function remoteFolderTarget(): ObjectiveWorkspaceTarget {
   return {
     kind: 'folder',
     executionHostId: 'ssh:objective-report-test',
-    workspacePath: '/srv/objective',
-    fileProvider: provider
+    workspacePath: '/srv/objective'
   }
 }
 
 afterEach(async () => {
-  unregisterSshGitProvider('objective-report-git-test')
   await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
@@ -51,56 +46,8 @@ describe('objective role report ingestion', () => {
     ).resolves.toBe(path)
   })
 
-  it('derives a remote Git report directory through the routed Git and file providers', async () => {
-    const gitProvider = {
-      exec: vi.fn().mockResolvedValue({
-        stdout: '/srv/main/.git/worktrees/objective\n',
-        stderr: ''
-      })
-    }
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the SshGitProvider class; only exec is exercised.
-    registerSshGitProvider('objective-report-git-test', gitProvider as never)
-    const createDir = vi.fn().mockResolvedValue(undefined)
-    const runtimeTarget = {
-      executionHostId: 'ssh:objective-report-git-test',
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by report path resolution.
-      worktree: {
-        id: 'objective-worktree',
-        repoId: 'objective-repo',
-        path: '/srv/objective',
-        git: {
-          path: '/srv/objective',
-          branch: 'objective',
-          isBare: false,
-          isMainWorktree: false
-        }
-      } as unknown as RuntimeGitTarget['worktree']
-    } satisfies RuntimeGitTarget
-    const target: ObjectiveWorkspaceTarget = {
-      kind: 'git',
-      executionHostId: 'ssh:objective-report-git-test',
-      workspacePath: '/srv/objective',
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only createDir is exercised.
-      fileProvider: { createDir } as unknown as IFilesystemProvider,
-      gitTarget: runtimeTarget
-    }
-
-    const path = await issueObjectiveReportPath(target, 'git-attempt')
-
-    expect(dirname(path)).toBe('/srv/main/.git/worktrees/objective/orca-heimdall/objective/reports')
-    expect(createDir).toHaveBeenCalledWith(dirname(path))
-    expect(gitProvider.exec).toHaveBeenCalledWith(
-      ['rev-parse', '--absolute-git-dir'],
-      '/srv/objective'
-    )
-  })
-
   it('refuses an arbitrary mailbox path before stat or read reaches the host', async () => {
-    const stat = vi.fn()
-    const readFile = vi.fn()
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only stat and readFile are exercised.
-    const provider = { stat, readFile } as unknown as IFilesystemProvider
-    const target = remoteFolderTarget(provider)
+    const target = await localFolderTarget()
 
     await expect(
       readObjectiveRoleReport({
@@ -110,8 +57,12 @@ describe('objective role report ingestion', () => {
         role: 'planner'
       })
     ).resolves.toEqual({ ok: false, reason: 'path-mismatch' })
-    expect(stat).not.toHaveBeenCalled()
-    expect(readFile).not.toHaveBeenCalled()
+  })
+
+  it('refuses to issue a report path for a non-local execution host', async () => {
+    await expect(issueObjectiveReportPath(remoteFolderTarget(), 'remote-attempt')).rejects.toThrow(
+      'Remote objective target is not served by this host'
+    )
   })
 
   it('enforces the complete report cap in UTF-8 bytes independently of field code units', async () => {
@@ -424,42 +375,6 @@ describe('objective role report ingestion', () => {
     ).resolves.toEqual({ ok: false, reason: 'task-mismatch' })
   })
 
-  it('reads the exact issued remote path with a host-enforced 256 KiB limit', async () => {
-    const body = JSON.stringify({
-      verdict: 'approve',
-      criteriaResults: [],
-      summary: 'Remote review complete.'
-    })
-    const lstat = vi.fn().mockResolvedValue({
-      size: Buffer.byteLength(body),
-      type: 'file',
-      mtime: 1,
-      mtimeMs: 1,
-      dev: 2,
-      ino: 3
-    })
-    const readFile = vi.fn().mockResolvedValue({ content: body, isBinary: false })
-    const realpath = vi.fn(async (path: string) => path)
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
-    const provider = { lstat, readFile, realpath } as unknown as IFilesystemProvider
-    const target = remoteFolderTarget(provider)
-    const path = await resolveExpectedObjectiveReportPath(target, 'remote-attempt')
-
-    const result = await readObjectiveRoleReport({
-      target,
-      attemptFingerprint: 'remote-attempt',
-      mailboxReportPath: path,
-      role: 'reviewer'
-    })
-
-    expect(result.ok).toBe(true)
-    expect(lstat).toHaveBeenCalledWith(path)
-    expect(readFile).toHaveBeenCalledWith(path, {
-      maxTextBytes: MAX_OBJECTIVE_REPORT_BYTES,
-      maxBinaryBytes: MAX_OBJECTIVE_REPORT_BYTES
-    })
-  })
-
   it('rejects a local report whose issued leaf was replaced by a symlink', async () => {
     const target = await localFolderTarget()
     const path = await issueObjectiveReportPath(target, 'symlink-leaf')
@@ -502,51 +417,6 @@ describe('objective role report ingestion', () => {
         role: 'reviewer'
       })
     ).resolves.toEqual({ ok: false, reason: 'malformed' })
-  })
-
-  it('fails closed before a remote read when secure lstat is unavailable', async () => {
-    const readFile = vi.fn()
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
-    const provider = {
-      readFile,
-      realpath: vi.fn(async (path: string) => path)
-    } as unknown as IFilesystemProvider
-    const target = remoteFolderTarget(provider)
-    const path = await resolveExpectedObjectiveReportPath(target, 'remote-no-lstat')
-
-    await expect(
-      readObjectiveRoleReport({
-        target,
-        attemptFingerprint: 'remote-no-lstat',
-        mailboxReportPath: path,
-        role: 'reviewer'
-      })
-    ).resolves.toEqual({ ok: false, reason: 'malformed' })
-    expect(readFile).not.toHaveBeenCalled()
-  })
-
-  it('rejects a remote report whose canonical ancestor escapes workspace authority', async () => {
-    const targetRoot = '/srv/objective'
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only the methods below are exercised.
-    const provider = {
-      lstat: vi.fn(),
-      readFile: vi.fn(),
-      realpath: vi.fn(async (path: string) =>
-        path === targetRoot ? targetRoot : path.replace('/srv/objective/.orca', '/outside')
-      )
-    } as unknown as IFilesystemProvider
-    const target = remoteFolderTarget(provider)
-    const path = await resolveExpectedObjectiveReportPath(target, 'remote-ancestor')
-
-    await expect(
-      readObjectiveRoleReport({
-        target,
-        attemptFingerprint: 'remote-ancestor',
-        mailboxReportPath: path,
-        role: 'reviewer'
-      })
-    ).resolves.toEqual({ ok: false, reason: 'malformed' })
-    expect(provider.readFile).not.toHaveBeenCalled()
   })
 
   it('returns a validated report and a digest only from the issued host path', async () => {

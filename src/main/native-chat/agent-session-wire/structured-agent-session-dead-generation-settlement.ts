@@ -32,28 +32,16 @@ import {
 } from './structured-agent-session-start-failure-row'
 import {
   runningTurnLifecycleRevisions,
-  lastProvenTurnLiveAt,
-  turnVerdictFromDeathEvidence,
-  turnVerdictFromReplacedRuntime,
   watchedExitRevisions,
   type StructuredAgentSessionTurnVerdict,
   type StructuredAgentSessionWatchedExit
 } from './structured-agent-session-stale-turn-verdict'
-import {
-  exitedRootTurnScope,
-  settledRootTurnScope
-} from './structured-agent-session-exit-turn-scope'
+import { exitedRootTurnScope } from './structured-agent-session-exit-turn-scope'
 import {
   hasUnfinishedStructuredAgentSessionWork,
   type DeadGenerationJournal
 } from './structured-agent-session-unfinished-work'
 import { codexUnopenedSendResolutions } from './structured-agent-session-unopened-send-withdrawal'
-import type { AgentSessionReplacedRuntime } from '../../runtime/agent-session-replaced-runtime'
-import {
-  isUnverifiableTurn,
-  staleStopRow,
-  type StaleCut
-} from './structured-agent-session-stale-stop-row'
 
 export { settleStaleStructuredAgentSessionState } from './structured-agent-session-stale-state-settlement'
 
@@ -84,49 +72,74 @@ export type StructuredAgentSessionDeadGenerationInput = {
   unrunRejection?: SubmissionRejectionFact
 }
 
-/**
- * Settles whatever a generation with no child in this process left running: found when a new child
- * is acquired, or when a chat is reopened for reading. Derived from the journal, the lease's death
- * evidence and the runtimes this one replaced each time, so nothing is owed in between. Either proof
- * ends the turn interrupted, and a proof written after an earlier settle revises what that settle
- * left `unverifiable`, the turn and the calls it closed alike. Must run before a new child's
- * buffered events land, or a live turn would be judged.
- */
-export async function settleStaleStructuredAgentSessionState(input: {
-  journal: AgentSessionJournal
-  sessionId: string
-  fence: number
-  acquisitionGeneration: string | null
-  deathEvidence: AgentSessionDeathEvidence | null
-  /** The runtimes this one replaced for this chat: every owner they held lost its pipes with them. */
-  replaced?: AgentSessionReplacedRuntime
-  /** Who the exit row names. */
-  failureTextContext?: AgentSessionFailureWordsContext
-}): Promise<number> {
-  const { journal, replaced } = input
-  const items = journal.snapshot().items
-  // Each turn is judged by the evidence only if it names that turn's owner.
-  const deathVerdictFor = (item: AgentJournalRenderItem) =>
-    turnVerdictFromDeathEvidence(
-      input.deathEvidence,
-      journal.itemFence(item.itemId),
-      lastProvenTurnLiveAt(journal, item)
-    )
-  const replacedVerdictFor = (item: AgentJournalRenderItem) =>
-    turnVerdictFromReplacedRuntime(
-      replaced,
-      journal.itemFence(item.itemId),
-      lastProvenTurnLiveAt(journal, item)
-    )
-  const verdictFor = (item: AgentJournalRenderItem) => {
-    const byDeath = deathVerdictFor(item)
-    return byDeath.state === 'interrupted' ? byDeath : replacedVerdictFor(item)
+/** The exit's rows, read from the journal as it stands. `owns`: which fences are the exited
+ *  generation's (and later); the rest are an earlier generation's, settled by its own rule. */
+export function planStructuredAgentSessionDeadGeneration(
+  input: StructuredAgentSessionDeadGenerationInput,
+  owns: (fence: number | undefined) => boolean = () => true
+): { mutations: JournalLifecycleMutationInput[]; dispatches: ResolveDispatchInput[] } {
+  const hasUnfinishedWork = hasUnfinishedStructuredAgentSessionWork(input.journal, input.exit)
+  const showUnexpectedExitOutcome = input.showUnexpectedExitOutcome ?? hasUnfinishedWork
+  if (!showUnexpectedExitOutcome && !hasUnfinishedWork) {
+    return { mutations: [], dispatches: [] }
   }
-  // A successful settlement leaves terminal items; a failed transaction leaves the same prefix.
-  const generation = input.acquisitionGeneration ?? `seq-${journal.cursor().sequence}`
-  const settlementId = `${STALE_SESSION_ROW_PREFIX}${input.sessionId}:${input.fence}:${generation}`
-  // Calls an earlier settle closed with no proof, revised once a proof names their owner.
-  const mutations = provenUnverifiedToolCallRevisions(items, input.deathEvidence, journal, replaced)
+  // A queued message is the delivery loop's to settle: it was never handed to this child. A send
+  // a child still starting was handed and never echoed did not run, and its root is gone: it is
+  // rejected, with the child's own diagnostic or as the Stop that ended it. A proven child's
+  // handed-over sends stay in doubt.
+  const startupFailure = input.exitedDuringStartup
+    ? structuredAgentSessionStartFailure({ exit: input.exitFailure }, input.failureTextContext)
+    : null
+  const closed = input.unrunRejection
+  const unrun =
+    startupFailure ?? (closed && agentSessionFailureWords(closed, { surface: 'rejection' }))
+  const withdrawn = unrun ? [] : codexUnopenedSendResolutions(input.journal, input.fence)
+  const withdrawnIds = new Set(withdrawn.map((entry) => entry.clientMessageId))
+  const dispatches = [
+    ...withdrawn,
+    ...journalPendingSubmissionResolutions(
+      (input.journal.submissions?.() ?? input.journal.pendingSubmissions?.() ?? []).filter(
+        (entry) => !withdrawnIds.has(entry.clientMessageId) && owns(entry.fence)
+      ),
+      input.fence,
+      unrun ? { rejection: unrun } : { reason: input.pendingSubmissionReason }
+    )
+  ]
+  const allItems = input.journal.snapshot().items
+  const items = allItems.filter((item) => owns(input.journal.itemFence(item.itemId)))
+  const proven = watchedExitRevisions(items, input.exit, input.journal)
+  const mutations: JournalLifecycleMutationInput[] = []
+  if (showUnexpectedExitOutcome && input.exitedDuringStartup && startupFailure) {
+    const startKey = input.exitedDuringStartup.generation ?? input.settlementId
+    // A start a message waited on is the delivery loop's to record, before or after this exit,
+    // in the words it rejected the message with; this row is for a command, goal or rewind start.
+    // A row already written stays: rejected is terminal, so its words are not reworded.
+    const recordedByDeliveryLoop =
+      input.journal.submissions?.().some(isQueuedAgentJournalSubmission) ||
+      hasStructuredAgentSessionStartFailureRow(allItems, startKey)
+    if (!recordedByDeliveryLoop) {
+      mutations.push(structuredAgentSessionStartFailureRow(startKey, startupFailure))
+    }
+  } else if (showUnexpectedExitOutcome) {
+    // The turn the exit ended, and an error so no fold ever hides why it stopped.
+    mutations.push({
+      kind: 'item',
+      identity: { provider: 'orca', clientMessageId: input.settlementId },
+      body: {
+        kind: 'status',
+        ...agentSessionFailureWords(
+          input.exitFailure ?? agentSessionFailureFact('providerExited'),
+          {
+            ...input.failureTextContext,
+            surface: 'row'
+          }
+        ),
+        tone: 'error'
+      },
+      turnScope: exitedRootTurnScope(withRevisions(items, proven), input.verdict)
+    })
+  }
+  const bodies = new Map(allItems.map((item) => [item.itemId, item.body]))
   for (const item of items) {
     // Ended as its turn is: a proven death cuts a running call short. An open reasoning row is
     // ended too, but is not unfinished work: its running turn already says so.
@@ -143,42 +156,8 @@ export async function settleStaleStructuredAgentSessionState(input: {
       })
     }
   }
-  const proven = provenUnverifiableTurnRevisions(items, input.deathEvidence, journal, replaced)
-  const turnEnds = [
-    ...items.flatMap((item) => runningTurnLifecycleRevisions([item], verdictFor(item))),
-    ...proven
-  ]
-  mutations.push(...turnEnds)
-  const stopRow = staleStopRow(input, items, (item): StaleCut => {
-    const unverifiable = isUnverifiableTurn(item)
-    if (!unverifiable && !isInProgressStructuredAgentSessionItem(item)) {
-      return null
-    }
-    const fence = journal.itemFence(item.itemId)
-    // An earlier settle's `unverifiable` turn is revised by a death naming its owner or by its replaced runtime.
-    if (
-      unverifiable
-        ? fence !== undefined && fence === input.deathEvidence?.ownerFence
-        : deathVerdictFor(item).state === 'interrupted'
-    ) {
-      return { by: 'death' }
-    }
-    return fence !== undefined && replacedVerdictFor(item).state === 'interrupted'
-      ? { by: 'replaced', fence }
-      : null
-  })
-  if (stopRow && !endedByPersonsStop(journal, turnEnds)) {
-    mutations.unshift({ ...stopRow, turnScope: settledRootTurnScope(items, turnEnds) })
-  }
-  if (mutations.length > 0) {
-    await journal.appendLifecycleBatch({
-      settlementId,
-      fence: input.fence,
-      recovered: true,
-      mutations
-    })
-  }
-  return mutations.length
+  mutations.push(...runningTurnLifecycleRevisions(items, input.verdict), ...proven)
+  return { mutations, dispatches }
 }
 
 function withRevisions(

@@ -261,10 +261,6 @@ export class AgentSessionJournal {
   /** Latest saved output at this fence, excluding client actions and recovery bookkeeping. */
   lastProviderActivityAt = (fence: number) => this.state.providerActivityAt.get(fence)
 
-  /** Latest saved output at this fence, excluding client actions and recovery bookkeeping. */
-  lastProviderActivityAt = (fence: number): number | undefined =>
-    this.state.providerActivityAt.get(fence)
-
   submissions = (): AgentJournalSubmission[] => [...this.state.submissions.values()]
 
   submission = (clientMessageId: string) => this.state.submissions.get(clientMessageId)

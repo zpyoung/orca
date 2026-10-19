@@ -18,7 +18,6 @@ import { prewarmStructuredAgentModelCatalogs } from '../runtime/structured-agent
 import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
 import { createAgentModelCatalogSettingsExpiry } from '../native-chat/agent-model-catalog/agent-model-catalog-account-expiry'
 import { mainProcessState as state } from './main-process-state'
-import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../fork-session-info/session-info-plan-window-correlation'
 
 // Settings that change which account or binary a new chat's agent runs under.
 const MODEL_CATALOG_ACCOUNT_SETTINGS = [
@@ -78,47 +77,7 @@ export function initializeMainProcessAccountServices(): void {
     if (MODEL_CATALOG_ACCOUNT_SETTINGS.some((key) => key in updates)) {
       prewarmStructuredAgentModelCatalogs()
     }
-    if ('opencodeSessionCookie' in updates || 'opencodeWorkspaceId' in updates) {
-      state.rateLimits?.invalidateOpenCodeGoCredentialState()
-      void state.rateLimits?.refresh().catch((error: unknown) => {
-        console.warn(
-          '[rate-limits] Failed to refresh OpenCode Go usage after a settings change:',
-          error
-        )
-      })
-    }
-    // Why: these three pick the MiniMax host and quota bucket, so a stale snapshot from the
-    // previous endpoint would otherwise sit in the status bar until the next poll.
-    if (
-      'minimaxEndpoint' in updates ||
-      'minimaxGroupId' in updates ||
-      'minimaxUsageModels' in updates
-    ) {
-      state.rateLimits?.invalidateMiniMaxCredentialState()
-      void state.rateLimits?.refresh().catch((error: unknown) => {
-        console.warn(
-          '[rate-limits] Failed to refresh MiniMax usage after a settings change:',
-          error
-        )
-      })
-    }
-    // Why: the site picks the GLM Coding Plan quota host, so a stale snapshot from
-    // the previous site would otherwise sit in the status bar until the next poll.
-    if ('zcodePlanSite' in updates) {
-      state.rateLimits?.invalidateZcodeCredentialState()
-      void state.rateLimits?.refresh().catch((error: unknown) => {
-        console.warn(
-          '[rate-limits] Failed to refresh GLM Coding Plan usage after a settings change:',
-          error
-        )
-      })
-    }
   })
-  state.rateLimits.setClaudeAuthPreparationResolver((target) =>
-    state.claudeRuntimeAuth!.prepareForRateLimitFetch(target)
-  )
-  // Why: live Claude sessions stream usage windows through their statusLine command; feeding them here avoids OAuth usage-endpoint polling (and its 429s).
-  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(state.rateLimits, event))
   store.migrateLegacyOpenCodeGoApiKey({
     has: hasOpenCodeGoApiKey,
     read: readOpenCodeGoApiKey,
@@ -133,42 +92,4 @@ export function initializeMainProcessAccountServices(): void {
     }
   })
   browserManager.setSettingsResolver(() => ({ keybindings: state.keybindings?.getOverrides() }))
-  state.rateLimits.setInactiveClaudeAccountsResolver(() => {
-    const settings = store.getSettings()
-    const activeIds = new Set(
-      [
-        normalizeClaudeRuntimeSelection(settings).host,
-        ...Object.values(normalizeClaudeRuntimeSelection(settings).wsl)
-      ].filter(Boolean)
-    )
-    return settings.claudeManagedAccounts
-      .filter((account) => !activeIds.has(account.id))
-      .map((account) => ({
-        id: account.id,
-        managedAuthRuntime: account.managedAuthRuntime,
-        wslDistro: account.wslDistro,
-        wslLinuxAuthPath: account.wslLinuxAuthPath
-      }))
-  })
-  state.rateLimits.setInactiveCodexAccountsResolver(() => {
-    const settings = store.getSettings()
-    const activeIds = new Set(
-      [
-        normalizeCodexRuntimeSelection(settings).host,
-        ...Object.values(normalizeCodexRuntimeSelection(settings).wsl)
-      ].filter(Boolean)
-    )
-    return settings.codexManagedAccounts
-      .filter((account) => !activeIds.has(account.id))
-      .map((account) => ({
-        id: account.id,
-        resolveHome: () => {
-          const resolved =
-            state.codexRuntimeHome!.resolveCodexManagedAccountHomeForInactiveFetch(account)
-          return resolved.kind === 'ready'
-            ? { kind: 'ready' as const, managedHomePath: resolved.homePath }
-            : { kind: 'skip' as const }
-        }
-      }))
-  })
 }

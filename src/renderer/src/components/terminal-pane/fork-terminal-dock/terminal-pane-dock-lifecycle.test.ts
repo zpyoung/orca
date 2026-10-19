@@ -6,6 +6,7 @@ import {
 } from '../fork-terminal-dock/TerminalPaneDockMount'
 import {
   resolveRemoteDockConptyUnverified,
+  resolveRemoteDockConptyUnverifiedForWorktree,
   restampRemoteDockConptyUnverifiedForLivePanes
 } from './terminal-dock-remote-conpty'
 import { collectTerminalDockPaneKeysForTabTeardown } from './terminal-pane-dock-prune'
@@ -187,5 +188,15 @@ describe('restampRemoteDockConptyUnverifiedForLivePanes', () => {
         terminal: { options: {} }
       } as never)
     ).toBe(true)
+  })
+})
+
+describe('resolveRemoteDockConptyUnverifiedForWorktree', () => {
+  it('reports no verdict for a missing worktree id or one no row places', () => {
+    const state = { ...dockConptyState(), settings: { activeRuntimeEnvironmentId: 'env-1' } }
+    expect(resolveRemoteDockConptyUnverifiedForWorktree(state as never, null)).toBeNull()
+    expect(
+      resolveRemoteDockConptyUnverifiedForWorktree(state as never, 'repo::/missing')
+    ).toBeNull()
   })
 })

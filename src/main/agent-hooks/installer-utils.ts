@@ -81,9 +81,8 @@ export function createManagedCommandMatcher(
     `agent-hooks/${scriptStem}.ps1`,
     `agent-hooks/${scriptStem}.sh`
   ]
-  // Why: 1.4.225/1.4.226 registered `orca-agent-hook.exe <agent>` on Windows; match it so this
-  // build replaces that entry instead of adding a second hook beside it.
-  const nativeHook = `agent-hooks/orca-agent-hook.exe ${scriptStem.replace(/-hook$/, '')} `
+  // The shared native hook names its agent in the first argument: `orca-agent-hook.exe claude`.
+  const nativeHook = `agent-hooks/${WINDOWS_NATIVE_HOOK_EXECUTABLE_NAME} ${getWindowsNativeHookAgent(scriptFileName)} `
   return (command) => {
     if (!command) {
       return false

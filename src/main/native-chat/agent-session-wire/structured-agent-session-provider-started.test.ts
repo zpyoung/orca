@@ -229,17 +229,21 @@ describe('a publish-first Claude create whose init is slow', () => {
       sessionId: SESSION,
       listing: expect.objectContaining({ models: LISTED })
     })
-    await claudeStartupSettled(adapter, SESSION)
+    await vi.waitFor(() =>
+      expect(host.readStatusSummary(SESSION)?.hostExecutionPhase).toBe('ready')
+    )
     await Promise.all(lifecycle)
-    expect(store.getRecord(SESSION)?.options?.model).toBe('claude-opus-9')
+    expect(store.getRecord(SESSION)?.options?.model).toBeUndefined()
     expect(savedListings.at(-1)).toEqual({
       sessionId: SESSION,
       listing: expect.objectContaining({
         configuredDefault: expect.objectContaining({ modelId: 'claude-opus-9' })
       })
     })
-    // A later options read lists the models and says nothing more about the default.
+    // A later read refreshes the listing without re-learning the configured default.
+    const saved = savedListings.length
     await host.readOptions(SESSION)
+    expect(savedListings).toHaveLength(saved + 1)
     expect(savedListings.at(-1)?.listing).not.toHaveProperty('configuredDefault')
   })
 
@@ -251,7 +255,9 @@ describe('a publish-first Claude create whose init is slow', () => {
       return proveOwner(input)
     }
     await expect(host.attach(CALLER, claudeParams())).resolves.toMatchObject({ ok: true })
-    await claudeStartupSettled(adapter, SESSION)
+    await vi.waitFor(() =>
+      expect(host.readStatusSummary(SESSION)?.hostExecutionPhase).toBe('ready')
+    )
     await Promise.all(lifecycle)
 
     await vi.waitFor(() =>

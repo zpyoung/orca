@@ -30,10 +30,6 @@ import {
   supportsStructuredAgentSessions
 } from './structured-agent-session-policy'
 import {
-  clientOpensStructuredChatFromHistory,
-  supportsStructuredAgentSessions
-} from './structured-agent-session-policy'
-import {
   AiVaultListSessionsParams,
   AiVaultPrepareSessionResumeParams,
   AiVaultSessionTitlesParams
@@ -121,6 +117,13 @@ export const AI_VAULT_METHODS = [
       // so sessions must come back stamped as the runtime host they addressed.
       const projected = projectStructuredAiVaultSessions(result, (agent) =>
         clientOpensStructuredChatFromHistory({ clientKind, clientCapabilities }, agent)
+      )
+      return conditionalAiVaultListResult(
+        params.executionHostId
+          ? restampAiVaultListResult(projected, params.executionHostId)
+          : projected,
+        params.unlimited ? undefined : params.afterFingerprint,
+        params.force
       )
     }
   }),

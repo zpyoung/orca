@@ -190,12 +190,7 @@ describe('buildMobileNativeChatTransientData', () => {
       timestamp: 0,
       source: 'transcript'
     })
-    const folded = foldMobileNativeChatMessages([
-      user('u1', 'audit'),
-      own('a'),
-      assistant('a1', 'started'),
-      own('b')
-    ])
+    const folded = fold([user('u1', 'audit'), own('a'), assistant('a1', 'started'), own('b')])
     expect(folded.map((message) => message.id)).toEqual(['u1', 'subagent:a', 'a1'])
     expect(folded[1]?.blocks).toEqual([
       {

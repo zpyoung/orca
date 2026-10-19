@@ -22,7 +22,7 @@ import {
 } from '../worktree-removal-safety'
 import type { RuntimeStore } from './runtime-store-contract'
 import type { RuntimeWorktreeRemovalTarget } from './runtime-worktree-selection'
-import { isRuntimeWorktreePathMissing } from './runtime-worktree-filesystem'
+import { isLocalRuntimeWorktreePathMissing } from './runtime-worktree-filesystem'
 
 type RemovalGate = { finish: (removed: boolean) => Promise<void> }
 
@@ -66,7 +66,7 @@ export async function removeRuntimeUnregisteredWorktree(args: {
     args.finishRemoval()
     return {}
   }
-  if (await isRuntimeWorktreePathMissing(route.hostId, target.path, args.localOptions)) {
+  if (await isLocalRuntimeWorktreePathMissing(target.path, args.localOptions)) {
     if (!args.force && !removedMeta) {
       throw new Error(UNREGISTERED_MISSING_WORKTREE_MESSAGE)
     }

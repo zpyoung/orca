@@ -67,7 +67,6 @@ type AutomationEditorDialogProps = {
   isEditing: boolean
   isSaving: boolean
   canSave: boolean
-  createTarget: AutomationCreateTarget
   launchOverridesGate: AutomationLaunchOverridesGate
   repos: readonly Repo[]
   projectHostSetups: readonly ProjectHostSetup[]
@@ -100,7 +99,6 @@ export function AutomationEditorDialog({
   isEditing,
   isSaving,
   canSave,
-  createTarget,
   launchOverridesGate,
   repos,
   projectHostSetups,

@@ -21,13 +21,6 @@ import {
   buildAiVaultSessionProjectById
 } from './ai-vault-session-projects'
 import { useAiVaultSessionLaunchActions } from './ai-vault-session-launch-actions'
-import type { AiVaultResumeInChatEligibility } from './ai-vault-session-resume-in-chat'
-import { resolveAiVaultHistoryRowResume } from './ai-vault-session-resume-in-chat-workspace'
-import {
-  useAiVaultSessionOwnerWorkspaces,
-  useAiVaultSessionWorktreeMap,
-  withAiVaultCurrentWorktreeStatus
-} from './ai-vault-session-worktree'
 import { openAiVaultSessionLogInOrca } from './ai-vault-session-log-open'
 import { revealAiVaultSessionPath } from './ai-vault-session-path-actions'
 import { useAiVaultOriginalPaneActions } from './ai-vault-original-pane-actions'
@@ -174,12 +167,19 @@ export default function AiVaultPanel(): React.JSX.Element {
       }),
     [allWorktrees, projectHostSetupProjection, repos, sessions]
   )
-  // Folder workspaces own their sessions by cwd too, so they resume and jump like a worktree.
-  const ownerWorkspaces = useAiVaultSessionOwnerWorkspaces(allWorktrees, resumeTargetState)
-  const sessionWorktreeById = useAiVaultSessionWorktreeMap({
+  const effectiveActiveWorktreeId = activeWorktreeId ?? activeWorktree?.id ?? null
+  const {
+    getSessionWorktreeInfo,
+    getSessionResumeState,
+    getSessionResumeActions,
+    getSessionResumeInChat
+  } = useAiVaultPanelSessionResume({
     sessions,
     repos,
-    worktrees: ownerWorkspaces
+    allWorktrees,
+    workspaceId: effectiveActiveWorktreeId,
+    resumeTargetState,
+    settings
   })
   const launchActions = useAiVaultSessionLaunchActions({
     activeWorktree: activeWorktree ?? null,
@@ -214,44 +214,6 @@ export default function AiVaultPanel(): React.JSX.Element {
       })
     )
   }, [])
-
-  const getSessionRowResumeArgs = useCallback(
-    (session: AiVaultSession) => ({
-      session,
-      worktreeInfo: getSessionWorktreeInfo(session),
-      activeWorktreeId: effectiveActiveWorktreeId,
-      worktrees: ownerWorkspaces,
-      repos,
-      targetState: resumeTargetState
-    }),
-    [effectiveActiveWorktreeId, getSessionWorktreeInfo, ownerWorkspaces, repos, resumeTargetState]
-  )
-  const getSessionResumeState = useCallback(
-    (session: AiVaultSession) =>
-      resolveAiVaultHistorySessionResumeState(getSessionRowResumeArgs(session)),
-    [getSessionRowResumeArgs]
-  )
-
-  const getSessionResumeActions = useCallback(
-    (session: AiVaultSession) =>
-      resolveAiVaultSessionResumeActions({
-        ...getSessionRowResumeArgs(session),
-        sessionFilePath: session.filePath,
-        sessionExecutionHostId: session.executionHostId
-      }),
-    [getSessionRowResumeArgs]
-  )
-
-  // Resuming into a chat asks a different question from resuming into a terminal: not "can this
-  // workspace host a PTY" but "will the provider still find this conversation from the workspace we
-  // would run it in". The workspace it targets is the session's own when that is open, because
-  // Claude looks its transcript up under a directory derived from the launch cwd.
-  const getSessionResumeInChat = useCallback(
-    (session: AiVaultSession): AiVaultResumeInChatEligibility =>
-      resolveAiVaultHistoryRowResume({ ...getSessionRowResumeArgs(session), settings })
-        .resumeInChat,
-    [getSessionRowResumeArgs, settings]
-  )
 
   // Settings asks for "everything, ready to type".
   const focusSearchRequestId = useAiVaultSearchFocusRequest(

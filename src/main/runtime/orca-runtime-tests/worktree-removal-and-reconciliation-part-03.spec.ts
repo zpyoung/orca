@@ -1,5 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { resetWorktreeTestSshHostHome } from '../../worktree-removal-test-ssh-host-home'
+import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import { _settlePendingWorktreeRemovalsForTests } from '../../worktree-background-removal'
 

@@ -62,8 +62,7 @@ const context = (
   hideCompletedReviewWorkspaces: hideCompleted,
   hidePassingCheckWorkspaces: hidePassing,
   hostedReviewCache,
-  prCache: {},
-  activeRuntimeEnvironmentId: null
+  prCache: {}
 })
 
 describe('filterWorktreesByReview', () => {

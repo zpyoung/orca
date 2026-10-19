@@ -7,14 +7,52 @@ import type {
   RuntimeMobileSessionTabMoveResult,
   RuntimeMobileSessionTabsSnapshot,
   RuntimeMobileSessionTerminalTab
-} from '../../shared/runtime-types'
-import { parseAppSshPtyId } from '../../shared/ssh-pty-id'
-import { buildHeadlessMobileSessionTabGroups } from './mobile-session-layout-projection'
-import { appendRetiredTerminalSurfaceProofs } from './mobile-session-terminal-retirement-proof'
-import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
-import type { TerminalPaneLayoutNode } from '../../shared/terminal-tab-types'
-import type { TerminalDockPropsPatch } from './fork-terminal-dock/terminal-dock-session-tab-props'
-import type { RuntimeSessionTabCloseReason } from '../../shared/runtime-session-contracts'
+} from '../../../shared/runtime-types'
+import { parseAppSshPtyId } from '../../../shared/ssh-pty-id'
+import { buildHeadlessMobileSessionTabGroups } from '../mobile-session-layout-projection'
+import { appendRetiredTerminalSurfaceProofs } from '../../../shared/terminal-retirement-proof-ledger'
+import type { RuntimePtyWorktreeRecord } from '../runtime-terminal-state-records'
+import type { TerminalPaneLayoutNode } from '../../../shared/terminal-tab-types'
+import type { RuntimeTerminalRename } from '../../../shared/runtime-terminal-contracts'
+import type { TerminalDockPropsPatch } from '../fork-terminal-dock/terminal-dock-session-tab-props'
+import type { RuntimeSessionTabCloseReason } from '../../../shared/runtime-session-contracts'
+
+export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWithCloseStructuredAgentSessionTab {
+  protected abstract applyHeadlessSessionTabPropsToSnapshot(
+    ...args: Parameters<HeadlessTabPropertiesMethods['applyHeadlessSessionTabPropsToSnapshot']>
+  ): ReturnType<HeadlessTabPropertiesMethods['applyHeadlessSessionTabPropsToSnapshot']>
+
+  protected abstract applyHeadlessTerminalPaneLayoutToSnapshot(
+    ...args: Parameters<HeadlessTabPropertiesMethods['applyHeadlessTerminalPaneLayoutToSnapshot']>
+  ): ReturnType<HeadlessTabPropertiesMethods['applyHeadlessTerminalPaneLayoutToSnapshot']>
+
+  protected abstract moveHeadlessMobileSessionTab(
+    ...args: Parameters<HeadlessTabGroupsMethods['moveHeadlessMobileSessionTab']>
+  ): ReturnType<HeadlessTabGroupsMethods['moveHeadlessMobileSessionTab']>
+
+  protected abstract normalizeMobileSessionTabOrder(
+    ...args: Parameters<PersistHeadlessTerminalTitleMethods['normalizeMobileSessionTabOrder']>
+  ): ReturnType<PersistHeadlessTerminalTitleMethods['normalizeMobileSessionTabOrder']>
+
+  protected abstract persistHeadlessSessionTabProps(
+    ...args: Parameters<HeadlessTabPropertiesMethods['persistHeadlessSessionTabProps']>
+  ): ReturnType<HeadlessTabPropertiesMethods['persistHeadlessSessionTabProps']>
+
+  protected abstract persistHeadlessTerminalPaneLayout(
+    ...args: Parameters<HeadlessTabPropertiesMethods['persistHeadlessTerminalPaneLayout']>
+  ): ReturnType<HeadlessTabPropertiesMethods['persistHeadlessTerminalPaneLayout']>
+
+  protected abstract getPtyIdsForExplicitTabClose(worktreeId: string, tabId: string): string[]
+
+  abstract renameTerminal(handle: string, title: string | null): Promise<RuntimeTerminalRename>
+
+  protected abstract persistHeadlessTerminalTitle(
+    ...args: Parameters<PersistHeadlessTerminalTitleMethods['persistHeadlessTerminalTitle']>
+  ): ReturnType<PersistHeadlessTerminalTitleMethods['persistHeadlessTerminalTitle']>
+
+  protected abstract resolveMobileSessionHostTabId(
+    ...args: Parameters<PersistHeadlessTerminalTitleMethods['resolveMobileSessionHostTabId']>
+  ): ReturnType<PersistHeadlessTerminalTitleMethods['resolveMobileSessionHostTabId']>
 
   protected async closeHeadlessMobileTerminalTab(
     worktreeId: string,
@@ -239,29 +277,33 @@ import type { RuntimeSessionTabCloseReason } from '../../shared/runtime-session-
       color?: string | null
       isPinned?: boolean
       viewMode?: 'terminal' | 'chat'
+      customTitle?: string | null
       terminalDock?: TerminalDockPropsPatch
     }
   ): Promise<{ updated: true }> {
     const explicitWorktreeId = this.getExplicitSessionWorktreeIdSelector(worktreeSelector)
     const worktreeId =
       explicitWorktreeId ?? (await this.resolveWorktreeSelector(worktreeSelector)).id
+    // Why: a renderer-authoritative host owns + republishes tab props, so a
+    // headless write would be overwritten. Persist only when headless.
     const snapshot = this.mobileSessionTabsByWorktree.get(worktreeId)
     const hostTabId = snapshot
       ? (this.resolveMobileSessionHostTabId(snapshot, args.tabId) ?? args.tabId)
       : args.tabId
-    // Why: color/pin/viewMode are edited in the authoritative renderer itself
-    // and republished from there, so a headless write here would just be
-    // overwritten. Dock state has no renderer-side editor — the client patch
-    // is its only writer — so it must still land on the stored snapshot
-    // mergeRendererTerminalDockAcrossSnapshot treats as `existing`, which is
-    // what lets it survive the renderer's next (dock-unaware) publication.
+    // Why by tab: a sleeping or starting pane has no handle for terminal.rename to name (#29975).
+    const customTitle =
+      args.customTitle === undefined ? undefined : args.customTitle?.trim() || null
     if (this.getAvailableAuthoritativeWindow()) {
-      if (args.terminalDock === undefined) {
-        return { updated: true }
+      if (customTitle !== undefined) {
+        this.notifier?.renameTerminal(hostTabId, customTitle)
       }
-      const dockArgs = { terminalDock: args.terminalDock }
-      this.persistHeadlessSessionTabProps(worktreeId, hostTabId, dockArgs)
-      this.applyHeadlessSessionTabPropsToSnapshot(worktreeId, hostTabId, dockArgs)
+      // Why: dock state has no renderer-side editor, so the client patch is its only writer and
+      // must land on the stored snapshot to survive the renderer's next dock-unaware publication.
+      if (args.terminalDock !== undefined) {
+        const dockArgs = { terminalDock: args.terminalDock }
+        this.persistHeadlessSessionTabProps(worktreeId, hostTabId, dockArgs)
+        this.applyHeadlessSessionTabPropsToSnapshot(worktreeId, hostTabId, dockArgs)
+      }
       return { updated: true }
     }
     this.persistHeadlessSessionTabProps(worktreeId, hostTabId, args)

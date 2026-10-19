@@ -38,6 +38,9 @@ import {
 } from '../../../../shared/workspace-view/workspace-view-options'
 import { translate } from '@/i18n/i18n'
 import { SidebarGroupByToggle } from './SidebarGroupByToggle'
+import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'
+import { getForkOnlyFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'
+import { WorkspaceReviewFilterRows } from './fork-workspace-review-filters/WorkspaceReviewFilterRows'
 
 export function useWorkspaceOptionsFilterBadge(): {
   hasAnyFilter: boolean
@@ -51,7 +54,7 @@ export function useWorkspaceOptionsFilterBadge(): {
       countActiveWorkspaceFilters(
         sidebarWorkspaceRowFilters(filterState),
         repos.map((repo) => repo.id)
-      ),
+      ) + getForkOnlyFilterCount(filterState),
     [filterState, repos]
   )
   return {
@@ -215,12 +218,15 @@ const OPTION_ITEMS: Record<WorkspaceViewOptionKey, ComponentType<OptionItemProps
   cardLayout: WorktreeCardLayoutMenuItem,
   cardProperties: WorktreeCardPropertiesMenuItem,
   cardDisplay: WorktreeCardDisplayMenuItem,
-  hideSleepingWorkspaces: () => <WorkspaceFilterOptionRow optionKey="hideSleepingWorkspaces" />,
+  hideSleepingWorkspaces: WorkspaceActivityWindowControl,
   alwaysShowDefaultBranchWorkspace: () => (
     <WorkspaceFilterOptionRow optionKey="alwaysShowDefaultBranchWorkspace" />
   ),
   hideDefaultBranchWorkspace: () => (
-    <WorkspaceFilterOptionRow optionKey="hideDefaultBranchWorkspace" />
+    <>
+      <WorkspaceReviewFilterRows />
+      <WorkspaceFilterOptionRow optionKey="hideDefaultBranchWorkspace" />
+    </>
   ),
   hideAutomationGeneratedWorkspaces: () => (
     <WorkspaceFilterOptionRow optionKey="hideAutomationGeneratedWorkspaces" />

@@ -446,25 +446,10 @@ describe('registerFilesystemHandlers', () => {
     }
   })
 
-  it('generates an SSH commit message using remote staged context and relay execution', async () => {
-    const context = {
-      branch: 'feature/ai',
-      stagedSummary: 'M\tREADME.md',
-      stagedPatch: '+hello'
-    }
-    const params = { agentId: 'claude', model: 'haiku' }
-    resolveCommitMessageSettingsMock.mockReturnValue({ ok: true, params })
-    getStagedCommitContextMock.mockResolvedValue(context)
-    generateCommitMessageFromContextMock.mockResolvedValue({
-      success: true,
-      message: 'Update README'
-    })
-
-    const resolveBaseEnvironment = vi.fn(async () => ({}))
-    registerFilesystemHandlers(store as never, {
-      prepareForCodexLaunch,
-      prepareForClaudeLaunch,
-      resolveBaseEnvironment
+  it('refuses SSH commit generation as not served without reading local staged changes', async () => {
+    resolveCommitMessageSettingsMock.mockReturnValue({
+      ok: true,
+      params: { agentId: 'custom', model: '', customAgentCommand: 'agent' }
     })
 
     registerFilesystemHandlers(store as never)
@@ -474,33 +459,9 @@ describe('registerFilesystemHandlers', () => {
         worktreePath: '/remote/repo',
         connectionId: 'conn-1'
       })
-    ).resolves.toEqual({ success: true, message: 'Add remote file' })
-
-    expect(generateCommitMessageFromContextMock).toHaveBeenCalledWith(
-      context,
-      params,
-      expect.objectContaining({
-        kind: 'remote',
-        cwd: '/remote/repo',
-        missingBinaryLocation: 'remote PATH'
-      })
-    )
-    const target = generateCommitMessageFromContextMock.mock.calls[0]?.[2]
-    await target.execute(
-      { binary: 'agent', args: [], stdinPayload: null, label: 'agent' },
-      '/cwd',
-      1,
-      'commit-message'
-    )
-    expect(executeCommitMessagePlan).toHaveBeenCalledWith(
-      { binary: 'agent', args: [], stdinPayload: null, label: 'agent' },
-      '/cwd',
-      1,
-      'commit-message'
-    )
-    expect(prepareForCodexLaunch).not.toHaveBeenCalled()
-    expect(prepareForClaudeLaunch).not.toHaveBeenCalled()
-    expect(resolveBaseEnvironment).not.toHaveBeenCalled()
+    ).resolves.toEqual({ success: false, error: SSH_HOST_NOT_SERVED_MESSAGE })
+    expect(getStagedCommitContextMock).not.toHaveBeenCalled()
+    expect(generateCommitMessageFromContextMock).not.toHaveBeenCalled()
   })
 
   it('ignores SSH generation cancellations instead of cancelling local work', async () => {

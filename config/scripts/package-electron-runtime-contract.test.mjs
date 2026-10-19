@@ -157,22 +157,16 @@ describe('Electron runtime package contract', () => {
             expect(evaluate(jobs['verify-mac-build'].if, needs, cancelled)).toBe(
               !cancelled && dispatch === 'success'
             )
+            // Fork is macOS-only: the Windows/Linux `build` result never gates publishing.
             expect(evaluate(jobs['publish-release'].if, needs, cancelled)).toBe(
-              !cancelled &&
-                matrix === 'success' &&
-                dispatch === 'success' &&
-                verification === 'success'
+              !cancelled && dispatch === 'success' && verification === 'success'
             )
           }
         }
       }
     }
-    for (const prerequisite of [
-      'cut',
-      'skill-sharing-linux-floor-release-gate',
-      'skill-sharing-release-gate',
-      'terminal-rendering-golden'
-    ]) {
+    // The fork's release carries neither skill-sharing gate, so only these gate publishing.
+    for (const prerequisite of ['cut', 'terminal-rendering-golden']) {
       const needs = Object.fromEntries([
         ['cut', { result: 'success', outputs: { should_release: 'true' } }],
         ...[

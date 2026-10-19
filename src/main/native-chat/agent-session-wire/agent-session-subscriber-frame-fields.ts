@@ -18,6 +18,7 @@ export type SubscriberFieldState = {
   sessionId: string
   /** Every frame to fit a phone's bridge frame; see `boundedFrames`. */
   boundedFrames: boolean
+  projectQueuePublication?: (publication: QueuePublication) => QueuePublication
   commands?: AgentSessionSlashCommand[] | null
   /** Canonical publication last sent, before reader projection. */
   queuePublication?: QueuePublication
@@ -70,7 +71,9 @@ export function buildSubscriberFrame(
     event.type !== 'end' &&
     (event.type !== 'batch' || queued !== subscriber.queuePublication)
   const backgroundTasks = subscriberBackgroundTasks(hooks, subscriber, event)
-  const sideQueued = attachedQueued ? queued : undefined
+  const sideQueued = attachedQueued
+    ? (subscriber.projectQueuePublication?.(queued) ?? queued)
+    : undefined
   return {
     frames: subscriber.boundedFrames
       ? boundedFrames(event, { queued: sideQueued, backgroundTasks })

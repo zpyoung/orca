@@ -306,8 +306,9 @@ export class AgentSessionRecordStore {
     claimAfter: ClaimAfterAdmission
   ) => this.transact((draft) => admitAndClaimAgentSessionOperationInto(draft, args, claimAfter))
 
-  recordOperationOutcome = (args: AgentSessionOperationSettlement): Promise<void> =>
-    this.transact((draft) => settleAgentSessionOperationInto(draft, args))
+  recordOperationOutcome = (
+    args: Parameters<typeof settleAgentSessionOperationInto>[1]
+  ): Promise<void> => this.transact((draft) => settleAgentSessionOperationInto(draft, args))
 
   /** That settlement, or an accepted row inserted if absent, committed by the journal write that
    *  makes it true. It changes only the ledger, so no record listener is owed. */

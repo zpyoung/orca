@@ -5,7 +5,8 @@ import { OptionalBoolean } from './rpc-param-primitives'
 import { sleepingAgentLaunchConfigSchema } from '../workspace-session-sleeping-agents'
 import type { TuiAgent } from '../tui-agent'
 import { isTuiAgent } from '../tui-agent-config'
-import { MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH } from '../terminal-quick-commands'
+import { LEGACY_MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH } from '../terminal-quick-command-prompt-limit'
+import { ResumeProviderSessionParam, WindowsShellOverrideParam } from './terminal-unary-params'
 import { parseLegacyNumericPaneKey, parsePaneKey } from '../stable-pane-id'
 import {
   MAX_GUTTER_ROWS,
@@ -164,6 +165,8 @@ export const SetTabProps = WorktreeTabSelector.extend({
   isPinned: z.boolean().optional(),
   // undefined = leave unchanged; no "clear" semantic (absence means default 'terminal').
   viewMode: z.enum(['terminal', 'chat']).optional(),
+  // A terminal tab's manual name; null clears it. Older hosts strip it and change nothing.
+  customTitle: z.string().max(512).nullable().optional(),
   // undefined = leave unchanged. A single-pane set and/or a removal list, never
   // the whole record — the host merges/removes in place, so one client's
   // update can't clobber another pane's entry from a different client.

@@ -7,6 +7,8 @@ import type { Worktree } from '../../../../../shared/worktree/types'
 const mocks = vi.hoisted(() => ({
   state: {
     projectGroups: [{ id: 'group-1', name: 'Existing group' }],
+    repos: [],
+    settings: null,
     updateWorktreeMeta: vi.fn(),
     createProjectGroup: vi.fn()
   }

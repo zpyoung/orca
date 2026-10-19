@@ -4,6 +4,10 @@ import type { AgentSessionJournal } from '../agent-session-journal/journal-store
 import { oversizedHistoryItem } from './agent-session-history-page-bounds'
 import { emptyAgentSessionBatch } from './agent-session-empty-batch'
 import { subscriberHistoryReader } from './agent-session-bounded-frames'
+import {
+  agentSessionPublishedWorkFields,
+  type AgentSessionPublishedWork
+} from './agent-session-published-work'
 import type { SubscriberDeliveryPort } from './agent-session-subscriber-catch-up'
 import type { Subscriber } from './structured-agent-session-subscribers'
 import { isStructuredAgentSessionStopNote } from './structured-agent-session-command-turn'

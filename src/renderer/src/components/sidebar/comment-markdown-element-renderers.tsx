@@ -287,8 +287,11 @@ export function createDocumentCommentMarkdownComponents(
             </code>
           )
       : CommentMarkdownDocumentCode,
-    pre: ({ children }) => (
-      <CommentMarkdownDocumentPre renderCodeBlock={renderCodeBlock}>
+    pre: ({ node, children }) => (
+      <CommentMarkdownDocumentPre
+        renderCodeBlock={renderCodeBlock}
+        blockLine={node?.position?.start.line}
+      >
         {children}
       </CommentMarkdownDocumentPre>
     ),

@@ -5,7 +5,7 @@ import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentCo
 
 export async function dispatchNativeChatStructuredComposerText(
   transport: NativeChatStructuredComposerTransport,
-  text: string,
+  draftText: string,
   attachments: readonly AgentComposerImageAttachment[] = []
 ): Promise<Omit<StructuredAgentSessionCommandOutcome, 'handled'> & { revealsTranscript: boolean }> {
   // The one place a chip's image gets its number: its place among the images this message carries.

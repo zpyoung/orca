@@ -18,6 +18,7 @@ import {
 
 export type StructuredAgentSessionAdoptionOwnership = {
   sessionId: string
+  workspaceId: string
   /** Any agent's chat may hold the conversation, though only one with an importer adopts. */
   provider: StructuredAgentId
   providerSessionId: string

@@ -25,8 +25,6 @@ import type {
   AgentSessionAttachmentUploadTarget
 } from '../../../../shared/agent-session-attachments'
 import type { AppState } from '@/store/types'
-import { reportTerminalDropUploadSkipsAndFailures } from '../terminal-pane/terminal-drop-upload-report'
-import { rememberUploadedAttachmentPreviewSources } from './fork-agent-composer/agent-composer-attachment-preview'
 import { NATIVE_FILE_DROP_MAX_PATHS } from '../../../../shared/native-file-drop'
 import { findTerminalTabWorktreeId } from './native-chat-file-link'
 
@@ -195,43 +193,6 @@ export function nativeChatTooManyAttachmentsNotice(): string {
 }
 
 export { nativeChatLocalAttachmentUnsupportedNotice } from './native-chat-composer-target'
-
-/**
- * Upload client-local paths into `${worktreePath}/.orca/drops` on the SSH
- * remote and return the remote paths the agent can read (input order
- * preserved). Returns null when the upload IPC itself failed; per-file
- * skips/failures surface through the shared drop toasts.
- */
-export async function uploadNativeChatAttachmentPaths(
-  paths: string[],
-  owner: NativeChatSshAttachmentOwner
-): Promise<string[] | null> {
-  const pending = toast.loading(
-    translate(
-      'components.native-chat.composer.uploadingAttachments',
-      'Uploading {{value0}} file(s) to remote…',
-      { value0: paths.length }
-    )
-  )
-  try {
-    const { resolvedPaths, skipped, failed } = await window.api.fs.resolveDroppedPathsForAgent({
-      paths,
-      worktreePath: owner.worktreePath,
-      connectionId: owner.connectionId,
-      expectedExecutionHostId: owner.expectedExecutionHostId,
-      expectedSshTargetId: owner.expectedSshTargetId,
-      expectedSshConnectionGeneration: owner.expectedSshConnectionGeneration
-    })
-    reportTerminalDropUploadSkipsAndFailures(skipped, failed)
-    rememberUploadedAttachmentPreviewSources(owner, paths, resolvedPaths, skipped, failed)
-    return resolvedPaths
-  } catch (err) {
-    toast.error(extractIpcErrorMessage(err, 'Failed to upload files.'))
-    return null
-  } finally {
-    toast.dismiss(pending)
-  }
-}
 
 /**
  * Ask the chat's server, right before uploading, whether it keeps chat attachments, and which

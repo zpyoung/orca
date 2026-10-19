@@ -23,7 +23,7 @@ import type { LineageToggleHandler } from '../../worktree-lineage-toggle-handler
 import {
   getLooseSectionProjectGroupId,
   isLooseProjectGroupTopRow
-} from '../../fork-worktree-groups/worktree-loose-group-membership'
+} from '../../../../../../shared/fork-worktree-groups/worktree-loose-group-membership'
 import { stopNestedWorktreeCardBubble } from './header-event-guards'
 import type { WorktreeItemRow } from '../listing/renderable-rows'
 import { getWorktreeOptionId } from './option-dom'
@@ -73,7 +73,12 @@ function getWorktreeItemRowGeometry(
   ctx: WorktreeItemRowContext,
   itemRow: WorktreeItemRow,
   nested: boolean
-): { surfaceInset: number; cardContentIndent: number; lineageChildrenInlineOffset?: number } {
+): { surfaceInset: number; cardContentIndent: number } {
+  // Why: the shared child wrapper already inherits the parent's group and content offsets.
+  if (nested) {
+    return { surfaceInset: LINEAGE_NESTED_ROW_SURFACE_INSET, cardContentIndent: 0 }
+  }
+
   // Why: the group this row is displayed in, which for a loose
   // worktree is its own and not its repo's — the repo's group decides
   // folder-backed indentation for rows that render under the repo.

@@ -14,8 +14,8 @@ the invariant this enforces.
 is empty and the last spinner-glyph row since the submitted prompt is a finished-turn summary such
 as `✻ Brewed for 1s`, not a live `✶ Flambéing…` or a `Thought for` row), and a `tui-idle`
 visible-screen probe in
-`src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts` that re-arms every second while
-the waiter is pending and the screen is still the only usable evidence; `runtime-terminal-wait.ts`
+`src/main/runtime/terminal/wait/terminal-wait-visible-probe.ts` that re-arms every second while
+the waiter is pending and the screen is still the only usable evidence; `terminal-wait.ts`
 starts that probe for a Claude pane even when a short preview exists, because the preview holds
 only the status rows below Claude's prompt box.
 
@@ -34,8 +34,8 @@ recorded with `config/scripts/capture-agent-pty-transcript.mjs` against Claude C
 **Paths:**
 
 - `src/main/runtime/terminal-wait-detection.ts`
-- `src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts`
-- `src/main/runtime/runtime-terminal-wait.ts`
+- `src/main/runtime/terminal/wait/terminal-wait-visible-probe.ts`
+- `src/main/runtime/terminal/wait/terminal-wait.ts`
 - `src/main/runtime/claude-readiness-transcripts.test.ts`
 - `src/main/runtime/__fixtures__/claude-code-*.txt` and `.meta.json`
 - `src/main/daemon/serialize-grid-transcript-replay.test.ts`: one registration line adding the
@@ -59,24 +59,6 @@ not a parallel fork-owned mapping.
 - `src/main/persistence/scheduling-automations/automation-context-migration.ts`
 
 **Excluded when preparing the upstream PR:** Heimdall's folder enrollment and picker changes.
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Git exec mutation cache invalidation
-
-**What:** classifies index staging, reset, and cherry-pick as Git mutations and finds the
-subcommand after global Git options. Read-only `remote` operations still preserve cached reads.
-
-**Why upstream, not isolated:** native and SSH providers share this cache-invalidation predicate.
-Ignoring a mutation leaves stale status and diffs for every consumer, not only Heimdall.
-
-**Paths:**
-
-- `src/shared/git-exec-mutation.ts`
-- `src/shared/git-exec-mutation.test.ts`
-
-**Excluded when preparing the upstream PR:** the fork-only relay allowlist and its registration
-seam. This entry covers only the generic mutation classifier.
 
 **Status:** pending-upstream. Not yet submitted.
 
@@ -108,21 +90,6 @@ state or losing its original evidence violates settlement independently of the r
 and their import swaps. The database change is generic.
 
 **Status:** pending-upstream. Not yet submitted.
-
-## Relay workflow inventory v1.4.224
-
-**What:** v1.4.224's release cut (`6ad7ac240e`) copied `cloud-operate-relay-production-cell-flags.yml`
-from main, but not main's matching updates to the two relay workflow inventory tests, so the tag
-fails `the copy carries every relay workflow` (26 !== 25) and the production identity reader list.
-The fork aligns both tests with the 26 workflows the release ships.
-
-**Paths:**
-
-- `cloud/dev/scripts/relay-public-workflow-contract.test.mjs`
-- `cloud/dev/scripts/relay-production-identity-boundaries.test.mjs`
-
-**Status:** pending-upstream. Resolves on its own when a stable tag carries main's test update; drop
-both exceptions at that sync.
 
 ## Warning status tokens
 
@@ -193,12 +160,6 @@ indefinitely while the fork carries a parallel, diverging copy of the same hook.
 
 **Introduced:** commit `6d7f5bc116` (2026-08-10), "fix(native-chat): stop retention blanking live
 transcript appends".
-
-**Excluded when preparing the upstream PR:** `use-native-chat-retained-session.ts` and its test
-also carry the native-chat-relay SSH-identity line `args.sshConnectionId ?? null,` and its two-line
-explanatory comment, added by commit `c137a9e97d`. `sshConnectionId` is a fork-only field with no
-upstream counterpart, so a PR built from this ledger entry must drop that line (and the test cases
-exercising it) or it will not compile against upstream's tree.
 
 **Status:** pending-upstream. Not yet submitted.
 
@@ -450,38 +411,19 @@ regression bundles and executes the actual writer with OXC and checks the emitte
 
 **Paths:**
 
-- `src/main/runtime/orca-runtime-write-terminal-agent-prompt.ts`
+- `src/main/runtime/terminal/input/terminal-agent-prompt.ts`
 - `src/main/runtime/agent-prompt-submission-omp-atomic.test.ts`
 - `src/main/runtime/runtime-terminal-state-records.ts`
-- `src/main/runtime/orca-runtime-create-terminal.ts`
-- `src/main/runtime/orca-runtime-record-pty-worktree.ts`
-- `src/main/runtime/orca-runtime-resolve-authoritative-terminal-wait-permission.ts`
+- `src/main/runtime/terminal/launch/terminal-create.ts`
+- `src/main/runtime/terminal/identity/pty-worktree-record.ts`
+- `src/main/runtime/terminal/wait/terminal-wait-permission.ts`
 
-## bug-2 Relay and SSH environment-dependent failures
-
-**Ledger:** `bug-2`.
-
-**What:** The POSIX GC regression feeds more than 1 MiB of upload-stage paths through the real
-shell filter before enumerating two real install directories. It no longer creates and removes
-15,197 directories merely to generate listing volume; the output must still contain only the two
-install names and remain below 1 KiB.
-
-**Why upstream, not isolated:** this repairs an existing upstream regression fixture in place. A
-fork copy would duplicate the suite without a seam.
-
-**Paths:**
-
-- `src/main/ssh/ssh-remote-commands.test.ts`
-
-**Status:** pending-upstream. Not yet submitted. `bug-2` stays open: this closes the POSIX GC
-failure only. The `git-handler` upstreamStatus failure is `bug-47`, and the two
-`agent-exec-handler` spawn-arg failures are host `GIT_CONFIG_*` bleed, still unaddressed.
 ## Git diff request cancellation
 
 **Ledger:** `bug-12`.
 
 **What:** repository probes carry their abort signal through the renderer, token-scoped
-`git:cancelDiff` IPC, runtime RPC, SSH transport, and host-side Git blob reads. Closing or
+`git:cancelDiff` IPC, runtime RPC, and host-side Git blob reads. Closing or
 retargeting a handoff must cancel the diff request, not merely discard its eventual result.
 Cancellation is scoped to the requesting sender and must not stop unrelated diff consumers.
 
@@ -500,7 +442,7 @@ that do not supply a signal.
 - `src/main/ipc/filesystem/filesystem-handler-context.ts`
 - `src/main/ipc/filesystem/filesystem-git-status-handlers.ts`
 - `src/main/providers/git-provider-contract.ts`
-- `src/main/providers/ssh-git-read-provider.ts`
+- `src/main/providers/local-git-provider.ts`
 - `src/main/runtime/runtime-git-diff-commands.ts`
 - `src/main/runtime/rpc/methods/git-diff-methods.ts`
 - `src/main/git/command-runner/git-exec-file.ts`
@@ -508,23 +450,15 @@ that do not supply a signal.
 - `src/main/git/source-control/file-diff.ts`
 - `src/main/git/source-control/git-blob-read.ts`
 - `src/main/git/source-control/submodule-paths.ts`
-- `src/relay/git-handler-operation-context.ts`
-- `src/relay/git-handler.ts`
-- `src/relay/git-handler-ops.ts`
-- `src/relay/git-handler-read-operations.ts`
-- `src/relay/git-handler-submodule-ops.ts`
 
 **Regression coverage:**
 
 - `src/main/ipc/filesystem-git-status-staging.test.ts`
-- `src/main/providers/ssh-git-provider-diff.test.ts`
 - `src/main/runtime/rpc/methods/git.test.ts`
 - `src/main/runtime/orca-runtime-git-diff-budget.test.ts`
-- `src/relay/git-handler-diff-read-coalescing.test.ts`
 - `src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts`
 - `src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts`
 - `src/main/git/status-submodule-path-cache.test.ts`
-- `src/relay/git-handler-submodule-ops.test.ts`
 - `src/main/git/status-diff-settled-cache.test.ts`
 - `src/renderer/src/web/web-preload-api-git.test.ts`
 
@@ -606,21 +540,5 @@ new quarantine-specific logic and regressions live under `fork-input-quarantine/
 PTY binding, native-chat eligibility, send queue, and migrated consumers/tests. The
 `input-quarantine` feature owns its isolated logic and regressions; existing composer changes
 remain under the `agent-composer` feature.
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Repeatable CLI flags are not globally exclusive
-
-**Orca ledger:** `bug-253`.
-
-**What:** removes the global flag-exclusivity assertion from `src/cli/specs/search.test.ts`. Heimdall
-create commands legitimately accept repeatable flags, so a cross-command assertion that every flag
-is exclusive encodes an invalid CLI invariant.
-
-**Why upstream, not isolated:** this corrects a test in an upstream-owned CLI file rather than
-adding fork behavior. Keeping the deletion in-tree prevents stable-tag sync from restoring an
-assertion that conflicts with valid repeatable command flags.
-
-**Paths:** `src/cli/specs/search.test.ts`.
 
 **Status:** pending-upstream. Not yet submitted.

@@ -254,13 +254,15 @@ export function NativeChatStructuredSession(
     failure: provisionalLaunch.failure,
     failureRows: startFailures.filter((fact) => isClaudeSignInFailureKind(fact.kind)).length
   })
+  // While Install shows, it says what to do; a start failure's "send again" or Retry can't help.
   const notices = structuredSessionNotices({
     launch: install.slot.kind === 'install' ? { ...launch, lifecycle: null } : launch,
     agentLabel,
     sessionError,
     composerError: composerError ?? continuation.continueError,
     claudeSignIn,
-    availability
+    availability,
+    hostPermission: hostPermission.notice
   })
   if (hostNotice) {
     notices.push(hostNotice)
@@ -312,6 +314,7 @@ export function NativeChatStructuredSession(
                   journalItems={controller.journalItems}
                   journalSubmissions={controller.submissions}
                   journalLatestTurn={controller.latestTurn}
+                  journalHostWork={controller.hostWork}
                   subagentRoster={controller.subagentRoster}
                   railOutline={controller.railOutline}
                   isVisible={props.isVisible}

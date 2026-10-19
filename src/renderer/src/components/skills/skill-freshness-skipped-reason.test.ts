@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SkillLocationRow } from './skill-freshness-grouping'
 import { skippedReason } from './skill-freshness-skipped-reason'
-import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 function row(
   chip: SkillLocationRow['chip'],
@@ -27,16 +26,8 @@ describe('skippedReason', () => {
 
   it('leads with the harder blocker when several placements are off', () => {
     expect(skippedReason([row('duplicate'), row('read-only')])).toContain('read-only location')
-  })
-
-  it('hands over the reinstall command when no location is at fault', () => {
-    // Why: the only way to reach this with a bare out-of-date copy is the updater's own
-    // record, which `skills update` can never converge — so the sentence has to give the
-    // one command that does, not report a skip the user cannot act on.
-    const reason = skippedReason([row(null)], 'orchestration')
-    expect(reason).toContain('reports the skill as already up to date')
-    expect(reason).toContain(
-      `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
+    expect(skippedReason([row('duplicate'), row('external-link')])).toContain(
+      'pointing outside Orca’s skill folders'
     )
   })
 

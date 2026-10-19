@@ -68,32 +68,10 @@ export function disposeClosedCheckDetailsReadingCache(
     if (closedFile.mode !== 'check-details' || !isStillClosed(closedFile)) {
       continue
     }
-    switch (closedFile.mode) {
-      case 'edit':
-        scrollTopCache.delete(closedFile.filePath)
-        scrollTopCache.delete(`${closedFile.filePath}:rich`)
-        scrollTopCache.delete(`${closedFile.filePath}:preview`)
-        scrollTopCache.delete(`${closedFile.filePath}:mermaid-diagram`)
-        editorSelectionCache.delete(closedFile.filePath)
-        scrollTopOwners.push(closedFile.filePath)
-        editorSelectionOwners.push(closedFile.filePath)
-        closedPdfFilePaths.push(closedFile.filePath)
-        break
-      case 'markdown-preview':
-        scrollTopCache.delete(`${closedFile.id}:preview`)
-        scrollTopOwners.push(closedFile.id)
-        break
-      case 'diff':
-        diffViewStateCache.delete(closedFile.id)
-        diffViewStateOwners.push(closedFile.id)
-        scrollTopCache.delete(`${closedFile.id}:preview`)
-        scrollTopOwners.push(closedFile.id)
-        break
-      case 'conflict-review':
-        break
-      case 'check-details':
-      case 'chat-visual':
-        break
+    for (const key of scrollTopCache.keys()) {
+      if (key.startsWith(`${closedFile.id}::`)) {
+        scrollTopCache.delete(key)
+      }
     }
   }
 }

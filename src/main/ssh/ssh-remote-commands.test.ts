@@ -265,7 +265,6 @@ describe('ssh remote command builders', () => {
         )
         const entries = output.trim().split('\n')
 
-        // find enumerates in filesystem order, which is insertion-ordered on ext4 but not APFS
         expect([...entries].sort()).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
         expect(Buffer.byteLength(output)).toBeLessThan(1_024)
         expect(entries.length).toBeLessThanOrEqual(MAX_REMOTE_INSTALL_GC_LISTING_ENTRIES)

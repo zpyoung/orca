@@ -145,20 +145,36 @@ export function createRepoRemovalActions(
         const idExistsOnOtherHost = get().repos.some(
           (repo) => repo.id === projectId && getRepoExecutionHostId(repo) !== ownerHostId
         )
+        // Why: a stopped or forgotten server leaves rows nothing can reach; only this desktop's copy goes.
+        const hostGone =
+          target.kind === 'environment' &&
+          !vmServerDestroyed &&
+          !(await isRuntimeEnvironmentRegistered(target.environmentId))
+        if (target.kind === 'environment' && !vmServerDestroyed && !hostGone) {
+          await stopRuntimeProjectTerminalsBeforeRemoval(
+            target.environmentId,
+            projectId,
+            // Why re-read: the registration await can let a listing refresh add worktrees.
+            getKnownRepoWorktreeIds(get(), projectId, ownerHostId)
+          )
+        }
         try {
-          // Why: always host-scoped; this catalog may be stale and miss a same-id row on another host (#13071).
-          await (target.kind === 'local'
-            ? window.api.repos.removeForHost({
-                repoId: projectId,
-                hostId: ownerHostId,
-                ...(idExistsOnOtherHost ? {} : expectedLedgers)
-              })
-            : callRuntimeRpc(
-                target,
-                'repo.rm',
-                { repo: projectId, ...expectedLedgers },
-                { timeoutMs: 15_000 }
-              ))
+          // Why: destroying the VM took its server, and the catalog holding this row, with it.
+          if (!vmServerDestroyed && !hostGone) {
+            // Why: always host-scoped; this catalog may be stale and miss a same-id row on another host (#13071).
+            await (target.kind === 'local'
+              ? window.api.repos.removeForHost({
+                  repoId: projectId,
+                  hostId: ownerHostId,
+                  ...(idExistsOnOtherHost ? {} : expectedLedgers)
+                })
+              : callRuntimeRpc(
+                  target,
+                  'repo.rm',
+                  { repo: projectId, ...expectedLedgers },
+                  { timeoutMs: 15_000 }
+                ))
+          }
         } catch (err) {
           // Why: the owner already dropped this project, so purge the local ghost row instead of aborting (#11994).
           if (!hasRuntimeRpcErrorCode(err, 'repo_not_found')) {

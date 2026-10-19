@@ -70,7 +70,7 @@ function Probe({
     caret,
     disabled: false,
     isComposing: () => false,
-    resolveTarget: () => ({ ptyId: 'remote:env-1@@pty-1' }),
+    resolveTarget: () => ({ terminalTabId: 'tab-1', ptyId: 'remote:env-1@@pty-1' }),
     textareaRef,
     setCaret,
     setDraft: (updater) => setDraft((previous) => updater(previous)),

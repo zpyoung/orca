@@ -14,7 +14,7 @@ export function useAutomationLaunchOverridesGateState(args: {
   destination: AutomationsPageDestinationState
 }): AutomationLaunchOverridesGate {
   const { repos, projectHostSetups } = args.store
-  const { draft, editingAutomationId, automations, createOpen, createTarget } = args.local
+  const { draft, editingAutomationId, automations, createOpen } = args.local
   const { automationHostTarget } = args.destination
 
   const target = useMemo(() => {
@@ -40,7 +40,7 @@ export function useAutomationLaunchOverridesGateState(args: {
   ])
 
   return useAutomationLaunchOverridesGate({
-    open: createOpen && createTarget === 'orca',
+    open: createOpen,
     target
   })
 }

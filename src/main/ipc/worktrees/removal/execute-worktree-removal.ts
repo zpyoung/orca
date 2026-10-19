@@ -70,13 +70,12 @@ export async function executeWorktreeRemoval(
     ])
   }
   if (
-    !repo.connectionId &&
-    (await retryFailedRemovalUnlessRegistered(
+    await retryFailedRemovalUnlessRegistered(
       args.worktreeId,
       worktreePath,
       registeredWorktrees,
       () => retryFailedLocalWorktreeRemoval(context, args, removalHostId)
-    ))
+    )
   ) {
     return { removing: true }
   }

@@ -48,7 +48,6 @@ it('pauses before creating a child when serial output is still dirty in the enro
       kind: 'git',
       executionHostId: 'local',
       workspacePath: '/workspace',
-      fileProvider: null,
       gitTarget: {
         executionHostId: 'local',
         worktree: { id: 'enrolled-worktree', repoId: 'repo-1', path: '/workspace' }

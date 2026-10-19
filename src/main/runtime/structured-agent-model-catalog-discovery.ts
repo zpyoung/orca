@@ -35,6 +35,7 @@ export function codexModelCatalogDiscovery({
         ? { prepareHome: deps.prepareCodexCatalogProbeHome }
         : {}),
       resolveEnvironment: () => environment.resolveAgentEnvironment('codex'),
+      refreshEnvironmentAfterMiss: environment.refreshAfterMissingProgram,
       ...(deps.resolveCodexCommand ? { resolveCommand: deps.resolveCodexCommand } : {})
     })
   }
@@ -61,12 +62,7 @@ export function claudeModelCatalogDiscovery(
     kind: 'probe',
     // Claude's settings or env can pick a model other than the one its listing recommends.
     listingNamesConfiguredModel: false,
-    probe: createClaudeModelCatalogProbe({
-      resolveInheritedEnv: environment.resolveBaseEnvironment,
-      resolveAuthPolicy: deps.resolveClaudeAuthPolicy,
-      ...(deps.resolveClaudeCommand ? { resolveCommand: deps.resolveClaudeCommand } : {}),
-      ...claudeLaunchEnvOverlay(deps)
-    })
+    probe: createClaudeModelCatalogProbe(claudeListingDeps(context))
   }
 }
 

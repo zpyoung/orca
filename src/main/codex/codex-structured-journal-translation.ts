@@ -1,4 +1,6 @@
 import { createCodexProviderActivityReader } from '../native-chat/agent-session-wire/provider-frame-activity'
+import { recordCodexContextUsage } from './codex-context-usage'
+import { CODEX_TOKEN_USAGE_METHOD } from './codex-subagent-activity'
 import {
   CODEX_JOURNAL_ADMITTED,
   type CodexJournalTranslationAdmission,
@@ -15,7 +17,7 @@ import { createCodexJournalTranslatorWriters } from './codex-structured-journal-
 import { publishCodexTurnLifecycle } from './codex-structured-journal-translation-turns'
 import { codexProviderRetryRowBody, isCodexProviderRetryFrame } from './codex-provider-retry-row'
 import { createCodexThreadItemRouter } from './codex-structured-journal-thread-item-routing'
-import { codexThreadStoppedRunning, readCodexTurnId } from './codex-structured-thread-facts'
+import { readCodexTurnId } from './codex-structured-thread-facts'
 import {
   observeCodexExecutionFrame,
   readCodexBackgroundTaskFrame
@@ -208,14 +210,9 @@ export function createCodexJournalTranslator(
         return genericFrames.appendUnhandled(event.kind, event.payload, event.threadId)
       }
       if (event.method === 'turn/started' || event.method === 'turn/completed') {
-        const admission =
-          event.method === 'turn/started'
-            ? turnBoundaries.start(event)
-            : turnBoundaries.complete(event)
-        if (admission.accepted) {
-          reportPrimaryThreadStoppedRunning()
-        }
-        return admission
+        return event.method === 'turn/started'
+          ? turnBoundaries.start(event)
+          : turnBoundaries.complete(event)
       }
       const compaction = compactions.handle(event)
       if (compaction) {
@@ -224,6 +221,20 @@ export function createCodexJournalTranslator(
       const goal = goals.handle(event)
       if (goal) {
         return publishActivity(event, goal)
+      }
+      // The session's own thread fills the window its chat shows; a child's frame measures its own.
+      if (
+        event.method === CODEX_TOKEN_USAGE_METHOD &&
+        event.threadId === (deps.primaryThreadId?.() ?? null)
+      ) {
+        recordCodexContextUsage({
+          sink: deps.sink,
+          activeTurns,
+          attributionFor,
+          threadId: event.threadId,
+          params: event.params,
+          capturedAt: deps.now?.() ?? Date.now()
+        })
       }
       if (event.method === 'item/started' || event.method === 'item/completed') {
         const routed = routeThreadItem(event)

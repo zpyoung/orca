@@ -1,6 +1,6 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: f51e82c4c26745f6a15e215e4391f533327697e2
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
   type AgentType,
@@ -39,8 +39,8 @@ export type UseNativeChatLiveSessionArgs = {
   transcriptPath?: string | null
   /** Runtime owner (Model B): non-null routes read/subscribe to the remote host; null keeps the local IPC path. */
   runtimeEnvironmentId?: string | null
-  /** Plain-`ssh:` owner (Model A): non-null makes main run transcript IO on that host's relay. */
-  sshConnectionId?: string | null
+  /** False suspends transcript IO while retaining the last committed session. */
+  enabled?: boolean
 }
 
 /** A live session plus the older-history pagination controls the view needs. */
@@ -64,6 +64,9 @@ export type NativeChatLiveSession = NativeChatSession & {
    *  outranks (and so hides) 'loading', which would let a consumer deciding from
    *  an empty list treat an in-flight transcript as real history. */
   readPhase: ReadState['phase']
+  /** The transcript is the host's present, not what a stopped or disconnected read left
+   *  behind. Absent on a chat read from a terminal, which cannot say what the reader missed. */
+  readCurrent?: boolean
   /** Model and effort the agent recorded for itself, newest turn first. Undefined
    *  until a turn lands, or on a host that predates the field. */
   sessionOptions?: NativeChatSessionOptionObservation
@@ -103,7 +106,7 @@ export function isNativeChatTranscriptUnsettled(phase: ReadState['phase']): bool
  * base list; live appends accumulate separately so a re-read never drops them.
  *
  * Transport: per-owner (getNativeChatSessionTransport) — a runtime-owned pane
- * (Model B) reads/tails the remote host; local/ssh panes keep the local IPC path.
+ * (Model B) reads/tails the remote host; local panes keep the local IPC path.
  *
  * Teardown: subscription closes on unmount and on owner/agent/sessionId change so
  * a swap or owner-flip never leaks a watcher.
@@ -111,7 +114,7 @@ export function isNativeChatTranscriptUnsettled(phase: ReadState['phase']): bool
 export function useNativeChatLiveSession(
   args: UseNativeChatLiveSessionArgs
 ): NativeChatLiveSession {
-  const { paneKey, agent, sessionId, transcriptPath, runtimeEnvironmentId, sshConnectionId } = args
+  const { paneKey, agent, sessionId, transcriptPath, runtimeEnvironmentId, enabled = true } = args
   // Stable per owner id so a re-render without an owner flip keeps the same transport and doesn't re-subscribe.
   const transport = useMemo(
     () => getNativeChatSessionTransport(runtimeEnvironmentId ?? null),
@@ -137,6 +140,19 @@ export function useNativeChatLiveSession(
 
   const [hookState, hookStateStartedAt, hookHasWorkingSubagents] = useNativeChatHookStatus(paneKey)
 
+  const latestEnabled = useRef(enabled)
+  // Fence late frames before passive cleanup closes the previous stream.
+  useLayoutEffect(() => {
+    latestEnabled.current = enabled
+  }, [enabled])
+  const sourceKey = JSON.stringify([
+    paneKey,
+    runtimeEnvironmentId ?? null,
+    agent,
+    sessionId,
+    transcriptPath ?? null
+  ])
+  const retainedSourceKeyRef = useRef(sourceKey)
   const latestSessionId = useRef<string | null>(sessionId)
   // Tracks the current transport so a load-earlier resolve from a prior host is discarded after an owner flip (session id can stay the same).
   const latestTransport = useRef(transport)
@@ -153,6 +169,20 @@ export function useNativeChatLiveSession(
     transcriptEpochRef.current += 1
     setOlderHistoryGeneration(transcriptEpochRef.current)
     setLoadingEarlier(false)
+    const sourceChanged = retainedSourceKeyRef.current !== sourceKey
+    retainedSourceKeyRef.current = sourceKey
+    if (!enabled) {
+      if (sourceChanged) {
+        limitRef.current = NATIVE_CHAT_INITIAL_LIMIT
+        oldestOffsetRef.current = null
+        transcriptCompanionControl.reset()
+        setRead({ phase: 'loading' })
+        replaceList(appendMergerRef.current, [])
+        setAppended([])
+        setHasMore(false)
+      }
+      return
+    }
     transcriptCompanionControl.reset()
     if (!sessionId) {
       // No session id yet: surface live hook state on an empty transcript; backfills once the id arrives.
@@ -183,13 +213,12 @@ export function useNativeChatLiveSession(
           agent,
           sessionId,
           limit: limitRef.current,
-          ...(transcriptPath ? { transcriptPath } : {}),
-          ...(sshConnectionId ? { sshConnectionId } : {})
+          ...(transcriptPath ? { transcriptPath } : {})
         }),
       // A not-yet-flushed transcript: stay in 'loading' and retry with backoff instead of a permanent error (#8401).
       isPending: (result) =>
         !transcriptPending && Boolean(result && 'error' in result && result.notFound),
-      isSuperseded: () => frameArrived,
+      isSuperseded: () => !latestEnabled.current || frameArrived,
       onResult: (result) => {
         if (result && 'error' in result) {
           // The live resolve-poll stream owns recovery once it confirms the file is
@@ -217,11 +246,10 @@ export function useNativeChatLiveSession(
         agent,
         sessionId,
         transcriptPath: transcriptPath ?? undefined,
-        limit: limitRef.current,
-        ...(sshConnectionId ? { sshConnectionId } : {})
+        limit: limitRef.current
       },
       (frame) => {
-        if (!cancelled) {
+        if (!cancelled && latestEnabled.current) {
           if (frame.type === 'snapshot' || frame.type === 'replacement') {
             // Why: snapshots and inode replacements are authoritative generations; older pagination must not repaint them.
             if ('error' in frame && frame.error) {
@@ -269,7 +297,7 @@ export function useNativeChatLiveSession(
       unsubscribe()
     }
     // `transport` identity changes on an owner flip, re-running this effect to re-subscribe against the new host.
-  }, [agent, sessionId, transcriptPath, transport, sshConnectionId, transcriptCompanionControl])
+  }, [agent, enabled, sessionId, sourceKey, transcriptPath, transport, transcriptCompanionControl])
 
   // The page in flight for the current transcript epoch; concurrent callers join it.
   const olderPageRef = useRef<{
@@ -284,7 +312,7 @@ export function useNativeChatLiveSession(
     if (!hasMore) {
       return Promise.resolve('exhausted')
     }
-    if (!sessionId || read.phase !== 'ready') {
+    if (!latestEnabled.current || !sessionId || read.phase !== 'ready') {
       return Promise.resolve('unchanged')
     }
     const request = nextNativeChatPageRequest(limitRef.current, oldestOffsetRef.current)
@@ -298,7 +326,6 @@ export function useNativeChatLiveSession(
         sessionId,
         limit: request.limit,
         ...(transcriptPath ? { transcriptPath } : {}),
-        ...(sshConnectionId ? { sshConnectionId } : {}),
         ...(request.mode === 'before' ? { beforeOffset: request.beforeOffset } : {})
       })
       .then((result): NativeChatOlderPageResult => {
@@ -306,6 +333,7 @@ export function useNativeChatLiveSession(
         if (
           latestSessionId.current !== sessionId ||
           latestTransport.current !== transport ||
+          !latestEnabled.current ||
           transcriptEpochRef.current !== requestEpoch
         ) {
           return 'superseded'
@@ -359,16 +387,7 @@ export function useNativeChatLiveSession(
       })
     olderPageRef.current = { epoch: requestEpoch, promise }
     return promise
-  }, [
-    agent,
-    sessionId,
-    transcriptPath,
-    transport,
-    sshConnectionId,
-    hasMore,
-    read,
-    transcriptCompanionControl
-  ])
+  }, [agent, sessionId, transcriptPath, transport, hasMore, read, transcriptCompanionControl])
 
   // Computed outside the status memo so hookState churn (status-only) never re-runs the assembler.
   const baseMessages = read.phase === 'ready' ? read.messages : EMPTY_MESSAGES

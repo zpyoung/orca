@@ -115,10 +115,33 @@ export function createClaudeAccountsApi(): PreloadApi['claudeAccounts'] {
     list: async () => (await fetchAccountsSnapshot(false)).claude,
     add: rejectHostOnlySignIn,
     cancelPendingLogin: () => Promise.resolve(false),
-    reauthenticate: () => Promise.resolve(empty),
+    reauthenticate: rejectHostOnlySignIn,
     waitForSignInLink: () => Promise.resolve(null),
-    remove: () => Promise.resolve(empty),
-    select: () => Promise.resolve(empty)
+    remove: ({ accountId }) =>
+      callRuntimeResult<ClaudeRateLimitAccountsState>(
+        'accounts.removeClaude',
+        { accountId },
+        ACCOUNT_MUTATION_TIMEOUT_MS
+      ),
+    select: ({ accountId, runtime }) => {
+      // Why: no targeted Claude select RPC exists and the server reads an untargeted
+      // null as the host lane; a concrete account id carries its own lane.
+      if (runtime === 'wsl' && accountId === null) {
+        return Promise.reject(
+          new Error(
+            translate(
+              'auto.components.web.preloadApi.accounts.claudeWslDefaultUnavailable',
+              'Switching a WSL lane back to the system default is only available in the desktop app.'
+            )
+          )
+        )
+      }
+      return callRuntimeResult<ClaudeRateLimitAccountsState>(
+        'accounts.selectClaude',
+        { accountId },
+        ACCOUNT_MUTATION_TIMEOUT_MS
+      )
+    }
   }
 }
 

@@ -33,7 +33,6 @@ describe('verified runtime input cancellation', () => {
     localWriteAccepted.mockResolvedValue(true)
     let cancelled = false
     const pending = sendRuntimePtyInputVerified(
-      { activeRuntimeEnvironmentId: null },
       'local-pty',
       'a'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1),
       'driving',
@@ -57,13 +56,9 @@ describe('verified runtime input cancellation', () => {
         })
     )
     let cancelled = false
-    const pending = sendRuntimePtyInputVerified(
-      { activeRuntimeEnvironmentId: null },
-      'local-pty',
-      'stale input',
-      'driving',
-      { isCancelled: () => cancelled }
-    )
+    const pending = sendRuntimePtyInputVerified('local-pty', 'stale input', 'driving', {
+      isCancelled: () => cancelled
+    })
     await vi.waitFor(() =>
       expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'stale input', 'driving')
     )

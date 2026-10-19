@@ -1,5 +1,10 @@
 import type { AppState } from '@/store/types'
-import { parseExecutionHostId } from '../../../../../shared/execution-host'
+import { resolveOwner } from '@/lib/resolve-owner'
+import type { WorktreeOperationRouteState } from '@/lib/worktree-operation-route'
+import {
+  parseExecutionHostId,
+  toRuntimeExecutionHostId
+} from '../../../../../shared/execution-host'
 import { isRemoteWindowsConptyStatusUnverified } from '@/lib/pane-manager/windows-pty-compatibility'
 import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './TerminalPaneDockMount'
 
@@ -22,6 +27,31 @@ export function resolveRemoteDockConptyUnverified(args: {
       ? args.state.sshConnectionStates.get(parsedHost.targetId)?.remotePlatform
       : args.state.runtimeStatusByEnvironmentId.get(parsedHost.environmentId)?.status?.hostPlatform
   return isRemoteWindowsConptyStatusUnverified(remotePlatform)
+}
+
+/**
+ * `resolveRemoteDockConptyUnverified` for the host that owns the worktree's rows. A worktree no
+ * row places, or that two hosts publish, reports no verdict rather than borrowing the focused
+ * server's.
+ */
+export function resolveRemoteDockConptyUnverifiedForWorktree(
+  state: WorktreeOperationRouteState &
+    Pick<AppState, 'sshConnectionStates' | 'runtimeStatusByEnvironmentId'>,
+  worktreeId: string | null | undefined
+): boolean | null {
+  if (!worktreeId) {
+    return null
+  }
+  const match = resolveOwner(state, { workspaceId: worktreeId })
+  if (match.kind !== 'resolved') {
+    return null
+  }
+  const { endpoint, at } = match.owner
+  return resolveRemoteDockConptyUnverified({
+    executionHostId:
+      endpoint.kind === 'environment' ? toRuntimeExecutionHostId(endpoint.environmentId) : at,
+    state
+  })
 }
 
 type RemoteConptyDockPaneManager = {

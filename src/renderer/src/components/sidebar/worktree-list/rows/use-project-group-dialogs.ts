@@ -5,7 +5,11 @@ import { translate } from '@/i18n/i18n'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
 import type { LedgerRemovalPreview } from '../../../../../../shared/ledger'
 import { requestLedger } from '@/runtime/runtime-ledger-client'
 import { isLedgerRemovalConflict } from '@/store/repos/ledger-removal-conflict'

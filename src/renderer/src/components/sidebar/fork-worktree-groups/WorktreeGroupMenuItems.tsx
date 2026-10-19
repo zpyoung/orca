@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx,src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx
-// FORK-COPY-SHA: f51e82c4c26745f6a15e215e4391f533327697e2
+// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
 import React, { useCallback, useState } from 'react'
 import { CircleX, FolderInput, FolderPlus } from 'lucide-react'
 import {
@@ -14,6 +14,7 @@ import { useAppStore } from '@/store'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { translate } from '@/i18n/i18n'
+import { getWorktreeExecutionHostId } from '../../../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../../../shared/workspace-scope'
 import {
   addWorktreeToGroup,
@@ -227,6 +228,12 @@ export function useWorktreeGroupDialog({
   dialogActiveRef
 }: WorktreeGroupDialogProps): WorktreeGroupDialog {
   const createProjectGroup = useAppStore((state) => state.createProjectGroup)
+  const hostId = useAppStore((state) =>
+    getWorktreeExecutionHostId(
+      worktree,
+      state.repos.find((repo) => repo.id === worktree.repoId)
+    )
+  )
   const updateWorktreeMeta = useAppStore((state) => state.updateWorktreeMeta)
   const [open, setOpen] = useState(false)
   const openDialog = useCallback(() => {
@@ -242,9 +249,14 @@ export function useWorktreeGroupDialog({
   )
   const handleSubmit = useCallback(
     async (name: string) => {
-      await createGroupFromWorktree(worktree, name, createProjectGroup, updateWorktreeMeta)
+      await createGroupFromWorktree(
+        worktree,
+        name,
+        (groupName) => createProjectGroup(groupName, hostId),
+        updateWorktreeMeta
+      )
     },
-    [createProjectGroup, updateWorktreeMeta, worktree]
+    [createProjectGroup, hostId, updateWorktreeMeta, worktree]
   )
 
   return {

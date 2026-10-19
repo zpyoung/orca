@@ -140,18 +140,15 @@ describe('options at rest', () => {
         conversation: async () => resting
       } as unknown as StructuredAgentSessionMutationContext
 
-      const result = await readStructuredAgentSessionOptions(context, SESSION, {
-        readsWithoutModel: true
-      })
-      expect(probe).toHaveBeenCalledTimes(provider === 'codex' ? 1 : 0)
+      const read = () =>
+        readStructuredAgentSessionOptions(context, SESSION, { readsWithoutModel: true })
+      const result = await read()
+      expect(probe).not.toHaveBeenCalled()
       expect(result.models).toEqual([])
       expect(result.current).not.toHaveProperty('model')
       record.options = { model: 'later-model', effort: 'off' }
-      // Of these, only Codex's chats state a permission mode.
-      expect(
-        (await readStructuredAgentSessionOptions(context, SESSION, { readsWithoutModel: true }))
-          .current
-      ).toEqual({
+      // Only Codex is registered here, and a mode is stated only for a registered agent's chat.
+      expect((await read()).current).toEqual({
         model: 'later-model',
         effort: 'off',
         ...(provider === 'codex' ? { permissionMode: 'ask' } : {})

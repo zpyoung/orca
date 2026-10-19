@@ -1,7 +1,17 @@
-import { ALL_EXECUTION_HOSTS_SCOPE } from '../../../../shared/execution-host'
-import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
-import type { SidebarFilterState } from './visible-worktree-kinds'
-import { getForkFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'
+import {
+  activeWorkspaceRowFilterKeys,
+  NO_WORKSPACE_ROW_FILTERS,
+  type WorkspaceRowFilters
+} from '../../../../shared/workspace-view/workspace-row-filters'
+import { resolveVisibleWorkspaceHostIds } from '../../../../shared/workspace-view/workspace-host-visibility'
+import type { AppState } from '../../store/types'
+import type { ExecutionHostId, ExecutionHostScope } from '../../../../shared/execution-host'
+import {
+  clearForkFilters,
+  getForkFilterCount,
+  selectForkFilterChromeState,
+  type ForkFilterSetters
+} from './fork-workspace-activity-window/workspace-filter-chrome'
 
 /**
  * Whether the sidebar is currently filtered, and what "clear filters" should undo.
@@ -10,21 +20,19 @@ import { getForkFilterCount } from './fork-workspace-activity-window/workspace-f
  * about the filter CHROME, not about which rows survive filtering.
  */
 
-export function sidebarHasActiveFilters(state: SidebarFilterState): boolean {
-  return (
-    getForkFilterCount(state) > 0 ||
-    state.filterRepoIds.length > 0 ||
-    state.hideDefaultBranchWorkspace ||
-    state.hideAutomationGeneratedWorkspaces ||
-    state.hideCliCreatedWorkspaces ||
-    state.hideDetachedHeadWorkspaces ||
-    state.hideWorkspacesFromOtherDevices ||
-    // Why: turning this off is the only way to narrow the list below the
-    // default, so Clear Filters must be able to undo it like any other filter.
-    state.alwaysShowDefaultBranchWorkspace === false ||
-    state.visibleWorkspaceHostIds != null ||
-    (state.workspaceHostScope != null && state.workspaceHostScope !== ALL_EXECUTION_HOSTS_SCOPE)
-  )
+/** Inputs describing sidebar filter settings that the Clear Filters path owns. */
+export type SidebarFilterState = {
+  showSleepingWorkspaces: boolean
+  filterRepoIds: readonly string[]
+  hideDefaultBranchWorkspace: boolean
+  hideAutomationGeneratedWorkspaces: boolean
+  hideCliCreatedWorkspaces: boolean
+  hideDetachedHeadWorkspaces: boolean
+  hideWorkspacesFromOtherDevices: boolean
+  /** Keeps each project's main workspace out of the "Hide sleeping" sweep; absent means on. */
+  alwaysShowDefaultBranchWorkspace?: boolean
+  visibleWorkspaceHostIds?: readonly ExecutionHostId[] | null
+  workspaceHostScope?: ExecutionHostScope
 }
 
 /** The sidebar's store fields as the shared Workspace options filters. */
@@ -59,12 +67,16 @@ export function selectSidebarFilterState(
     hideWorkspacesFromOtherDevices: state.hideWorkspacesFromOtherDevices,
     alwaysShowDefaultBranchWorkspace: state.alwaysShowDefaultBranchWorkspace,
     visibleWorkspaceHostIds: state.visibleWorkspaceHostIds,
-    workspaceHostScope: state.workspaceHostScope
+    workspaceHostScope: state.workspaceHostScope,
+    ...selectForkFilterChromeState(state)
   }
 }
 
 export function sidebarHasActiveFilters(state: SidebarFilterState): boolean {
-  return activeWorkspaceRowFilterKeys(sidebarWorkspaceRowFilters(state)).length > 0
+  return (
+    activeWorkspaceRowFilterKeys(sidebarWorkspaceRowFilters(state)).length > 0 ||
+    getForkFilterCount(state) > 0
+  )
 }
 
 export type SidebarFilterSetters = Pick<
@@ -113,7 +125,11 @@ const RESET_SIDEBAR_FILTER: Record<
  * Clear filters: resets every active filter to its default, and only those, so a click with
  * nothing set issues no write.
  */
-export function clearSidebarFilters(state: SidebarFilterState, store: SidebarFilterSetters): void {
+export function clearSidebarFilters(
+  state: SidebarFilterState,
+  store: SidebarFilterSetters & Partial<ForkFilterSetters>
+): void {
+  clearForkFilters(state, store)
   for (const key of activeWorkspaceRowFilterKeys(sidebarWorkspaceRowFilters(state))) {
     RESET_SIDEBAR_FILTER[key](store)
   }

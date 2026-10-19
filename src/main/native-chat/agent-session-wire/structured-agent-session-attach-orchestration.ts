@@ -205,7 +205,6 @@ async function runAttachUnderAbort(
         attempt.startup = startup
         return startupAttempts.track(sessionId, startup)
       },
-      optionRevision: () => context.runtimeState.optionRevisions.current(sessionId),
       launchPermissionMode: async (record) =>
         (await structuredAgentSessionLaunchPermission(context.deps, record)) ?? undefined,
       ...(options.onAcquisitionFailed ? { onAcquisitionFailed: options.onAcquisitionFailed } : {}),
@@ -222,11 +221,10 @@ async function runAttachUnderAbort(
       onAttached: async (attached, acquisitionGeneration, owner, providerChildPhase) => {
         const fence = structuredAgentSessionConversationFence(context.deps.store, sessionId)
         const current = context.sessions.get(sessionId)?.child ?? null
-        const startedFor = acquiredOwner ? options.startedFor : current?.startedFor
+        const startedFor = owner === 'acquired' ? options.startedFor : current?.startedFor
         // A re-attach to a live child keeps the mode that child was launched with.
-        const permissionMode = acquiredOwner
-          ? attempt.startup?.permissionMode
-          : current?.permissionMode
+        const permissionMode =
+          owner === 'acquired' ? attempt.startup?.permissionMode : current?.permissionMode
         // A re-attach to a live child keeps the sink that child already writes through.
         const eventSink =
           owner === 'acquired'
@@ -252,10 +250,11 @@ async function runAttachUnderAbort(
           child: {
             generation: acquisitionGeneration ?? current?.generation ?? null,
             fence,
-            // A re-attach to a live child keeps what that child already proved, and its cause.
-            phase: acquiredOwner ? providerChildPhase : (current?.phase ?? 'ready'),
+            // An acquire reports its phase; a re-attach keeps what its child already proved.
+            phase: owner === 'acquired' ? providerChildPhase : (current?.phase ?? 'ready'),
             ...(startedFor === undefined ? {} : { startedFor }),
-            ...(permissionMode === undefined ? {} : { permissionMode })
+            ...(permissionMode === undefined ? {} : { permissionMode }),
+            heldSends: () => context.deps.adapter.heldSends?.(sessionId)
           }
         }
         // Only a proven child has the protocol session recovery asks; a starting one recovers in

@@ -24,6 +24,8 @@ import {
   createRuntimeTransportMetadata,
   sweepOrphanedRuntimeSockets
 } from './runtime-rpc-socket-metadata'
+import { errorMessage } from '../../../shared/error-message'
+import { loadHostDescriptor, publishHostDescriptor } from '../host-descriptor'
 import { askRosterFor } from '../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {

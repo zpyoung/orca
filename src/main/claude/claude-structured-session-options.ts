@@ -266,10 +266,8 @@ export function claudeResolvedCatalogListing(
   return listing ? { catalogListing: listing } : {}
 }
 
-/** The options as main already holds them, over `catalog`; asks the CLI nothing. Startup's
- *  settings readback is applied by the time a start proves, and the SDK answers `list_models`
- *  from its initialize result, so a started session's snapshot passes that result here rather
- *  than paying two round trips for what it already read. */
+/** The options already held in memory, over `catalog`; asks the CLI nothing. The SDK answers
+ *  `list_models` from initialize, so open passes that result without another round trip. */
 export function claudeStructuredSessionOptionsFrom(
   session: ClaudeSession,
   catalog: unknown[] | null,

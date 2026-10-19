@@ -61,6 +61,7 @@ export type NativeChatInteractiveSend = {
  * `sendNativeChatMessage`. Control strings (option digits, ESC) are written raw.
  */
 export function useNativeChatInteractiveSend(
+  terminalTabId: string,
   paneKey: string,
   targetPtyId: string | null,
   agent: AgentType
@@ -100,21 +101,17 @@ export function useNativeChatInteractiveSend(
       }
       sendRuntimePtyInput(targetPtyId, raw, 'driving')
     },
-    [targetPtyId]
+    [terminalTabId, targetPtyId]
   )
 
   const sendRawVerified = useCallback(
     (raw: string): Promise<boolean> =>
       targetPtyId && !isTerminalInputQuarantined(terminalTabId)
-        ? sendRuntimePtyInputVerified(
-            getSettingsForAgentTabRuntimeOwner(terminalTabId),
-            targetPtyId,
-            raw,
-            'driving',
-            { requireWriteSettlement: true }
-          ).catch(() => false)
+        ? sendRuntimePtyInputVerified(targetPtyId, raw, 'driving', {
+            requireWriteSettlement: true
+          }).catch(() => false)
         : Promise.resolve(false),
-    [targetPtyId]
+    [terminalTabId, targetPtyId]
   )
 
   const sendAnswer = useCallback(
@@ -135,8 +132,7 @@ export function useNativeChatInteractiveSend(
       }
       // Cancel any prior in-flight answer before starting a new one.
       cancelInFlight()
-      const settings = getSettingsForAgentTabRuntimeOwner(terminalTabId)
-      const target = { terminalTabId, ptyId: targetPtyId, settings }
+      const target = { terminalTabId, ptyId: targetPtyId }
       // Selector TUIs ignore pasted labels; Codex uses a different key sequence.
       const stepsAnswer = shouldStepNativeChatAskAnswer(agent)
       const buildsCodexAnswer = resolveNativeChatTranscriptAgent(agent) === 'codex'
@@ -189,7 +185,7 @@ export function useNativeChatInteractiveSend(
         settleAfterMs: handle.settleAfterMs
       }
     },
-    [paneKey, targetPtyId, agent, cancelInFlight]
+    [terminalTabId, paneKey, targetPtyId, agent, cancelInFlight]
   )
 
   const cancelAsk = useCallback(() => {
@@ -204,18 +200,14 @@ export function useNativeChatInteractiveSend(
         return
       }
       // OpenCode confirms interruption with a second Escape; pace writes like mobile Stop.
-      inFlightRef.current = sendNativeChatAskAnswer(
-        {
-          terminalTabId,
-          ptyId: targetPtyId,
-          settings: getSettingsForAgentTabRuntimeOwner(terminalTabId)
-        },
-        [{ raw: ESC }, { raw: ESC }]
-      )
+      inFlightRef.current = sendNativeChatAskAnswer({ terminalTabId, ptyId: targetPtyId }, [
+        { raw: ESC },
+        { raw: ESC }
+      ])
       return
     }
     sendRaw(ESC)
-  }, [agent, cancelInFlight, sendRaw, targetPtyId])
+  }, [agent, cancelInFlight, sendRaw, targetPtyId, terminalTabId])
 
   return { sendAnswer, sendRaw, sendRawVerified, cancelPending: cancelInFlight, cancelAsk, cancel }
 }

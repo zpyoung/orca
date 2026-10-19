@@ -3,7 +3,6 @@ import type { AgentProviderSessionMetadata } from '../../../../shared/agent-sess
 import { agentProviderSessionsEqual } from '../../../../shared/agent-session-resume'
 import {
   AGENT_SESSION_HISTORY_MAX_LIMIT,
-  type AgentSessionHistoryPage,
   type AgentSessionHistoryResult
 } from '../../../../shared/agent-session-wire'
 import {
@@ -21,22 +20,14 @@ import {
 } from './structured-agent-session-older-page-read'
 import { startStructuredAgentSessionReadTransport } from './structured-agent-session-read-transport'
 
-export type StructuredAgentSessionReadSnapshot = {
-  state: StructuredAgentSessionState
-  loadingOlder: boolean
-  /** Bumped whenever older-page reads are invalidated (open, snapshot, reset, dispose). */
-  olderHistoryGeneration: number
-  providerSession?: AgentProviderSessionMetadata
-}
-
-export type StructuredAgentSessionReadOwner = {
-  publishCreated: (page: AgentSessionHistoryPage) => void
-  activate: () => () => void
-  dispose: () => void
-  getSnapshot: () => StructuredAgentSessionReadSnapshot
-  loadOlder: () => Promise<NativeChatOlderPageResult>
-  subscribe: (listener: () => void) => () => void
-}
+import type {
+  StructuredAgentSessionReadSnapshot,
+  StructuredAgentSessionReadOwner
+} from './structured-agent-session-read-owner-contract'
+export type {
+  StructuredAgentSessionReadSnapshot,
+  StructuredAgentSessionReadOwner
+} from './structured-agent-session-read-owner-contract'
 
 import {
   adoptStructuredReadOwner,

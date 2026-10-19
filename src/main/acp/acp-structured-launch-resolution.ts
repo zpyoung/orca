@@ -71,24 +71,14 @@ export type AcpStructuredLaunch = {
 export type AcpStructuredLaunchPartDeps = {
   /** The chat's journal as it stands, read without opening it; null when it has none. */
   readJournal: (sessionId: string) => JournalLoad | null
-  /** The Agent Permissions setting's bypass posture for this agent, re-read per acquisition. */
-  resolveFullAccess?: (agent: string) => boolean
   resolveCommand?: typeof resolveCliCommand
   homePath?: string
   /** The environment the child process inherits at spawn; this process's own by default. */
   inheritedEnv?: NodeJS.ProcessEnv
   probeVersion?: typeof probeAgentCliVersion
+  /** Orca's data folder on this host, which holds the spec's managed runtime. */
+  dataDirectory: string
 } & Pick<AcpLaunchVisualsDeps, 'logger'>
-
-/** What a launch's binary and environment are read from; a catalog probe reads the same. */
-export type AcpLaunchInvocationDeps = {
-  /** The shared base env; re-read per acquisition. */
-  resolveEnvironment: () => Promise<Record<string, string>>
-  /** The user's per-agent environment overlay from settings. */
-  resolveLaunchEnv?: (agent: string) => Record<string, string>
-  /** The user's per-agent Command setting, re-read per acquisition; none runs the stock binary. */
-  resolveCommandSettings?: () => StructuredAgentCommandSettings
-} & Pick<AcpStructuredLaunchPartDeps, 'resolveCommand' | 'homePath' | 'inheritedEnv'>
 
 /** What a launch's binary and environment are read from; a catalog probe reads the same. */
 export type AcpLaunchInvocationDeps = {
@@ -233,9 +223,12 @@ export function acpStructuredLaunchPart(
         resolveEnvironment: basis.baseEnvironment,
         resolveLaunchEnv: () => basis.launchEnv(),
         resolveCommandSettings: basis.commandSettings,
+        refreshEnvironmentAfterMiss: basis.refreshAfterMissingProgram,
+        resolveWorkingDirectory: basis.launchDirectory,
         ...(deps.resolveCommand ? { resolveCommand: deps.resolveCommand } : {}),
         ...(deps.homePath ? { homePath: deps.homePath } : {}),
-        ...(deps.inheritedEnv ? { inheritedEnv: deps.inheritedEnv } : {})
+        ...(deps.inheritedEnv ? { inheritedEnv: deps.inheritedEnv } : {}),
+        dataDirectory: deps.dataDirectory
       }
     )
     const cwd = await basis.launchDirectory()
@@ -262,7 +255,8 @@ export function acpStructuredLaunchPart(
           inherited: deps.inheritedEnv ?? process.env
         })
       : null
-    const fullAccess = deps.resolveFullAccess?.(spec.agent) ?? false
+    // The chat's own mode, as the host decided it for this start; a start naming none asks.
+    const fullAccess = basis.permissionMode === 'full-access'
     const head = agentSessionProviderHandleChainHead(record.providerHandleChain)
     return {
       launch: {
@@ -287,7 +281,8 @@ export function acpStructuredLaunchPart(
         ...STRUCTURED_CHILD_ENV_TO_DELETE,
         ...envToDelete,
         // Without visuals, a folder Orca itself inherited (started from a chat) names another chat's.
-        ...(skill ? [] : [NATIVE_CHAT_VISUALS_DIR_ENV])
+        ...(skill ? [] : [NATIVE_CHAT_SCRATCH_DIR_ENV]),
+        LEGACY_NATIVE_CHAT_VISUALS_DIR_ENV
       ]
     }
   }

@@ -1,5 +1,4 @@
 import { resolveLoginShellEnvironment } from '../startup/login-shell-environment'
-import type { GlobalSettings } from '../../shared/global-settings-types'
 import {
   mergePersistedWindowsPathAsync,
   readPersistedWindowsPathSegmentsAsync
@@ -79,30 +78,14 @@ export function structuredAgentBaseEnvironment(input: {
   )
 }
 
-/** The base env every local agent launch on this host starts from, read from current settings. */
-export async function resolveHostAgentBaseEnvironment(
-  settings: Pick<
-    GlobalSettings,
-    'nativeChatInheritShellEnvironment' | 'nativeChatShellEnvironmentVariables'
-  >
-): Promise<Record<string, string>> {
-  return structuredAgentBaseEnvironment({
-    shellEnv: await resolveLoginShellEnvironment(),
-    policy: nativeChatShellEnvironmentPolicy(settings)
-  })
-}
-
-export type StructuredAgentEnvironmentSources = {
-  resolveEnvironment?: () => Promise<NodeJS.ProcessEnv>
-  resolveShellEnvironmentPolicy?: () => NativeChatShellEnvironmentPolicy
-  /** The user's per-agent environment overlay from settings. */
-  resolveAgentLaunchEnv?: (agent: string) => Record<string, string>
-}
+// Why: long enough that a burst of starts shares one capture, short enough that a CLI
+// installed on the host reaches new chats without a restart.
+const SHELL_ENVIRONMENT_TTL_MS = 10_000
 
 /**
- * Every agent's child env over one login-shell snapshot, taken once at install.
- * The policy and overlays are re-read per acquisition, so a settings change reaches
- * the next chat without a restart.
+ * This host's shell env, from the shared login-shell cache: the last result at once, rerun in the
+ * background past the TTL. Windows keeps a loaded PowerShell profile for good (only a failed load
+ * is retried) and lays the saved PATH, where installers add themselves, over it on every read.
  */
 async function hostShellEnvironment(): Promise<NodeJS.ProcessEnv> {
   const windows = process.platform === 'win32'
@@ -159,6 +142,7 @@ export function createStructuredAgentEnvironmentResolvers(
   resolveBaseEnvironment: () => Promise<Record<string, string>>
   /** The base with the user's overlay for `agent` laid over it. */
   resolveAgentEnvironment: (agent: string) => Promise<Record<string, string>>
+  refreshAfterMissingProgram: (askedAt: number) => Promise<void>
 } {
   // Why: start as soon as the runtime exists so the first chat rarely waits for the profile.
   const injected = sources.resolveEnvironment?.()
@@ -172,6 +156,9 @@ export function createStructuredAgentEnvironmentResolvers(
       policy: sources.resolveShellEnvironmentPolicy?.() ?? nativeChatShellEnvironmentPolicy(null)
     })
   return {
+    refreshAfterMissingProgram: injected
+      ? async () => {}
+      : refreshHostAgentBaseEnvironmentAfterMiss,
     resolveBaseEnvironment: resolveBase,
     resolveAgentEnvironment: async (agent) => ({
       ...(await resolveBase()),

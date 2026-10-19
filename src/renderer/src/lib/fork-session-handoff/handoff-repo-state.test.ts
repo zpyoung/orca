@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getRuntimeGitDiff, getRuntimeGitStatus } from '@/runtime/runtime-git-client'
-import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
+import { getRuntimeGitDiff } from '@/runtime/runtime-git-diff-client'
+import { getRuntimeGitStatus } from '@/runtime/runtime-git-status-client'
+import { runtimeTargetForWorkspaceOwner } from '@/lib/resolve-owner'
 import type { HandoffTargetResolution } from './handoff-target-resolution'
 import { fetchHandoffRepoState, formatHandoffStatusSummary } from './handoff-repo-state'
 
-vi.mock('@/runtime/runtime-git-client', () => ({
-  getRuntimeGitStatus: vi.fn(),
-  getRuntimeGitDiff: vi.fn()
-}))
-vi.mock('@/lib/worktree-runtime-owner', () => ({
-  getSettingsForWorktreeRuntimeOwner: vi.fn(() => ({ activeRuntimeEnvironmentId: null }))
+vi.mock('@/runtime/runtime-git-status-client', () => ({ getRuntimeGitStatus: vi.fn() }))
+vi.mock('@/runtime/runtime-git-diff-client', () => ({ getRuntimeGitDiff: vi.fn() }))
+vi.mock('@/lib/resolve-owner', () => ({
+  runtimeTargetForWorkspaceOwner: vi.fn(() => ({ kind: 'local' }))
 }))
 
 function target(overrides: Partial<HandoffTargetResolution> = {}): HandoffTargetResolution {
@@ -42,9 +41,7 @@ describe('fetchHandoffRepoState', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getRuntimeGitStatus).mockResolvedValue(status)
-    vi.mocked(getSettingsForWorktreeRuntimeOwner).mockReturnValue({
-      activeRuntimeEnvironmentId: null
-    })
+    vi.mocked(runtimeTargetForWorkspaceOwner).mockReturnValue({ kind: 'local' })
     vi.mocked(getRuntimeGitDiff).mockResolvedValue({
       kind: 'text',
       originalContent: 'before',
@@ -68,7 +65,7 @@ describe('fetchHandoffRepoState', () => {
   it('fetches status through the resolved SSH host and formats changed paths', async () => {
     const result = await fetchHandoffRepoState({
       state: {
-        settings: { activeRuntimeEnvironmentId: 'stale-env' } as never
+        settings: null
       },
       target: target({ sshConnectionId: 'dev-box' }),
       includeDiffBodies: false
@@ -76,7 +73,7 @@ describe('fetchHandoffRepoState', () => {
 
     expect(getRuntimeGitStatus).toHaveBeenCalledWith(
       {
-        settings: expect.objectContaining({ activeRuntimeEnvironmentId: null }),
+        target: { kind: 'local' },
         worktreeId: 'repo::/worktree',
         worktreePath: '/worktree',
         connectionId: 'dev-box'
@@ -93,13 +90,14 @@ describe('fetchHandoffRepoState', () => {
     })
   })
 
-  it('selects owner settings through the target worktree runtime helper', async () => {
-    vi.mocked(getSettingsForWorktreeRuntimeOwner).mockReturnValue({
-      activeRuntimeEnvironmentId: 'target-env'
+  it('routes git through the target workspace owner', async () => {
+    vi.mocked(runtimeTargetForWorkspaceOwner).mockReturnValue({
+      kind: 'environment',
+      environmentId: 'target-env'
     })
     await fetchHandoffRepoState({
       state: {
-        settings: { activeRuntimeEnvironmentId: 'old-env' } as never
+        settings: null
       },
       target: target({ runtimeEnvironmentId: 'target-env' }),
       includeDiffBodies: false
@@ -107,7 +105,7 @@ describe('fetchHandoffRepoState', () => {
 
     expect(getRuntimeGitStatus).toHaveBeenCalledWith(
       expect.objectContaining({
-        settings: expect.objectContaining({ activeRuntimeEnvironmentId: 'target-env' })
+        target: { kind: 'environment', environmentId: 'target-env' }
       }),
       expect.anything()
     )

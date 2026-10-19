@@ -78,6 +78,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
   agent: StructuredAgentId
   caller: StructuredAgentSessionCaller
   resumeFrom?: StructuredAgentSessionResumeSource
+  structuredAgentCliSourceEvidence?: StructuredAgentCliSourceEvidence
   /** Explicit picks override seed keys at rest; acquired in-process launches replace the seed. */
   options?: Readonly<Record<string, string>>
   /** The tab id the caller reserved for this chat, taken when its tab is published; absent, the tab
@@ -156,15 +157,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     ...(hostLaunchDirectory ? { hostLaunchDirectory } : {}),
     attachParams: {
       ...resolvedAttach,
-      // The ledger covers explicit overrides, never defaults that settings can change on replay.
-      // Explicit picks replace the saved selection; the permission default is the chat's own.
-      ...(args.options
-        ? {
-            options: atRest
-              ? { ...resolved.options, ...args.options }
-              : { ...seededPermissionMode(resolved.options), ...args.options }
-          }
-        : {}),
+      ...(options ? { options } : {}),
       ...(args.tabId ? { surfaceTabId: args.tabId } : {}),
       provider: resolved.provider,
       agent: resolved.agent,
@@ -195,16 +188,20 @@ export async function commitStructuredAgentSessionCreate(args: {
         : {}),
       ...(tab
         ? {
+            // A chat closed while it was being made gets no tab to show before main closes it.
             publishTab: () =>
-              args.runtime.publishStructuredAgentSessionTab({
-                workspaceId: tab.workspaceId,
-                sessionId: prepared.attachParams.envelope.sessionId,
-                agent: tab.agent,
-                activate: args.activate,
-                ...(prepared.attachParams.surfaceTabId
-                  ? { tabId: prepared.attachParams.surfaceTabId }
-                  : {})
-              })
+              ORCA_LAYOUT_OWNER_IS_MAIN &&
+              structuredAgentSessionClosedBeforeCreate(prepared.attachParams.envelope.sessionId)
+                ? Promise.resolve()
+                : args.runtime.publishStructuredAgentSessionTab({
+                    workspaceId: tab.workspaceId,
+                    sessionId: prepared.attachParams.envelope.sessionId,
+                    agent: tab.agent,
+                    activate: args.activate,
+                    ...(prepared.attachParams.surfaceTabId
+                      ? { tabId: prepared.attachParams.surfaceTabId }
+                      : {})
+                  })
           }
         : {})
     })

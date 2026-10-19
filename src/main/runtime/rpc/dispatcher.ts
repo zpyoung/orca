@@ -81,37 +81,7 @@ export class RpcDispatcher {
       emulatorProbe(`rpc ${request.method}`, request.params)
     }
     try {
-      const result = await invokeDispatcherUnaryMethod({
-        runtime: this.runtime,
-        request: resolved.request,
-        method,
-        params: parsedParams.value,
-        context: {
-          runtime: this.runtime,
-          signal: options?.signal,
-          connectionId: options?.connectionId,
-          // Session tabs always need this fence. COMPAT(terminal request-addressed unsubscribe): terminal only for phones without `requestId`.
-          subscriptionRegistrationVersion: isRegistrationFencedUnsubscribe(request.method)
-            ? this.runtime.getSubscriptionRegistrationVersion()
-            : undefined,
-          requestId: request.id,
-          clientId: options?.clientId,
-          caller: resolveRpcCallerIdentity(options),
-          clientKind: options?.clientKind,
-          clientCapabilities: options?.clientCapabilities,
-          updateClientCapabilities: options?.updateClientCapabilities,
-          authenticatedCallerFingerprint: options?.authenticatedCallerFingerprint,
-          authenticatedCredential: options?.authenticatedCredential,
-          orchestrationCaller: resolved.caller
-        },
-        orchestrationMutations: this.orchestrationMutations,
-        legacyOrchestration: this.legacyOrchestration
-      })
-      const filtered = binding?.filterResult?.(result) ?? { kind: 'allowed', result }
-      if (filtered.kind === 'denied') {
-        return errorResponse(request.id, meta, 'forbidden', filtered.message)
-      }
-      return successResponse(request.id, meta, filtered.result)
+      return successResponse(request.id, meta, await this.invokeUnary(admission, options))
     } catch (error) {
       if (probeEmulator) {
         emulatorProbeError(`rpc ${request.method}`, error, {

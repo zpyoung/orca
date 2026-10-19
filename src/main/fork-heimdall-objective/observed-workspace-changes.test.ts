@@ -1,17 +1,8 @@
 import { chmod, mkdir, mkdtemp, readdir, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, posix } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
-import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
-} from '../providers/ssh-filesystem-dispatch'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
-import type { SshGitProvider } from '../providers/ssh-git-provider'
-import type { FileStat, IFilesystemProvider } from '../providers/types'
-import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
-import type { ObjectiveWorkspaceTarget } from './content-identity'
 import { observeObjectiveWorkspaceManifest } from './objective-workspace-manifest'
 import {
   captureObjectiveWorkspaceBaseline,
@@ -21,7 +12,6 @@ import { folderTarget, gitTarget } from './objective-workspace-target-test-fixtu
 import { cleanupTemporaryDirectories } from './objective-temp-workspace-test-fixtures'
 
 const temporaryDirectories: string[] = []
-const SSH_TARGET = 'objective-observation-test'
 
 async function temporaryDirectory(prefix: string): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), prefix))
@@ -63,128 +53,7 @@ async function gitRepositoryWithIgnore(prefix: string, pattern: string): Promise
   return root
 }
 
-function asFilesystemProvider(memory: MemoryFilesystemProvider): IFilesystemProvider {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large IFilesystemProvider interface; only readDir/readFile/lstat are exercised.
-  return memory as unknown as IFilesystemProvider
-}
-
-type MemoryNode =
-  | { type: 'directory'; mtime: number }
-  | { type: 'file'; content: string; mtime: number }
-
-class MemoryFilesystemProvider {
-  private readonly nodes = new Map<string, MemoryNode>([
-    ['/srv/objective', { type: 'directory', mtime: 1 }]
-  ])
-  readonly observedPaths: string[] = []
-  private clock = 1
-
-  put(path: string, content: string): void {
-    this.createParents(dirname(path))
-    this.nodes.set(path, { type: 'file', content, mtime: ++this.clock })
-  }
-
-  async readDir(dirPath: string) {
-    this.observedPaths.push(dirPath)
-    const prefix = `${dirPath.replace(/\/$/u, '')}/`
-    const entries = new Map<string, MemoryNode>()
-    for (const [path, node] of this.nodes) {
-      if (!path.startsWith(prefix)) {
-        continue
-      }
-      const suffix = path.slice(prefix.length)
-      if (!suffix || suffix.includes('/')) {
-        continue
-      }
-      entries.set(suffix, node)
-    }
-    return [...entries].map(([name, node]) => ({
-      name,
-      isDirectory: node.type === 'directory',
-      isSymlink: false
-    }))
-  }
-
-  async readFile(path: string) {
-    this.observedPaths.push(path)
-    const node = this.nodes.get(path)
-    if (!node || node.type !== 'file') {
-      throw this.missing()
-    }
-    return { content: node.content, isBinary: false }
-  }
-
-  async lstat(path: string): Promise<FileStat> {
-    this.observedPaths.push(path)
-    const node = this.nodes.get(path)
-    if (!node) {
-      throw this.missing()
-    }
-    return {
-      type: node.type,
-      size: node.type === 'file' ? Buffer.byteLength(node.content) : 0,
-      mtime: node.mtime,
-      mtimeMs: node.mtime
-    }
-  }
-
-  stat(path: string): Promise<FileStat> {
-    return this.lstat(path)
-  }
-
-  async realpath(path: string): Promise<string> {
-    this.observedPaths.push(path)
-    if (!this.nodes.has(path)) {
-      throw this.missing()
-    }
-    return path
-  }
-
-  async writeFile(path: string, content: string): Promise<void> {
-    this.observedPaths.push(path)
-    this.put(path, content)
-  }
-
-  async createDir(path: string): Promise<void> {
-    this.observedPaths.push(path)
-    this.createParents(path)
-  }
-
-  async renameNoClobber(oldPath: string, newPath: string): Promise<void> {
-    this.observedPaths.push(oldPath, newPath)
-    if (this.nodes.has(newPath)) {
-      throw Object.assign(new Error('destination exists'), { code: 'EEXIST' })
-    }
-    const node = this.nodes.get(oldPath)
-    if (!node) {
-      throw this.missing()
-    }
-    this.createParents(dirname(newPath))
-    this.nodes.set(newPath, node)
-    this.nodes.delete(oldPath)
-  }
-
-  async deletePath(path: string): Promise<void> {
-    this.observedPaths.push(path)
-    this.nodes.delete(path)
-  }
-
-  private createParents(path: string): void {
-    if (path === '/' || this.nodes.has(path)) {
-      return
-    }
-    this.createParents(posix.dirname(path))
-    this.nodes.set(path, { type: 'directory', mtime: ++this.clock })
-  }
-
-  private missing(): Error {
-    return Object.assign(new Error('missing'), { code: 'ENOENT' })
-  }
-}
-
 afterEach(async () => {
-  unregisterSshFilesystemProvider(SSH_TARGET)
-  unregisterSshGitProvider(SSH_TARGET)
   await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
@@ -375,64 +244,6 @@ describe('objective observed workspace changes', () => {
       reason: 'reported-files-do-not-match-observed-changes',
       observedFiles: []
     })
-  })
-
-  it('checks ignored reports through the SSH Git and filesystem authorities', async () => {
-    const fileProvider = new MemoryFilesystemProvider()
-    const exec = vi.fn(async (args: string[]) => {
-      if (args[0] === 'rev-parse' && args[1] === '--absolute-git-dir') {
-        return { stdout: '/srv/objective/.git\n', stderr: '' }
-      }
-      if (args[0] === 'rev-parse' && args[1] === '--verify') {
-        return { stdout: `${'1'.repeat(40)}\n`, stderr: '' }
-      }
-      if (args[0] === 'status') {
-        return { stdout: '', stderr: '' }
-      }
-      throw new Error(`Unexpected Git command: ${args.join(' ')}`)
-    })
-    const checkIgnoredPaths = vi.fn(async (_worktreePath: string, paths: string[]) =>
-      paths.filter((path) => path === 'generated/remote.json')
-    )
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the SshGitProvider class; only exec and checkIgnoredPaths are exercised.
-    const gitProvider = { exec, checkIgnoredPaths } as unknown as SshGitProvider
-    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(fileProvider))
-    registerSshGitProvider(SSH_TARGET, gitProvider)
-    const workspacePath = '/srv/objective'
-    const target: ObjectiveWorkspaceTarget = {
-      kind: 'git',
-      executionHostId: `ssh:${SSH_TARGET}`,
-      workspacePath,
-      fileProvider: asFilesystemProvider(fileProvider),
-      gitTarget: {
-        executionHostId: `ssh:${SSH_TARGET}`,
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by the observed-workspace-changes remote path.
-        worktree: {
-          id: `objective-remote::${workspacePath}`,
-          repoId: 'objective-remote',
-          path: workspacePath,
-          git: {
-            path: workspacePath,
-            branch: 'main',
-            isBare: false,
-            isMainWorktree: true
-          }
-        } as unknown as RuntimeGitTarget['worktree']
-      }
-    }
-    await captureObjectiveWorkspaceBaseline(target, 'ssh-ignored-attempt')
-    fileProvider.put('/srv/objective/generated/remote.json', '{"remote":true}\n')
-
-    await expect(
-      validateObjectiveWorkspaceChanges({
-        target,
-        attemptFingerprint: 'ssh-ignored-attempt',
-        reportedFiles: ['generated/remote.json'],
-        writeTerritory: ['generated/**']
-      })
-    ).resolves.toEqual({ ok: true, changedPaths: ['generated/remote.json'] })
-    expect(checkIgnoredPaths).toHaveBeenCalledWith('/srv/objective', ['generated/remote.json'])
-    expect(fileProvider.observedPaths.every((path) => path.startsWith('/srv/objective'))).toBe(true)
   })
 
   it.skipIf(process.platform === 'win32')(
@@ -670,57 +481,6 @@ describe('objective observed workspace changes', () => {
     ).resolves.toEqual({ ok: false, reason: 'objective-workspace-baseline-malformed' })
   })
 
-  it('reads and stores an SSH folder baseline only through its execution-host provider', async () => {
-    const provider = new MemoryFilesystemProvider()
-
-    provider.put('/srv/objective/src/remote.ts', 'before\n')
-    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(provider))
-    const target: ObjectiveWorkspaceTarget = {
-      kind: 'folder',
-      executionHostId: `ssh:${SSH_TARGET}`,
-      workspacePath: '/srv/objective',
-      fileProvider: asFilesystemProvider(provider)
-    }
-    await captureObjectiveWorkspaceBaseline(target, 'ssh-attempt')
-    provider.put('/srv/objective/src/remote.ts', 'after\n')
-
-    await expect(
-      validateObjectiveWorkspaceChanges({
-        target,
-        attemptFingerprint: 'ssh-attempt',
-        reportedFiles: ['src/remote.ts'],
-        writeTerritory: ['src/**']
-      })
-    ).resolves.toEqual({ ok: true, changedPaths: ['src/remote.ts'] })
-    expect(provider.observedPaths.length).toBeGreaterThan(0)
-    expect(provider.observedPaths.every((path) => path.startsWith('/srv/objective'))).toBe(true)
-    expect(provider.observedPaths.some((path) => path.includes('/workspace-baselines/'))).toBe(true)
-  })
-
-  it('fails closed when an SSH route is rebound after baseline capture', async () => {
-    const originalProvider = new MemoryFilesystemProvider()
-    originalProvider.put('/srv/objective/src/remote.ts', 'before\n')
-    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(originalProvider))
-    const target: ObjectiveWorkspaceTarget = {
-      kind: 'folder',
-      executionHostId: `ssh:${SSH_TARGET}`,
-      workspacePath: '/srv/objective',
-      fileProvider: asFilesystemProvider(originalProvider)
-    }
-    await captureObjectiveWorkspaceBaseline(target, 'rebound-attempt')
-    const replacementProvider = new MemoryFilesystemProvider()
-    registerSshFilesystemProvider(SSH_TARGET, asFilesystemProvider(replacementProvider))
-
-    await expect(
-      validateObjectiveWorkspaceChanges({
-        target,
-        attemptFingerprint: 'rebound-attempt',
-        reportedFiles: [],
-        writeTerritory: ['src/**']
-      })
-    ).resolves.toEqual({ ok: false, reason: 'objective-workspace-route-unavailable' })
-    expect(replacementProvider.observedPaths).toEqual([])
-  })
   it('does not report a path that was dirty at capture and is then committed unchanged', async () => {
     const root = await gitRepository('orca-objective-observed-commit-')
     await writeFile(join(root, 'src', 'staged.ts'), 'before\n')

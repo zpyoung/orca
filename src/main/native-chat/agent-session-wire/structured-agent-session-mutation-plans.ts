@@ -281,6 +281,7 @@ export function cancelPlan(params: {
   /** The session's child records, which name the tasks a background Stop reaches. */
   childWork?: () => readonly AgentChildWorkView[] | undefined
   acknowledgeStops?: (evidence: AgentChildWorkEvidence[]) => void
+  captureStops?: StructuredAgentSessionBackgroundStopInput['captureStops']
   unlisted?: StructuredAgentSessionBackgroundStopInput['unlisted']
 }): MutationPlan<AgentSessionCancelResult> {
   const named = params.turnId !== undefined ? { turnId: params.turnId } : {}
@@ -299,22 +300,10 @@ export function cancelPlan(params: {
     // The chat's own Stop runs through `mutateWithChatStop`; this is a background-task stop's and a
     // prompt card's interrupt.
     run: (ctx) =>
-      performCancel(ctx, {
-        clientOperationId: params.envelope.clientOperationId,
-        ...(params.turnId !== undefined ? { turnId: params.turnId } : {}),
-        ...(params.scope ? { scope: params.scope } : {}),
-        ...(params.taskId ? { taskId: params.taskId } : {}),
-        ...(params.prompt ? { prompt: params.prompt } : {}),
-        ...(params.childWork ? { childWork: params.childWork } : {}),
-        ...(params.acknowledgeStops ? { acknowledgeStops: params.acknowledgeStops } : {}),
-        ...(params.unlisted ? { unlisted: params.unlisted } : {})
-      }),
-    // Interrupting twice would kill a turn the client never asked to stop, so a
-    // replay reports the turn as already handled.
-    replay: () => ({
-      ...(params.turnId !== undefined ? { turnId: params.turnId } : {}),
-      cancelled: false
-    })
+      runTargetedCancel(ctx, { ...params, clientOperationId: params.envelope.clientOperationId }),
+    // A retry acknowledges the Stop it repeats and never stops anything again: interrupting twice
+    // would stop a turn the client never asked to stop.
+    replay: () => ({ ...named, cancelled: false })
   }
 }
 

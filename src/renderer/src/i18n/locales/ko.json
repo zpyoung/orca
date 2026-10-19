@@ -25,7 +25,7 @@
     "chat": {
       "permissionsTitle": "새 채팅의 권한",
       "permissionsDescription": "새 채팅에만 적용됩니다. 터미널에서 여는 에이전트는 설정 → 에이전트 → 에이전트 권한을 사용합니다.",
-      "description": "채팅 모양과 이름 지정 방식을 선택하세요.",
+      "description": "채팅의 모양과 동작 방식을 선택하세요.",
       "names": {
         "title": "채팅 이름",
         "description": "에이전트가 첫 메시지를 바탕으로 새 채팅의 이름을 생성합니다. 이름이 생성되지 않으면 Claude Chat 또는 Codex Chat으로 유지됩니다.",
@@ -11277,7 +11277,7 @@
           "sourceControlAiDefaults": "레시피, 프롬프트, 호스팅 리뷰 기본값은 이 클라이언트에서 공유됩니다. 모델 선택과 탐색은 agent가 실행되는 호스트 범위에 유지됩니다.",
           "projectOnThisHost": "이 호스트의 프로젝트",
           "repositorySourceControlAi": "이 재정의는 이 프로젝트 설정에 적용되며, 사용자 지정하기 전까지 클라이언트의 Source Control AI 기본값을 상속합니다.",
-          "agentLaunchDefaults": "기본 agent, 명령 재정의, CLI 인수 및 실행 환경은 선택한 호스트에 저장됩니다.",
+          "agentLaunchDefaults": "기본 에이전트, 명령 재정의, CLI 인수 및 실행 환경은 선택한 호스트에 저장됩니다.",
           "clientDefaultProjectScopes": "클라이언트 기본값 + 프로젝트 범위",
           "terminalQuickCommands": "명령은 이 클라이언트에 저장된 뒤 전역 또는 프로젝트 설정 범위로 지정되어 선택한 terminal 컨텍스트에서 실행됩니다.",
           "hostOverride": "호스트 재정의",
@@ -17928,6 +17928,23 @@
         "resuming": "다시 시작한 후 자동으로 재개하는 중입니다.",
         "resumed": "다시 시작한 후 자동으로 재개했습니다.",
         "changeInSettings": "설정에서 변경"
+      },
+      "TaskPageJiraSavedFilters": {
+        "6c381858a1": "Saved filters",
+        "d14121662d": "No saved filters yet.",
+        "af0dd8c528": "Edit {{value0}}",
+        "bae9bd87bf": "You can save up to {{value0}} filters.",
+        "85506127a5": "Save current filter",
+        "7aef259c28": "Edit Jira filter",
+        "4f0e55d2e5": "Save Jira filter",
+        "466c1b12ce": "Give this JQL query a name for quick access.",
+        "e4c2f52972": "Name",
+        "0ab71bb840": "A saved filter with this name already exists.",
+        "42ce360813": "JQL",
+        "7b21c59a26": "Delete filter",
+        "a62f9db53d": "Cancel",
+        "c77189bc0c": "Update filter",
+        "19af906d12": "Save filter"
       }
     },
     "i18n": {
@@ -18315,6 +18332,7 @@
         "permissionAskSharedDescription": "아직 허용되지 않은 편집이나 명령 전에 묻습니다",
         "permissionAcceptEdits": "편집 허용",
         "permissionAcceptEditsDescription": "파일 편집과 파일 명령은 승인하고, 나머지는 묻습니다",
+        "permissionAcceptEditsAntigravityDescription": "파일 편집은 승인하고, 나머지는 묻습니다",
         "permissionAuto": "대신 승인",
         "permissionAutoDescription": "승인 요청을 대신 검토합니다",
         "permissionFullAccess": "전체 액세스",
@@ -18555,7 +18573,8 @@
         "orcaStopQuit": "이 응답이 진행되는 동안 {{machine}}의 Orca가 종료되었습니다.",
         "orcaStopCrash": "이 응답이 진행되는 동안 {{machine}}의 Orca가 예기치 않게 중지되었습니다.",
         "orcaStopRemote": "이 응답이 진행되는 동안 {{machine}}의 Orca가 중지되었습니다.",
-        "orcaStopCanContinue": "이 대화에서 계속할 수 있습니다."
+        "orcaStopCanContinue": "이 대화에서 계속할 수 있습니다.",
+        "orcaStopUnnamedServer": "원격 서버"
       },
       "providerFrame": {
         "byteLength": "{{value0}}바이트"
@@ -18767,7 +18786,10 @@
       },
       "visualUnavailable": "시각화를 사용할 수 없습니다",
       "visualLoading": "시각화 로드 중",
-      "visualOpenInNewTab": "새 탭에서 열기"
+      "visualOpenInNewTab": "새 탭에서 열기",
+      "claudeSignIn": {
+        "signingIn": "로그인 중…"
+      }
     },
     "tab": {
       "bar": {
@@ -19898,6 +19920,50 @@
       "learnMore": "자세히 알아보기",
       "dontShowAgain": "다시 보지 않기",
       "dismiss": "닫기"
+    },
+    "claudeOldTerminalBanner": {
+      "title": "이 터미널은 Orca의 Claude 계정 업데이트 이전에 열렸으므로, 여기의 claude는 시스템 기본값의 로그인을 사용합니다.",
+      "dialogTitle": "여기의 claude가 선택한 계정을 사용하지 않는 이유",
+      "dialogDescription": "이제 Orca는 각 Claude 계정을 자체 폴더에 보관하며, 새 터미널의 claude는 선택한 계정을 따릅니다.",
+      "dialogCause": "이 업데이트 이전에 열린 터미널은 그렇지 않으므로, 여기의 claude는 시스템 기본값의 로그인을 사용합니다. 선택한 계정을 사용하려면 새 터미널을 여세요."
+    },
+    "newerDaemonBanner": {
+      "failedTitle": "이 터미널을 다시 열지 못했습니다",
+      "title": "이 터미널은 더 새로운 버전의 Orca에서 열렸습니다",
+      "resumableBody": "계속 작업하려면 여기에서 다시 여세요. 에이전트 세션이 재개됩니다.",
+      "reopening": "다시 여는 중…",
+      "tryAgain": "다시 시도",
+      "reopenTerminal": "터미널 {{count}}개 다시 열기",
+      "reopenTerminal_one": "터미널 다시 열기",
+      "reopenTerminal_other": "터미널 {{count}}개 다시 열기",
+      "reopened": "터미널 {{count}}개를 다시 열었습니다",
+      "reopened_one": "터미널 {{count}}개를 다시 열었습니다",
+      "reopened_other": "터미널 {{count}}개를 다시 열었습니다",
+      "resumed": "에이전트 세션 {{count}}개가 재개되었습니다.",
+      "resumed_one": "에이전트 세션 {{count}}개가 재개되었습니다.",
+      "resumed_other": "에이전트 세션 {{count}}개가 재개되었습니다."
+    },
+    "severedDaemonBanner": {
+      "unknownCount": "실행 중인 터미널",
+      "count": "실행 중인 터미널 {{count}}개",
+      "unverifiable": "Orca가 터미널 서비스 프로세스를 확인할 수 없어 아무것도 중지되지 않았습니다.",
+      "alreadyReplaced": "터미널 서비스가 이미 교체되었으므로 아무것도 중지되지 않았습니다.",
+      "restarted": "터미널 서비스가 다시 시작되었습니다.",
+      "failed": "다시 시작하지 못했습니다.",
+      "title": "터미널 서비스가 프로그램 파일 없이 실행 중입니다",
+      "body": "이 컴퓨터의 터미널 서비스가 더 이상 마운트되지 않은 AppImage에서 시작되었습니다. 아직 {{sessions}}을(를) 실행 중이지만 언제든 충돌할 수 있습니다. 다시 시작할 때까지 Orca를 종료하면 새 터미널이 유지되지 않습니다.",
+      "restart": "터미널 데몬 다시 시작",
+      "dismiss": "닫기",
+      "confirmTitle": "터미널 데몬을 다시 시작하시겠습니까?",
+      "confirmBody": "다시 시작하면 {{sessions}}에서 실행 중인 모든 프로세스가 종료됩니다. 재개를 지원하는 에이전트는 나중에 재개할 수 있지만, 셸과 기타 작업은 재개할 수 없으므로 다시 시작해야 합니다. 에이전트가 유휴 상태일 때 실행하세요.",
+      "cancel": "취소",
+      "confirm": "다시 시작하고 프로세스 종료"
+    },
+    "restartedInputNotSent": "입력하는 동안 터미널이 다시 시작되어 일부 입력이 전달되지 않았을 수 있습니다. 다시 입력하기 전에 새 셸을 확인하세요.",
+    "stalledDaemonBanner": {
+      "body": "이 컴퓨터의 백그라운드 작업이 멈췄습니다. 입력과 새 터미널이 작동하지 않을 수 있습니다. 터미널 서비스를 다시 시작하면 실행 중인 터미널과 명령이 종료됩니다.",
+      "review": "다시 시작 옵션 검토",
+      "title": "터미널 서비스를 다시 시작해야 할 수 있습니다"
     }
   },
   "fileSearch": {
@@ -19977,15 +20043,215 @@
   "projectField": {
     "updateFailed": "프로젝트 필드를 업데이트하지 못했습니다"
   },
-  "settings.agents.environmentName": "환경 변수 이름",
-  "settings.agents.environmentValue": "{{name}} 값",
-  "settings.agents.savedEnvironment": "저장된 값 · 바꾸려면 입력",
-  "settings.agents.newEnvironment": "값",
-  "settings.agents.removeEnvironment": "삭제",
-  "settings.agents.loadingHost": "에이전트 설정 불러오는 중…",
-  "settings.agents.updateHost": "에이전트 실행 설정을 편집하려면 이 서버를 업데이트하세요.",
-  "settings.agents.readFailed": "에이전트 설정을 읽을 수 없습니다. 호스트 연결을 확인하고 다시 시도하세요.",
-  "settings.agents.saveFailed": "에이전트 설정을 저장할 수 없습니다. 호스트 연결을 확인하고 다시 시도하세요.",
-  "settings.agents.hostDefaults": "선택한 호스트의 새 에이전트 기본값입니다.",
-  "settings.agents.save": "저장"
+  "workspaceDeletion": {
+    "preferenceSaveFailed": "삭제 환경설정을 저장하지 못했습니다",
+    "alwaysForceDelete": "항상 강제 삭제",
+    "moreActions": "추가 강제 삭제 옵션",
+    "alwaysForceDeleteTooltip": "이후 모든 워크스페이스 삭제에 적용됩니다."
+  },
+  "workspace": {
+    "links": {
+      "foreignReview": "이 리뷰는 다른 리포지토리에 속합니다. 이 워크스페이스의 리포지토리에서 리뷰를 추가하세요.",
+      "repositoryLoading": "리포지토리 정보를 아직 불러오는 중입니다. 사용할 수 있게 되면 다시 시도하세요.",
+      "duplicate": "이 링크는 이미 첨부되어 있습니다.",
+      "title": "연결된 작업",
+      "count": "{{count}}개 연결됨",
+      "empty": "이 워크스페이스의 모든 리뷰와 작업을 한곳에 모아 두세요.",
+      "reviews": "리뷰",
+      "tasks": "이슈 및 작업",
+      "openItem": "{{label}} 열기",
+      "open": "링크 열기",
+      "unlinkItem": "{{label}} 연결 해제",
+      "unlink": "워크스페이스에서 연결 해제",
+      "show": "연결된 리뷰와 작업 {{count}}개 표시",
+      "manage": "링크 관리…",
+      "details": "워크스페이스 세부정보",
+      "description": "리뷰와 작업을 첨부하고 이 워크스페이스의 메모를 보관하세요.",
+      "commentHelp": "Markdown을 지원합니다. 저장하려면 Enter 또는 {{shortcut}} · 새 줄은 Shift+Enter를 누르세요.",
+      "kind": {
+        "github_pr": "GitHub PR",
+        "github_issue": "GitHub 이슈",
+        "linear_task": "Linear 작업",
+        "gitlab_mr": "GitLab MR",
+        "gitlab_issue": "GitLab 이슈",
+        "jira_task_url": "Jira 작업(URL)",
+        "bitbucket_pr": "Bitbucket PR",
+        "azure_devops_pr": "Azure DevOps PR",
+        "gitea_pr": "Gitea PR"
+      },
+      "mrReference": "MR !{{number}}",
+      "prReference": "PR #{{number}}",
+      "issueReference": "이슈 #{{number}}",
+      "foreignIssue": "이 이슈는 다른 리포지토리에 속합니다. 이 워크스페이스의 리포지토리에서 이슈를 추가하세요.",
+      "linkedResult": "연결됨",
+      "addReference": "참조 추가",
+      "searchLabel": "참조 검색",
+      "searchReferences": "리뷰와 작업을 검색하거나 링크를 붙여넣으세요",
+      "noReferences": "일치하는 참조가 없습니다. 제목, 번호 또는 URL을 입력해 보세요.",
+      "addItem": "{{label}} 추가",
+      "referenceType": "참조 유형",
+      "clearSearch": "검색 지우기",
+      "inlineSearchHint": "결과를 선택하여 첨부하세요.",
+      "nameHelp": "사이드바에 표시됩니다. 폴더 이름은 그대로 유지됩니다.",
+      "notes": "메모",
+      "addNotes": "메모 추가",
+      "notesOptional": "선택 사항 · Markdown",
+      "saveHint": "변경 사항은 저장할 때 적용됩니다",
+      "terminal": "터미널",
+      "seenIn": "{{label}}에서 확인됨",
+      "unavailableTab": "탭을 사용할 수 없음",
+      "sessions": "세션 및 터미널",
+      "jiraModeRequired": "이 이슈를 불러오려면 스마트 또는 Jira를 선택하세요.",
+      "linearModeRequired": "이 이슈를 불러오려면 스마트 또는 Linear를 선택하세요.",
+      "loadingLinear": "Linear 이슈 불러오는 중…",
+      "linearConnectRequired": "이 이슈를 연결하려면 설정에서 Linear를 연결하세요.",
+      "linearReadFailed": "이 Linear 이슈를 불러오지 못했습니다. URL과 연결된 워크스페이스를 확인하세요.",
+      "retrySource": "다시 시도",
+      "lastKnownStatus": "마지막으로 확인된 상태",
+      "reviewTarget": "대상: {{branch}}",
+      "reviewUrlRequired": "리포지토리와 제공자를 확인하려면 리뷰 URL을 붙여넣으세요.",
+      "stackSummary": "{{count}}개 연결됨: {{references}}",
+      "sessionsForItem": "{{label}}의 세션 및 터미널 · {{count}}",
+      "checksFailed": "실패",
+      "checksPending": "대기 중",
+      "checksPassing": "통과",
+      "checksUnknown": "알 수 없음",
+      "checksNeutral": "중립",
+      "allReviewChecks": "리뷰: {{count}} · 체크: {{status}}"
+    },
+    "attachments": {
+      "updateRuntime": "워크스페이스 링크를 변경하려면 원격 런타임을 업데이트하세요",
+      "updateRuntimeSafely": "워크스페이스 링크를 안전하게 변경하려면 원격 런타임을 업데이트하세요"
+    }
+  },
+  "tabHoverCard": {
+    "browser": "브라우저",
+    "editor": "편집기",
+    "terminal": "터미널"
+  },
+  "jira": {
+    "savedFilters": {
+      "retry": "다시 시도",
+      "find": "저장된 필터 검색",
+      "noMatch": "일치하는 필터가 없습니다.",
+      "loadFailed": "저장된 Jira 필터를 불러올 수 없습니다.",
+      "saveFailed": "Jira 필터를 저장할 수 없습니다."
+    },
+    "statusFilters": {
+      "loadFailed": "Jira 상태 필터를 불러올 수 없습니다.",
+      "saveFailed": "Jira 상태 필터를 저장할 수 없습니다.",
+      "manualQuery": "상태 필터는 사전 설정 보기에 적용됩니다. 사용하려면 검색을 지우세요.",
+      "label": "상태별로 Jira 이슈 필터링",
+      "clear": "상태 지우기",
+      "jql": "상태 필터 JQL",
+      "editJql": "JQL로 편집",
+      "catalogHint": "상태는 불러온 이슈에서 가져옵니다. 이 보기에서 다른 상태를 찾으려면 선택을 지우세요."
+    },
+    "connect": {
+      "scopedTokenGuide": "범위가 지정된 토큰에는 read:jira-work, write:jira-work, read:jira-user가 필요합니다. Bearer 인증을 사용하려면 이메일을 비워 두세요.",
+      "oldHostGuide": "이 원격 런타임에는 이메일과 범위가 지정되지 않은 API 토큰이 필요합니다. 범위가 지정된 토큰을 사용하려면 원격 런타임을 업데이트하세요.",
+      "scopedDescription": "Jira Cloud 사이트 URL과 API 토큰으로 이슈를 찾아보세요. 범위가 지정된 토큰은 이메일을 생략할 수 있습니다.",
+      "optionalEmail": "Atlassian 이메일(범위가 지정된 토큰은 선택 사항)"
+    },
+    "workspace": {
+      "open": "{{key}}에 연결된 워크스페이스 열기",
+      "count": "{{key}}에 연결된 워크스페이스 {{count}}개",
+      "startAnother": "새 워크스페이스 시작",
+      "empty": "Jira 이슈를 워크스페이스에 연결하거나 다른 보기를 선택하세요.",
+      "openFailed": "이 Jira 이슈에 연결된 워크스페이스를 열 수 없습니다.",
+      "mode": "워크스페이스 있음",
+      "search": "연결된 이슈 검색",
+      "single": "{{key}}에 연결된 워크스페이스 1개"
+    },
+    "prompt": {
+      "dialogTitle": "템플릿에서 프롬프트 복사",
+      "template": "템플릿",
+      "custom": "사용자 지정 템플릿",
+      "templateText": "템플릿 텍스트",
+      "variables": "이슈 컨텍스트에는 $jira-issue를, 추가 지침에는 $other-prompt를 사용하세요. 이 기기에 저장됩니다.",
+      "other": "추가 지침(선택 사항)",
+      "preview": "미리보기",
+      "implementation": "구현 시작",
+      "bug": "버그 조사",
+      "testPlan": "테스트 계획 작성",
+      "prSummary": "PR 요약 초안 작성"
+    },
+    "copy": {
+      "context": "{{key}}의 컨텍스트 복사",
+      "actions": "이슈 컨텍스트 복사"
+    },
+    "transitions": {
+      "changeStatus": "상태 변경: {{status}}",
+      "loadError": "상태 변경을 로드하지 못했습니다.",
+      "retry": "다시 시도",
+      "loading": "상태 변경 로드 중…",
+      "completeInJira": "Jira에서 “{{name}}” 완료",
+      "unsupported": "Jira에는 Orca가 아직 수집할 수 없는 필드가 필요합니다: {{fields}}.",
+      "chooseResolution": "해결 방법 선택",
+      "comment": "댓글",
+      "back": "뒤로",
+      "apply": "상태 변경",
+      "empty": "사용 가능한 상태 변경이 없습니다."
+    },
+    "board": {
+      "currentSprint": "현재 스프린트",
+      "viewMode": "Jira 보기",
+      "list": "목록",
+      "board": "보드",
+      "moveIssue": "{{key}} 이동",
+      "moveTitle": "{{key}}을(를) {{column}}(으)로 이동",
+      "moveDescription": "Jira는 사용 가능한 상태 변경과 해당 변경에 필요한 필드를 제어합니다.",
+      "chooseTransition": "상태 변경을 선택하세요:",
+      "cancel": "취소",
+      "noTransition": "{{key}}에 대해 {{column}}(으)로 가는 상태 변경을 사용할 수 없습니다.",
+      "queryTooLong": "Jira 쿼리가 너무 깁니다. 쿼리를 줄이거나 필터를 지우세요."
+    },
+    "favourites": {
+      "activeLabel": "Jira 즐겨찾기: {{name}}",
+      "applyFailed": "Jira 즐겨찾기를 적용할 수 없습니다.",
+      "chooseSite": "즐겨찾기를 사용할 연결된 Jira 사이트를 하나 선택하세요.",
+      "clear": "Jira 즐겨찾기 지우기",
+      "clearFailed": "저장된 필터를 지우지 못했습니다. 불러오기나 저장이 끝난 후 다시 시도하세요.",
+      "empty": "Jira 즐겨찾기를 찾을 수 없습니다.",
+      "find": "Jira 즐겨찾기 검색",
+      "label": "Jira 즐겨찾기",
+      "loadFailed": "Jira 즐겨찾기를 불러올 수 없습니다.",
+      "loading": "즐겨찾기 불러오는 중…",
+      "refresh": "새로고침",
+      "siteMismatch": "즐겨찾기의 Jira 사이트에서 프로젝트를 선택하거나 프로젝트 필터를 지우세요.",
+      "truncated": "일부 즐겨찾기를 표시할 수 없습니다. Jira에서 즐겨찾기를 관리하여 목록을 좁히세요.",
+      "unsupported": "즐겨찾기를 사용하려면 Jira 호스트를 업데이트하세요."
+    }
+  },
+  "updates": {
+    "installBlock": {
+      "instancesLabel": "Orca를 사용 중인 인스턴스",
+      "browserLabel": "백그라운드 브라우저",
+      "serverLabel": "백그라운드 서버",
+      "windowLabel": "다른 Orca 창",
+      "instanceLabel": "다른 Orca 인스턴스",
+      "processId": "PID {{pid}}",
+      "preparingTitle": "업데이트 준비 중",
+      "preparingSummary": "다시 시작하기 전에 실행 중인 Orca 인스턴스를 확인하는 중입니다.",
+      "later": "나중에",
+      "retainedDownload": "Orca는 계속 열려 있습니다. 다시 다운로드할 필요가 없습니다.",
+      "retryInstallation": "설치 다시 시도",
+      "waitingLabel": "업데이트 대기 중",
+      "busyTitle": "다른 Orca가 업데이트 중입니다",
+      "busySummary": "다른 Orca 인스턴스가 이미 업데이트를 설치하고 있습니다.",
+      "busyGuidance": "잠시 기다린 후 다시 시도하세요. 다운로드한 업데이트가 준비되어 있습니다.",
+      "unresponsiveTitle": "백그라운드 서버 대기 중",
+      "unresponsiveSummary": "Orca가 업데이트를 위해 백그라운드 서버 일시 중지를 완료하지 못했습니다.",
+      "unresponsiveGuidance": "시작한 터미널 또는 서비스에서 중지한 후 다시 시도하세요. 연결된 기기는 연결이 끊어집니다.",
+      "readyTitle": "업데이트가 준비되었습니다",
+      "serverSummary": "백그라운드 Orca 서버가 아직 이 앱을 사용 중입니다.",
+      "instanceSummary": "다른 Orca 인스턴스가 아직 이 앱을 사용 중입니다.",
+      "serverGuidance": "시작한 터미널 또는 서비스에서 서버를 중지한 후 다시 시도하세요. 연결된 기기는 연결이 끊어집니다.",
+      "mixedGuidance": "다른 Orca 창을 모두 닫고, 시작한 터미널 또는 서비스에서 서버를 중지하세요. 연결된 기기는 연결이 끊어집니다. 그런 다음 다시 시도하세요.",
+      "instanceGuidance": "다른 Orca 인스턴스를 종료한 후 다시 시도하세요. 다운로드한 업데이트는 준비된 상태로 유지됩니다.",
+      "waitingAriaLabel": "다른 Orca 인스턴스를 기다리는 업데이트입니다. 클릭하여 펼치세요.",
+      "preparingLabel": "업데이트 준비 중",
+      "preparingAriaLabel": "업데이트 준비 중입니다. 클릭하여 펼치세요."
+    }
+  }
 }

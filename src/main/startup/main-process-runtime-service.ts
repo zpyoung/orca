@@ -26,6 +26,7 @@ import { getPreferredPairedRuntimeConnection } from '../../shared/runtime-enviro
 import { fingerprintOrchestrationPeer } from '../runtime/orchestration/environment-transport'
 import { callRuntimeEnvironment } from '../ipc/runtime-environments/runtime-environment-transport-routing'
 import { mainProcessState as state } from './main-process-state'
+import { installWslOrcadAccountShim } from './wsl-orcad-account-env-wiring'
 import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'
 import { startHeimdall } from '../fork-heimdall/registration'
 import { wireHeimdallFleetWindows } from '../fork-heimdall/fleet-ipc-forward'
@@ -108,29 +109,6 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
       }
     },
     getDesktopWindowStatus,
-    // Why: worktree.ps pulls hook-reported agent status (same source as the desktop sidebar) at query time so mobile shows the same agents.
-    getAgentStatusSnapshot: () =>
-      agentHookServer.getStatusSnapshot().filter((entry) => entry.providerSessionOnly !== true),
-    getAgentStatusSnapshotForPane: (paneKey) => agentHookServer.getStatusSnapshotForPane(paneKey),
-    // Why: structured chats have no hooks, so the host writes their projections here itself; the
-    // snapshot above then lists them for the CLI and mobile without a second store.
-    structuredAgentStatusSink: {
-      publish: (summary, subject) => agentHookServer.ingestStructuredStatus(summary, subject),
-      forget: (subject) => agentHookServer.dropStructuredStatus(subject),
-      publishChildWork: (subject, evidence, provider) =>
-        agentHookServer.ingestStructuredChildWork(subject, evidence, provider),
-      readChildWork: (subject) => agentHookServer.getStructuredChildWorkViews(subject),
-      readChildWorkRecords: (subject) => agentHookServer.getStructuredChildWork(subject)
-    },
-    // Why captured rather than resolved at read: the fleet snapshot remints cached rows on every
-    // read, so a row observed under one process otherwise acquires whatever the pane owns now.
-    readObservedAgentStatusPaneIdentity: (paneKey) => observedPaneIdentities.read(paneKey),
-    // Why: the filter above hides resume-identity rows from the live-agent views, but
-    // those rows carry the provider session mobile native chat addresses transcripts
-    // by — Pi publishes identity that way and would otherwise be unreachable.
-    getAgentProviderSessionSnapshot: () => agentHookServer.getStatusSnapshot(),
-    getAgentProviderSessionRowsForPane: (paneKey) =>
-      agentHookServer.getStatusSnapshotForPane(paneKey),
     attestAgentHookCompatibilityAuthority: (candidate) =>
       agentHookServer.attestCompatibilityAuthority(candidate),
     retireAgentHookCompatibilityAuthority: (paneKey) =>

@@ -40,7 +40,7 @@ jobs:
     # submission, not two — dual-arch ran ~80min and fit no workable timeout.
     # Sized so a full retry fits (70 + 0.5 + 70).
     timeout-minutes: 150
-    # actions: read fetches the relay addons from the release-cut run.
+    # actions: read fetches the release-cut run's artifacts.
     permissions:
       actions: read
       contents: write
@@ -189,9 +189,6 @@ jobs:
           ORCA_DIAGNOSTICS_TOKEN_URL: https://www.onorca.dev/diagnostics/token
           # fork has no PostHog secret; pack and restore need the same non-empty key, inert while TELEMETRY_ENABLED is false
           ORCA_POSTHOG_WRITE_KEY: ${{ secrets.ORCA_POSTHOG_WRITE_KEY || 'fork-telemetry-disabled' }}
-          # Fail the release rather than ship a relay that cannot launch outside
-          # sshd's job for a standard user on a Windows SSH host.
-          ORCA_REQUIRE_RELAY_NATIVE_ADDONS: x64,arm64
 
       # Design D2: the parent release-cut run merged it from every node-server lane at this tag.
       - name: Download the orcad deployment template from the release run

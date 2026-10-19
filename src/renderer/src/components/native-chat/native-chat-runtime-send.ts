@@ -7,10 +7,7 @@ import {
   isTerminalInputQuarantined,
   subscribeTerminalInputQuarantine
 } from '../terminal-pane/terminal-input-quarantine'
-import type {
-  NativeChatResolvedTarget,
-  NativeChatRuntimeSettings
-} from './native-chat-composer-target'
+import type { NativeChatResolvedTarget } from './native-chat-composer-target'
 import { runBodyAcceptedThen } from './fork-agent-composer/native-chat-runtime-send-acceptance'
 import { enqueueNativeChatBodySend } from './fork-agent-composer/native-chat-body-send'
 import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
@@ -67,8 +64,6 @@ export type NativeChatSendHandle = {
   /** Actual completion, which can outlive the nominal schedule if the renderer stalls. */
   settled?: Promise<void>
 }
-
-export type RuntimeSettings = NativeChatRuntimeSettings
 
 const NOOP_NATIVE_CHAT_SEND_HANDLE: NativeChatSendHandle = {
   cancel: () => {},
@@ -194,7 +189,6 @@ export function sendNativeChatImagePastes(
       }
       delayGuarded(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
         runBodyAcceptedThen(
-          target.settings,
           target.ptyId,
           [buildNativeChatPasteBytes(text)],
           isCancelled,
@@ -212,7 +206,7 @@ export function sendNativeChatImagePastes(
  *  composer is empty. */
 export function submitNativeChatPrompt(target: NativeChatResolvedTarget): void {
   if (!isTerminalInputQuarantined(target.terminalTabId)) {
-    sendRuntimePtyInput(target.settings, target.ptyId, NATIVE_CHAT_SUBMIT, 'driving')
+    sendRuntimePtyInput(target.ptyId, NATIVE_CHAT_SUBMIT, 'driving')
   }
 }
 

@@ -16,7 +16,15 @@ import {
   structuredAgentSessionOptionPicks,
   type StructuredAgentSessionOptionState
 } from '../../../src/shared/structured-agent-session-options'
-import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from '../../../src/shared/agent-chat-permission-mode'
+import {
+  structuredAgentSessionOptionView,
+  structuredAgentSessionShownSnapshot
+} from '../../../src/shared/structured-agent-session-option-view'
+import {
+  AGENT_CHAT_PERMISSION_MODE_OPTION_ID,
+  agentChatPermissionModes
+} from '../../../src/shared/agent-chat-permission-mode'
+import { legacyHostPermissionDescriptor } from '../../../src/shared/structured-agent-session-permission-option'
 import type { RpcClient } from '../transport/rpc-client'
 import type { StructuredAgentSessionHostSupport } from './mobile-structured-agent-session-host-support'
 import {
@@ -30,18 +38,7 @@ import {
   mobileCreatedStructuredSession
 } from './mobile-created-structured-sessions'
 import { encodeStructuredAgentSessionOptionValue } from '../../../src/shared/structured-agent-session-option-codec'
-
-type StructuredOptionsController = {
-  optionPickerRequest: { id: string; sequence: number } | null
-  conversationCommands: readonly AgentSessionConversationCommand[]
-  /** The chat takes images, as its options report says; else only Claude and Codex, as before. */
-  acceptsImages: boolean
-  optionSnapshot: SessionOptionDescriptor[]
-  optionSurface: SessionOptionsSurface
-  pendingOptionId: string | null
-  setStructuredOption: (id: string, value: SessionOptionValue) => Promise<boolean>
-  invokeStructuredOption: (id: string) => Promise<boolean>
-}
+import { useMobileStructuredOptionSurface } from './use-mobile-structured-option-surface'
 
 export function useMobileStructuredAgentOptions(args: {
   agent: string | null
@@ -52,8 +49,10 @@ export function useMobileStructuredAgentOptions(args: {
   mutate: StructuredAgentSessionMutate
   /** Moves when the host's status says a session option changed; each move re-reads them. */
   optionStamp?: string
-}): StructuredOptionsController {
-  const { agent, client, enabled, fence, mutate, optionStamp, sessionId } = args
+  /** What the host advertised; null until its status probe answers. */
+  hostSupport: Pick<StructuredAgentSessionHostSupport, 'permissionModes'> | null
+}) {
+  const { agent, client, enabled, fence, mutate, optionStamp, sessionId, hostSupport } = args
   // Every agent's seed, as on the desktop: a built-in list or the provider-default pill.
   const optionCatalog = useMemo(
     () => (agent ? structuredAgentSessionSeedCatalog(agent) : null),
@@ -81,6 +80,8 @@ export function useMobileStructuredAgentOptions(args: {
   const [imageSupport, setImageSupport] = useState<{
     sessionId: string
     acceptsImages: boolean | undefined
+    /** The answer named the chat's permission mode, as only a host applying modes does. */
+    statesPermissionMode: boolean
   } | null>(null)
 
   const optionIdentityRef = useRef(`${agent}:${sessionId}`)
@@ -138,7 +139,11 @@ export function useMobileStructuredAgentOptions(args: {
         forgetMobileCreatedStructuredSession(sessionId)
         // Not an option value: a pick made during the read leaves it standing.
         if (!stale) {
-          setImageSupport({ sessionId, acceptsImages: result.acceptsImages })
+          setImageSupport({
+            sessionId,
+            acceptsImages: result.acceptsImages,
+            statesPermissionMode: result.current?.permissionMode !== undefined
+          })
         }
         if (!stale && optionMutationGeneration.current === readGeneration) {
           setConversationSupport({ sessionId, commands: result.conversationCommands ?? [] })
@@ -293,6 +298,7 @@ export function useMobileStructuredAgentOptions(args: {
     optionPickerRequest,
     conversationCommands:
       conversationSupport?.sessionId === sessionId ? conversationSupport.commands : [],
+    /** The chat takes images, as its options report says; else only Claude and Codex, as before. */
     acceptsImages:
       (imageSupport?.sessionId === sessionId ? imageSupport.acceptsImages : undefined) ??
       (agent !== null && isAgentSessionHandleProvider(agent)),

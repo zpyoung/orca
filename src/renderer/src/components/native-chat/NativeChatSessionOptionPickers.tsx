@@ -189,23 +189,69 @@ function SessionOptionPopover(props: {
   }
 
   return (
-    <DropdownMenuRadioGroup
-      aria-label={nativeChatSessionOptionLabel(descriptor)}
-      value={descriptor.kind.currentValue}
-      onValueChange={(value) => {
-        notePick()
-        setValue(value)
-      }}
-    >
-      {descriptor.kind.choices.map((choice) => (
-        <DropdownMenuRadioItem
-          key={choice.value}
-          value={choice.value}
-          disabled={!descriptor.settable || pending}
-        >
-          <NativeChatSessionOptionChoiceBody
-            label={nativeChatSessionChoiceLabel(choice, descriptor.id)}
-            description={choice.description}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PickerTrigger
+        modelLabel={modelLabel}
+        optionsLabel={optionsLabel}
+        accessibleName={
+          optionsLabel
+            ? `${modelName}, ${pillAccessibleName(optionsTitle, optionsLabel)}`
+            : modelName
+        }
+        disabled={props.isWorking}
+        disabledReason={modelReason ?? optionsReason}
+        dispatched={
+          sessionOptionDispatchUnconfirmed(model) || options.some(sessionOptionDispatchUnconfirmed)
+        }
+        triggerRef={focusReturn.triggerRef}
+        // Why: a popover trigger opens on Enter and Space only; a menu also takes ArrowDown.
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            setOpen(true)
+          }
+        }}
+      />
+      <PopoverContent
+        // Why end: the pill's label changes under an open picker; only its right edge stays put.
+        align="end"
+        side="top"
+        collisionPadding={8}
+        className="flex w-96 max-w-(--radix-popover-content-available-width) flex-col"
+        onOpenAutoFocus={(event) => {
+          const content = event.currentTarget
+          const optionId = requestedOptionId
+          setRequestedOptionId(null)
+          if (!optionId || !(content instanceof HTMLElement)) {
+            return
+          }
+          const row = content.querySelector(`[data-option-id="${CSS.escape(optionId)}"]`)
+          const control =
+            row?.querySelector<HTMLElement>('[aria-checked="true"]:not(:disabled)') ??
+            row?.querySelector<HTMLElement>('button:not(:disabled)')
+          if (control) {
+            event.preventDefault()
+            control.focus()
+          }
+        }}
+        onInteractOutside={focusReturn.onInteractOutside}
+        onCloseAutoFocus={focusReturn.onCloseAutoFocus}
+        // Why: a focused level's tooltip is the top layer, so Radix hands it the first Escape and
+        // the picker would take a second. The search is left to Radix, which waits out an IME.
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !(event.target instanceof HTMLInputElement)) {
+            setOpen(false)
+          }
+        }}
+      >
+        {model.kind.type === 'select' && !model.action ? (
+          <NativeChatModelCombobox
+            choices={model.kind.choices}
+            currentValue={model.kind.currentValue}
+            readOnly={!model.settable}
+            readOnlyReason={modelReason}
+            busy={pendingIds.has(model.id)}
+            onSelect={(value) => set(model, value)}
           />
         ) : (
           <NativeChatSessionOptionWriteGroup
@@ -259,33 +305,17 @@ function NativeChatSessionOptionPickersInner({
     withPendingValue(descriptor, pending.get(descriptor.id) ?? null)
   )
 
-  const setOption = (descriptor: SessionOptionDescriptor, value: SessionOptionValue): void => {
-    runSessionOptionSurfaceCall(descriptor.id, setPendingId, () =>
-      surface.setOption(descriptor.id, value)
-    )
+  const markPending = (id: string) => (pick: PendingPick | null) => {
+    setPending((current) => {
+      const next = new Map(current)
+      if (pick === null) {
+        next.delete(id)
+      } else {
+        next.set(id, pick)
+      }
+      return next
+    })
   }
-  const invokeAction = (descriptor: SessionOptionDescriptor): void => {
-    runSessionOptionSurfaceCall(descriptor.id, setPendingId, () =>
-      surface.invokeAction(descriptor.id)
-    )
-  }
-
-  const modelReason = nativeChatSessionOptionDisabledReason(model.disabledReason)
-  const modelPickerKey = `model:${requestedModelSequence ?? 'idle'}`
-  // Read only when a request remounts the picker.
-  const modelPickerDefaultOpen = requestedModelSequence !== null
-  const modelTrigger = {
-    label: nativeChatModelPillLabel(model),
-    tooltipLabel: translate('components.native-chat.composer.model', 'Model'),
-    disabled: isWorking || pendingId !== null,
-    disabledReason: modelReason,
-    dispatched: sessionOptionDispatchUnconfirmed(model)
-  }
-  const optionsTooltip = nativeChatOptionsPillTitle(options)
-  const optionsReason =
-    options.length > 0 && options.every((descriptor) => !descriptor.settable)
-      ? nativeChatSessionOptionDisabledReason(options[0]?.disabledReason)
-      : null
 
   return (
     <div className="flex min-w-0 items-center text-chat-foreground-faint">

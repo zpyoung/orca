@@ -39,7 +39,8 @@ describe('a live Grok listing', () => {
   it('starts the chat even when saving its start listing throws', async () => {
     const modelCatalog: AgentModelCatalogService = {
       read: vi.fn(async () => ({ origin: 'unknown' as const })),
-      recordLiveListing: vi.fn(() => {
+      retainedLiveModelIds: vi.fn(() => []),
+      recordLiveListing: vi.fn().mockImplementationOnce(() => {
         throw new Error('catalog unavailable')
       }),
       prewarm: vi.fn(async () => {}),
@@ -47,8 +48,10 @@ describe('a live Grok listing', () => {
       providerStarted: vi.fn()
     }
     // The rig's attach must succeed: bookkeeping never fails a proven start.
-    const { store } = await openAttachedHostRig({}, undefined, modelCatalog)
+    const { host, store } = await openAttachedHostRig({}, undefined, modelCatalog)
     expect(modelCatalog.recordLiveListing).toHaveBeenCalledTimes(1)
     expect(store.getRecord(SESSION)?.lease.ownerProcess).not.toBeNull()
+    await expect(host.readOptions(SESSION)).resolves.toHaveProperty('models')
+    expect(modelCatalog.recordLiveListing).toHaveBeenCalledTimes(2)
   })
 })

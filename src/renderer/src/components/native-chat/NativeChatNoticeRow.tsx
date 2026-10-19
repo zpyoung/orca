@@ -59,7 +59,8 @@ export function NativeChatNoticeRow({
   useTranslation()
   const orcaStopView = useNativeChatOrcaStopView()
   const claudeSignIn = useNativeChatClaudeSignInView()
-  if (block.presentation === 'compaction' || block.presentation === 'context-cleared') {
+  const look = nativeChatNoticeLook(block)
+  if (look.kind === 'divider') {
     const label =
       look.label === 'contextCleared'
         ? translate(
@@ -122,7 +123,15 @@ export function NativeChatNoticeRow({
   // agent. Outside a chat that knows its machine it keeps the host's own words.
   const { orcaStop } = block
   const { hostLabel, remoteHost, continueAvailable } = orcaStopView
-  const named = orcaStop !== undefined && hostLabel !== null
+  // A paired server with no name to show is still a remote server; its id is not a name.
+  const machine =
+    hostLabel ??
+    (remoteHost
+      ? translate('components.native-chat.notices.orcaStopUnnamedServer', 'the remote server')
+      : null)
+  const named = orcaStop !== undefined && machine !== null
+  const continueOffered =
+    orcaStop?.turnItemId !== undefined && orcaStop.turnItemId === orcaStopView.offeredTurnItemId
   const failure = readWholeAgentSessionFailureFact(block.failure)
   // Only reword auth text fully described by its fact; host text may also carry command advice.
   const authSurface =
@@ -132,7 +141,7 @@ export function NativeChatNoticeRow({
         )
       : undefined
   const text = named
-    ? nativeChatOrcaStopRowText(orcaStop.cause, hostLabel, { continueAvailable, remoteHost })
+    ? nativeChatOrcaStopRowText(orcaStop.cause, machine, { continueAvailable, remoteHost })
     : failure && authSurface
       ? agentSessionFailureSentence(
           failure,

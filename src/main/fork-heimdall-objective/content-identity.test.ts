@@ -3,14 +3,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
-import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
-} from '../providers/ssh-filesystem-dispatch'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
-import type { SshGitProvider } from '../providers/ssh-git-provider'
-import type { IFilesystemProvider } from '../providers/types'
-import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
 import { computeObjectiveWorktreeContentDigest } from './objective-workspace-manifest'
 import {
@@ -51,8 +43,6 @@ function gitTarget(workspacePath: string): ObjectiveWorkspaceTarget {
 }
 
 afterEach(async () => {
-  unregisterSshFilesystemProvider('objective-content-test')
-  unregisterSshGitProvider('objective-content-test')
   await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
@@ -121,68 +111,6 @@ describe('computeWorkspaceContentIdentity', () => {
       await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(movedHeadIdentity)
     }
   )
-
-  it('uses the routed Git provider for remote dirty object hashes and ignores remote .orca paths', async () => {
-    const calls: string[][] = []
-    let remoteObjectHash = 'b'.repeat(40)
-    const provider = {
-      async exec(args: string[], cwd: string) {
-        calls.push(args)
-        expect(cwd).toBe('/srv/objective')
-        if (args[0] === 'rev-parse') {
-          return { stdout: `${'a'.repeat(40)}\n`, stderr: '' }
-        }
-        if (args[0] === 'status') {
-          return { stdout: '? remote.txt\0? .orca/heimdall/objective/reports/a.json\0', stderr: '' }
-        }
-        if (args[0] === 'hash-object' && args.at(-1) === 'remote.txt') {
-          return { stdout: `${remoteObjectHash}\n`, stderr: '' }
-        }
-        throw new Error(`Unexpected Git command: ${args.join(' ')}`)
-      }
-    }
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the SshGitProvider class; only exec is exercised by content-identity's remote diffing.
-    registerSshGitProvider('objective-content-test', provider as unknown as SshGitProvider)
-    const runtimeTarget = {
-      executionHostId: 'ssh:objective-content-test',
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large Worktree type; only the fields below are read by content identity's remote path.
-      worktree: {
-        id: 'remote-objective',
-        repoId: 'remote-objective-repo',
-        path: '/srv/objective',
-        git: {
-          path: '/srv/objective',
-          branch: 'main',
-          isBare: false,
-          isMainWorktree: true
-        }
-      } as unknown as RuntimeGitTarget['worktree']
-    } satisfies RuntimeGitTarget
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large filesystem-provider interface; only lstat is exercised by content-identity's dirty-file hashing.
-    const fileProvider = {
-      async lstat(path: string) {
-        expect(path).toBe('/srv/objective/remote.txt')
-        return { type: 'file' as const, size: 8, mtime: 1 }
-      }
-    } as unknown as IFilesystemProvider
-    registerSshFilesystemProvider('objective-content-test', fileProvider)
-    const target: ObjectiveWorkspaceTarget = {
-      kind: 'git',
-      executionHostId: 'ssh:objective-content-test',
-      workspacePath: '/srv/objective',
-      fileProvider,
-      gitTarget: runtimeTarget
-    }
-
-    const firstIdentity = await computeWorkspaceContentIdentity(target)
-    remoteObjectHash = 'c'.repeat(40)
-    await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(firstIdentity)
-    expect(
-      calls
-        .filter((args) => args[0] === 'hash-object')
-        .every((args) => args.at(-1) === 'remote.txt')
-    ).toBe(true)
-  })
 
   it.skipIf(process.platform === 'win32')(
     'tracks executable mode changes for an untracked Git path',
@@ -271,37 +199,6 @@ describe('computeWorkspaceContentIdentity', () => {
     await writeFile(join(root, 'a.txt'), 'b')
     await utimes(join(root, 'a.txt'), fixedTime, fixedTime)
     await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(addedIdentity)
-  })
-
-  it('reads remote folder contents through the filesystem provider', async () => {
-    let content = 'one\n'
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial double of the large filesystem-provider interface; only readDir/readFile/lstat are exercised here.
-    const provider = {
-      async readDir(path: string) {
-        expect(path).toBe('/srv/objective')
-        return [{ name: 'remote.txt', isDirectory: false, isSymlink: false }]
-      },
-      async readFile(path: string) {
-        expect(path).toBe('/srv/objective/remote.txt')
-        return { content, isBinary: false }
-      },
-      async lstat(path: string) {
-        expect(path).toBe('/srv/objective/remote.txt')
-        return { type: 'file' as const, size: 4, mtime: 1 }
-      }
-    } as unknown as IFilesystemProvider
-    registerSshFilesystemProvider('objective-content-test', provider)
-    const target: ObjectiveWorkspaceTarget = {
-      kind: 'folder',
-      executionHostId: 'ssh:objective-content-test',
-      workspacePath: '/srv/objective',
-      fileProvider: provider
-    }
-    const firstIdentity = await computeWorkspaceContentIdentity(target)
-
-    content = 'two\n'
-
-    await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(firstIdentity)
   })
 })
 

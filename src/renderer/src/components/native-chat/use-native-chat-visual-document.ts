@@ -102,13 +102,12 @@ function useEditorSavesOf(target: RuntimeClientTarget, path: string | null): num
 
 /**
  * The visual's current document. Starts from the cached revision when there is one, then asks the
- * host (revalidating it) once `enabled`, and again whenever `refreshKey` changes. A later failure
- * keeps a document already shown.
+ * host (revalidating it) once `enabled`, and freshly again after each editor save of its file. A
+ * later failure keeps a document already shown.
  */
 export function useNativeChatVisualDocument(
   identity: NativeChatVisualIdentity,
-  enabled: boolean,
-  refreshKey?: unknown
+  enabled: boolean
 ): NativeChatVisualDocumentState {
   const { sessionId, file } = identity
   const environmentId =
@@ -134,7 +133,7 @@ export function useNativeChatVisualDocument(
     const abort = new AbortController()
     void loadWithRetries(identityNow, abort.signal, setState, saves > 0)
     return () => abort.abort()
-  }, [enabled, environmentId, file, sessionId, refreshKey])
+  }, [enabled, environmentId, file, sessionId, saves])
 
   return state
 }

@@ -40,7 +40,7 @@ export function retireStructuredAgentSessionTab(args: {
   worktreeId: string
   sessionId: string
   onError?: (error: unknown) => void
-}): void {
+}): Promise<boolean> {
   retireStructuredAgentSessionReadOwner(args.sessionId, args.target)
   const key = retirementKey(args.target, args.worktreeId, args.sessionId)
   const existing = inFlightRetirements.get(key)

@@ -30,10 +30,32 @@ import {
   loadOpenCodeVisualsSkill,
   type AcpVisualsSkillLoader
 } from './acp-visuals-skill'
-import type { StructuredAgentSessionHistory } from '../native-chat/structured-agent-cli-conversations'
+import type {
+  StructuredAgentSessionHistory,
+  StructuredAgentTranscriptImport
+} from '../native-chat/structured-agent-cli-conversations'
 import { GROK_SESSION_HISTORY } from '../grok/grok-session-history'
+import { GROK_TRANSCRIPT_IMPORT } from '../grok/grok-transcript-import'
 import { OPENCODE_SESSION_HISTORY } from '../opencode/opencode-session-history'
+import { OPENCODE_TRANSCRIPT_IMPORT } from '../opencode/opencode-transcript-import'
 import { OMP_SESSION_HISTORY } from '../omp/omp-session-history'
+import { OMP_TRANSCRIPT_IMPORT } from '../omp/omp-transcript-import'
+import {
+  ANTIGRAVITY_ACP_COMMAND,
+  ANTIGRAVITY_ACP_RUNTIME
+} from '../antigravity/antigravity-acp-runtime'
+import {
+  ANTIGRAVITY_ACP_ENV,
+  scrubAntigravityAcpEnvironment
+} from '../antigravity/antigravity-acp-environment'
+import {
+  ANTIGRAVITY_LAUNCH_GATE,
+  answerAntigravityChatAuth,
+  antigravityChatAccount
+} from '../antigravity/antigravity-chat-account'
+import { readAntigravitySignInLine } from '../antigravity/antigravity-sign-in-url'
+import type { AcpSignInWatch } from './acp-agent-connection'
+import type { AcpLaunchGate } from './acp-launch-gate'
 
 /** How an agent lists its models without a session: from its `initialize` answer (plus extension
  *  requests), from a listing command, or not at all. Never `authenticate` or `session/new`. */
@@ -107,8 +129,16 @@ export type AcpLaunchSpec = {
   modelDiscovery: AcpModelDiscovery
   /** How a launch loads the inline-visuals skill; absent, the agent's chats have no visuals. */
   visualsSkill?: AcpVisualsSkillLoader
+  /** How a chat adopts a conversation the agent's CLI recorded; null when it cannot. */
+  transcriptImport: StructuredAgentTranscriptImport | null
   /** How the agent's chats own the Session History rows their conversations list as. */
   sessionHistory: StructuredAgentSessionHistory
+  /** Each process gets its own temp folder: the agent's temp files collide across processes. */
+  privateTempDirectory?: true
+  /** Reopens a chat's session with `session/resume` even when the agent can also load it. */
+  resumePreference?: 'resume'
+  /** Holds this host's chat starts off while its sign-in or runtime is replaced or removed. */
+  launchGate?: AcpLaunchGate
 }
 
 const GROK_LAUNCH_SPEC: AcpLaunchSpec = {
@@ -142,6 +172,7 @@ const GROK_LAUNCH_SPEC: AcpLaunchSpec = {
   },
   visualsSkill: loadGrokVisualsSkill,
   compaction: true,
+  transcriptImport: GROK_TRANSCRIPT_IMPORT,
   sessionHistory: GROK_SESSION_HISTORY
 }
 
@@ -181,6 +212,7 @@ const OPENCODE_LAUNCH_SPEC: AcpLaunchSpec = {
   },
   visualsSkill: loadOpenCodeVisualsSkill,
   compaction: true,
+  transcriptImport: OPENCODE_TRANSCRIPT_IMPORT,
   sessionHistory: OPENCODE_SESSION_HISTORY
 }
 
@@ -209,6 +241,7 @@ const OMP_LAUNCH_SPEC: AcpLaunchSpec = {
   },
   visualsSkill: loadOmpVisualsSkill,
   compaction: true,
+  transcriptImport: OMP_TRANSCRIPT_IMPORT,
   sessionHistory: OMP_SESSION_HISTORY
 }
 

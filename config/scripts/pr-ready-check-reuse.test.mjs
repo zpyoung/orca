@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
-import { PR_CHECK_JOBS as CLASSIFIED_JOBS } from './pr-code-change-scope.mjs'
+import {
+  PR_CHECK_JOBS,
+  workflowWithoutForkGuard
+} from './fork-ownership-guard/pr-workflow-contract.mjs'
 import {
   lookupReadyCheckRun,
   prCheckRunTitle,
@@ -37,8 +40,7 @@ const env = {
   GH_TOKEN: 'read-only-test-token'
 }
 const response = (runs) => ({ ok: true, json: async () => ({ workflow_runs: runs }) })
-const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
-const PR_CHECK_JOBS = CLASSIFIED_JOBS.filter((job) => job in workflow.jobs)
+const workflow = workflowWithoutForkGuard(parse(readFileSync('.github/workflows/pr.yml', 'utf8')))
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -146,20 +148,21 @@ describe('ready-for-review required check reuse', () => {
       )
     }
     expect(detector.outputs.should_run).toBe('${{ steps.filter.outputs.should_run }}')
-    for (const name of ['test_files', 'ssh_source_changed', 'native_ime_source_changed']) {
+    for (const name of ['test_files', 'native_ime_source_changed']) {
       expect(detector.outputs[name]).toBe(`\${{ steps.e2e_filter.outputs.${name} }}`)
     }
     expect(detector.steps.find((step) => step.id === 'e2e_filter').if).toBe(
       "github.event.pull_request.draft != true && steps.filter.outputs.should_run == 'true'"
     )
-    expect(workflow.jobs.verify.if).toBe('${{ !cancelled() }}')
-    expect(workflow.jobs.verify.needs).toEqual(
-      [
-        'code_paths',
-        'preflight',
-        ...PR_CHECK_JOBS.filter((job) => job !== 'static_analysis' && job !== 'typecheck')
-      ].toSpliced(2, 0, 'fork_ownership_guard')
-    )
+    expect(workflow.jobs.verify.needs).toEqual([
+      'code_paths',
+      'preflight',
+      ...new Set(
+        PR_CHECK_JOBS.filter((job) => job !== 'static_analysis' && job !== 'typecheck').map(
+          (job) => (job === 'orcad_browser' ? 'test' : job)
+        )
+      )
+    ])
   })
 
   it.each(['pr-test-loc.yml'])(

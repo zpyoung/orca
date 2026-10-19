@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { SquareArrowOutUpRight } from 'lucide-react'
+import { toast } from 'sonner'
+import type { ArtifactWriteRequest } from '../../../../shared/artifacts'
+import { ArtifactPublishButton } from '@/components/artifacts/ArtifactPublishButton'
+import { ArtifactPublishPreparationError } from '@/components/artifacts/artifact-publish-flow'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
@@ -75,7 +79,9 @@ export function NativeChatInlineVisual({
   const boxRef = useRef<HTMLDivElement | null>(null)
   const [near, setNear] = useState(false)
   const [retired, setRetired] = useState(false)
-  const openChatVisualTab = useAppStore((state) => state.openChatVisualTab)
+  // Share's popover is portalled, so hover and focus-within can't keep the toolbar shown.
+  const [shareOpen, setShareOpen] = useState(false)
+  const forwardGesture = useContext(NativeChatForwardedGestureContext)
   const state = useNativeChatVisualDocument(
     { target: owner.target, sessionId: owner.sessionId, file },
     near
@@ -114,14 +120,7 @@ export function NativeChatInlineVisual({
                   variant="outline"
                   size="icon-xs"
                   aria-label={openLabel}
-                  onClick={() =>
-                    openChatVisualTab(owner.worktreeId, {
-                      target: owner.target,
-                      sessionId: owner.sessionId,
-                      file,
-                      title
-                    })
-                  }
+                  onClick={() => openNativeChatVisualFile(owner.worktreeId, state.document.path)}
                 >
                   <SquareArrowOutUpRight />
                 </Button>

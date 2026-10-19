@@ -30,7 +30,10 @@ export function readStructuredAgentSessionHistoryResult(input: {
   /** The host's current-work projection, which the page's turn and prompt fields state. */
   work?: AgentSessionPublishedWork
 }): AgentSessionHistoryResult {
-  const result = readAgentSessionHistory(input.journal, input.request, { scope: input.scope })
+  const result = withPublishedWorkResult(
+    readAgentSessionHistory(input.journal, input.request, { scope: input.scope }),
+    input.work
+  )
   const fence = input.record?.lease.runtimeFence
   const providerSession = structuredAgentSessionProviderSessionMetadata(input.record)
   if (fence === undefined) {

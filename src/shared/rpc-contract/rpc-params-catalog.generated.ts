@@ -24,13 +24,13 @@ import {
   DesktopBrowserBridgeResultParams
 } from '../desktop-browser-bridge-protocol'
 import { RegisterDeviceKeyParamsSchema } from '../device-key-registration-contract'
-import { HostAccountLaunchEnvParams } from '../host-account-launch-env'
 import {
   EmptyHeimdallRequestSchema,
   HeimdallUnsubscribeRequestSchema,
   WatcherCommandRequestSchema,
   WatcherTargetSchema
 } from '../fork-heimdall/api'
+import { HostAccountLaunchEnvParams } from '../host-account-launch-env'
 import {
   PairingGetEndpointsParamsSchema,
   PairingProvisionRelayParamsSchema

@@ -8,14 +8,21 @@
 // Nothing here is saved, nothing outlives one deadline, and nothing is ever sent twice: a send makes
 // one request, and whatever its answer, nothing sends it again.
 
-import type { AgentJournalSubmission } from '../../../../shared/agent-session-journal-types'
+import type {
+  AgentJournalCursor,
+  AgentJournalSubmission
+} from '../../../../shared/agent-session-journal-types'
 import type { StructuredAgentSessionFirstMessage } from '../../../../shared/structured-agent-session-create'
 import {
   agentSessionUnconfirmedSendParts,
   agentSessionWriteNotDoneParts
 } from '../../../../shared/agent-session-refusal-notice'
 import type { AgentSessionWriteFailure } from '../../../../shared/agent-session-write-failure'
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import {
+  structuredAgentSessionReadCoversSend,
+  structuredAgentSessionSettledSends
+} from '../../../../shared/structured-agent-session-send-settlement'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import {
   attemptStructuredAgentSessionSend,
   forgetStructuredAgentSessionFence,
@@ -120,7 +127,7 @@ export type StructuredAgentSessionCreateSend = StructuredAgentSessionSent & {
   message: StructuredAgentSessionFirstMessage
   settle: (
     result:
-      | { kind: 'recorded'; submission: AgentJournalSubmission }
+      | { kind: 'recorded'; submission: AgentJournalSubmission; cursor?: AgentJournalCursor }
       | { kind: 'refused'; failure?: AgentSessionWriteFailure }
       | { kind: 'unconfirmed' }
   ) => void
@@ -195,7 +202,7 @@ export function reserveStructuredAgentSessionSend(
             return
           }
           if (result.kind === 'recorded') {
-            settleRecorded(pending, result.submission, 'reply')
+            settleRecorded(pending, result.submission, 'reply', result.cursor)
           } else {
             handBack(
               pending,

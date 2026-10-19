@@ -199,7 +199,7 @@ describe('status bar runtime switch groups', () => {
       activeClaudeManagedAccountId: null,
       activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: {} }
     }
-    const state = resolveClaudeStatusAccountState(settings, runtimeState)
+    const state = resolveClaudeStatusAccountState(settings, runtimeState, null)
     const [host] = buildClaudeStatusSwitchGroups(state, { runtime: 'host', wslDistro: null })
     expect(
       host.targets.map((target) => [target.label, target.disabled ?? false, target.hint ?? null])

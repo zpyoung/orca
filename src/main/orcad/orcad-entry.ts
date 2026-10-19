@@ -260,38 +260,6 @@ async function startOrcadRuntime(
     // what powers serve→desktop promotion. A Node host can never do that, and the
     // constructor's default would advertise it.
     getDesktopWindowStatus: () => 'blocked',
-    // Why here too and not only on the desktop: main's OSC parse is the only producer for a
-    // PTY agent on this host, and the store is the only place `worktree.ps` and the mobile
-    // projection read from — unwired, orcad lists no PTY agents at all.
-    onTerminalAgentStatus: (event) => agentHookServer.ingestTerminalStatus(event),
-    onClaudeTerminalEvidence: (paneKey, evidence) =>
-      agentHookServer.observeClaudeTerminalEvidence(paneKey, evidence),
-    // Why here too and not only on the desktop: orcad serves `worktree.ps` and `agentSession.*`,
-    // so without these a headless host publishes its structured chats nowhere and lists no agents.
-    getAgentStatusSnapshot: () =>
-      agentHookServer.getStatusSnapshot().filter((entry) => entry.providerSessionOnly !== true),
-    getAgentStatusSnapshotForPane: (paneKey) => agentHookServer.getStatusSnapshotForPane(paneKey),
-    getAgentProviderSessionSnapshot: () => agentHookServer.getStatusSnapshot(),
-    getAgentProviderSessionRowsForPane: (paneKey) =>
-      agentHookServer.getStatusSnapshotForPane(paneKey),
-    // Why captured rather than resolved at read: the fleet snapshot remints cached rows on every
-    // read, so a row observed under one process otherwise acquires whatever process owns the pane now.
-    readObservedAgentStatusPaneIdentity: (paneKey) => observedPaneIdentities.read(paneKey),
-    structuredAgentStatusSink: {
-      publish: (summary, subject) => agentHookServer.ingestStructuredStatus(summary, subject),
-      forget: (subject) => agentHookServer.dropStructuredStatus(subject),
-      publishChildWork: (subject, evidence, provider) =>
-        agentHookServer.ingestStructuredChildWork(subject, evidence, provider),
-      readChildWork: (subject) => agentHookServer.getStructuredChildWorkViews(subject),
-      readChildWorkRecords: (subject) => agentHookServer.getStructuredChildWork(subject)
-    },
-    checkHookAgentPresence: (paneKey) => agentHookServer.checkAgentPresence(paneKey),
-    reconcileAgentStatusForEndedProcess: (paneKeys) =>
-      agentHookServer.reconcileEndedProcessForPaneKeys(paneKeys),
-    dropAgentStatusForRemovedWorktree: (worktreeId, host) =>
-      agentHookServer.dropStatusEntriesForRemovedWorktree(worktreeId, host),
-    buildAgentHookPtyEnv: () =>
-      isAgentStatusHooksEnabled(profileStore.getSettings()) ? agentHookServer.buildPtyEnv() : {},
     // Why the dedupe here and not in the instance: `apply` closes and reconstructs
     // unconditionally, so an unchanged value would restart a healthy index.
     applySessionSearchSettings: (before, after) => {

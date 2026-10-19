@@ -1,7 +1,7 @@
-import { PINNED_GROUP_KEY } from '../grouping/group-keys'
+import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/group-keys'
 import { getNaturalWorktreeIds } from '../../natural-worktree-ids'
 import { needsWorktreeDragGroup } from '../../fork-worktree-groups/worktree-drag-group-key'
-import type { HostSectionRow } from '../../host-section-rows'
+import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
 import type { WorktreeDragGroup } from '../../worktree-manual-order'
 
 export function getWorktreeDragGroups(rows: HostSectionRow[]): WorktreeDragGroup[] {
@@ -29,11 +29,11 @@ export function getWorktreeDragGroups(rows: HostSectionRow[]): WorktreeDragGroup
     }
     // Why: a header's key is not always its items' sectionKey (loose worktrees
     // carry `<group>::loose`), and every other drag consumer keys off sectionKey.
-    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {
+    if (current === null || needsWorktreeDragGroup(current.key, row.sectionKey)) {
       current = { key: row.sectionKey, ids: [] }
       groups.push({ key: current.key, worktreeIds: current.ids })
     }
-    current!.ids.push(row.worktree.id)
+    current.ids.push(row.worktree.id)
   }
 
   return groups.filter((group) => group.worktreeIds.length > 0)

@@ -40,15 +40,17 @@ import { getProfileUserDataPath } from '../../orca-profiles/profile-storage-path
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { buildWorktreeListingPage } from '../worktree-listing-host-scope'
 import {
-  resolvedTuiAgentArgsBypassPermissions,
-  resolveTuiAgentLaunchEnv
-} from '../../shared/tui-agent-launch-defaults'
-import { isTuiAgent } from '../../shared/tui-agent-config'
-import { nativeChatShellEnvironmentPolicy } from '../../shared/native-chat-shell-environment'
-import { claudeStructuredAuthPolicyForSettings } from '../claude-accounts/claude-structured-auth-policy'
-import { resolveStructuredAgentCommand } from '../native-chat/structured-agent-command-resolution'
-import { structuredAgentConfiguredArgs } from '../native-chat/structured-agent-configured-args'
-import { claudeCliFlagSupport } from '../claude/claude-cli-flag-support'
+  structuredWorkerOpenTaskTitle,
+  structuredWorkerOwesWork
+} from '../structured-worker-custody'
+import { resolveTuiAgentLaunchEnv } from '../../../shared/tui-agent-launch-defaults'
+import { preModeChatGetsFullAccess } from '../../../shared/agent-chat-permission-mode'
+import { isTuiAgent } from '../../../shared/tui-agent-config'
+import { nativeChatShellEnvironmentPolicy } from '../../../shared/native-chat-shell-environment'
+import { claudeStructuredAuthPolicyForSettings } from '../../claude-accounts/claude-structured-auth-policy'
+import { resolveStructuredAgentCommand } from '../../native-chat/structured-agent-command-resolution'
+import { structuredAgentConfiguredArgs } from '../../native-chat/structured-agent-configured-args'
+import { claudeCliFlagSupport } from '../../claude/claude-cli-flag-support'
 import {
   runtimeHiddenHostIds,
   runtimeHiddenRepos,

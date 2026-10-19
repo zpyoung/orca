@@ -43,13 +43,6 @@ export function EditorPanelHeaderPath({
   const canCopyHeaderPath = headerCopyState.copyText !== null
   // Why: virtual editor tabs use synthetic ids instead of on-disk paths.
   const isVirtualEditorTab = isVirtualEditorFile(activeFile)
-  const revealBlocked = useAppStore((s) =>
-    isRevealInFileManagerBlocked(s.settings, {
-      connectionId:
-        activeFile.externalSshTargetId ?? getConnectionIdFromState(s, activeFile.worktreeId),
-      runtimeEnvironmentId: activeFile.runtimeEnvironmentId
-    })
-  )
   const markdownPreviewShortcutLabel = useShortcutLabel('editor.markdownPreview')
   const {
     canRename,

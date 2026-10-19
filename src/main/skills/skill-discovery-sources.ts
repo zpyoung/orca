@@ -4,6 +4,10 @@ import type { SkillDiscoverySource, SkillProvider, SkillSourceKind } from '../..
 import type { AgentType } from '../../shared/agent-status-types'
 import type { Repo } from '../../shared/repo-types'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import {
+  SKILL_INSTALL_PROVIDERS,
+  type SkillInstallProviderId
+} from '../../shared/skill-install-providers'
 import { CODEX_PLUGIN_CACHE_ROOT_ID } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 import type { SkillProviderRootOverrides } from './skill-provider-destinations'
 import { stablePathId } from './skill-discovery-classification'
@@ -125,14 +129,6 @@ export function buildSkillDiscoverySources(
       'home',
       ['agent-skills'],
       null
-    ),
-    source(
-      'home-claude',
-      'Claude home',
-      providerRootOverrides.claude ?? pathApi.join(home, '.claude', 'skills'),
-      'home',
-      ['claude'],
-      'claude'
     ),
     source(
       CODEX_PLUGIN_CACHE_ROOT_ID,

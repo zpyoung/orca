@@ -1,7 +1,7 @@
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { OrchestrationDb, RunRow } from '../../runtime/orchestration/db'
 import { inspectWorkerTerminal } from '../../runtime/rpc/methods/orchestration/worker/worker-observation'
-import { isStructuredWorkerHandle } from '../../runtime/structured-worker-identity'
+import { isStructuredWorkerHandle } from '../../../shared/structured-worker-handle'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { WorkerPromptUndeliverableError } from './orchestration-contract'
 
