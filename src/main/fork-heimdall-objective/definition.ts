@@ -32,6 +32,7 @@ import {
   objectiveForgeContext,
   type ObjectiveForgeAccess
 } from './objective-forge-access'
+import { getRepoMainWorktreeId } from '../../shared/worktree/id'
 
 type ObjectiveRuntimeResolver = {
   resolveRuntimeGitTarget(selector: string): Promise<RuntimeGitTarget>
@@ -154,7 +155,7 @@ async function resolveLegacyFolderWorkspace(
   worktreeId: null
   gitTarget?: never
 }> {
-  const target = await runtime.resolveRuntimeFileTarget(`id:${repo.id}::${repo.path}`)
+  const target = await runtime.resolveRuntimeFileTarget(`id:${getRepoMainWorktreeId(repo)}`)
   const worktree = target.worktree
   if (worktree.repoId !== repo.id || worktree.path !== repo.path) {
     throw new Error('Invalid objective folder workspace identity')

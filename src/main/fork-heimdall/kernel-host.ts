@@ -20,6 +20,7 @@ import {
   isWorkspaceAbsenceCandidate
 } from './orchestration/placement-absence'
 import { LeaseConfigurationError, type LeaseWorkspaceTarget } from './lease-store'
+import { composeWorktreeId } from '../../shared/worktree/id'
 
 type RuntimeGitTargetResolver = {
   resolveRuntimeGitTarget(selector: string): Promise<RuntimeGitTarget>
@@ -123,7 +124,8 @@ export class HeimdallKernelHost {
   }
 
   private async confirmWorkspaceRemoved(enrollment: WatcherEnrollment): Promise<boolean> {
-    const worktreeId = enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
+    const worktreeId =
+      enrollment.worktreeId ?? composeWorktreeId(enrollment.repoId, enrollment.workspacePath)
     const scope = parseWorkspaceKey(worktreeId)
     if (scope?.type === 'folder') {
       return (
@@ -198,7 +200,8 @@ export class HeimdallKernelHost {
     if (!isRuntimeFileTargetResolver(runtime)) {
       throw new LeaseConfigurationError('Runtime cannot resolve a Heimdall folder target')
     }
-    const worktreeId = enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
+    const worktreeId =
+      enrollment.worktreeId ?? composeWorktreeId(enrollment.repoId, enrollment.workspacePath)
     const fileTarget = await runtime.resolveRuntimeFileTarget(`id:${worktreeId}`)
     if (
       fileTarget.worktree.id !== worktreeId ||

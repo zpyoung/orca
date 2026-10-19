@@ -7,6 +7,7 @@ import {
 } from '../runtime/files/file-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
+import { composeWorktreeId } from '../../shared/worktree/id'
 
 type ObjectiveRuntimeResolver = {
   resolveRuntimeGitTarget(selector: string): Promise<RuntimeGitTarget>
@@ -38,7 +39,8 @@ export async function resolveObjectiveWorkspaceTarget(
       ? enrollment.worktreeId
       : null
   if (enrollment.worktreeId === null || folderWorktreeId) {
-    const selector = folderWorktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
+    const selector =
+      folderWorktreeId ?? composeWorktreeId(enrollment.repoId, enrollment.workspacePath)
     const target = await resolver.resolveRuntimeFileTarget(`id:${selector}`)
     assertResolvedAuthority(enrollment, target)
     if (folderWorktreeId && target.worktree.id !== folderWorktreeId) {
