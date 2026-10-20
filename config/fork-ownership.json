@@ -1519,8 +1519,8 @@
       "feature": "worktree-groups",
       "kind": "passthrough",
       "lines": [
-        "  groupMembershipDrag: ReturnType<typeof useWorktreeGroupMembershipDrag>",
-        "      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag.trackPointerDragFrame,"
+        "  groupMembershipDrag?: ReturnType<typeof useWorktreeGroupMembershipDrag>",
+        "      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag?.trackPointerDragFrame,"
       ]
     },
     {
@@ -3262,6 +3262,12 @@
       "feature": "workspace-activity-window",
       "kind": "passthrough",
       "lines": ["  activityHiddenCount?: number"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-main-list-model.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": ["      activityHiddenFolderCount: 0"]
     },
     {
       "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-window-list-model.ts",
@@ -7211,7 +7217,7 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
-      "added": 144,
+      "added": 157,
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
@@ -8006,6 +8012,10 @@
       "added": 1,
       "removed": 0
     },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-main-list-model.ts": {
+      "added": 2,
+      "removed": 1
+    },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-window-list-model.ts": {
       "added": 11,
       "removed": 10
@@ -8199,7 +8209,7 @@
       "removed": 0
     },
     "src/main/runtime/runtime-project-group-controller.ts": {
-      "added": 64,
+      "added": 62,
       "removed": 3
     },
     "src/main/runtime/runtime-repository-settings-controller.ts": {

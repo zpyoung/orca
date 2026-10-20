@@ -287,7 +287,8 @@ export function useMainSidebarListModel(args: SidebarListModelArgs): SidebarList
     visibleScope: {
       visibleReposForRows,
       visibleProjectGroupsForRows: planned.visibleProjectGroups,
-      visibleFolderWorkspacesForRows
+      visibleFolderWorkspacesForRows,
+      activityHiddenFolderCount: 0
     },
     externalWorktreeCards,
     rowModel: {

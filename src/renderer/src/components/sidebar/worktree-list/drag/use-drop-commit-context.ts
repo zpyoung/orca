@@ -13,7 +13,7 @@ export function useWorktreeDropCommitContext(args: {
   session: ReturnType<typeof useWorktreeDragSession>
   lineageDrop: ReturnType<typeof useWorktreeLineageDropCommit>
   runtime: ReturnType<typeof useWorktreeDragRuntime>
-  groupMembershipDrag: ReturnType<typeof useWorktreeGroupMembershipDrag>
+  groupMembershipDrag?: ReturnType<typeof useWorktreeGroupMembershipDrag>
   onMoveWorktreesToStatus: WorktreeDropCommitContext['onMoveWorktreesToStatus']
   onMoveWorktreesToStatusAtIndex: WorktreeDropCommitContext['onMoveWorktreesToStatusAtIndex']
   onReorderWorktrees: WorktreeDropCommitContext['onReorderWorktrees']
@@ -42,8 +42,8 @@ export function useWorktreeDropCommitContext(args: {
       refreshWorktreeDragSession: session.refreshWorktreeDragSession,
       getEligibleLineageDropTarget: lineageDrop.getEligibleLineageDropTarget,
       commitWorktreeLineageParentDrop: lineageDrop.commitWorktreeLineageParentDrop,
-      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag.trackPointerDragFrame,
-      commitWorktreeGroupMembershipDrop: groupMembershipDrag.commitPointerDrop,
+      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag?.trackPointerDragFrame,
+      commitWorktreeGroupMembershipDrop: groupMembershipDrag?.commitPointerDrop,
       clearReorderedWorktreeParents: lineageDrop.clearReorderedWorktreeParents,
       clearWorktreeDrag: runtime.clearWorktreeDrag,
       onMoveWorktreesToStatus: (worktreeIds, status) =>
@@ -55,8 +55,8 @@ export function useWorktreeDropCommitContext(args: {
       onPinWorktrees: (worktreeIds) => onPinWorktrees(worktreeIds, draggedCopies())
     }
   }, [
-    groupMembershipDrag.commitPointerDrop,
-    groupMembershipDrag.trackPointerDragFrame,
+    groupMembershipDrag?.commitPointerDrop,
+    groupMembershipDrag?.trackPointerDragFrame,
     lineageDrop.clearReorderedWorktreeParents,
     lineageDrop.commitWorktreeLineageParentDrop,
     lineageDrop.getEligibleLineageDropTarget,
