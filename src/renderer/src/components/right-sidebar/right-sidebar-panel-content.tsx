@@ -7,7 +7,7 @@ const FileExplorer = lazy(() => import('./FileExplorer'))
 const SourceControl = lazy(() => import('./SourceControl'))
 const ChecksPanel = lazy(() => import('./ChecksPanel'))
 const PortsPanel = lazy(() => import('./PortsPanel'))
-const AiVaultPanel = lazy(() => import('./AiVaultPanel'))
+const AiVaultSidebarPanel = lazy(() => import('./AiVaultSidebarPanel'))
 const SessionInfoPanel = lazy(() => import('./fork-session-info/SessionInfoPanel'))
 const AskQuestionsPanel = lazy(() => import('./fork-ask-question-tool/AskQuestionsPanel'))
 const FolderWorkspaceWorktreesPanel = lazy(() => import('./FolderWorkspaceWorktreesPanel'))
@@ -36,7 +36,7 @@ export function RightSidebarPanelContent({
         {effectiveTab === 'ports' && (
           <PortsPanel isVisible={rightSidebarOpen && effectiveTab === 'ports'} />
         )}
-        {effectiveTab === 'vault' && <AiVaultPanel />}
+        {effectiveTab === 'vault' && <AiVaultSidebarPanel />}
         {effectiveTab === 'session-info' && <SessionInfoPanel />}
         {effectiveTab === 'ask' && <AskQuestionsPanel />}
         {effectiveTab === 'workspaces' && <FolderWorkspaceWorktreesPanel />}

@@ -714,7 +714,8 @@ describe('repo RPC methods', () => {
       makeRequest('projectGroup.moveProject', {
         repo: 'repo-1',
         groupId: group.id,
-        order: 2
+        order: 2,
+        connectionId: 'srv-ssh'
       })
     )
     const folderListResponse = await dispatcher.dispatch(makeRequest('folderWorkspace.list'))
@@ -760,7 +761,7 @@ describe('repo RPC methods', () => {
       expectedLedgers: undefined,
       removeContainedProjects: undefined
     })
-    expect(runtime.moveProjectToGroup).toHaveBeenCalledWith('repo-1', group.id, 2)
+    expect(runtime.moveProjectToGroup).toHaveBeenCalledWith('repo-1', group.id, 2, 'srv-ssh')
     expect(runtime.listVisibleFolderWorkspaces).toHaveBeenCalled()
     expect(runtime.createFolderWorkspace).toHaveBeenCalledWith({
       projectGroupId: group.id,

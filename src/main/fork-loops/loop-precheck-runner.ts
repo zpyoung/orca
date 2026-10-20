@@ -1,12 +1,13 @@
 // FORK-COPY-OF: src/main/automations/precheck-runner.ts
-// FORK-COPY-SHA: 2bb20586ebc39d605e16d95f57420e20a16e7485
+// FORK-COPY-SHA: 49109f362f057cd2dc3d81cd378cb84d140c3dc5
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { ClientChannel } from 'ssh2'
 import type { AutomationPrecheck, AutomationPrecheckResult } from '../../shared/automations-types'
 import { MAX_AUTOMATION_PRECHECK_OUTPUT_CHARS } from '../../shared/automation-precheck'
-import { getSshConnectionManager } from '../ssh/ssh-target-registry'
-import { shellEscape } from '../ssh/ssh-connection-utils'
+import { getSshConnectionManager } from '../ssh/targets/ssh-target-registry'
+import { quotePosixShell } from '../../shared/shell-argument-quoting'
 import { admitSelfInitiatedTreeKill } from '../own-chromium-tree-kill-guard'
+import { errorMessage } from '../../shared/error-message'
 
 type AutomationPrecheckExecutionTarget =
   | {
@@ -303,7 +304,7 @@ async function runSshPrecheck(
     return failedPrecheckResult(precheck, startedAt, 'SSH target is not connected.')
   }
   try {
-    const remoteCommand = `cd ${shellEscape(target.cwd)} && ${precheck.command}`
+    const remoteCommand = `cd ${quotePosixShell(target.cwd)} && ${precheck.command}`
     const channel = await connection.exec(remoteCommand)
     if (signal?.aborted) {
       channel.close()
@@ -311,11 +312,7 @@ async function runSshPrecheck(
     }
     return await runSshChannelPrecheck({ precheck, channel, startedAt, signal })
   } catch (error) {
-    return failedPrecheckResult(
-      precheck,
-      startedAt,
-      error instanceof Error ? error.message : String(error)
-    )
+    return failedPrecheckResult(precheck, startedAt, errorMessage(error))
   }
 }
 

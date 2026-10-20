@@ -82,6 +82,7 @@ export function mergeWorktree(
     ...(meta?.manualOrder !== undefined ? { manualOrder: meta.manualOrder } : {}),
     lastActivityAt: meta?.lastActivityAt ?? 0,
     ...(meta?.smartTier !== undefined ? { smartTier: meta.smartTier, smartAt: meta.smartAt } : {}),
+    ...(meta?.lastTerminalUseAt !== undefined ? { lastTerminalUseAt: meta.lastTerminalUseAt } : {}),
     ...(meta?.createdAt !== undefined ? { createdAt: meta.createdAt } : {}),
     ...(meta?.createdWithAgent !== undefined ? { createdWithAgent: meta.createdWithAgent } : {}),
     ...(meta?.automationProvenance !== undefined

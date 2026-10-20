@@ -3,9 +3,9 @@ import { resolveStartupShell } from '../../shared/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../shared/windows-terminal-shell'
 import {
   execCommandInWslOrThrow,
-  execLocalPreflightCommandOrThrow,
-  shellQuote
+  execLocalPreflightCommandOrThrow
 } from '../ipc/preflight-command-exec'
+import { quotePosixShell } from '../../shared/shell-argument-quoting'
 import type { AskGateHostKey } from './claude-ask-suppression-gate'
 
 /** The settings fields that decide which binary a managed local Claude launch actually runs. */
@@ -57,7 +57,7 @@ export function buildLocalClaudeAskGateHost(
       }
       const { stdout } = await execCommandInWslOrThrow(
         distro ? { distro } : {},
-        argv.map(shellQuote).join(' ')
+        argv.map(quotePosixShell).join(' ')
       )
       return stdout
     }

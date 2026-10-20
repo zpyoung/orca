@@ -22,9 +22,8 @@ import { useNativeChatSessionOptions } from './use-native-chat-session-options'
 import { useNativeChatContextUsageSummary } from './use-native-chat-context-usage-summary'
 import { useNativeChatDictation } from './use-native-chat-dictation'
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
-import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
-import { useNativeChatComposerCatalog } from './use-native-chat-composer-catalog'
+import { useNativeChatComposerCommandPicker } from './use-native-chat-composer-command-picker'
 import { useNativeChatStructuredComposerSend } from './use-native-chat-structured-composer-send'
 import { useNativeChatMobileHoldNotice } from './use-native-chat-mobile-hold-notice'
 import { useNativeChatComposerSubmit } from './use-native-chat-composer-submit'
@@ -143,24 +142,22 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setCaret: core.setCaret
     })
 
-    const { agentCommands, sessionSkillNames } = useNativeChatComposerCatalog(
-      agent,
-      structuredTransport
-    )
-    const picker = useNativeChatPickerState({
+    const { picker, resume } = useNativeChatComposerCommandPicker({
       agent,
       terminalTabId,
       draftScopeKey: paneKey,
       draft: core.draft,
       caret: core.caret,
-      agentCommands,
       recalledFromHistory: core.history.index !== null,
       disabled: core.disabled,
-      sessionSkillNames,
-      textareaRef: core.textareaRef,
-      setDraft: core.setDraft,
-      setCaret: core.setCaret,
-      setActiveSuggestion: core.setActiveSuggestion
+      structuredTransport,
+      editor: {
+        textareaRef: core.textareaRef,
+        setDraft: core.setDraft,
+        setCaret: core.setCaret,
+        setActiveSuggestion: core.setActiveSuggestion
+      },
+      setNotice: core.setNotice
     })
     const mentionFiles = useNativeChatMentionFiles({
       query: picker.autocomplete.mode === 'mention' ? picker.autocomplete.query : null,
@@ -283,6 +280,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       disabled: core.disabled,
       sendPty: noop,
       sendStructured,
+      consumeOrcaCommand: resume.consume,
       setDraft: core.setDraft,
       setCaret: core.setCaret
     })
@@ -344,11 +342,11 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       pickerListboxId: picker.listboxId,
       classifySend: picker.classifySend,
       clearSkillOrigin: picker.clearSkillOrigin,
-      completeItem: picker.completeItem,
+      completeItem: resume.interceptPick(picker.completeItem),
       retrySkills: picker.retrySkills,
       dismissPicker: picker.dismiss,
       handleDraftOrCaretChange: picker.handleDraftOrCaretChange,
-      dispatchPickerCommand,
+      dispatchPickerCommand: resume.interceptPick(dispatchPickerCommand),
       mentionFiles,
       completeMention: picker.completeMention,
       ...(steerQueued ? { steerQueued } : {}),

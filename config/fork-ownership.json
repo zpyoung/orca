@@ -585,7 +585,7 @@
       "kind": "registration",
       "lines": [
         "import { createHeimdallFleetSlice } from './slices/fork-heimdall/fleet'",
-        "        ...createHeimdallFleetSlice(...a)"
+        "          ...createHeimdallFleetSlice(...a)"
       ]
     },
     {
@@ -639,6 +639,14 @@
         "import { wireHeimdallFleetWindows } from '../fork-heimdall/fleet-ipc-forward'",
         "  state.heimdall = startHeimdall(runtime, store, state.isServeMode)",
         "  wireHeimdallFleetWindows(runtime, () => state.mainWindow)"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-ready-duplicate-pty-repair.test.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "  ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: vi.fn(), removeListener: vi.fn() },"
       ]
     },
     {
@@ -1367,7 +1375,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/native-chat-picker-items.ts",
+      "path": "src/shared/native-chat-picker-items.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
       "lines": ["      pluginName?: string", "  namespacePluginSkills = false"]
@@ -1519,8 +1527,8 @@
       "feature": "worktree-groups",
       "kind": "passthrough",
       "lines": [
-        "  groupMembershipDrag: ReturnType<typeof useWorktreeGroupMembershipDrag>",
-        "      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag.trackPointerDragFrame,"
+        "  groupMembershipDrag?: ReturnType<typeof useWorktreeGroupMembershipDrag>",
+        "      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag?.trackPointerDragFrame,"
       ]
     },
     {
@@ -1547,7 +1555,7 @@
       "kind": "passthrough",
       "lines": [
         "  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview",
-        "          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
+        "            'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
         "  sectionSeparatorClass?: string | false",
         "        args.sectionSeparatorClass,"
       ]
@@ -2509,7 +2517,7 @@
       "kind": "registration",
       "lines": [
         "import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'",
-        "          <ForkAiVaultLineageLine session={session} />"
+        "      <ForkAiVaultLineageLine session={session} />"
       ]
     },
     {
@@ -2923,13 +2931,10 @@
       "kind": "registration",
       "lines": [
         "import { app, ipcMain } from 'electron'",
-        "import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'",
+        "import { forwardRuntimeAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'",
         "import { startClaudeSuppressionVerdictPublisher } from '../fork-ask-question-tool/claude-suppression-verdict-publisher'",
         "import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'",
-        "  forwardAskEventsToRenderer(",
-        "    runtime.getAskServices().registry,",
-        "    () => state.mainWindow,",
-        "    getDashboardPopoutWindow",
+        "  forwardRuntimeAskEventsToRenderer(runtime, () => state.mainWindow, getDashboardPopoutWindow)",
         "  startClaudeSuppressionVerdictPublisher({",
         "    store,",
         "    ipcMain,",
@@ -2975,7 +2980,7 @@
       "kind": "registration",
       "lines": [
         "import { createAsksSlice } from './slices/fork-ask-question-tool/asks'",
-        "        ...createAsksSlice(...a),"
+        "          ...createAsksSlice(...a),"
       ]
     },
     {
@@ -3255,6 +3260,27 @@
         "    activityHiddenCount: activityHiddenWorktreeCount,",
         "        <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />",
         "import { WorkspaceActivityHiddenCountRow } from './fork-workspace-activity-window/WorkspaceActivityHiddenCountRow'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/sidebar-list-model.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": ["  activityHiddenCount?: number"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-main-list-model.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": ["      activityHiddenFolderCount: 0"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-window-list-model.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "  const { visibleWorktrees, activityHiddenCount, pairedDeviceIdsByEnvironment } =",
+        "  return { visibleWorktrees, visibleScope, externalWorktreeCards, rowModel, activityHiddenCount }"
       ]
     },
     {
@@ -3560,7 +3586,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/tab-bar/SortableTab.tsx",
+      "path": "src/renderer/src/components/tab-bar/use-terminal-tab-activity.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
@@ -4109,19 +4135,11 @@
       ]
     },
     {
-      "path": "src/main/runtime/orca-runtime.ts",
+      "path": "src/main/runtime/orca-runtime-agent-transitions.ts",
       "feature": "project-ledger",
       "kind": "import-swap",
       "lines": [
         "import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from './orca-runtime-ledger'"
-      ]
-    },
-    {
-      "path": "src/main/runtime/sidebar-inputs/orca-runtime-workspace-activity-facts.ts",
-      "feature": "project-ledger",
-      "kind": "import-swap",
-      "lines": [
-        "import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from '../orca-runtime-ledger'"
       ]
     },
     {
@@ -5571,7 +5589,7 @@
       "kind": "registration",
       "lines": [
         "import { createLoopsSlice } from '@/fork-loops/loops-slice'",
-        "        ...createLoopsSlice(...a),"
+        "          ...createLoopsSlice(...a),"
       ]
     },
     {
@@ -5889,9 +5907,24 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/mac-notarization-builder-contract.test.mjs",
+      "status": "permanent",
+      "reason": "Asserts the macOS release channel runs on Blacksmith through the dual-arch notarization-overlap builder; the fork's release channel builds arm64 only on a hosted runner, so its release case asserts that shape instead."
+    },
+    {
+      "path": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "status": "permanent",
+      "reason": "Contracts for the fork-owned PR job graph: this fork's PR workflow has no e2e caller, so the shard case feeds the lane the selector's output directly and asserts the caller's absence."
+    },
+    {
       "path": "config/scripts/release-cut-token-permissions.test.mjs",
       "status": "permanent",
       "reason": "Asserts upstream's release-cut job matrix and github.repository == 'stablyai/orca'; the fork publishes macOS-only arm64 artifacts from zpyoung/orca, so upstream's version can never describe this pipeline."
+    },
+    {
+      "path": "config/scripts/release-windows-signing-gate.test.mjs",
+      "reason": "Upstream's Windows signing-gate contract, kept against the fork's release-cut.yml: the fork's Windows/Linux build job is disabled, so it asserts if: false where upstream asserts the build-mac success condition.",
+      "status": "permanent"
     },
     {
       "path": "config/scripts/release-rc-history.mjs",
@@ -6608,6 +6641,11 @@
       "status": "permanent"
     },
     {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.resume-command.test.tsx",
+      "reason": "Upstream's /resume coverage, run against the fork composer field, keydown and draft hooks (upstream's mocks target components the fork composer does not render).",
+      "status": "permanent"
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-prompt-recall.test.tsx",
       "reason": "Exercises upstream's transcript prompt recall (useNativeChatComposerRecall), which the fork composer replaces with its own per-pane history; the fork's equivalent coverage is in fork-agent-composer.",
       "status": "permanent",
@@ -6701,6 +6739,10 @@
     }
   ],
   "residuals": {
+    "src/main/startup/main-process-ready-duplicate-pty-repair.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "tests/e2e/native-chat-ssh-delivery.unit.test.ts": {
       "added": 10,
       "removed": 9
@@ -6894,7 +6936,7 @@
       "removed": 0
     },
     "src/main/startup/main-process-runtime-service.ts": {
-      "added": 21,
+      "added": 17,
       "removed": 2
     },
     "src/main/startup/main-process-state.ts": {
@@ -7194,7 +7236,7 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
-      "added": 144,
+      "added": 157,
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
@@ -7215,15 +7257,15 @@
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
       "added": 14,
-      "removed": 40
+      "removed": 37
     },
     "src/renderer/src/components/native-chat/native-chat-pending.ts": {
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/native-chat/native-chat-picker-items.ts": {
-      "added": 65,
-      "removed": 17
+    "src/shared/native-chat-picker-items.ts": {
+      "added": 76,
+      "removed": 21
     },
     "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
       "added": 25,
@@ -7626,8 +7668,8 @@
       "removed": 1
     },
     "src/shared/native-chat-agent-profiles.ts": {
-      "added": 16,
-      "removed": 2
+      "added": 11,
+      "removed": 1
     },
     "src/shared/native-chat-session-option-state.test.ts": {
       "added": 65,
@@ -7882,8 +7924,8 @@
       "removed": 0
     },
     "src/main/runtime/orca-runtime.ts": {
-      "added": 6,
-      "removed": 1
+      "added": 5,
+      "removed": 0
     },
     "src/main/runtime/rpc/methods/terminal/terminal-multiplex-cleanup.ts": {
       "added": 3,
@@ -7982,8 +8024,20 @@
       "removed": 13
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
-      "added": 46,
+      "added": 49,
       "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/sidebar-list-model.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-main-list-model.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-window-list-model.ts": {
+      "added": 11,
+      "removed": 10
     },
     "src/renderer/src/components/sidebar/sidebar-filter-actions.ts": {
       "added": 17,
@@ -8093,7 +8147,7 @@
       "added": 3,
       "removed": 1
     },
-    "src/renderer/src/components/tab-bar/SortableTab.tsx": {
+    "src/renderer/src/components/tab-bar/use-terminal-tab-activity.ts": {
       "added": 2,
       "removed": 0
     },
@@ -8114,16 +8168,16 @@
       "removed": 2
     },
     "src/main/ipc/repos.ts": {
-      "added": 2,
-      "removed": 2
+      "added": 1,
+      "removed": 1
     },
     "src/main/ipc/repos/project-group-handlers.ts": {
       "added": 23,
       "removed": 5
     },
     "src/main/ipc/repos/repo-catalog-handlers.ts": {
-      "added": 24,
-      "removed": 4
+      "added": 15,
+      "removed": 2
     },
     "src/main/ipc/repos/repo-ipc-arg-schemas.ts": {
       "added": 6,
@@ -8174,7 +8228,7 @@
       "removed": 0
     },
     "src/main/runtime/runtime-project-group-controller.ts": {
-      "added": 64,
+      "added": 62,
       "removed": 3
     },
     "src/main/runtime/runtime-repository-settings-controller.ts": {
@@ -8270,8 +8324,8 @@
       "removed": 2
     },
     "src/renderer/src/store/repos/repo-state.ts": {
-      "added": 15,
-      "removed": 2
+      "added": 11,
+      "removed": 1
     },
     "src/renderer/src/store/right-sidebar-route.test.ts": {
       "added": 21,
@@ -8337,7 +8391,7 @@
       "added": 20,
       "removed": 0
     },
-    "src/main/runtime/sidebar-inputs/orca-runtime-workspace-activity-facts.ts": {
+    "src/main/runtime/orca-runtime-agent-transitions.ts": {
       "added": 1,
       "removed": 1
     },
@@ -8626,11 +8680,11 @@
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-background-session.ts": {
-      "added": 38,
-      "removed": 22
+      "added": 30,
+      "removed": 18
     },
     "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
-      "added": 27,
+      "added": 28,
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-in-new-tab.ts": {

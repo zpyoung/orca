@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: b2879bd5aaac5d27c101ccf4171faa25d9f0bb1e
+// FORK-COPY-SHA: 49109f362f057cd2dc3d81cd378cb84d140c3dc5
 import { ArrowUp, CircleAlert, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -82,6 +82,8 @@ export function AgentComposerActions({
       type="button"
       aria-label={sendReason ?? translate('components.native-chat.composer.send', 'Send')}
       disabled={sendDisabled}
+      // A press keeps focus where it was; a focused button drops it to <body> when it disables.
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onSend}
       variant="default"
       size="icon"
@@ -182,6 +184,7 @@ export function AgentComposerActions({
                 data-native-chat-critical-action="stop"
                 aria-label={stopLabel}
                 disabled={!onStop || isStopping}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={onStop}
                 variant="secondary"
                 size="icon"

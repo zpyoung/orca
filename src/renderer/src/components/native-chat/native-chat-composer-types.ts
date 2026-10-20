@@ -1,3 +1,4 @@
+import type { StructuredAgentSessionSendRequest } from './structured-agent-session-send-slot'
 import type { NativeChatComposerNotice } from './native-chat-composer-notice'
 import type { AgentSessionConversationCommand } from '../../../../shared/agent-session-conversation-command'
 import type { StructuredAgentContextUsage } from '../../../../shared/structured-agent-session-context-usage'
@@ -37,7 +38,11 @@ export type NativeChatOptionPickerRequest = {
 
 export type NativeChatStructuredComposerTransport = {
   conversationCommands?: readonly AgentSessionConversationCommand[]
-  send: (text: string, attachments: readonly AgentComposerImageAttachment[]) => boolean | 'queued'
+  send: (
+    text: string,
+    attachments: readonly AgentComposerImageAttachment[],
+    request?: StructuredAgentSessionSendRequest
+  ) => boolean | 'queued'
   /** A send is out: Send stays disabled, and a send returns false, until it settles. */
   sendOut?: boolean
   /** Send is held for this reason, which the disabled button says. */

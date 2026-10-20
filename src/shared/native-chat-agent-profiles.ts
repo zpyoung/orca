@@ -1,4 +1,5 @@
 import type { AgentType } from './agent-status-types'
+import type { SkillDiscoverySource } from './skills'
 import {
   getAgentSlashCommands,
   type NativeChatCommandReply,
@@ -13,12 +14,29 @@ export type NativeChatAgentProfile = {
    *  where that syntax is verified — an unverified guess would insert a token
    *  the agent cannot resolve, so the rest fall back to the bare skill name. */
   namespacesPluginSkills: boolean
+  /** The agent reports and invokes each skill under this prefix, e.g. Pi's `skill:<name>`. */
+  skillNamePrefix?: string
+  /** Another agent whose own skill folders, though not its plugins, this agent also reads. */
+  readsSkillFoldersOf?: AgentType
+  /** The agent's command report may list some skills among its commands (OpenCode 1.x) or none
+   *  (2.x), so a running chat keeps the skill folders' list. */
+  keepsScannedSkills?: true
   /** The agent's own harness expands a slash command out of the message text, so
    *  the chat host claims only the commands it implements itself. */
   expandsSlashCommandsFromText?: true
   /** Catalog commands the model acts on when they arrive as prose, even though
    *  the runtime has no slash parser of its own. */
   textDrivenCommands?: readonly string[]
+}
+
+// Both lines read `.claude/skills` beside their own folders, and 2.x reports no skill as a command.
+const OPENCODE_PROFILE: NativeChatAgentProfile = {
+  skillPrefix: '/',
+  skillSourceOwner: 'opencode',
+  namespacesPluginSkills: false,
+  readsSkillFoldersOf: 'claude',
+  keepsScannedSkills: true,
+  expandsSlashCommandsFromText: true
 }
 
 const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfile>> = {
@@ -42,23 +60,33 @@ const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfi
     namespacesPluginSkills: true,
     expandsSlashCommandsFromText: true
   },
-  opencode: {
-    skillPrefix: '/',
-    skillSourceOwner: 'opencode',
-    namespacesPluginSkills: false,
-    expandsSlashCommandsFromText: true
-  },
-  opencode2: {
-    skillPrefix: '/',
-    skillSourceOwner: 'opencode2',
-    namespacesPluginSkills: false,
-    expandsSlashCommandsFromText: true
-  },
+  opencode: OPENCODE_PROFILE,
+  opencode2: OPENCODE_PROFILE,
   grok: {
     skillPrefix: '/',
     skillSourceOwner: 'grok',
     namespacesPluginSkills: false
+  },
+  // Pi expands only `/skill:<name>`; a bare `/<name>` reaches the model as text.
+  pi: {
+    skillPrefix: '/',
+    skillSourceOwner: 'pi',
+    namespacesPluginSkills: false,
+    skillNamePrefix: 'skill:'
   }
+}
+
+/** Whether skills under `source` reach `profile`'s agent: shared roots, its own, and the skill
+ *  folders of an agent it also reads. */
+export function readsSkillSource(
+  profile: Pick<NativeChatAgentProfile, 'skillSourceOwner' | 'readsSkillFoldersOf'>,
+  source: Pick<SkillDiscoverySource, 'owner' | 'sourceKind'>
+): boolean {
+  return (
+    source.owner === null ||
+    source.owner === profile.skillSourceOwner ||
+    (source.owner === profile.readsSkillFoldersOf && source.sourceKind !== 'plugin')
+  )
 }
 
 export function getNativeChatAgentProfile(

@@ -2,7 +2,7 @@ import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-la
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentStartupPlan } from '../tui-agent-startup'
 import { createRuntimeAgentBackgroundTerminal } from '../runtime-agent-background-create'
-import { toRemoteRuntimePtyId } from '@/runtime/runtime-terminal-stream'
+import { toRemoteRuntimePtyId } from '../../../../shared/remote-runtime-pty-id'
 
 /** Create one background agent session on a paired runtime environment. */
 export async function createRuntimeAgentBackgroundSession(args: {

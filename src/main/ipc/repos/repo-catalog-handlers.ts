@@ -2,24 +2,30 @@ import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
 import type { Store } from '../../persistence'
 import type { Project, ProjectUpdateArgs } from '../../../shared/project-types'
-import { normalizeExecutionHostId } from '../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  normalizeExecutionHostId,
+  parseExecutionHostId
+} from '../../../shared/execution-host'
+import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import { enrichRepoGitUsernames } from '../../repo-git-username-enrichment'
 import { enrichMissingRepoGitRemoteIdentities } from '../../repo-git-remote-identity-enrichment'
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { notifyReposChanged } from './repos-changed-notification'
+import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../worktree-base-directory-watcher'
 import { ProjectUpdateIpcArgs, parseProjectGroupIpcArgs } from './repo-ipc-arg-schemas'
-import { visibleRepos } from '../../ssh/orcad-retained-source'
+import { visibleProjectHostSetups, visibleRepos } from '../../ssh/orcad-retained-source'
 import {
   assertWslMoveProjectWritable,
   assertWslMoveReposWritable,
   isWslMoveSourceHost
 } from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
-import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
+import { withLedgerErrorCode } from './ledger-removal-guard'
 
 export function registerRepoCatalogHandlers(
   mainWindow: BrowserWindow,
   store: Store,
-  runtime?: RepoRemovalRuntime
+  runtime: Pick<OrcaRuntimeService, 'removeProject'>
 ): void {
   // Why one shared reference: enrichment dedupes coalesced callers by callback identity, so a fresh
   // closure per list call would stack up (and re-broadcast) for the length of a slow sweep.
@@ -50,7 +56,7 @@ export function registerRepoCatalogHandlers(
 
   ipcMain.handle('projectHostSetups:list', () => {
     enrichMissingRepoGitRemoteIdentities(store, { onChanged: broadcastReposChanged })
-    return store.getProjectHostSetups()
+    return visibleProjectHostSetups(store)
   })
 
   ipcMain.handle(
@@ -105,16 +111,24 @@ export function registerRepoCatalogHandlers(
       if (isWslMoveSourceHost(hostId)) {
         assertWslMoveProjectWritable(store, { repoId: args.repoId })
       }
-      // Why: the runtime resolves a bare id and rejects one registered on two hosts, so only route
-      // through it when the caller actually asked for the ledger retention guard.
-      if (runtime && args.expectedLedgers) {
+      const row = store
+        .getRepos()
+        .find((repo) => repo.id === args.repoId && getRepoExecutionHostId(repo) === hostId)
+      // Why the runtime's removal: this process runs the project's local and SSH sessions, and only
+      // the host's own sweep stops the ones no renderer lists. A paired server's row is residue.
+      if (row && parseExecutionHostId(hostId)?.kind !== 'runtime') {
+        // It notifies the renderer and paired clients itself.
+        const { expectedLedgers } = args
         await withLedgerErrorCode(() =>
-          runtime.removeProject(args.repoId, { expectedLedgers: args.expectedLedgers })
+          expectedLedgers
+            ? runtime.removeProject(row, { expectedLedgers })
+            : runtime.removeProject(row)
         )
-      } else {
-        store.removeProjectForHost(args.repoId, hostId)
-        invalidateAuthorizedRootsCache()
+        scheduleCurrentWorktreeBaseDirectoryWatcherSync()
+        return
       }
+      store.removeProjectForHost({ id: args.repoId, executionHostId: hostId })
+      invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)
     }
   )

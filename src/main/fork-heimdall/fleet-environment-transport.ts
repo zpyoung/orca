@@ -4,10 +4,10 @@ import type { RuntimeStatus } from '../../shared/runtime-types'
 import { listEnvironments, resolveEnvironment } from '../../shared/runtime-environment-store'
 import { getPreferredPairedRuntimeConnection } from '../../shared/runtime-environments'
 import {
-  RemoteRuntimeClientError,
   sendRemoteRuntimeRequestWithStatusPreflight,
   type RemoteRuntimeSubscription
 } from '../../shared/remote-runtime-client'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,

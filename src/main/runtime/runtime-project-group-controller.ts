@@ -19,8 +19,7 @@ import {
   runtimeVisibleProjectGroups
 } from './runtime-visible-catalog'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
-import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import {
   assertWslMoveProjectWritable,
   assertWslMoveRepoWritable,
@@ -36,7 +35,8 @@ import {
 
 type RuntimeProjectGroupDependencies = {
   getStore: () => RuntimeStore | null
-  resolveRepo: (selector: string) => Promise<Repo>
+  // `connectionId` narrows twins by their SSH target; undefined keeps the plain selector.
+  resolveRepo: (selector: string, connectionId?: string | null) => Promise<Repo>
   notifyReposChanged: () => void
   forgetTerminalTopology?: (repoId: string) => void
   invalidateResolvedWorktrees?: () => void
@@ -150,11 +150,10 @@ export class RuntimeProjectGroupController {
     const reposBefore = store
       .getRepos()
       .filter((repo) => repo.projectGroupId && groupIds.has(repo.projectGroupId))
-      .map((repo) => ({ id: repo.id, hostId: getRepoExecutionHostId(repo) }))
     const operation = (): boolean => {
       if (options?.removeContainedProjects) {
         for (const repo of reposBefore) {
-          store.removeProjectForHost?.(repo.id, repo.hostId)
+          store.removeProjectForHost?.(repo)
         }
       }
       return store.deleteProjectGroup!(groupId)
@@ -189,14 +188,19 @@ export class RuntimeProjectGroupController {
     }
   }
 
-  async moveProject(repoSelector: string, groupId: string | null, order?: number): Promise<Repo> {
+  async moveProject(
+    repoSelector: string,
+    groupId: string | null,
+    order?: number,
+    connectionId?: string | null
+  ): Promise<Repo> {
     const store = this.deps.getStore()
     if (!store?.moveProjectToGroup) {
       throw new Error('runtime_unavailable')
     }
-    const repo = await this.deps.resolveRepo(repoSelector)
+    const repo = await this.deps.resolveRepo(repoSelector, connectionId)
     assertWslMoveRepoWritable(store, repo)
-    const moved = store.moveProjectToGroup(repo.id, groupId, order)
+    const moved = store.moveProjectToGroup(repo, groupId, order)
     if (!moved) {
       throw new Error('repo_not_found')
     }

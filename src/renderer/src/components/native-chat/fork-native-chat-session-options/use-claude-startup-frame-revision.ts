@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AgentType } from '../../../../../shared/agent-status-types'
-import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
+import { isRemoteRuntimePtyId } from '../../../../../shared/remote-runtime-pty-id'
 import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-stream'
 import { subscribeToPtyData } from '../../terminal-pane/pty-data-sidecar-subscriptions'
 import type { NativeChatPtySessionOptionsSurface } from '../native-chat-pty-session-options'

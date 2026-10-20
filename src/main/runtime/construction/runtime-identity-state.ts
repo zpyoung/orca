@@ -56,6 +56,7 @@ import {
 import { RuntimeTerminalWait as RuntimeTerminalWaitController } from '../terminal/wait/terminal-wait'
 import type { PtyLivenessVerdict } from '../../../shared/pty-liveness-verdict'
 import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import type { HostScopedWorktreeKey } from '../../../shared/worktree/host-qualified-identity'
 
 import { RuntimeConstructionServices } from './runtime-construction-services'
 
@@ -186,15 +187,16 @@ export abstract class OrcaRuntimeWithRuntimeId extends RuntimeConstructionServic
   protected readonly terminalCreateIdempotency = new RemoteRuntimeTerminalCreateIdempotency()
 
   // Why: concurrent clients sleeping one host workspace must share one physical teardown.
-  protected terminalSleepByWorktreeId = new Map<
-    string,
+  // Both sleep maps key on host + workspace (hostSleepKey), never the bare id.
+  protected terminalSleepByHostWorktree = new Map<
+    HostScopedWorktreeKey,
     Promise<RuntimeWorktreeTerminalSleepResult>
   >()
 
   protected readonly terminalMutationLock = new WorktreeTerminalMutationLock()
 
-  protected terminalSleepStateByWorktreeId = new Map<
-    string,
+  protected terminalSleepStateByHostWorktree = new Map<
+    HostScopedWorktreeKey,
     {
       worktreeId: string
       generation: number
@@ -319,12 +321,6 @@ export abstract class OrcaRuntimeWithRuntimeId extends RuntimeConstructionServic
       pendingRegistration: boolean
     }
   >()
-
-  // Why: pointer state is process-local; one harmless replay after restart avoids a wire or schema change.
-  protected readonly lastPointedMessageSequenceByHandle = new Map<string, number>()
-
-  // Why: a waiter can reserve an older row while a newer row advances the sequence watermark.
-  protected readonly pointedMessageIdsByHandle = new Map<string, Set<string>>()
 
   protected readonly mailPointerRepointScheduler = new MailPointerRepointScheduler((handle) =>
     this.repointPendingMessagesForHandle(handle)

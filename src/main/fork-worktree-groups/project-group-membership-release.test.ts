@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 
 let dataDir = ''
 
@@ -40,9 +41,15 @@ describe('Store project group worktree membership', () => {
       createdFrom: 'manual'
     })
     const other = store.createProjectGroup({ name: 'Other', createdFrom: 'manual' })
-    store.setWorktreeMeta('root', { projectGroupId: root.id })
-    store.setWorktreeMeta('child', { projectGroupId: child.id })
-    store.setWorktreeMeta('other', { projectGroupId: other.id })
+    store.setWorktreeMeta(hostWorktreeTarget({ id: 'root', hostId: 'local' }), {
+      projectGroupId: root.id
+    })
+    store.setWorktreeMeta(hostWorktreeTarget({ id: 'child', hostId: 'local' }), {
+      projectGroupId: child.id
+    })
+    store.setWorktreeMeta(hostWorktreeTarget({ id: 'other', hostId: 'local' }), {
+      projectGroupId: other.id
+    })
 
     expect(store.deleteProjectGroup(root.id)).toBe(true)
     expect(store.getAllWorktreeMeta()).toMatchObject({
@@ -99,7 +106,9 @@ describe('Store project group worktree membership', () => {
   it('preserves a foreign host group id when writing metadata', async () => {
     const store = await createStore()
     expect(
-      store.setWorktreeMeta('foreign', { projectGroupId: 'host:elsewhere' }).projectGroupId
+      store.setWorktreeMeta(hostWorktreeTarget({ id: 'foreign', hostId: 'local' }), {
+        projectGroupId: 'host:elsewhere'
+      }).projectGroupId
     ).toBe('host:elsewhere')
   })
 })

@@ -86,7 +86,11 @@ RUN useradd --create-home --shell /bin/bash runner \
 USER runner
 WORKDIR /work
 
+# Why: the image is a throwaway per-shard install, so it keeps a project-local node_modules as CI does.
+ENV ORCA_PNPM_GLOBAL_VIRTUAL_STORE=0
+
 COPY --chown=runner:runner package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --chown=runner:runner config/pnpmfile.cjs ./config/pnpmfile.cjs
 COPY --chown=runner:runner config/patches ./config/patches
 # Why: pnpm-workspace.yaml lists these packages, so install fails without their manifests.
 COPY --chown=runner:runner src/packages ./src/packages
