@@ -1,6 +1,6 @@
 ---
-last_released_commit: ad2869d55bf935c0359a6c8d3c06f6847cbfb3e6
-upstream_synced: v1.4.230
+last_released_commit: 9bd674f464eb47d9b0416982ecec45dfa65fdc06
+upstream_synced: v1.4.233
 ---
 
 # Changelog
@@ -11,6 +11,26 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.234-rc.0.zy01] - 2026-10-20
+
+Synced to upstream [v1.4.233](https://github.com/stablyai/orca/releases/tag/v1.4.233), by way of
+[v1.4.232](https://github.com/stablyai/orca/releases/tag/v1.4.232).
+
+### Added
+- Typing `/resume` in a structured chat, optionally followed by a search, opens Agent Session
+  History for that chat's workspace instead of sending the text to the agent. Terminal-backed
+  chats and the terminal dock still pass `/resume` to the agent.
+
+### Fixed
+- Signing in from a protected artifact's share panel shows the same sign-in progress as upstream,
+  with a link to copy and a way to cancel while the browser sign-in is pending.
+- Fork features that hang off code upstream reworked in these releases keep working: removing a
+  project still checks its ledgers, ask cards still reach the dashboard popout, and the workspace
+  activity window, worktree groups, session handoff and plugin skill names follow upstream's new
+  modules.
+- The remote test sandbox builds again. Its image now ships upstream's new pnpm config file and
+  keeps a project-local `node_modules`.
 
 ## [1.4.231-rc.0.zy03] - 2026-10-19
 
