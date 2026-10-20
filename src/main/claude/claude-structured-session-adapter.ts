@@ -13,6 +13,7 @@ import { releaseClaudeAcquisition } from './claude-structured-acquisition-releas
 import { acquireClaudeSession } from './claude-structured-session-acquisition'
 import { supportsClaudeStructuredLocation } from './claude-structured-location-support'
 import { setClaudeStructuredSessionOption } from './claude-structured-options'
+import { dispatchClaudeMessage } from './claude-structured-message-options'
 import { readClaudeStructuredSessionOptions } from './claude-structured-session-options'
 import {
   ClaudeAcquisitionRegistry,
@@ -164,7 +165,7 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
   }
 
   dispatch: StructuredAgentSessionAdapter['dispatch'] = (input) =>
-    dispatchClaudeTurn(this.session(input.sessionId), input, input.beforeDispatch)
+    dispatchClaudeMessage(this.session(input.sessionId), input, this.deps.requestTimeoutMs)
 
   compact: NonNullable<StructuredAgentSessionAdapter['compact']> = (input) =>
     dispatchClaudeCommand(this.session(input.sessionId), input.command)
@@ -256,12 +257,17 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
   }
   readOptions = (input: { sessionId: string; fence: number }) =>
     readClaudeStructuredSessionOptions(this.session(input.sessionId), this.deps.requestTimeoutMs)
-  readOptionRestoreFailures = (sessionId: string): readonly string[] => [
-    ...(this.sessions.get(sessionId)?.restoreSkippedOptions ?? [])
-  ]
+  readOptionRestoreFailures = (sessionId: string): readonly string[] => {
+    const session = this.sessions.get(sessionId)
+    return session?.retiredModel !== undefined && !session.options.has('model') ? ['model'] : []
+  }
 
   releaseAcquisition = (input: { sessionId: string }): Promise<boolean> =>
     this.afterClose(input.sessionId, () => this.releaseProviderSession(input.sessionId))
+  hasOwnedAcquisition = (sessionId: string): boolean =>
+    this.acquisitions.get(sessionId) !== undefined ||
+    this.sessions.has(sessionId) ||
+    this.exits.has(sessionId)
 
   /** A close clears the session's tasks outside `emit`; its ending still reaches the host. */
   private async afterClose(sessionId: string, close: () => Promise<boolean>): Promise<boolean> {

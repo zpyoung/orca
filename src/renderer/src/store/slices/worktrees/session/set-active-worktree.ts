@@ -1,3 +1,4 @@
+import { cancelActiveWorktreeRemoval } from '@/store/active-worktree-deselection-intent'
 import type { WorktreeSlice } from '../../worktree-helpers'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import { projectWorktreeTabModelReconciliation } from '../../tabs'
@@ -38,6 +39,9 @@ export function createSetActiveWorktree(
         set(stateTransition.patch)
       }
       return false
+    }
+    if (!worktreeId) {
+      cancelActiveWorktreeRemoval()
     }
     const workspaceScope = worktreeId ? parseWorkspaceKey(worktreeId) : null
     const previousWorkspaceId = get().activeWorktreeId

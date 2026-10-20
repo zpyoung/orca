@@ -16,11 +16,13 @@ import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { getDeleteStateForWorktreeHost } from './worktree-delete-state-host-match'
 import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'
 import {
+  EMPTY_AGENT_STATUS_BY_PANE_KEY,
   EMPTY_BROWSER_TABS_BY_WORKTREE,
   EMPTY_CYCLIC_LINEAGE_IDS,
   EMPTY_DELETE_STATE_BY_WORKTREE_ID,
   EMPTY_PTY_IDS_BY_TAB_ID,
   EMPTY_TABS_BY_WORKTREE,
+  EMPTY_UNIFIED_TABS_BY_WORKTREE,
   EMPTY_WORKSPACE_LINEAGE_BY_CHILD_KEY,
   EMPTY_WORKTREE_LINEAGE_BY_ID,
   hasWorktreeParentLink,
@@ -126,6 +128,12 @@ export function useWorktreeContextMenuModel({
   const browserTabsByWorktree = useAppStore((s) =>
     selectMenuScopedMap(menuOpen, s.browserTabsByWorktree, EMPTY_BROWSER_TABS_BY_WORKTREE)
   )
+  const unifiedTabsByWorktree = useAppStore((s) =>
+    selectMenuScopedMap(menuOpen, s.unifiedTabsByWorktree, EMPTY_UNIFIED_TABS_BY_WORKTREE)
+  )
+  const agentStatusByPaneKey = useAppStore((s) =>
+    selectMenuScopedMap(menuOpen, s.agentStatusByPaneKey, EMPTY_AGENT_STATUS_BY_PANE_KEY)
+  )
   const deleteStateByWorktreeId = useAppStore((s) =>
     selectMenuScopedMap(menuOpen, s.deleteStateByWorktreeId, EMPTY_DELETE_STATE_BY_WORKTREE_ID)
   )
@@ -142,17 +150,32 @@ export function useWorktreeContextMenuModel({
         hasSleepableWorkspaceActivity(item.id, {
           tabsByWorktree,
           ptyIdsByTabId,
-          browserTabsByWorktree
+          browserTabsByWorktree,
+          unifiedTabsByWorktree,
+          agentStatusByPaneKey
         })
       ),
-    [activeContextWorktrees, browserTabsByWorktree, ptyIdsByTabId, tabsByWorktree]
+    [
+      activeContextWorktrees,
+      agentStatusByPaneKey,
+      browserTabsByWorktree,
+      ptyIdsByTabId,
+      tabsByWorktree,
+      unifiedTabsByWorktree
+    ]
   )
   const lineageMenuActions = useWorkspaceLineageMenuActions({
     enabled: !isMultiContext,
     parent: worktree,
     worktrees: allWorktrees,
     lineageById: worktreeLineageById,
-    activity: { tabsByWorktree, ptyIdsByTabId, browserTabsByWorktree }
+    activity: {
+      tabsByWorktree,
+      ptyIdsByTabId,
+      browserTabsByWorktree,
+      unifiedTabsByWorktree,
+      agentStatusByPaneKey
+    }
   })
   const lineageDescendantCount = lineageMenuActions.descendants.length
   const subtreeSleepableWorktrees = lineageMenuActions.sleepableTargets

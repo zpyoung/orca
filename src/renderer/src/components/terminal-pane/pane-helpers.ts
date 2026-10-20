@@ -1,3 +1,4 @@
+import { quotePosixShellUnlessPlain } from '../../../../shared/shell-argument-quoting'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'
 import { makePaneKey, type PaneKey } from '../../../../shared/stable-pane-id'
@@ -92,9 +93,5 @@ export function shellEscapePath(path: string, targetShell: 'posix' | 'windows'):
     return /^[a-zA-Z0-9_./@:\\-]+$/.test(path) ? path : `"${path}"`
   }
 
-  if (/^[a-zA-Z0-9_./@:-]+$/.test(path)) {
-    return path
-  }
-
-  return `'${path.replace(/'/g, "'\\''")}'`
+  return quotePosixShellUnlessPlain(path)
 }

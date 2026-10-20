@@ -1,4 +1,5 @@
 import type { AgentType } from './agent-status-types'
+import type { SkillDiscoverySource } from './skills'
 import {
   getAgentSlashCommands,
   type NativeChatCommandReply,
@@ -19,6 +20,15 @@ export type NativeChatAgentProfile = {
   /** Catalog commands the model acts on when they arrive as prose, even though
    *  the runtime has no slash parser of its own. */
   textDrivenCommands?: readonly string[]
+}
+
+// Both lines read `.claude/skills` beside their own folders, and 2.x reports no skill as a command.
+const OPENCODE_PROFILE: NativeChatAgentProfile = {
+  skillPrefix: '/',
+  skillSourceOwner: 'opencode',
+  readsSkillFoldersOf: 'claude',
+  keepsScannedSkills: true,
+  expandsSlashCommandsFromText: true
 }
 
 const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfile>> = {
@@ -59,6 +69,19 @@ const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfi
     skillSourceOwner: 'grok',
     namespacesPluginSkills: false
   }
+}
+
+/** Whether skills under `source` reach `profile`'s agent: shared roots, its own, and the skill
+ *  folders of an agent it also reads. */
+export function readsSkillSource(
+  profile: Pick<NativeChatAgentProfile, 'skillSourceOwner' | 'readsSkillFoldersOf'>,
+  source: Pick<SkillDiscoverySource, 'owner' | 'sourceKind'>
+): boolean {
+  return (
+    source.owner === null ||
+    source.owner === profile.skillSourceOwner ||
+    (source.owner === profile.readsSkillFoldersOf && source.sourceKind !== 'plugin')
+  )
 }
 
 export function getNativeChatAgentProfile(

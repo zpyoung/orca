@@ -29,6 +29,7 @@ export function buildWebSessionTabsFinalPatch(
     removedTerminalResourceIds,
     mirroredTerminalIds,
     nextOpenFiles,
+    nextEditorBuffers,
     nextBrowserTabsByWorktree,
     nextUnifiedTabsByWorktree,
     nextGroupsByWorktree,

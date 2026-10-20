@@ -714,7 +714,8 @@ describe('repo RPC methods', () => {
       makeRequest('projectGroup.moveProject', {
         repo: 'repo-1',
         groupId: group.id,
-        order: 2
+        order: 2,
+        connectionId: 'srv-ssh'
       })
     )
     const folderListResponse = await dispatcher.dispatch(makeRequest('folderWorkspace.list'))

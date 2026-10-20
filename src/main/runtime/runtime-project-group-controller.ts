@@ -36,7 +36,8 @@ import {
 
 type RuntimeProjectGroupDependencies = {
   getStore: () => RuntimeStore | null
-  resolveRepo: (selector: string) => Promise<Repo>
+  // `connectionId` narrows twins by their SSH target; undefined keeps the plain selector.
+  resolveRepo: (selector: string, connectionId?: string | null) => Promise<Repo>
   notifyReposChanged: () => void
   forgetTerminalTopology?: (repoId: string) => void
   invalidateResolvedWorktrees?: () => void
@@ -189,14 +190,19 @@ export class RuntimeProjectGroupController {
     }
   }
 
-  async moveProject(repoSelector: string, groupId: string | null, order?: number): Promise<Repo> {
+  async moveProject(
+    repoSelector: string,
+    groupId: string | null,
+    order?: number,
+    connectionId?: string | null
+  ): Promise<Repo> {
     const store = this.deps.getStore()
     if (!store?.moveProjectToGroup) {
       throw new Error('runtime_unavailable')
     }
-    const repo = await this.deps.resolveRepo(repoSelector)
+    const repo = await this.deps.resolveRepo(repoSelector, connectionId)
     assertWslMoveRepoWritable(store, repo)
-    const moved = store.moveProjectToGroup(repo.id, groupId, order)
+    const moved = store.moveProjectToGroup(repo, groupId, order)
     if (!moved) {
       throw new Error('repo_not_found')
     }

@@ -1,13 +1,11 @@
 // Making a reservation real for an ACP agent: open its connection (which spawns and owns the
-// process), record it before any handshake, initialize with the client's file system and terminals
-// off, then reattach the session this chat proved with `session/load` (`session/resume` for an
-// agent that cannot load or prefers it) or start a new one. A saved session the agent cannot reopen
-// is replaced by a new one, with a warning row that any later start writes if this attach never
-// did. The journal already holds a reattached chat, so whatever the agent sends while it reattaches
-// is not written, except context usage. The handshake has no time bound: the acquire's abort
-// signal (Close, Stop, quit) stops it at any point.
+// process) and record it before any handshake, so the host publishes the child at spawn. The
+// handshake (`acp-structured-handshake`) runs after: initialize, then reattach the session this chat
+// proved with `session/load` (`session/resume` for an agent that cannot load) or start a new one,
+// and the host receives protocol facts once that session answers. The handshake has no time bound of
+// its own: the host's startup limit, or a close, Stop or quit, stops it at any point.
 
-import type { AgentSessionProviderHandleLink } from '../../shared/agent-session-provider-handle'
+import { initializeAcpStructuredSession } from './acp-structured-handshake'
 import {
   AgentSessionPreSpawnError,
   type AgentSessionAcquisition,
@@ -15,52 +13,48 @@ import {
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import { providerTimelineSink } from '../native-chat/agent-session-timeline/provider-timeline-plan'
 import { providerSpawnedProcessIdentity } from '../provider-process/provider-spawned-process-identity'
-import { AcpAgentError } from './acp-errors'
 import { acpPrivateTempConnect } from './acp-private-temp'
-import { acpAuthenticationRequired, acpSignInRequiredRefusal } from './acp-turn-failures'
 import {
-  ACP_REOPEN_FAILED,
-  acpReopenTakeover,
-  acpSessionNotRestoredRow
-} from './acp-session-reopen-failure'
+  assertAcpStartingSession,
+  isAcpReadySession,
+  type AcpStructuredChild
+} from './acp-structured-child'
 import type { AcpSessionEvent } from './acp-session-runtime'
 import type { AcpStructuredConnection } from './acp-structured-connection'
-import { ACP_HANDLE_TRANSPORT, acpAgentName } from './acp-structured-agent-definitions'
+import { acpAgentName } from './acp-structured-agent-definitions'
 import { AcpStructuredLane, acpLaneChildWorkDelivery } from './acp-structured-lane'
-import { NO_ACP_CHILD_STOPS, probeAcpChildStops } from './acp-structured-child-stop'
+import { NO_ACP_CHILD_STOPS } from './acp-structured-child-stop'
 import { prepareAcpStructuredLaunch } from './acp-structured-launch-preparation'
-import { AcpStructuredOptions, restoreAcpSessionOptions } from './acp-structured-options'
+import { AcpStructuredOptions } from './acp-structured-options'
 import { AcpStructuredPrompts } from './acp-structured-prompts'
-import {
-  asReattachHistory,
-  routeAcpSessionEvent,
-  type AcpStructuredSession
-} from './acp-structured-session'
+import { asReattachHistory, routeAcpSessionEvent } from './acp-structured-session'
 import type { AcpStructuredSessionAdapterDeps } from './acp-structured-session-adapter-deps'
-import { AcpStructuredTurns, type AcpStructuredTurnsDeps } from './acp-structured-turns'
+import type { AcpStructuredTurnsDeps } from './acp-structured-turns'
 import { RequestPermissionResponseSchema } from './generated/acp-protocol.generated'
 import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 
 /** Frames an agent may send before its session exists; past this they are dropped. */
 const MAX_EARLY_FRAMES = 2_048
-export { acpAgentName } from './acp-structured-agent-definitions'
 
 export async function acquireAcpStructuredSession(input: {
   acquire: StructuredAgentSessionAcquireInput
   deps: AcpStructuredSessionAdapterDeps
   generation: string
-  /** The acquire was aborted; checked until the spawn, after which `track` hands it the connection. */
+  /** The spawn was aborted; checked until the spawn, after which `track` hands it the connection. */
   abandoned: () => boolean
   /** Registers the connection so a close during the acquire can stop it. */
   track: (connection: AcpStructuredConnection) => void
   /** The process's exit, observed while or after the session exists. */
-  onExit: (session: AcpStructuredSession | null) => void
+  onExit: (session: AcpStructuredChild | null) => void
   /** The protocol broke with the process perhaps still running. Null while starting: then the
    *  start itself fails. */
-  onConnectionLost: (session: AcpStructuredSession | null, error: Error) => void
+  onConnectionLost: (session: AcpStructuredChild | null, error: Error) => void
   onSettled: AcpStructuredTurnsDeps['settle']
   forceClose: (sessionId: string) => void
-}): Promise<{ acquisition: AgentSessionAcquisition; session: AcpStructuredSession }> {
+}): Promise<{
+  acquisition: AgentSessionAcquisition
+  session: AcpStructuredChild
+}> {
   const { acquire, deps, generation } = input
   const { spec } = deps
   const agentName = acpAgentName(spec.agent)
@@ -78,7 +72,7 @@ export async function acquireAcpStructuredSession(input: {
   }
   closedBeforeSpawn()
   const launch = await prepareAcpStructuredLaunch(deps, acquire, closedBeforeSpawn)
-  let session: AcpStructuredSession | null = null
+  let session: AcpStructuredChild | null = null
   // A slot rather than a `let`: closures read it, and control-flow narrowing cannot see them write.
   const slot: { lane: AcpStructuredLane | null; reattaching: boolean } = {
     lane: null,
@@ -89,9 +83,9 @@ export async function acquireAcpStructuredSession(input: {
   // has nobody waiting on it. What a settled request carries still shows in that turn.
   const prompts = new AcpStructuredPrompts(
     () => slot.lane,
-    () => session?.turns.acceptsRequests === true,
+    () => isAcpReadySession(session) && session.turns?.acceptsRequests === true,
     () =>
-      session !== null &&
+      isAcpReadySession(session) &&
       (session.turns.acceptsRequests ||
         (!session.turns.running && !session.turns.stopped && session.lane.openTurnId !== null))
   )
@@ -117,10 +111,9 @@ export async function acquireAcpStructuredSession(input: {
     },
     {
       clientInfo: { name: 'orca', version: '1' },
-      ...(acquire.onOutput ? { onOutput: acquire.onOutput } : {}),
       ...(spec.signIn ? { signIn: spec.signIn } : {}),
       onPermission: (request, context) => {
-        if (!session?.turns.acceptsRequests) {
+        if (!isAcpReadySession(session) || !session.turns?.acceptsRequests) {
           // No prompt of Orca's runs (a turn the agent began itself included), or a Stop or steer
           // is cutting it short: nobody is there to ask.
           return { outcome: { outcome: 'cancelled' } }
@@ -167,11 +160,25 @@ export async function acquireAcpStructuredSession(input: {
   // unanswered fails at once and the process ends, whether or not its exit is proven yet.
   input.track(connection)
   connection.subscribe((event: AcpSessionEvent) =>
-    whenLane(
-      () =>
-        slot.lane &&
+    whenLane(() => {
+      if (slot.lane) {
         routeAcpSessionEvent({ lane: slot.lane, options }, event, now(), slot.reattaching)
-    )
+      }
+      if (
+        isAcpReadySession(session) &&
+        !session.ended &&
+        event.kind === 'known' &&
+        event.notification.update.sessionUpdate === 'config_option_update'
+      ) {
+        deps.onEvent?.({
+          type: 'options-reported',
+          sessionId,
+          fence: acquire.fence,
+          acquisitionGeneration: generation,
+          reportedOptions: options.read().current
+        })
+      }
+    })
   )
   const identity = providerSpawnedProcessIdentity(
     acquire,
@@ -179,7 +186,6 @@ export async function acquireAcpStructuredSession(input: {
     deps.readProcessStartTime
   )
   /** `attaching`: the lane opens inside the attach window, before any frame queued so far. */
-  let childStops = NO_ACP_CHILD_STOPS
   const makeLane = (providerSessionId: string, attaching = false): AcpStructuredLane => {
     const lane = new AcpStructuredLane({
       sink,
@@ -190,10 +196,14 @@ export async function acquireAcpStructuredSession(input: {
       providerSessionId,
       dialect: spec.dialect,
       now,
-      childStops: () => childStops,
+      childStops: () => session?.childStops ?? NO_ACP_CHILD_STOPS,
       ...acpLaneChildWorkDelivery(deps, sessionId, events),
       logger: deps.logger ?? createStructuredAgentSessionLogger(),
-      onInputAccepted: (clientMessageId) => session?.turns.accept(clientMessageId),
+      onInputAccepted: (clientMessageId) => {
+        if (isAcpReadySession(session)) {
+          session.turns?.accept(clientMessageId)
+        }
+      },
       onFailed: () => input.forceClose(sessionId)
     })
     slot.lane = lane
@@ -292,17 +302,24 @@ export async function acquireAcpStructuredSession(input: {
       options,
       turns: new AcpStructuredTurns({
         connection,
-        withdrawRequests: () => prompts.withdrawAll(),
-        lane: liveLane,
-        agentName,
-        now,
-        settle: input.onSettled
+        options,
+        prompts,
+        child,
+        abandoned: () => signal.aborted,
+        lanes: {
+          create: makeLane,
+          clear: () => {
+            slot.lane = null
+          },
+          finishLoad: () => {
+            slot.reattaching = false
+          }
+        },
+        onSettled: input.onSettled
       }),
-      restoreSkipped,
-      closeRequested: false,
-      journalClosed: null,
-      ended: false,
-      exitObservedAt: null
+    dispose: () => {
+      slot.lane?.dispose()
+      early.length = 0
     }
     const reading = liveLane
     const unbind = events?.bindReadingControl?.({

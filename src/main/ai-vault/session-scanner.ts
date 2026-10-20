@@ -91,7 +91,6 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
 
         const candidates = await sessionCandidatesFromDiscoveries(discoveries, options)
         const parseCandidates = candidates.slice(0, limit * SESSION_PARSE_CANDIDATE_MULTIPLIER)
-        noteAiVaultScanReading(options.signal, parseCandidates.length)
 
         const parsedSessions = await parseSessionCandidates({
           candidates: parseCandidates,

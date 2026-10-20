@@ -112,6 +112,7 @@ export const SQLITE_SCHEMA_FILE_DATABASES: Record<string, string> = {
   'src/main/ai-vault-search/session-search-query-schema.ts': 'ai-vault-search',
   'src/main/ai-vault-search/session-search-schema.ts': 'ai-vault-search',
   'src/main/ai-vault/session-parse-cache-database.ts': 'ai-vault-parse-cache',
+  'src/main/ai-vault/session-scope-cwds-table.ts': 'ai-vault-parse-cache',
   'src/main/browser/browser-cookie-staged-import.ts': 'browser-cookie-import',
   'src/main/native-chat/agent-session-attachments/agent-session-attachment-claims.ts':
     'agent-session-journal',
@@ -239,7 +240,7 @@ export const SQLITE_TABLE_DISPOSITIONS: Record<string, WslMoveFieldDisposition> 
     ),
     ...tables(
       'ai-vault-parse-cache',
-      ['meta', 'rows'],
+      ['meta', 'rows', 'scope_cwds'],
       notApplicableDisposition(57, 'Session History parse cache; rebuilt from transcripts.')
     ),
     ...tables(

@@ -24,6 +24,21 @@ const EXPECTED_MATRIX = {
   '.github/workflows/node-server-tests.yml#mobile_web_bundle': { contents: 'read' },
   '.github/workflows/node-server-tests.yml#persistence': { contents: 'read' },
   '.github/workflows/release-mac-build.yml#build-mac': { actions: 'read', contents: 'write' },
+  '.github/workflows/release-mac-build.yml#qualification-template': { contents: 'read' },
+  ...Object.fromEntries(
+    [
+      'changes',
+      'desktop_template',
+      'linux_glibc217_compat',
+      'linux_glibc_floor',
+      'linux_musl',
+      'mobile_web_bundle',
+      'persistence'
+    ].map((job) => [
+      `.github/workflows/release-mac-build.yml#qualification-template -> .github/workflows/node-server-tests.yml#${job}`,
+      { contents: 'read' }
+    ])
+  ),
   [`${RELEASE_WORKFLOW}#build`]: { actions: 'read', contents: 'write' },
   [`${RELEASE_WORKFLOW}#build-mac`]: { actions: 'write', contents: 'read' },
   [`${RELEASE_WORKFLOW}#verify-mac-build`]: { actions: 'read', contents: 'read' },

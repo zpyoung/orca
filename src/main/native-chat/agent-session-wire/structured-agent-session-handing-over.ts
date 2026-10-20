@@ -42,3 +42,25 @@ export async function whileStructuredAgentSessionHandingOver<T>(
     released()
   }
 }
+
+/** The same held window across the host's separate pending-row and provider-call steps. */
+export function beginStructuredAgentSessionHandover(
+  journal: HandoverJournal,
+  clientMessageId: string,
+  workChanged?: () => void
+): () => void {
+  let sends = handingOver.get(journal)
+  if (!sends) {
+    sends = new Set()
+    handingOver.set(journal, sends)
+  }
+  sends.add(clientMessageId)
+  let held = true
+  return (): void => {
+    if (held) {
+      held = false
+      sends.delete(clientMessageId)
+      workChanged?.()
+    }
+  }
+}

@@ -26,8 +26,13 @@ export function useWorktreeDropCommitContext(args: {
     onReorderWorktrees,
     onPinWorktrees
   } = args
-  return useMemo<WorktreeDropCommitContext>(
-    () => ({
+  const { worktreePointerDragRef } = runtime
+  const { worktreeDragSessionRef } = session
+  return useMemo<WorktreeDropCommitContext>(() => {
+    // Why: read at drop time; the drops pass ids, which name a twin's card on another host too.
+    const draggedCopies = () =>
+      worktreePointerDragRef.current?.draggedCopies ?? worktreeDragSessionRef.current?.draggedCopies
+    return {
       scrollRef,
       workspaceStatuses,
       worktreeDragGroups: session.worktreeDragGroups,

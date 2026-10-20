@@ -105,6 +105,7 @@ import {
 } from '../../ai-vault/runtime-session-scanner'
 import { callRuntimeSessionSearch } from '../../ai-vault/runtime-session-search-call'
 import { ensureStructuredAgentSessionHostUnlessRefused } from '../../runtime/structured-agent-session-host-refusal'
+import { getAgentSessionAttachmentStore } from '../../native-chat/agent-session-attachments/agent-session-attachment-store-registry'
 import type { PluginService } from '../../plugins/plugin-service'
 import type { PluginMarketplaceHandlerServices } from '../plugin-marketplaces'
 import { settleWithinMs } from '../../quit-teardown-deadline'
@@ -170,6 +171,7 @@ export function registerCoreHandlers(
   registered = true
 
   registerAppHandlers(store, {
+    quitResumeRecordsFor: (session) => runtime.quitResumeRecordsFor(session),
     onBeforeRelaunch: lifecycleOptions.onBeforeRelaunch,
     // Why here, not onBeforeRelaunch: restart and profile switches quit through will-quit, which closes it.
     onBeforeRelaunchExit: () => closeNotificationDismissalsBeforeRelaunch(runtime)
@@ -285,7 +287,14 @@ export function registerCoreHandlers(
       prepareRuntimeAiVaultSessionResume(app.getPath('userData'), environmentId, args)
   })
   registerNativeChatHandlers()
-  registerClipboardHandlers(store)
+  registerClipboardHandlers(store, {
+    localChatAttachmentStore: async () => {
+      await ensureStructuredAgentSessionHostUnlessRefused(() =>
+        runtime.ensureStructuredAgentSessionHost()
+      )
+      return getAgentSessionAttachmentStore()
+    }
+  })
   registerUpdaterHandlers(store)
   registerSpeechHandlers(store)
 }

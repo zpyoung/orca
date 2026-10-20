@@ -33,8 +33,6 @@ export type AcpStructuredSession = {
   prompts: AcpStructuredPrompts
   options: AcpStructuredOptions
   turns: AcpStructuredTurns
-  /** Saved picks the agent refused when this child started. */
-  restoreSkipped: readonly string[]
   /** Orca asked this child to stop; its exit is then a requested close. */
   closeRequested: boolean
   /** Why nothing this child says reaches the journal any more; null while it does. */
@@ -43,6 +41,8 @@ export type AcpStructuredSession = {
   ended: boolean
   exitObservedAt: number | null
   unbindReadingControl?: () => void
+  dispose: () => void
+  open: (signal: AbortSignal) => Promise<StructuredAgentSessionProviderOpenResult>
 }
 
 /** Every agent frame goes through here once the lane exists: options and commands first, so a
@@ -156,7 +156,9 @@ export function endAcpStructuredSession(
 }
 
 /** Only for a send refused before its prompt was written. */
-export function rejectedAcpDispatch(session: AcpStructuredSession): AgentSessionDispatchOutcome {
+export function rejectedAcpDispatch(
+  session: Pick<AcpStructuredSession, 'spec'>
+): AgentSessionDispatchOutcome {
   return {
     state: 'rejected',
     ...agentSessionFailureWords(

@@ -138,7 +138,7 @@ export async function launchAgentInWebHostTab(args: {
       launchDraft: prompt
     }).then((outcome) => handleCreation({ outcome, promptDelivered: outcome.status === 'created' }))
   }
-  return createWebRuntimeSessionTerminal(launch).then((outcome) =>
+  return createWebRuntimeSessionTerminal(launch, { notifyFailure: false }).then((outcome) =>
     handleCreation({ outcome, promptDelivered: outcome.status === 'created' && hasPrompt })
   )
 }

@@ -76,7 +76,7 @@ export async function applyWindowLayoutCommand(
       markAgentLaunchesClosedByUser(command.workspace, { kind: 'tab', tabId })
     }
     const reply = await store.applyLayoutCommand({ ...command, force: true }, holders)
-    // Why: a workspace main lacks records nothing; today's close records it in the routed partition.
+    // Why: a workspace main lacks has no partition record to write; the window already removed the tab.
     return reply.ok && reply.result.alreadyClosed
       ? { ok: false, code: 'workspace_not_found' }
       : reply
@@ -85,7 +85,16 @@ export async function applyWindowLayoutCommand(
     // Read before the move, which re-homes the pane.
     const sourceTabId = terminalIdOf(store, hostIds[0], command.workspace, command.tabId)
     const reply = await store.applyLayoutCommand(
-      { ...command, windowDetach: { ptyId: command.windowDetach?.ptyId ?? null } },
+      {
+        ...command,
+        // Why: main mints the new tab's id, so the window's is not carried.
+        windowDetach: {
+          ptyId: command.windowDetach?.ptyId ?? null,
+          ...(command.windowDetach?.startupCwd
+            ? { startupCwd: command.windowDetach.startupCwd }
+            : {})
+        }
+      },
       holders
     )
     if (reply.ok && reply.result.tabId) {

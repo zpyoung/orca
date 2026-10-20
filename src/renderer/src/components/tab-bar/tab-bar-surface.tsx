@@ -68,7 +68,6 @@ export function renderTabBarSurface({
     showMobileEmulatorIntroCallout,
     windowsTerminalCapabilities,
     defaultWindowsPowerShellImplementation,
-    agentLaunchOptions,
     newTerminalShortcut,
     newBrowserShortcut,
     newSimulatorShortcut,
@@ -76,6 +75,9 @@ export function renderTabBarSurface({
     openMarkdownShortcut
   } = runtime
   const {
+    agentMenu,
+    agentLaunchOptions,
+    launchAgentRow,
     newTabMenuOpen,
     setNewTabMenuOpen,
     setCreateMenuQuery,
@@ -85,7 +87,6 @@ export function renderTabBarSurface({
     launchAgentFromNewTabEntry,
     runPendingNewTabMenuFocusAfterClose,
     queueNewActiveTerminalFocusAfterNewTabMenuClose,
-    queueTerminalTabFocusAfterNewTabMenuClose,
     queueFocusAfterNewTabMenuClose,
     showStaticCreateMenuItems
   } = createMenu
@@ -239,7 +240,7 @@ export function renderTabBarSurface({
                 menuOpen={newTabMenuOpen}
                 menuOptions={createMenuOptions}
                 agentOptions={agentLaunchOptions}
-                onLaunchAgent={launchAgentFromNewTabEntry}
+                onLaunchAgentOption={launchAgentFromNewTabEntry}
                 onOpenDefaultTerminal={() => {
                   queueNewActiveTerminalFocusAfterNewTabMenuClose()
                   onNewTerminalTab()

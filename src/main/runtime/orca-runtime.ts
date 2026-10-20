@@ -7,6 +7,7 @@ import {
 } from './sidebar-inputs/orca-runtime-sidebar-temporal'
 import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from './orca-runtime-ledger'
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-inputs-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../shared/layout-owner-switch'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import type {
   AgentLaunchTabPublished,
@@ -37,6 +38,10 @@ import type { LayoutApplyReply } from '../../shared/workspace-layout/workspace-l
 import { rekeyMovedPaneOwners } from './moved-pane-owner-rekey'
 import { applyWindowLayoutCommand, type WindowLayoutCommand } from './runtime-layout-apply'
 import type { TerminalCreateOptions } from './runtime-terminal-contracts'
+import {
+  installStructuredAgentAvailability,
+  type StructuredAgentAvailabilityReader
+} from './structured-agent-availability'
 import { PairedServerRowsProducer } from './sidebar-inputs/paired-server-rows-producer'
 import { RepoIconDataUrls } from './sidebar-inputs/repo-icon-data-urls'
 import { WorkspaceRowsProducer } from './sidebar-inputs/workspace-rows-producer'
@@ -50,9 +55,9 @@ import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-session-contrac
 import { getHostDisplayLabelOverrides } from '../../shared/host-setting-overrides'
 
 // Switch point: a window-fed build keeps no sidebar facts layer.
-const OrcaRuntimeSidebarBase: typeof OrcaRuntimeWithMigrationCatalog = ORCA_SIDEBAR_INPUTS_IS_MAIN
+const OrcaRuntimeSidebarBase: typeof OrcaRuntimeWithAgentTransitions = ORCA_SIDEBAR_INPUTS_IS_MAIN
   ? OrcaRuntimeWithSidebarTemporal
-  : OrcaRuntimeWithMigrationCatalog
+  : OrcaRuntimeWithAgentTransitions
 
 // oxlint-disable-next-line typescript/no-unsafe-declaration-merging -- SAFETY: The existing Linear installer supplies the canonical prototype surface.
 class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
@@ -107,6 +112,7 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
             pairedServerRows: requireSwitchedOn(this.pairedServerRows),
             workspaceCreations: requireSwitchedOn(this.workspaceCreations),
             workspaceRows: requireSwitchedOn(this.workspaceRows),
+            repoIcons: requireSwitchedOn(this.repoIconDataUrls),
             store: () => this.store,
             onClientEvent: (listener, options) => this.onClientEvent(listener, options)
           }),
@@ -167,7 +173,7 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
     })
   }
 
-  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithMigrationCatalog>) {
+  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithAgentTransitions>) {
     super(...args)
     // Why: the runtime listing re-runs a scan the worktree-change generation overtook and re-lists
     // through this runtime's scan cache, so a worktree change must reach both. The desktop IPC
@@ -256,18 +262,24 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
 
   /** A window's layout command (`layout.apply`), applied to the partitions that hold its tab. */
   async applyLayoutCommand(command: WindowLayoutCommand): Promise<LayoutApplyReply> {
-    const reply = await applyWindowLayoutCommand(
-      this.requireStore(),
-      (worktreeId, tabId) => {
-        if (tabId !== null) {
-          return this.getWorkspaceSessionHostIdsForTab(worktreeId, tabId)
-        }
-        const routed = this.tryGetWorkspaceSessionHostIdForWorktree(worktreeId)
-        return routed ? [routed] : []
-      },
-      command,
-      (move) => rekeyMovedPaneOwners(this, move)
-    )
+    const apply = (): Promise<LayoutApplyReply> =>
+      applyWindowLayoutCommand(
+        this.requireStore(),
+        (worktreeId, tabId) => {
+          if (tabId !== null) {
+            return this.getWorkspaceSessionHostIdsForTab(worktreeId, tabId)
+          }
+          const routed = this.tryGetWorkspaceSessionHostIdForWorktree(worktreeId)
+          return routed ? [routed] : []
+        },
+        command,
+        (move) => rekeyMovedPaneOwners(this, move)
+      )
+    // A window's sleep or wake lands after the hook statuses main accepted before it, as in the window.
+    const reply = await (ORCA_LAYOUT_OWNER_IS_MAIN &&
+    (command.type === 'sleep' || command.type === 'wake')
+      ? this.inResumeRecordOrder(apply)
+      : apply())
     // Sent before the reply, so the window can wait for the frame that shows the change.
     return { ...reply, frameSeq: this.workspaceLayoutStream.settledSeq() }
   }

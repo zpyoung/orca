@@ -31,6 +31,7 @@ import {
   RelayAssignmentRowBusyError,
   RelayCellInReserveModeError,
   RelayHomeCellUnavailableError,
+  type AssignOptions,
   type CellFenceAttemptEvidence,
   type RelayAssignment,
   type RelayAssignmentStore,
@@ -143,6 +144,7 @@ export function createRelayApp(
     cellReserverPoll?: () => void
     cellAdmitModeEffective?: () => 'db' | 'reserve'
     cellAdmitModeRaw?: () => 'db' | 'reserve'
+    cellPhonePathEffective?: () => 'db' | 'memory'
     cellReserveCounts?: () => {
       bookings: number
       intake: { perSec: number; burst: number; tokens: number }
@@ -459,7 +461,7 @@ export function createRelayApp(
         .setExpirationTime('5m')
         .sign(config.assignmentSigningKey)
     // Step 5: switched-on cells answer from the map; anything else keeps today's path below.
-    let step5: { epochFloor?: number; placeFresh?: () => Promise<RelayAssignment | null> } = {}
+    let step5: Pick<AssignOptions, 'epochFloor' | 'placeFresh' | 'regionReserve'> = {}
     if (operations.reservePlacement && !body.data.regionCorrection) {
       let plan: ReservePlan
       try {
@@ -491,7 +493,7 @@ export function createRelayApp(
         context.header('Retry-After', String(plan.retryAfterSeconds))
         return context.json({ error: 'assignment_temporarily_unavailable' }, 503)
       }
-      step5 = { epochFloor: plan.epochFloor, placeFresh: plan.placeFresh }
+      step5 = { epochFloor: plan.epochFloor, placeFresh: plan.placeFresh, regionReserve: plan.regionReserve }
     }
     let admission: { release(): void } | null = null
     let lane: AssignmentAdmissionLane = 'placement'
@@ -890,6 +892,9 @@ export function createRelayApp(
         : {}),
       ...(operations.cellAdmitModeEffective
         ? { admitModeEffective: operations.cellAdmitModeEffective() }
+        : {}),
+      ...(operations.cellPhonePathEffective
+        ? { phonePathEffective: operations.cellPhonePathEffective() }
         : {}),
       // Placement as built, not as configured: `on` only when this director books reserve cells.
       ...(config.role === 'director'

@@ -16,7 +16,10 @@ import { probeActiveOrcadReadiness } from '../../ssh/orcad-active-readiness'
 import { resolveOrcadRemoteContext, type OrcadRemoteContext } from '../install/orcad-remote-context'
 import { ORCAD_INSTALL_MODEL } from '../install/remote-install-model'
 import { computeRemoteInstallDir } from '../install/remote-versioned-install'
-import { getSshConnectionManager, getSshTargetRegistryStore } from '../../ssh/ssh-target-registry'
+import {
+  getSshConnectionManager,
+  getSshTargetRegistryStore
+} from '../../ssh/targets/ssh-target-registry'
 
 export const ORCAD_BIND_HOST = '127.0.0.1'
 
@@ -126,15 +129,18 @@ export function managedOrcadDeployPolicy(
   force?: boolean
 ): {
   census: OrcadTerminalCensus
+  recountCensus: () => Promise<OrcadTerminalCensus>
   censusRecord: OrcadActivationRecord
   admitRecord: (record: OrcadActivationRecord, candidateVersion: string) => string | null
 } {
+  // Why unknown when a version is active: only the daemon can count its sessions, and
+  // a deploy that guessed zero would restart over live terminals.
+  const census: OrcadTerminalCensus = context.activationRecord.active
+    ? { liveSessions: null, startedSinceActivation: null, daemonProtocolVersion: null }
+    : { liveSessions: 0, startedSinceActivation: 0, daemonProtocolVersion: null }
   return {
-    // Why unknown when a version is active: only the daemon can count its sessions, and
-    // a deploy that guessed zero would restart over live terminals.
-    census: context.activationRecord.active
-      ? { liveSessions: null, startedSinceActivation: null, daemonProtocolVersion: null }
-      : { liveSessions: 0, startedSinceActivation: 0, daemonProtocolVersion: null },
+    census,
+    recountCensus: async () => census,
     censusRecord: context.activationRecord,
     // Why: a host another desktop stopped may hold state its newer build migrated, and this
     // path has no linked record to check first, so only the fenced read can refuse it.

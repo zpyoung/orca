@@ -153,7 +153,7 @@ export function useAiVaultSessionLaunchActions({
           state: useAppStore.getState(),
           worktreeId,
           session,
-          commandOverride: agentCmdOverrides?.opencode
+          commandOverride: agentCmdOverrides?.[session.agent]
         })
         const prepared = await prepareAiVaultSessionForFork(session)
         const target = await dropDeletedSshResumeCwd(prepared.session)
