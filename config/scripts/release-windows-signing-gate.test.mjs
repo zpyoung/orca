@@ -29,7 +29,8 @@ function signingAllowed(submission, outcome, attempt = 1, platform = 'win', uplo
 describe('Windows release signing waits for macOS success', () => {
   it('packages concurrently, then verifies the exact dispatched macOS run before signing', () => {
     expect(jobs.build.needs).toContain('build-mac')
-    expect(jobs.build.if).toContain("needs.build-mac.result == 'success'")
+    // the fork releases macOS only, so its Windows/Linux build job never runs
+    expect(jobs.build.if).toBe(false)
     expect(jobs.build.needs).not.toContain('verify-mac-build')
     expect(jobs['build-mac'].needs).not.toContain('build')
     expect(jobs['verify-mac-build'].needs).toContain('build')

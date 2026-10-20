@@ -5922,6 +5922,11 @@
       "reason": "Asserts upstream's release-cut job matrix and github.repository == 'stablyai/orca'; the fork publishes macOS-only arm64 artifacts from zpyoung/orca, so upstream's version can never describe this pipeline."
     },
     {
+      "path": "config/scripts/release-windows-signing-gate.test.mjs",
+      "reason": "Upstream's Windows signing-gate contract, kept against the fork's release-cut.yml: the fork's Windows/Linux build job is disabled, so it asserts if: false where upstream asserts the build-mac success condition.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/release-rc-history.mjs",
       "reason": "Fork release-tooling delta for the fork's own RC history.",
       "status": "permanent"
