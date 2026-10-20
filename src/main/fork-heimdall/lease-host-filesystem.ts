@@ -3,7 +3,7 @@ import { posix, win32 } from 'node:path'
 import { getSshTargetIdForExecutionHost, type ExecutionHostId } from '../../shared/execution-host'
 import type { DirEntry } from '../../shared/filesystem-entry-types'
 import type { IFilesystemProvider } from '../providers/filesystem-provider-contract'
-import { getRegisteredSshState } from '../ssh/ssh-target-registry'
+import { getRegisteredSshState } from '../ssh/targets/ssh-target-registry'
 
 export type LeaseHostFilesystem = Pick<
   IFilesystemProvider,

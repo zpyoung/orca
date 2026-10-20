@@ -20,7 +20,7 @@ import {
 } from './runtime-visible-catalog'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { getRepoExecutionHostId } from '../../shared/execution-host'
-import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import {
   assertWslMoveProjectWritable,
   assertWslMoveRepoWritable,
