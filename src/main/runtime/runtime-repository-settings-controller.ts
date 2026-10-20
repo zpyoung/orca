@@ -12,6 +12,7 @@ import {
   type ExpectedLedgerRevision,
   type LedgerCatalogRemoval
 } from './runtime-ledger-catalog-removal'
+import { teardownStops } from './owned-session-teardown-policy'
 
 const PROJECT_TERMINAL_STOP_BUDGET_MS = 10_000
 
@@ -128,8 +129,9 @@ export class RuntimeRepositorySettingsController {
     return updated
   }
 
+  /** `repo.rm` names a selector; this desktop's own removal names the exact host row. */
   async remove(
-    repoSelector: string,
+    target: string | Repo,
     options?: { expectedLedgers?: ExpectedLedgerRevision[] }
   ): Promise<{ removed: true; ledgers?: DetachedLedgerRemoval[] }> {
     const store = this.deps.getStore()
@@ -155,7 +157,7 @@ export class RuntimeRepositorySettingsController {
       if (!store.removeProjectForHost) {
         throw new Error('runtime_unavailable')
       }
-      store.removeProjectForHost(repo.id, hostId)
+      store.removeProjectForHost(repo)
       return true
     }
     const removed = this.deps.withCatalogRemoval

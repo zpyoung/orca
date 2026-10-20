@@ -160,7 +160,9 @@ function deriveSlashAutocomplete(
     scannedSkills,
     query,
     profile?.skillPrefix ?? '/',
-    skillsEnabled ? sessionSkillNames : [],
+    skillsEnabled ? sessionSkills : [],
+    undefined,
+    prefix,
     profile?.namespacesPluginSkills === true
   )
   return {

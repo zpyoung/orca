@@ -24,7 +24,8 @@ afterEach(() => {
 })
 
 it('uses one PR shard for at most two selected files and preserves the full default', () => {
-  const caller = compileAggregateExpression(prWorkflow.jobs.e2e.with.managed_ssh_shards)
+  // This fork's PR workflow has no e2e caller, so the lane takes the selector's output directly.
+  expect(prWorkflow.jobs.e2e).toBeUndefined()
   const matrix = compileAggregateExpression(lane.strategy.matrix.shard, ['inputs'])
   for (const [specs, expected] of [
     [[small[0]], ['1/1']],
@@ -35,15 +36,7 @@ it('uses one PR shard for at most two selected files and preserves the full defa
     ],
     [[MANAGED_SSH_E2E_SPEC_PREFIX], ['1/2', '2/2']]
   ]) {
-    const shards = caller({
-      needs: {
-        code_paths: {
-          outputs: {
-            e2e_ssh_shards: JSON.stringify(managedSshShards(JSON.stringify(specs)))
-          }
-        }
-      }
-    }).coerceString()
+    const shards = JSON.stringify(managedSshShards(JSON.stringify(specs)))
     expect(
       matrix({ inputs: { managed_ssh_shards: shards } })
         .values()

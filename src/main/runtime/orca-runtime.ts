@@ -5,7 +5,7 @@ import {
   OrcaRuntimeWithSidebarTemporal,
   sidebarFactsRuntime
 } from './sidebar-inputs/orca-runtime-sidebar-temporal'
-import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from './orca-runtime-ledger'
+import { OrcaRuntimeWithAgentTransitions } from './orca-runtime-agent-transitions'
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-inputs-switch'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../shared/layout-owner-switch'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
@@ -185,6 +185,14 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
 
   getAskServices(): AskServices {
     return askServicesFor(this, () => Boolean(this.getAvailableAuthoritativeWindow()))
+  }
+
+  private structuredAgentAvailability?: ReturnType<typeof installStructuredAgentAvailability>
+
+  /** This host's agent health snapshot and every replacement, from first use; returns the release. */
+  subscribeStructuredAgentAvailability(read: StructuredAgentAvailabilityReader): () => void {
+    this.structuredAgentAvailability ??= installStructuredAgentAvailability(this.store, this)
+    return this.structuredAgentAvailability.subscribe(read)
   }
 
   /** Whether a window owns the layout and can show a launch's tab ahead of its process. */

@@ -109,7 +109,9 @@ export function buildWebSessionTabsFinalPatch(
     ...(nextTerminalDockPendingMutationsByPaneKey !== state.terminalDockPendingMutationsByPaneKey
       ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
       : {}),
-    ...(nextOpenFiles !== state.openFiles ? { openFiles: nextOpenFiles } : {}),
+    ...(nextOpenFiles !== state.openFiles
+      ? { openFiles: nextOpenFiles, editorBuffers: nextEditorBuffers }
+      : {}),
     ...(nextTabsByWorktree !== state.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
     ...(nextBrowserTabsByWorktree !== state.browserTabsByWorktree
       ? { browserTabsByWorktree: nextBrowserTabsByWorktree }

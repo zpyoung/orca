@@ -14,6 +14,13 @@ export type NativeChatAgentProfile = {
    *  where that syntax is verified — an unverified guess would insert a token
    *  the agent cannot resolve, so the rest fall back to the bare skill name. */
   namespacesPluginSkills: boolean
+  /** The agent reports and invokes each skill under this prefix, e.g. Pi's `skill:<name>`. */
+  skillNamePrefix?: string
+  /** Another agent whose own skill folders, though not its plugins, this agent also reads. */
+  readsSkillFoldersOf?: AgentType
+  /** The agent's command report may list some skills among its commands (OpenCode 1.x) or none
+   *  (2.x), so a running chat keeps the skill folders' list. */
+  keepsScannedSkills?: true
   /** The agent's own harness expands a slash command out of the message text, so
    *  the chat host claims only the commands it implements itself. */
   expandsSlashCommandsFromText?: true
@@ -26,6 +33,7 @@ export type NativeChatAgentProfile = {
 const OPENCODE_PROFILE: NativeChatAgentProfile = {
   skillPrefix: '/',
   skillSourceOwner: 'opencode',
+  namespacesPluginSkills: false,
   readsSkillFoldersOf: 'claude',
   keepsScannedSkills: true,
   expandsSlashCommandsFromText: true
@@ -52,22 +60,19 @@ const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfi
     namespacesPluginSkills: true,
     expandsSlashCommandsFromText: true
   },
-  opencode: {
-    skillPrefix: '/',
-    skillSourceOwner: 'opencode',
-    namespacesPluginSkills: false,
-    expandsSlashCommandsFromText: true
-  },
-  opencode2: {
-    skillPrefix: '/',
-    skillSourceOwner: 'opencode2',
-    namespacesPluginSkills: false,
-    expandsSlashCommandsFromText: true
-  },
+  opencode: OPENCODE_PROFILE,
+  opencode2: OPENCODE_PROFILE,
   grok: {
     skillPrefix: '/',
     skillSourceOwner: 'grok',
     namespacesPluginSkills: false
+  },
+  // Pi expands only `/skill:<name>`; a bare `/<name>` reaches the model as text.
+  pi: {
+    skillPrefix: '/',
+    skillSourceOwner: 'pi',
+    namespacesPluginSkills: false,
+    skillNamePrefix: 'skill:'
   }
 }
 

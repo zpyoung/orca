@@ -8,6 +8,7 @@ import type { WorktreeDragUnitGroup } from '../../worktree-drag-units'
 import type { WorktreeSidebarDropPreview } from '../../worktree-sidebar-drop-preview'
 import type { WorktreeStatusDropRequest } from './use-session'
 import type { WorktreePointerDrag, WorktreeSidebarLineageDropTarget } from './row-state'
+import type { DraggedWorktreeCopies } from './dragged-worktree-copies'
 
 export const NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK = (): void => {}
 

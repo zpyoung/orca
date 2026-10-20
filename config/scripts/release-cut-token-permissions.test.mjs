@@ -258,8 +258,12 @@ describe('release-cut token permissions', () => {
     }
 
     const macWorkflow = readWorkflow('.github/workflows/release-mac-build.yml')
-    expect(macWorkflow.jobs['build-mac'].if).toBe("github.repository == 'zpyoung/orca'")
-    expect(checkoutRef(macWorkflow.jobs['build-mac'])).toBe('refs/tags/${{ inputs.tag }}')
+    expect(macWorkflow.jobs['build-mac'].if).toBe(
+      "${{ !cancelled() && (!inputs.qualification_only || needs.qualification-template.result == 'success') && github.repository == 'zpyoung/orca' }}"
+    )
+    expect(checkoutRef(macWorkflow.jobs['build-mac'])).toBe(
+      "${{ inputs.qualification_only && github.sha || format('refs/tags/{0}', inputs.tag) }}"
+    )
 
     const e2eWorkflow = readWorkflow('.github/workflows/e2e.yml')
     for (const jobName of Object.keys(e2eWorkflow.jobs)) {

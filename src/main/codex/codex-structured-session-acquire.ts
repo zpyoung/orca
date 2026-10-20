@@ -215,37 +215,17 @@ export async function acquireCodexStructuredSession(input: {
     const process = await spawnIdentity.read(connection.pid)
     acquisitions.assertCurrent(sessionId, attempt)
     assertCodexConnectionOpen(connection, sessionId)
-    acquisitions.assertCurrent(sessionId, attempt)
-    const options = restoredCodexSessionOptions(acquireInput.options)
-    const catalogAccess = codexAcquireCatalogAccess(deps, launch)
-    acquisitions.assertCurrent(sessionId, attempt)
-    assertCodexConnectionOpen(connection, sessionId)
-    acquisitions.deleteIfCurrent(sessionId, attempt)
-    // Where this session's child work goes: the host's records, after each frame is journaled.
-    const sink = codexChildWorkSink(sessionId, deps, acquireInput.events)
-    const session: CodexSession = {
-      account,
-      connection,
-      ...codexSessionLifecycle(acquireInput.fence, acquired.acquisitionGeneration as string),
-      threadId: opened.threadId,
-      historyMode: opened.historyMode,
-      activeTurnIds: new Set(),
-      abortedTurnIds: new Set(),
-      prompts: acquisition.prompts,
-      options,
-      reportedOptions: reportedCodexThreadOptions(opened),
-      ...(catalogAccess ? { catalogAccess } : {}),
-      dispatchEchoes,
-      translator,
-      backgroundTasks: new CodexBackgroundTaskTracker(opened.threadId, subagentExecutions, sink),
-      forceCloseUnexpected: (reason) =>
-        input.forceCloseUnexpected(
-          sessionId,
-          acquireInput.fence,
-          acquired.acquisitionGeneration as string,
-          reason
-        ),
-      ...(unbindReadingControl ? { unbindReadingControl } : {})
+    attempt.acquisitionGeneration = acquisitionGeneration
+    let disposed = false
+    attempt.dispose = () => {
+      if (disposed) {
+        return
+      }
+      disposed = true
+      unbindReadingControl?.()
+      acquisition.prompts.clear()
+      acquisition.drain()
+      translator?.dispose()
     }
     attempt.open = (openInput) =>
       openCodexStructuredSession(

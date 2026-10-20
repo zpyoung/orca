@@ -46,29 +46,33 @@ export function useWorktreeDropCommitContext(args: {
       commitWorktreeGroupMembershipDrop: groupMembershipDrag.commitPointerDrop,
       clearReorderedWorktreeParents: lineageDrop.clearReorderedWorktreeParents,
       clearWorktreeDrag: runtime.clearWorktreeDrag,
-      onMoveWorktreesToStatus,
-      onMoveWorktreesToStatusAtIndex,
-      onReorderWorktrees,
-      onPinWorktrees
-    }),
-    [
-      groupMembershipDrag.commitPointerDrop,
-      groupMembershipDrag.trackPointerDragFrame,
-      lineageDrop.clearReorderedWorktreeParents,
-      lineageDrop.commitWorktreeLineageParentDrop,
-      lineageDrop.getEligibleLineageDropTarget,
-      onMoveWorktreesToStatus,
-      onMoveWorktreesToStatusAtIndex,
-      onPinWorktrees,
-      onReorderWorktrees,
-      runtime.clearWorktreeDrag,
-      scrollRef,
-      session.computeWorktreeDrop,
-      session.computeWorktreeStatusDrop,
-      session.refreshWorktreeDragSession,
-      session.worktreeDragGroups,
-      session.worktreeDragUnitGroups,
-      workspaceStatuses
-    ]
-  )
+      onMoveWorktreesToStatus: (worktreeIds, status) =>
+        onMoveWorktreesToStatus(worktreeIds, status, draggedCopies()),
+      onMoveWorktreesToStatusAtIndex: (drop) =>
+        onMoveWorktreesToStatusAtIndex({ ...drop, draggedCopies: draggedCopies() }),
+      onReorderWorktrees: (reorder) =>
+        onReorderWorktrees({ ...reorder, draggedCopies: draggedCopies() }),
+      onPinWorktrees: (worktreeIds) => onPinWorktrees(worktreeIds, draggedCopies())
+    }
+  }, [
+    groupMembershipDrag.commitPointerDrop,
+    groupMembershipDrag.trackPointerDragFrame,
+    lineageDrop.clearReorderedWorktreeParents,
+    lineageDrop.commitWorktreeLineageParentDrop,
+    lineageDrop.getEligibleLineageDropTarget,
+    onMoveWorktreesToStatus,
+    onMoveWorktreesToStatusAtIndex,
+    onPinWorktrees,
+    onReorderWorktrees,
+    runtime.clearWorktreeDrag,
+    scrollRef,
+    session.computeWorktreeDrop,
+    session.computeWorktreeStatusDrop,
+    session.refreshWorktreeDragSession,
+    session.worktreeDragGroups,
+    session.worktreeDragUnitGroups,
+    workspaceStatuses,
+    worktreeDragSessionRef,
+    worktreePointerDragRef
+  ])
 }

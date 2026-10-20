@@ -288,13 +288,13 @@ export class StructuredAgentSessionHost {
     createStructuredAgentSessionHostMutationContext({
       deps: this.deps,
       sessions: this.sessions,
-      publish: (sessionId, journal) => this.subscribers.publish(sessionId, journal),
-      conversation: this.lifetime.conversation,
-      readChildWork: this.clientDelivery.readChildWork,
-      publishChildWork: this.clientDelivery.publishChildWork,
-      captureChildWorkStops: this.clientDelivery.captureChildWorkStops,
-      childWorkOpen: this.clientDelivery.childWorkOpen,
-      childWorkIncomplete: this.clientDelivery.childWorkIncomplete,
+      subscribers: this.subscribers,
+      lifetime: this.lifetime,
+      clientDelivery: this.clientDelivery,
+      conversationDelivery: this.conversationDelivery,
+      queued: this.queued,
+      runtimeState: this.runtimeState,
+      attachContext: () => this.attachContext(),
       serialize: (sessionId, task) => this.serialize(sessionId, task),
       now: () => this.now()
     })

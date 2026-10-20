@@ -158,6 +158,15 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
   agentHookServer.subscribeEnrichedStatus((enriched) =>
     recordObservedAgentStatusPaneIdentity(observedPaneIdentities, enriched, runtime)
   )
+  agentHookServer.setCliWriterExecutionMatcher(observedPaneIdentities, runtime)
+  // Switch point: main keeps the resume record of each pane it holds from the status it accepts.
+  if (ORCA_LAYOUT_OWNER_IS_MAIN) {
+    agentHookServer.subscribeEnrichedStatus((enriched) =>
+      runtime.recordHookStatusResume(toAgentStatusIpcPayload(enriched))
+    )
+    agentHookServer.subscribePaneStatusClear((clear) => runtime.forgetHookStatusResume(clear))
+    agentHookServer.subscribeStatusDrop((paneKey) => runtime.forgetHookStatusResume({ paneKey }))
+  }
   forwardAskEventsToRenderer(
     runtime.getAskServices().registry,
     () => state.mainWindow,

@@ -40,6 +40,9 @@ export function remoteRuntimeClientCapabilities(
       REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
       TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY,
       ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES,
+      // Switch point: every desktop socket, browser hosting's included, leaves the unread flag to
+      // a host that raises it.
+      ...(ORCA_SIDEBAR_INPUTS_IS_MAIN ? [WORKSPACE_UNREAD_HOST_RAISES_CAPABILITY] : []),
       ...additionalCapabilities
     ])
   )

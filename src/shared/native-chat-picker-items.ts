@@ -78,7 +78,11 @@ export function buildNativeChatPickerItems(
   skills: readonly DiscoveredSkill[],
   query: string,
   skillSigil: '/' | '$',
-  sessionSkillNames?: readonly string[],
+  sessionSkills?: readonly NativeChatSessionSkill[],
+  /** Rows kept per group; a caller that needs every skill passes Infinity. */
+  limit = PICKER_RESULT_LIMIT,
+  /** `$` matches skill names only, so a shell word like `$CODEX_HOME` never hits a description. */
+  trigger: '/' | '$' = '/',
   namespacePluginSkills = false
 ): NativeChatPickerItem[] {
   // A name can only collide when both kinds invoke through the same sigil;
@@ -89,7 +93,7 @@ export function buildNativeChatPickerItems(
   )
   const mergedSkills = mergeNativeChatSkills(
     skills,
-    sessionSkillNames,
+    sessionSkills,
     unclassifiedNames,
     skillSigil,
     namespacePluginSkills
@@ -168,12 +172,20 @@ function mergeNativeChatSkills(
   const names =
     sessionSkills !== undefined
       ? [
-          ...sessionSkillNames.filter(isTokenSafe),
+          ...sessionSkills.map((skill) => skill.name).filter(isTokenSafe),
           ...[...byName.keys()].filter((name) => unclassifiedNames.has(name))
         ]
       : [...byName.keys()]
   return [...new Set(names)]
-    .flatMap((name) => pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills))
+    .flatMap((name) => {
+      const reported = sessionSkills?.find((entry) => entry.name === name)?.description
+      return pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills).map(
+        (skill) =>
+          skill.description === null && reported
+            ? { ...skill, description: sanitizePickerText(reported, 240) }
+            : skill
+      )
+    })
     .sort(comparePickerSkills)
 }
 

@@ -47,4 +47,5 @@ export type SidebarListModel = {
   visibleScope: ReturnType<typeof useSidebarHostVisibleScope>
   externalWorktreeCards: ReturnType<typeof useSidebarExternalWorktreeCards>
   rowModel: ReturnType<typeof useSidebarSectionRows>
+  activityHiddenCount?: number
 }

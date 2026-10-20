@@ -288,20 +288,20 @@ async function runAttachUnderAbort(
             failureTextContext: structuredAgentSessionFailureWordsContext(priorRecord)
           })
         }
-        await bindAndDrain(eventSink, attached.journal, fence, (activity) =>
-          context.subscribers.publish(sessionId, attached.journal, activity)
-        )
-        attempt.candidate = {
-          sink: eventSink,
-          child: {
-            generation: acquisitionGeneration ?? current?.generation ?? null,
-            fence,
-            // An acquire reports its phase; a re-attach keeps what its child already proved.
-            phase: owner === 'acquired' ? providerChildPhase : (current?.phase ?? 'ready'),
-            ...(startedFor === undefined ? {} : { startedFor }),
-            ...(permissionMode === undefined ? {} : { permissionMode }),
-            heldSends: () => context.deps.adapter.heldSends?.(sessionId)
-          }
+        eventSink.bind({
+          journal: attached.journal,
+          fence,
+          publish: (activity) => context.subscribers.publish(sessionId, attached.journal, activity)
+        })
+        const { journal } = attached
+        attempt.bound = { acquisitionGeneration, owner, fence, journal, current, eventSink }
+      },
+      // Outside the commits: the barrier the host publishes behind, and for a proven child the
+      // provider's word on a rewind in doubt (a starting one recovers in its open step).
+      beforePublish: async (owner) => {
+        const barrier = await attempt.bound?.eventSink.drained()
+        if (barrier && !barrier.ok) {
+          throw barrier.error
         }
         if (owner === 'kept' && attempt.bound?.current?.phase === 'ready') {
           attempt.rewind = await readBoundChildRewind(context, sessionId, attempt.bound)

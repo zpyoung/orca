@@ -190,15 +190,9 @@ export function MobileNativeChatSessionOptionPickers({
                 {segmentOptions.map((descriptor) => (
                   <SessionOptionSegments
                     key={descriptor.id}
-                    label={descriptor.label}
-                    value={mobileSessionOptionSummaryValue(descriptor)}
-                    disabled={disabled}
-                    divided={index < options.length - 1}
-                    onPress={
-                      isReadOnlySessionOptionValue(descriptor)
-                        ? undefined
-                        : () => onNavigate(descriptor.id)
-                    }
+                    descriptor={descriptor}
+                    disabled={locked}
+                    onSetOption={(value) => applyOption(descriptor, value)}
                   />
                 ))}
                 <OptionRows

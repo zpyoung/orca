@@ -5,6 +5,7 @@ import {
   resolveTerminalTabProgramProgress,
   type TerminalTabActivityStatus
 } from './terminal-tab-activity-status'
+import { selectTabHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
 
 type TerminalTabActivity = {
   activityStatus: TerminalTabActivityStatus
@@ -19,6 +20,7 @@ export function useTerminalTabActivity(
   // Pane bucketing is memoized per snapshot, so every mounted tab shares one pass.
   const activityStatus = useAppStore((s) =>
     resolveTerminalTabActivityStatus({
+      hasPendingAsk: selectTabHasPendingAsk(s, tab.id),
       tab,
       agentStatusByPaneKey: s.agentStatusByPaneKey,
       agentStatusEpoch: s.agentStatusEpoch,

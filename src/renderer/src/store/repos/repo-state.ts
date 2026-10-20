@@ -280,6 +280,7 @@ export type RepoSlice = {
     options: {
       hostId: ExecutionHostId
       errorFeedback?: 'toast' | 'silent'
+      automaticCleanup?: boolean
       expectedLedgers?: ExpectedLedgerRevision[]
     }
   ) => Promise<void>

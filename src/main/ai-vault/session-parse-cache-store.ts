@@ -143,6 +143,86 @@ export function getSessionParseCacheEntry(path: string): SessionParseCacheEntry 
   return restored
 }
 
+/** A row's stored fields without placing it in memory: a scope walk checks thousands. */
+export function peekSessionParseCacheEntry(
+  path: string
+): PersistedSessionParseCacheEntry | undefined {
+  return (
+    cache.get(path) ??
+    (scopeKnowledge.get(path) === 'unresolved' ? undefined : coldTier?.read(path))
+  )
+}
+
+/** Scope cwds for many paths at once: memory first, then one batched database read. */
+export function lookupSessionScopeCwds(paths: readonly string[]): void {
+  const cold = paths.filter((path) => !cache.has(path))
+  const stored =
+    coldTier === null || cold.length === 0
+      ? { found: new Map<string, SessionScopeCwdLookup>(), parsed: true, read: true }
+      : coldTier.readScopeCwds?.(cold)
+  for (const path of paths) {
+    const row = stored?.found.get(path)
+    const parsed = row?.parsed ?? (stored?.parsed ? 'absent' : 'unresolved')
+    scopeKnowledge.set(path, cache.has(path) ? 'changed' : parsed)
+    const read = row?.read
+    if (read && !readScopeCwds.has(path)) {
+      readScopeCwds.set(path, read)
+    }
+  }
+}
+
+export function resolveSessionScopeCwd(
+  path: string,
+  matches: (stamp: SessionScopeCwdStamp) => boolean
+): { cwd: string | null } | 'read' | 'parse' {
+  const hot = cache.get(path)
+  let parsed = hot ? scopeCwdStampOf(hot) : scopeKnowledge.get(path)
+  if (parsed === 'changed') {
+    const stored = coldTier?.readScopeCwds?.([path]).found.get(path)
+    parsed = stored?.parsed ?? 'unresolved'
+    scopeKnowledge.set(path, parsed)
+    if (stored?.read && !readScopeCwds.has(path)) {
+      readScopeCwds.set(path, stored.read)
+    }
+  }
+  if (parsed === undefined || parsed === 'unresolved') {
+    scopeKnowledge.set(path, 'unresolved')
+    return 'parse'
+  }
+  for (const stamp of [typeof parsed === 'object' ? parsed : undefined, readScopeCwds.get(path)]) {
+    if (stamp && matches(stamp)) {
+      return { cwd: stamp.cwd }
+    }
+  }
+  return 'read'
+}
+
+export function storeSessionScopeCwd(path: string, stamp: SessionScopeCwdStamp): void {
+  readScopeCwds.set(path, stamp)
+  coldTier?.storedScopeCwd?.(path, stamp)
+}
+
+/** Keeps in memory only the read cwds of transcripts the latest scope walk found. */
+export function pruneSessionScopeCwds(discoveredPaths: ReadonlySet<string>): void {
+  for (const map of [readScopeCwds, scopeKnowledge]) {
+    for (const path of map.keys()) {
+      if (!discoveredPaths.has(path)) {
+        map.delete(path)
+      }
+    }
+  }
+}
+
+export function scopeCwdStampOf(entry: PersistedSessionParseCacheEntry): SessionScopeCwdStamp {
+  return {
+    mtimeMs: entry.mtimeMs,
+    sizeBytes: entry.sizeBytes,
+    platform: entry.platform,
+    cwd: entry.session?.cwd ?? null,
+    ...(entry.sidecar === undefined ? {} : { sidecar: entry.sidecar })
+  }
+}
+
 export function storeSessionParseCacheEntry(path: string, entry: SessionParseCacheEntry): void {
   if (scopeKnowledge.has(path)) {
     scopeKnowledge.set(path, 'changed')

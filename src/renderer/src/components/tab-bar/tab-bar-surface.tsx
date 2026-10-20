@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { QuickLaunchAgentMenuItems } from './QuickLaunchButton'
+import { ProjectedAgentMenuItems } from './QuickLaunchButton'
 import { LoopMenuItem } from '@/fork-loops/LoopMenuItem'
 import TabBarCreateEntry from './TabBarCreateEntry'
 import { TabStripScrollIndicator } from './TabStripScrollIndicator'
@@ -279,11 +279,7 @@ export function renderTabBarSurface({
           {showStaticCreateMenuItems && showAgentLaunchItems ? (
             <>
               <DropdownMenuSeparator />
-              <QuickLaunchAgentMenuItems
-                worktreeId={worktreeId}
-                groupId={resolvedGroupId}
-                onFocusTerminal={queueTerminalTabFocusAfterNewTabMenuClose}
-              />
+              <ProjectedAgentMenuItems model={agentMenu} runLaunch={launchAgentRow} />
               <LoopMenuItem worktreeId={worktreeId} groupId={resolvedGroupId} />
             </>
           ) : null}

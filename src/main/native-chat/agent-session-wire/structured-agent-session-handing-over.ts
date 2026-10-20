@@ -22,20 +22,7 @@ export async function whileStructuredAgentSessionHandingOver<T>(
   handOver: (released: () => void) => Promise<T>,
   workChanged?: () => void
 ): Promise<T> {
-  let sends = handingOver.get(journal)
-  if (!sends) {
-    sends = new Set()
-    handingOver.set(journal, sends)
-  }
-  sends.add(clientMessageId)
-  let held = true
-  const released = (): void => {
-    if (held) {
-      held = false
-      sends.delete(clientMessageId)
-      workChanged?.()
-    }
-  }
+  const released = beginStructuredAgentSessionHandover(journal, clientMessageId, workChanged)
   try {
     return await handOver(released)
   } finally {

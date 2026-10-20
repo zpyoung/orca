@@ -44,7 +44,8 @@ jobs:
       build_template: true
 
   build-mac:
-    if: github.repository == 'zpyoung/orca'
+    needs: qualification-template
+    if: ${{ !cancelled() && (!inputs.qualification_only || needs.qualification-template.result == 'success') && github.repository == 'zpyoung/orca' }}
     # Fork: GitHub-hosted macOS runner (no Blacksmith on this fork). Signs +
     # notarizes with the fork's own Apple Developer ID secrets.
     runs-on: macos-15
@@ -250,7 +251,8 @@ jobs:
           timeout_minutes: 70
           max_attempts: 2
           retry_wait_seconds: 30
-          command: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON config/scripts/pinned-node-downloads.mjs darwin-arm64 darwin-x64 && node config/scripts/ensure-native-runtime.mjs --runtime=electron && if [ -f config/scripts/build-mac-notarization-overlap.mjs ]; then ORCA_MAC_RELEASE=1 node config/scripts/build-mac-notarization-overlap.mjs --publish "$ORCA_MAC_PUBLISH" --draft; else ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish "$ORCA_MAC_PUBLISH" -c.publish.releaseType=draft; fi
+          # Fork: no notarization-overlap builder; it signs x64 and arm64 together and this channel ships arm64 only.
+          command: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON config/scripts/pinned-node-downloads.mjs darwin-arm64 darwin-x64 && node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish "$ORCA_MAC_PUBLISH" -c.publish.releaseType=draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORCA_REQUIRE_ORCAD_TEMPLATE: '1'

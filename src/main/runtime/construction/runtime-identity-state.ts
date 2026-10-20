@@ -56,6 +56,7 @@ import {
 import { RuntimeTerminalWait as RuntimeTerminalWaitController } from '../terminal/wait/terminal-wait'
 import type { PtyLivenessVerdict } from '../../../shared/pty-liveness-verdict'
 import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import type { HostScopedWorktreeKey } from '../../../shared/worktree/host-qualified-identity'
 
 import { RuntimeConstructionServices } from './runtime-construction-services'
 

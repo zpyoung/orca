@@ -63,10 +63,10 @@ export class PiRpcSession {
   readonly turns: PiRpcTurns
   readonly dialogs: PiRpcDialogCallbacks
   readonly selected = new Map<string, string>()
-  private startCatalogListing?: AgentModelCatalogLiveListing
-  readonly skipped: string[] = []
-  commands?: AgentSessionSlashCommand[]
-  options?: AgentSessionOptionsResult
+  readonly optionProof = { current: new Map<string, string>(), writes: new Map<string, symbol>() }
+  readonly startup: PiRpcSessionStartup
+  initialOptions: Readonly<Record<string, string>> = {}
+  openedLink: AgentSessionProviderHandleLink | null = null
   requestedClose = false
   private publishedExit = false
   private failedCause?: Error
@@ -158,23 +158,19 @@ export class PiRpcSession {
     )
   }
 
-  async start(): Promise<string> {
-    const state = piRpcStateSchema.parse(await this.connection.request('get_state'))
-    this.lane.apply(this.turns.context.setModel(state.model ?? undefined, Date.now()))
-    // Keys a restore sent, whether or not Pi took them.
-    const picked = new Set<string>()
-    for (const [key, value] of Object.entries(this.input.options ?? {})) {
-      if (!['model', 'effort'].includes(key)) {
-        this.skipped.push(key)
-        continue
-      }
-      picked.add(key)
-      try {
-        await applyPiRpcSessionOption(this.connection, this.selected, key, value)
-      } catch (error) {
-        this.skipped.push(key)
-        this.deps.logger.warn('Pi rejected a saved option', {
-          scope: 'pi-option-restore',
+  async open(signal: AbortSignal): Promise<StructuredAgentSessionProviderOpenResult> {
+    const result = await this.startup.run(this.resolvedLaunch, signal)
+    this.initialOptions = {
+      ...(result.reportedOptions.model ? { model: result.reportedOptions.model } : {}),
+      ...(result.reportedOptions.effort ? { effort: result.reportedOptions.effort } : {})
+    }
+    this.openedLink = result.link ?? null
+    this.optionProof.current = new Map(Object.entries(this.initialOptions))
+    void this.startup
+      .readAfterOpen(this.generation, result.reportedOptions)
+      .catch((error: unknown) =>
+        this.deps.logger.warn('Pi startup reports failed', {
+          scope: 'pi-startup-reports',
           sessionId: this.input.identity.sessionId,
           error
         })
@@ -245,6 +241,7 @@ export class PiRpcSession {
       return
     }
     this.publishedExit = true
+    this.failedCause ??= error
     this.dialogs.cancelAll()
     this.turns.end()
     this.lane.finalize()

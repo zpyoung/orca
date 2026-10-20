@@ -1,7 +1,4 @@
-import {
-  createNormalizedPathInsideOrEqualMatcher,
-  normalizeRuntimePathForComparison
-} from './cross-platform-path'
+import { createAiVaultScopeCwdMatcher } from './ai-vault-scope-cwd-match'
 import type { AiVaultListArgs, AiVaultListResult } from './ai-vault-types'
 
 export const DEFAULT_AI_VAULT_SCAN_LIMIT = 1000
@@ -54,22 +51,11 @@ export function truncateAiVaultListResult(
   if (depth === 'unlimited') {
     return result
   }
-  const selectedIds = new Set(result.sessions.slice(0, depth).map((session) => session.id))
-  if (scopePaths.length > 0) {
-    const scopeMatchers = scopePaths.map(createNormalizedPathInsideOrEqualMatcher)
-    let scopedCount = 0
-    for (const session of result.sessions) {
-      const cwd = session.cwd
-      const normalizedCwd = cwd ? normalizeRuntimePathForComparison(cwd) : null
-      if (normalizedCwd !== null && scopeMatchers.some((matches) => matches(normalizedCwd))) {
-        selectedIds.add(session.id)
-        if (++scopedCount >= depth) {
-          break
-        }
-      }
-    }
-  }
-  const sessions = result.sessions.filter((session) => selectedIds.has(session.id))
+  const inScope = scopePaths.length > 0 ? createAiVaultScopeCwdMatcher(scopePaths) : null
+  let outOfScopeCount = 0
+  const sessions = result.sessions.filter(
+    (session) => inScope?.(session.cwd, session.filePath) === true || outOfScopeCount++ < depth
+  )
   return {
     ...result,
     sessions,

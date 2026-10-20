@@ -245,6 +245,7 @@ export function VaultSessionRow({
         worktreeInfo={worktreeInfo}
         vaultScope={vaultScope}
       />
+      <ForkAiVaultLineageLine session={session} />
       {detailsExpanded ? (
         <SessionInlineDetails
           id={detailsId}
@@ -271,117 +272,7 @@ export function VaultSessionRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild className="block w-full min-w-0">
-        <div
-          className={cn(
-            'group/session-row flex w-full min-w-0 cursor-pointer flex-col border-b border-sidebar-border px-3 py-2 text-left transition-colors hover:bg-sidebar-accent/55',
-            !detailsExpanded && 'min-h-[98px]'
-          )}
-          onClick={(event) => {
-            // Radix portals this row's menus out of its DOM, but React still
-            // bubbles their clicks here — without this, choosing Delete expands
-            // the row behind the dialog.
-            const target = event.target
-            if (target instanceof Node && !event.currentTarget.contains(target)) {
-              return
-            }
-            onToggleDetails()
-          }}
-        >
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1">
-            <div
-              className={cn(
-                'min-w-0 text-[13px] font-medium leading-5 text-foreground',
-                // Why: only the title is the resume drag handle — expanded
-                // details/preview need text selection and a normal pointer.
-                !resumeDisabled && 'cursor-grab active:cursor-grabbing',
-                detailsExpanded ? 'line-clamp-2 [overflow-wrap:anywhere]' : 'line-clamp-1'
-              )}
-              draggable={!resumeDisabled}
-              title={
-                resumeDisabled
-                  ? undefined
-                  : translate(
-                      'auto.components.right.sidebar.AiVaultSessionRow.dragToResume',
-                      'Drag to resume in a new tab'
-                    )
-              }
-              onDragStart={startResumeDrag}
-              onDragEnd={() => {
-                window.dispatchEvent(new Event(AI_VAULT_SESSION_DRAG_END_EVENT))
-              }}
-            >
-              {title}
-            </div>
-            <SessionRowTrailingActions
-              session={session}
-              detailsExpanded={detailsExpanded}
-              detailsId={detailsId}
-              detailsTooltip={detailsTooltip}
-              resumeDisabled={resumeDisabled}
-              resumeHidden={resumeHidden}
-              resumeLabel={resumeLabel}
-              worktreeInfo={worktreeInfo}
-              onToggleDetails={onToggleDetails}
-              onJumpToOriginalPane={onJumpToOriginalPane}
-              showJumpToWorktree={showJumpToWorktree}
-              onJumpToWorktree={onJumpToWorktree}
-              onResume={onResume}
-              onContinueInNewSession={onContinueInNewSession}
-              onResumeInNewChat={onResumeInNewChat}
-              onResumeInNewCli={onResumeInNewCli}
-              onCopyResume={onCopyResume}
-              onCopyId={onCopyId}
-              onCopyPath={onCopyPath}
-              onOpenLog={onOpenLog}
-              onRevealLog={onRevealLog}
-              onOpenCwd={onOpenCwd}
-              deleteBlockedReason={deleteBlockedReason}
-              onRequestDelete={requestDelete}
-            />
-          </div>
-          {searchHit ? <AiVaultSearchEvidence hit={searchHit} /> : null}
-          {!detailsExpanded && !searchHit ? (
-            <div className="mt-0.5 min-w-0 line-clamp-2 text-[12px] leading-4 text-muted-foreground">
-              {latestTurn ? (
-                <>
-                  <span className="font-medium text-foreground/80">
-                    {conversationRoleLabel(latestTurn.role)}
-                  </span>
-                  <span>: {latestTurn.text}</span>
-                </>
-              ) : (
-                translate(
-                  'auto.components.right.sidebar.AiVaultSessionRow.noPreviewAvailable',
-                  'No conversation preview available'
-                )
-              )}
-            </div>
-          ) : null}
-          <SessionMetadata
-            session={session}
-            liveState={liveState}
-            updatedAt={updatedAt}
-            worktreeInfo={worktreeInfo}
-            vaultScope={vaultScope}
-          />
-          <ForkAiVaultLineageLine session={session} />
-          {detailsExpanded ? (
-            <SessionInlineDetails
-              id={detailsId}
-              session={session}
-              worktreeInfo={worktreeInfo}
-              vaultScope={vaultScope}
-              resumeActions={resumeActions}
-              onResumeInWorktree={onResumeInWorktree}
-              onResumeInNewTab={onResumeInNewTab}
-              subagentResume={subagentResume}
-              onContinueInNewSession={onContinueInNewSession}
-              onResumeInNewChat={onResumeInNewChat}
-              onResumeInNewCli={onResumeInNewCli}
-              onOpenLog={onOpenLog}
-            />
-          ) : null}
-        </div>
+        {body}
       </ContextMenuTrigger>
       <ContextMenuContent>
         <SessionActionMenuItems

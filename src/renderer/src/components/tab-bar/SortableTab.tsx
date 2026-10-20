@@ -11,7 +11,6 @@ import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TerminalAgent } from '../../../../shared/terminal-agent'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import { useAppStore } from '../../store'
-import { selectTabHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
 import {
   ACTIVE_TAB_INDICATOR_CLASSES,
   getDropIndicatorClasses,
@@ -116,18 +115,7 @@ export default function SortableTab({
       unreadAgentCompletionPanes: s.unreadAgentCompletionPanes
     })
   )
-  // Why: resolver returns a primitive so unrelated agent updates can't repaint this tab (pane bucketing memoized per snapshot).
-  const activityStatus = useAppStore((s) =>
-    resolveTerminalTabActivityStatus({
-      hasPendingAsk: selectTabHasPendingAsk(s, tab.id),
-      tab,
-      agentStatusByPaneKey: s.agentStatusByPaneKey,
-      agentStatusEpoch: s.agentStatusEpoch,
-      runtimePaneTitlesByTabId: s.runtimePaneTitlesByTabId,
-      ptyIdsByTabId: s.ptyIdsByTabId,
-      terminalLayout: s.terminalLayoutsByTabId?.[tab.id]
-    })
-  )
+  const { activityStatus, programProgress } = useTerminalTabActivity(tab)
 
   // Why: shellOverride is stamped at create time, so changing the default shell later won't repaint existing tabs.
   const shellForIcon = tab.shellOverride

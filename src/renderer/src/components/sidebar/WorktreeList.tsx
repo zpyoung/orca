@@ -124,8 +124,10 @@ const WorktreeList = React.memo(function WorktreeList({
   const {
     visibleWorktrees,
     activityHiddenCount: activityHiddenWorktreeCount,
-    pairedDeviceIdsByEnvironment
-  } = useVisibleSidebarWorktrees({
+    visibleScope,
+    externalWorktreeCards,
+    rowModel
+  } = useSidebarListModel({
     filterState,
     sortBy,
     groupBy,
@@ -241,7 +243,8 @@ const WorktreeList = React.memo(function WorktreeList({
     hasFilters,
     revealWorkspaceFilters
   })
-  const activityHiddenCount = activityHiddenWorktreeCount + visibleScope.activityHiddenFolderCount
+  const activityHiddenCount =
+    (activityHiddenWorktreeCount ?? 0) + visibleScope.activityHiddenFolderCount
   const filtersHideAllRows = shouldFiltersHideAllRows({
     hasFilters,
     visibleWorktreeCount: visibleWorktrees.length,

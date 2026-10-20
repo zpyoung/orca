@@ -20,6 +20,7 @@ import type { AcpStructuredLane } from './acp-structured-lane'
 import type { AcpStructuredOptions } from './acp-structured-options'
 import type { AcpStructuredPrompts } from './acp-structured-prompts'
 import type { AcpStructuredTurns } from './acp-structured-turns'
+import type { StructuredAgentSessionProviderOpenResult } from '../native-chat/agent-session-wire/structured-agent-session-provider-open-contract'
 
 export type AcpStructuredSession = {
   sessionId: string

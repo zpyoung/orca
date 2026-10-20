@@ -281,6 +281,18 @@ export class AcpStructuredSessionAdapter implements StructuredAgentSessionAdapte
     return session ? isAcpReadySession(session) && session.turns.running : false
   }
 
+  holdsLiveProviderProcess = (sessionId: string, generation: string): boolean => {
+    const session = this.children.sessions.get(sessionId)
+    return session?.acquisitionGeneration === generation && !session.connection.exited
+  }
+
+  acknowledgeSessionRelease = (sessionId: string): void => {
+    const session = this.children.sessions.get(sessionId)
+    if (session?.ended) {
+      this.children.sessions.delete(sessionId)
+    }
+  }
+
   stopBackgroundTasks: NonNullable<StructuredAgentSessionAdapter['stopBackgroundTasks']> = (
     input
   ) => stopAcpChildren(this.live(input.sessionId), input.fence, input.taskIds, input.acknowledge)

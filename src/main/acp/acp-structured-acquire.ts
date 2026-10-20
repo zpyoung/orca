@@ -224,83 +224,28 @@ export async function acquireAcpStructuredSession(input: {
     )
   }
   await identity.onSpawned(pid)
-  try {
-    const initialized = await connection.initialize()
-    // Chosen here, on the machine Grok runs on, from the environment it was launched with.
-    const authMethodId = spec.authMethod?.({
-      advertised: (initialized.authMethods ?? []).map((method) => method.id),
-      env: launch.env
-    })
-    const setup = { authMethodId, resumePreference: spec.resumePreference }
-    const resume = launch.resume
-    let started: Awaited<ReturnType<AcpStructuredConnection['start']>> | null = null
-    let liveLane: AcpStructuredLane | null = null
-    let takeover: ReturnType<typeof acpReopenTakeover> | null = null
-    if (resume) {
-      const attaching = makeLane(resume.sessionId, true)
-      liveLane = attaching
-      try {
-        started = await connection.start({
-          cwd: launch.cwd,
-          mcpServers: [],
-          sessionId: resume.sessionId,
-          ...setup
-        })
-        slot.reattaching = false
-        attaching.translator.finishLoad()
-      } catch (error) {
-        takeover = acpReopenTakeover(error, resume, {
-          over: connection.closed || acquire.signal?.aborted === true,
-          now: now(),
-          warn: (fields) => deps.logger?.warn(ACP_REOPEN_FAILED, { ...fields, sessionId })
-        })
-        // A new session takes the old one's place, with a new lane, so nothing of the failed
-        // attach's window outlives it.
-      }
-    }
-    if (!started || !liveLane) {
-      liveLane?.dispose()
-      slot.lane = null
-      started = await connection.start({ cwd: launch.cwd, mcpServers: [], ...setup })
-      liveLane = makeLane(started.sessionId)
-    }
-    childStops = await probeAcpChildStops(connection, spec.dialect)
-    options.adoptSession(started.response, started.kind === 'new' ? 'new' : 'loaded')
-    liveLane.apply(liveLane.translator.contextModels(started.response.models, now()))
-    const restoreSkipped = await restoreAcpSessionOptions(connection, options, acquire.options)
-    const mode = spec.permissionModeConfig
-    if (mode) {
-      // Unlike a saved pick, a refusal fails the start: the session would run another posture.
-      // A start the host names no mode for asks, never more access than the chat chose.
-      const requested = mode.values[acquire.permissionMode ?? 'ask'] ?? mode.values.ask
-      const configId = options.modeConfigId()
-      const { configOptions } = await connection.setConfigOption(configId, requested)
-      if (configOptions.find((option) => option.id === configId)?.currentValue !== requested) {
-        throw new Error('Permission mode could not be confirmed')
-      }
-      options.adoptConfigOptions(configOptions)
-    }
-    const process = await identity.read(pid)
-    const link: AgentSessionProviderHandleLink = {
-      linkId:
-        deps.mintLinkId?.() ?? `${spec.agent}-${acquire.fence}-${started.sessionId}`.slice(0, 128),
-      handle: { transport: ACP_HANDLE_TRANSPORT, agent: spec.agent, nativeId: started.sessionId },
-      origin: started.kind === 'new' ? 'created' : 'resumed',
-      mintedAtFence: acquire.fence,
-      observedAt: now(),
-      ...takeover
-    }
-    session = {
-      sessionId,
-      fence: acquire.fence,
-      acquisitionGeneration: generation,
-      spec,
-      childStops,
-      connection,
-      lane: liveLane,
-      prompts,
-      options,
-      turns: new AcpStructuredTurns({
+  const process = await identity.read(pid)
+  const child: AcpStructuredChild = {
+    sessionId,
+    fence: acquire.fence,
+    acquisitionGeneration: generation,
+    spec,
+    connection,
+    lane: null,
+    turns: null,
+    options,
+    prompts,
+    childStops: undefined,
+    closeRequested: false,
+    journalClosed: null,
+    ended: false,
+    exitObservedAt: null,
+    open: (signal) =>
+      initializeAcpStructuredSession({
+        acquire,
+        deps,
+        generation,
+        launch,
         connection,
         options,
         prompts,
@@ -321,35 +266,11 @@ export async function acquireAcpStructuredSession(input: {
       slot.lane?.dispose()
       early.length = 0
     }
-    const reading = liveLane
-    const unbind = events?.bindReadingControl?.({
-      pauseReading: () => connection.pauseReading(),
-      resumeReading: () => {
-        connection.resumeReading()
-        reading.retry()
-      }
-    })
-    if (unbind) {
-      session.unbindReadingControl = unbind
-    }
-    if (connection.exited || connection.closed) {
-      throw new Error(connection.stderrTail() || `${spec.command} exited while starting`)
-    }
-    // The chat says once per lost conversation that the agent forgot it, this start's loss included.
-    const lost = [
-      ...(launch.resume?.unannouncedLosses() ?? []),
-      ...(takeover?.replaces ? [takeover.replaces.key] : [])
-    ]
-    for (const key of lost) {
-      liveLane.apply(acpSessionNotRestoredRow(key, started.sessionId, agentName))
-    }
-    return { acquisition: { process, link, acquisitionGeneration: generation }, session }
-  } catch (error) {
-    session = null
-    slot.lane?.dispose()
-    if (error instanceof AcpAgentError && acpAuthenticationRequired(spec.dialect, error)) {
-      throw acpSignInRequiredRefusal(spec.agent, spec.dialect, error)
-    }
-    throw error
+  }
+  session = child
+  assertAcpStartingSession(child, input.abandoned)
+  return {
+    acquisition: { process, acquisitionGeneration: generation },
+    session: child
   }
 }

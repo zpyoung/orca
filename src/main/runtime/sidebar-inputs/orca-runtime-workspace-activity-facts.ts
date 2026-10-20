@@ -1,4 +1,4 @@
-import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from '../orca-runtime-ledger'
+import { OrcaRuntimeWithAgentTransitions } from '../orca-runtime-agent-transitions'
 import type { PtyLivenessVerdict } from '../../../shared/pty-liveness-verdict'
 import type {
   WorkspaceActivityFactsSnapshot,

@@ -61,7 +61,28 @@ it('the pinned builder reaches both signed slices before either real archive tar
 })
 
 describe('macOS build workflow policy', () => {
-  it.each(['release', 'adhoc', 'daily', 'hourly'])(
+  // The fork's release channel ships arm64 only, so it never takes the dual-arch overlap builder.
+  it('release builds arm64 directly on a hosted runner, keeping retries and signing secrets', () => {
+    const job = workflow('release').jobs['build-mac']
+    expect(job['runs-on']).toBe('macos-15')
+    const step = job.steps.find((step) => step.name === 'Publish release artifacts (macOS)')
+    expect(step.with.command).not.toContain('build-mac-notarization-overlap')
+    expect(step.with.command).toContain(
+      'ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac'
+    )
+    expect(step.with.max_attempts).toBeGreaterThan(1)
+    for (const key of [
+      'CSC_LINK',
+      'CSC_KEY_PASSWORD',
+      'APPLE_ID',
+      'APPLE_APP_SPECIFIC_PASSWORD',
+      'APPLE_TEAM_ID'
+    ]) {
+      expect(step.env[key]).toContain('secrets.')
+    }
+  })
+
+  it.each(['adhoc', 'daily', 'hourly'])(
     '%s uses the guarded builder, preserving the serial fallback for older source refs',
     (channel) => {
       const job = Object.values(workflow(channel).jobs).find((job) =>
@@ -108,7 +129,7 @@ describe('macOS build workflow policy', () => {
     expect(publish.env.ORCA_MAC_PUBLISH).toBe(
       "${{ inputs.qualification_only && 'never' || 'always' }}"
     )
-    expect(publish.with.command.match(/--publish "\$ORCA_MAC_PUBLISH"/g)).toHaveLength(2)
+    expect(publish.with.command.match(/--publish "\$ORCA_MAC_PUBLISH"/g)).toHaveLength(1)
     for (const name of [
       'Abort if the parent release-cut run was cancelled',
       'Verify release remains draft after artifact upload'

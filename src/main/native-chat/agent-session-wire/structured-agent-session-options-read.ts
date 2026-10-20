@@ -267,18 +267,25 @@ export async function readStructuredAgentSessionOptions(
   const permissionMode = record
     ? await structuredAgentSessionLaunchPermission(context.deps, record)
     : null
-  // The saved pick shows, except one the running child could not take (a model its provider says
+  const selected = live ? await atRest() : options
+  // The saved pick shows, except a model the running child could not take (its provider says it
   // does not exist): that shows what the child runs instead.
-  const refused = live ? (adapter.readOptionRestoreFailures?.(sessionId) ?? []) : []
-  const saved = record?.options
-  const shownSaved = (key: 'model' | 'effort'): boolean =>
-    saved?.[key] !== undefined && !refused.includes(key)
-  const selected = live && (shownSaved('model') || shownSaved('effort')) ? await atRest() : options
+  const refusedModel = live && !!adapter.readOptionRestoreFailures?.(sessionId).includes('model')
+  const saved = record?.options ?? {}
+  const { model: _refused, ...selectedWithoutModel } = selected.current
+  const model = refusedModel
+    ? options.current.model
+    : (saved.model ?? (options.current.model || selected.current.model))
   const current = {
     ...(refusedModel ? selectedWithoutModel : selected.current),
     ...options.current,
-    ...(shownSaved('model') ? { model: selected.current.model } : {}),
-    ...(shownSaved('effort') ? { effort: selected.current.effort } : {})
+    ...(model !== undefined ? { model } : {}),
+    effort: saved.effort ?? options.current.effort,
+    fastMode:
+      saved.fastMode !== undefined
+        ? selected.current.fastMode
+        : (options.current.fastMode ?? selected.current.fastMode),
+    serviceTier: saved.serviceTier ?? options.current.serviceTier ?? selected.current.serviceTier
   }
   const confirmed = options.current.confirmed?.filter((key) =>
     key === 'model' || key === 'effort' || key === 'fastMode' || key === 'serviceTier'

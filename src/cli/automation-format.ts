@@ -15,6 +15,7 @@ import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { formatAutomationPrecheckTimeout } from '../shared/automation-precheck'
 import { formatAutomationSchedule } from '../shared/automation-schedules'
 import { formatAutomationLaunchOverrides } from './fork-automation-launch-settings/automation-launch-format'
+import { quoteCliCommandArgument } from './shell-command-quote'
 
 export type AutomationListPayload = {
   automations: Automation[]

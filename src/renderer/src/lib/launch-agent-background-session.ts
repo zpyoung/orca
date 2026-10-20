@@ -303,7 +303,8 @@ export async function launchAgentBackgroundSession(
       startupPlan,
       startupShell,
       effectiveAgentArgs: planInputs.agentArgs ?? '',
-      terminalOwnership
+      terminalOwnership,
+      releaseRuntimeObservers: () => releaseRuntimeObservers()
     }
   } catch (error) {
     // Why: terminal creation and stream subscription are separate remote calls.

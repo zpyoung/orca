@@ -3,7 +3,7 @@ import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-session-contrac
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
-import { OrcaRuntimeWithMigrationCatalog } from './orca-runtime-migration-catalog'
+import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from './orca-runtime-ledger'
 import { getRuntimeDesktopSurface } from './runtime-desktop-surface'
 import type { AgentStatusStoreView } from './sidebar-inputs/workspace-activity-facts-producer'
 import {

@@ -133,30 +133,11 @@ export class PiRpcSessionAdapter implements StructuredAgentSessionAdapter {
 
   dispatch: StructuredAgentSessionAdapter['dispatch'] = async (input) => {
     const session = this.session(input.sessionId, input.fence)
-    let prompt
-    try {
-      prompt = await preparePiRpcPrompt(input.body)
-    } catch (error) {
-      this.deps.logger.warn('Pi prompt could not be prepared', {
-        scope: 'pi-prompt',
-        sessionId: input.sessionId,
-        error
-      })
-      return {
-        state: 'rejected',
-        ...agentSessionFailureWords(
-          error instanceof PiRpcPromptError || error instanceof ClaudeDispatchContentError
-            ? error.failure
-            : agentSessionFailureFact('attachmentUnreadable'),
-          { agentName: 'Pi', surface: 'rejection' }
-        )
-      }
-    }
-    return session.turns.submit(
-      input.clientMessageId,
-      input.requestedAt ?? Date.now(),
-      { ...prompt },
-      input.beforeDispatch
+    return dispatchPiRpcMessage(
+      session,
+      input,
+      this.deps.logger,
+      () => this.sessions.get(input.sessionId) === session
     )
   }
 
@@ -244,9 +225,7 @@ export class PiRpcSessionAdapter implements StructuredAgentSessionAdapter {
   holdsDispatch(id: string): boolean {
     return this.sessions.get(id)?.turns.holdsDispatch ?? false
   }
-  /** Started with no model listed: Pi keeps a placeholder, so every prompt this child takes fails
-   *  as not signed in, even after a sign-in, which only a new Pi reads. */
-  startUnavailable(id: string): AgentSessionUnavailable | undefined {
+  holdsLiveProviderProcess(id: string, generation: string): boolean {
     const session = this.sessions.get(id)
     return session?.generation === generation && !session.connection.closed
   }

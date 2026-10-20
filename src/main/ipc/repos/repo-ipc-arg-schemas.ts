@@ -35,12 +35,6 @@ export const ProjectGroupDeleteArgs = ProjectGroupSelectorArgs.extend({
   removeContainedProjects: z.boolean().optional()
 })
 
-export const ProjectGroupMoveProjectArgs = z.object({
-  projectId: z.string().min(1),
-  groupId: z.string().nullable(),
-  order: z.number().finite().optional()
-})
-
 export const ProjectHostSetupExistingFolderIpcArgs = z.object({
   projectId: z.string().min(1),
   projectProviderIdentity: z

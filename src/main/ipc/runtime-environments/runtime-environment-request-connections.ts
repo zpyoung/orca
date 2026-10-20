@@ -18,6 +18,7 @@ import type {
 } from '../../../shared/remote-runtime-shared-control-types'
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-manual-disconnect'
 import { publishRuntimeEnvironmentDiagnostics } from '../../fork-heimdall/runtime-environment-diagnostics-port'
+import { sharedControlEnvironmentPolicy } from './runtime-environment-shared-control-policy'
 import {
   clearSharedControlAnswerSource,
   setSharedControlAnswerSource
