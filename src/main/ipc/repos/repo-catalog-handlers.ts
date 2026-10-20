@@ -118,8 +118,11 @@ export function registerRepoCatalogHandlers(
       // the host's own sweep stops the ones no renderer lists. A paired server's row is residue.
       if (row && parseExecutionHostId(hostId)?.kind !== 'runtime') {
         // It notifies the renderer and paired clients itself.
+        const { expectedLedgers } = args
         await withLedgerErrorCode(() =>
-          runtime.removeProject(row, { expectedLedgers: args.expectedLedgers })
+          expectedLedgers
+            ? runtime.removeProject(row, { expectedLedgers })
+            : runtime.removeProject(row)
         )
         scheduleCurrentWorktreeBaseDirectoryWatcherSync()
         return
