@@ -41,6 +41,8 @@ export type VisibleWorktreeOptions = {
   forcedVisibleWorktreeIds?: readonly string[]
   workspaceActivity?: WorkspaceActivityFilterContext
   workspaceReview?: WorkspaceReviewFilterContext
+  /** The sorted keys are host identities (the stamp sort's), not bare ids, so a same-id pair keeps two ranks. */
+  sortedByHostIdentity?: boolean
   /** Exempt from the sleeping sweep only; unlike forcedVisibleWorktreeIds, every other filter still applies. */
   sleepingSweepExemptWorktreeIds?: ReadonlySet<string>
 }

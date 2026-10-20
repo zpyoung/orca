@@ -219,71 +219,19 @@ export function renderWorktreeSectionHeaderRow(args: {
       )}
       style={isActiveStickyHeader ? undefined : { transform: getVirtualRowTransform(vItem.start) }}
     >
-      <div
-        id={getWorktreeOptionId(row.key)}
-        role="button"
-        tabIndex={0}
-        aria-expanded={showHeaderCollapseAffordance ? !isHeaderCollapsed : undefined}
-        data-repo-header-id={projectIdForHeader}
-        data-repo-header-index={repoHeaderIndex}
-        data-repo-header-bucket={repoHeaderBucketKey}
-        data-repo-header-section-end={
-          projectIdForHeader
-            ? headerDrag.repoHeaderSectionEndByRepoId.get(projectIdForHeader)
-            : undefined
-        }
-        // Why: row keeps handle attrs so indent/padding still arms drag; grab
-        // cursor lives only on the title surface so … / + never inherit it.
-        data-repo-header-drag-handle={isDraggableRepoHeader ? '' : undefined}
-        data-project-group-header-id={projectGroupIdForHeader}
-        data-project-group-header-index={projectGroupHeaderIndex}
-        data-project-group-header-bucket={projectGroupHeaderBucketKey}
-        data-project-group-header-section-end={
-          projectGroupIdForHeader
-            ? headerDrag.projectGroupHeaderSectionEndByGroupId.get(projectGroupIdForHeader)
-            : undefined
-        }
-        data-project-group-header-drag-handle={isDraggableProjectGroupHeader ? '' : undefined}
-        data-workspace-status-drop-target={headerWorkspaceStatus ? '' : undefined}
-        data-workspace-status={headerWorkspaceStatus ?? undefined}
-        data-workspace-pin-drop-target={isPinnedHeader ? '' : undefined}
-        className={cn(
-          // Why: no row-level grab — only the title surface below shows the hand;
-          // actions use cursor-pointer so … / + never look reorderable.
-          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',
-          !(isDraggableRepoHeader || isDraggableProjectGroupHeader) && 'cursor-pointer',
-          ctx.highlightedRevealRowKey === row.key &&
-            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/50',
-          (isDraggingThis || isDraggingThisProjectGroup) &&
-            'bg-accent/80 ring-1 ring-ring/40 shadow-md rounded-md scale-[1.01]',
-          headerWorkspaceStatus &&
-            ctx.dragOverStatus === headerWorkspaceStatus &&
-            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
-          isPinnedHeader &&
-            ctx.pinDragOver &&
-            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
-          projectGroupIdForHeader !== undefined &&
-            ctx.worktreeGroupMembershipDragPreview.target.kind === 'join' &&
-            ctx.worktreeGroupMembershipDragPreview.target.groupId === projectGroupIdForHeader &&
-            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
-          projectIdForHeader !== undefined &&
-            ctx.worktreeGroupMembershipDragPreview.target.kind === 'leave' &&
-            ctx.worktreeGroupMembershipDragPreview.repoId === projectIdForHeader &&
-            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
-          row.repo && 'overflow-hidden'
-        )}
-        style={{
-          // Why: non-project headers like "All" are flat-list labels; don't reserve project hierarchy indent.
-          paddingLeft:
-            isRepoHeader || isProjectGroupHeader
-              ? getProjectGroupHeaderPaddingLeft(row.projectGroupDepth ?? 0)
-              : WORKTREE_SECTION_HEADER_PADDING_LEFT
-        }}
-        onDragOver={
-          isPinnedHeader
-            ? ctx.onWorkspacePinDragOver
-            : headerWorkspaceStatus
-              ? (event) => ctx.onWorkspaceStatusDragOver(event, headerWorkspaceStatus)
+      <ProjectHeaderHostTooltip label={label} context={hostContext}>
+        <div
+          id={getWorktreeOptionId(row.key)}
+          role="button"
+          tabIndex={0}
+          aria-label={hostContext ? `${label} — ${hostContext.label}` : undefined}
+          aria-expanded={showHeaderCollapseAffordance ? !isHeaderCollapsed : undefined}
+          data-repo-header-id={projectIdForHeader}
+          data-repo-header-index={repoHeaderIndex}
+          data-repo-header-bucket={repoHeaderBucketKey}
+          data-repo-header-section-end={
+            projectIdForHeader
+              ? headerDrag.repoHeaderSectionEndByRepoId.get(projectIdForHeader)
               : undefined
           }
           // Why: row keeps handle attrs so indent/padding still arms drag; grab
@@ -304,7 +252,7 @@ export function renderWorktreeSectionHeaderRow(args: {
           className={cn(
             // Why: no row-level grab — only the title surface below shows the hand;
             // actions use cursor-pointer so … / + never look reorderable.
-            'group relative flex h-7 w-full items-center gap-1.5 pr-2 text-left transition-all',
+            'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',
             !(isDraggableRepoHeader || isDraggableProjectGroupHeader) && 'cursor-pointer',
             ctx.highlightedRevealRowKey === row.key &&
               'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/50',
@@ -315,6 +263,14 @@ export function renderWorktreeSectionHeaderRow(args: {
               'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
             isPinnedHeader &&
               ctx.pinDragOver &&
+              'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+            projectGroupIdForHeader !== undefined &&
+              ctx.worktreeGroupMembershipDragPreview.target.kind === 'join' &&
+              ctx.worktreeGroupMembershipDragPreview.target.groupId === projectGroupIdForHeader &&
+              'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+            projectIdForHeader !== undefined &&
+              ctx.worktreeGroupMembershipDragPreview.target.kind === 'leave' &&
+              ctx.worktreeGroupMembershipDragPreview.repoId === projectIdForHeader &&
               'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
             row.repo && 'overflow-hidden'
           )}
@@ -399,20 +355,16 @@ export function renderWorktreeSectionHeaderRow(args: {
               )}
             </div>
 
-          {isProjectGroupHeader && !row.repo && projectGroupIdForHeader ? (
-            <ProjectGroupHeaderMenu
-              groupId={projectGroupIdForHeader}
-              hostId={projectGroupHostIdForHeader}
-              label={label}
-              onRename={ctx.onRenameProjectGroup}
-              onDelete={ctx.onDeleteProjectGroup}
-              onOpenLedger={
-                projectGroupForHeader
-                  ? () => ctx.onOpenGroupLedger(projectGroupForHeader)
-                  : undefined
-              }
-            />
-          ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <div className="min-w-0 truncate text-[13px] font-semibold leading-4">{label}</div>
+                {hostContext ? <ProjectHeaderHostLabel context={hostContext} /> : null}
+                <RepoForkIndicator upstream={row.repo?.upstream} />
+                <FolderPathStatusIndicator status={projectGroupPathStatus} />
+                {isRepoHeader ? <RepoScanUnavailableIndicator repo={row.repo!} /> : null}
+              </div>
+            </div>
+          </div>
 
           <ProjectHeaderActions>
             {showHeaderCollapseAffordance ? (
@@ -440,6 +392,11 @@ export function renderWorktreeSectionHeaderRow(args: {
                 label={label}
                 onRename={ctx.onRenameProjectGroup}
                 onDelete={ctx.onDeleteProjectGroup}
+                onOpenLedger={
+                  projectGroupForHeader
+                    ? () => ctx.onOpenGroupLedger(projectGroupForHeader)
+                    : undefined
+                }
               />
             ) : null}
 

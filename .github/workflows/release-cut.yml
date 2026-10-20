@@ -1139,6 +1139,7 @@ jobs:
       - orcad-template
       - release-preflight
       - release-javascript
+      - build-mac
     # Fork: mac-only. Windows/Linux builds are disabled (no SignPath on this fork).
     # macOS is built + signed by build-mac -> release-mac-build.yml.
     if: false

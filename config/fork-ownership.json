@@ -1547,7 +1547,7 @@
       "kind": "passthrough",
       "lines": [
         "  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview",
-        "          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
+        "            'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
         "  sectionSeparatorClass?: string | false",
         "        args.sectionSeparatorClass,"
       ]
