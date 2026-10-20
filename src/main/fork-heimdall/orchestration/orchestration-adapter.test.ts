@@ -92,6 +92,8 @@ vi.mock('../../runtime/rpc/orchestration-mutation-executor', () => ({
 vi.mock('../../runtime/rpc/methods/orchestration/worker/worker-start-prompt-budget', () => ({
   assertWorkerStartTaskSpecWithinPromptBudget: upstream.assertPromptBudget
 }))
+// trust writes touch the test user's agent config; only the PTY/readiness path is under test
+vi.mock('../../agent-workspace-trust', () => ({ applyAgentWorkspaceTrust: async () => ({}) }))
 vi.mock('../../runtime/rpc/methods/orchestration-worker-start-mode', () => ({
   decideWorkerStartMode: upstream.decideWorkerStartMode,
   readWorkerStartModeSettings: upstream.readWorkerStartModeSettings
@@ -383,15 +385,6 @@ describe('Heimdall orchestration adapter', () => {
       getSize: () => ({ cols: 120, rows: 40 })
     })
     const revealTerminalSession = vi.fn(async () => ({ tabId: 'renderer-tab' }))
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: trust writes touch the test user's agent config; only the PTY/readiness path is under test.
-    const runtimeInternals = runtime as unknown as {
-      markWorkspaceTrustedForAgent(
-        agent: string,
-        connectionId: string | null | undefined,
-        workspacePath: string
-      ): Promise<void>
-    }
-    vi.spyOn(runtimeInternals, 'markWorkspaceTrustedForAgent').mockResolvedValue(undefined)
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test supplies only the reveal callback consumed by createTerminal.
     runtime.setNotifier({ revealTerminalSession } as never)
 
