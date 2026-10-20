@@ -642,6 +642,14 @@
       ]
     },
     {
+      "path": "src/main/startup/main-process-ready-duplicate-pty-repair.test.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "  ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: vi.fn(), removeListener: vi.fn() },"
+      ]
+    },
+    {
       "path": "src/main/startup/main-process-state.ts",
       "feature": "heimdall",
       "kind": "registration",
@@ -6726,6 +6734,10 @@
     }
   ],
   "residuals": {
+    "src/main/startup/main-process-ready-duplicate-pty-repair.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "tests/e2e/native-chat-ssh-delivery.unit.test.ts": {
       "added": 10,
       "removed": 9
