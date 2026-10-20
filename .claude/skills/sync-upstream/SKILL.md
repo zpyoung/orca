@@ -706,7 +706,12 @@ report "needs attention" — for:
 - the Step 6 human decisions (feature collision, pending-upstream item, unresolvable conflict)
 - an upstream defect the fork would have to work around — including a new lint rule that upstream's
   own release violates in its own file. Retarget to a newer stable tag first if one exists; that
-  usually dissolves it
+  usually dissolves it. Prove the defect before retargeting: `pnpm test:sandbox --shards=1
+  --source-ref="$UPSTREAM_TARGET" -- <test>` runs the bare tag, and an identical failure there is
+  upstream's. To retarget with the PR already open, merge the newer tag into the same branch by
+  Steps 5–8 with the old tag as `$PREV_TAG`, push, and retitle the PR; this skill never creates a
+  branch. PR #129 did this when v1.4.232's clock-dependent `session-scanner-scope-cwd-facts` test
+  failed and v1.4.233 (#31098) fixed it
 - a single lint violation that cannot be cleared without changing what the code does. Adopt every
   other rule, and escalate that one file alone rather than the run
 
@@ -850,6 +855,15 @@ count N with confirmation every SHA is still reachable; each ownership list and 
 every `merge-review.txt` path with what the hand review concluded; the tier-2, tier-4, and
 feature-collision checklist outcomes; what the Step 8 gate covered (and that tests are left to this
 PR's own CI); and the backup ref.
+
+**Label the PR at creation when the release bumps the daemon protocol.**
+`check-runtime-launcher-protocol-ratchet.mjs` fails `cross-version wire compatibility` when one diff
+changes `PROTOCOL_VERSION` and any of its `RUNTIME_LAUNCHER_PATHS`, and a sync diff carries
+upstream's separate PRs for the two as one. If
+`git diff "$PREV_TAG" "$UPSTREAM_TARGET" -- src/main/daemon/daemon-protocol-version.ts` is non-empty,
+pass `--label allow-runtime-launcher-protocol-bump` to `gh pr create`; #115, #122 and #129 all
+needed it. `pr.yml` has no `labeled` trigger, so a label added after the first run counts only from
+the next push.
 
 Record `PR_NUMBER` and `PR_URL`. If a PR already exists for this branch, reuse it
 (`env -u GITHUB_TOKEN gh pr view "$SYNC_BRANCH" --repo zpyoung/orca --json number,url`) instead of
