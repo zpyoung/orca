@@ -143,7 +143,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setCaret: core.setCaret
     })
 
-    const { agentCommands, sessionSkillNames } = useNativeChatComposerCatalog(
+    const { agentCommands, sessionSkills } = useNativeChatComposerCatalog(
       agent,
       structuredTransport
     )
@@ -156,7 +156,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       agentCommands,
       recalledFromHistory: core.history.index !== null,
       disabled: core.disabled,
-      sessionSkillNames,
+      sessionSkills,
       textareaRef: core.textareaRef,
       setDraft: core.setDraft,
       setCaret: core.setCaret,
