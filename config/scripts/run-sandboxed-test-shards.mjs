@@ -49,6 +49,8 @@ const IMAGE_CONTEXT_ROOTS = [
   '.npmrc',
   'config/docker/test-sandbox',
   'config/patches',
+  // pnpm-workspace.yaml names it, so install fails without it.
+  'config/pnpmfile.cjs',
   'config/scripts',
   'package.json',
   'pnpm-lock.yaml',
