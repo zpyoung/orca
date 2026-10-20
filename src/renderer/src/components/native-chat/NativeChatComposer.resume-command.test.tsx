@@ -5,6 +5,7 @@ import type { RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeChatPickerItem } from '../../../../shared/native-chat-picker-items'
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
+import type * as RemoteRuntimePtyIdModule from '../../../../shared/remote-runtime-pty-id'
 
 type CommandItem = Extract<NativeChatPickerItem, { kind: 'command' }>
 
@@ -38,12 +39,27 @@ vi.mock('../../store', () => {
     activeWorkspaceExecutionHostId: 'ssh:box',
     tabsByWorktree: { 'wt-1': [{ id: 'tab-1' }] },
     unifiedTabsByWorktree: {},
-    clearNativeChatLaunchDraft: vi.fn()
+    updateSettings: vi.fn(),
+    clearNativeChatLaunchDraft: vi.fn(),
+    markNativeChatLaunchDraftAdopted: vi.fn()
   }
   const useAppStore = (selector: (value: typeof state) => unknown) => selector(state)
   useAppStore.getState = () => state
   return { useAppStore }
 })
+vi.mock('@/runtime/runtime-terminal-inspection', () => ({
+  sendRuntimePtyInput: vi.fn()
+}))
+vi.mock('../../../../shared/remote-runtime-pty-id', async (importOriginal) => ({
+  ...(await importOriginal<typeof RemoteRuntimePtyIdModule>()),
+  isRemoteRuntimePtyId: () => false
+}))
+vi.mock('@/lib/native-chat-telemetry', () => ({
+  emitNativeChatMessageSent: vi.fn(),
+  emitNativeChatPickerItemAccepted: vi.fn(),
+  emitNativeChatPickerOpened: vi.fn(),
+  emitNativeChatSendClassified: vi.fn()
+}))
 vi.mock('../right-sidebar/ai-vault-panel-workspace', () => ({
   selectAiVaultPanelWorkspace: () => ({ worktree: { id: 'wt-1' }, repo: null })
 }))
@@ -52,13 +68,27 @@ vi.mock('../right-sidebar/agent-session-history-modal', () => ({
 }))
 vi.mock('./native-chat-runtime-send', () => ({
   sendNativeChatMessage: vi.fn(),
+  sendNativeChatMessageVerified: vi.fn(),
+  sendNativeChatMessageWithImageAttachments: vi.fn(),
+  submitNativeChatPrompt: vi.fn(),
+  typeNativeChatCommand: vi.fn(),
   sendNativeChatTypedCommand: mocks.sendNativeChatTypedCommand
 }))
-vi.mock('./use-native-chat-draft', () => ({
-  useNativeChatDraft: () => ({ draft: mocks.draft, setDraft: mocks.setDraft })
+vi.mock('./fork-agent-composer/use-agent-composer-draft', () => ({
+  useAgentComposerDraft: () => ({
+    draft: mocks.draft,
+    setDraft: mocks.setDraft,
+    flushDraftAppends: () => {}
+  })
 }))
-vi.mock('./NativeChatComposerField', () => ({
-  NativeChatComposerField: (props: FieldProps) => {
+vi.mock('./fork-agent-composer/agent-composer-draft-cache', () => ({
+  readAgentComposerDraftCache: () => ''
+}))
+vi.mock('./fork-agent-composer/use-agent-composer-history', () => ({
+  useAgentComposerHistory: () => ({ history: { entries: [], index: null }, setHistory: vi.fn() })
+}))
+vi.mock('./fork-agent-composer/AgentComposerField', () => ({
+  AgentComposerField: (props: FieldProps) => {
     mocks.fieldProps = props
     return <textarea ref={props.textareaRef} />
   }
@@ -69,15 +99,36 @@ vi.mock('./use-native-chat-skills', () => ({
 vi.mock('./use-native-chat-composer-attachments', () => ({
   useNativeChatComposerAttachments: () => ({
     imageAttachments: mocks.imageAttachments,
+    attachResolvedPaths: vi.fn(),
     clearImageAttachments: mocks.clearImageAttachments,
-    pendingChips: {}
+    flushPendingAttachments: vi.fn(),
+    removeImageAttachment: vi.fn(),
+    beginPendingImageAttachment: vi.fn(),
+    revealPendingImageAttachment: vi.fn(),
+    dropPendingImageAttachment: vi.fn(),
+    pendingChips: { begin: vi.fn(), resolve: vi.fn(), drop: vi.fn(), attachReferences: vi.fn() }
   })
 }))
-vi.mock('./use-native-chat-composer-keydown', () => ({
-  useNativeChatComposerKeyDown: (args: KeyDownArgs) => {
+vi.mock('./use-native-chat-composer-paste', () => ({
+  useNativeChatComposerPaste: () => ({ handlePaste: vi.fn(), pasteFromClipboard: vi.fn() })
+}))
+vi.mock('./use-native-chat-external-attachments', () => ({
+  useNativeChatExternalAttachments: () => ({
+    attachExternalPaths: vi.fn(),
+    resolveAttachmentOwner: vi.fn()
+  })
+}))
+vi.mock('../dictation/dictation-control-events', () => ({
+  dispatchDictationControl: vi.fn()
+}))
+vi.mock('./fork-agent-composer/use-agent-composer-keydown', () => ({
+  useAgentComposerKeyDown: (args: KeyDownArgs) => {
     mocks.keyDownArgs = args
     return vi.fn()
   }
+}))
+vi.mock('./use-native-chat-send-lifecycle', () => ({
+  useNativeChatSendLifecycle: () => ({ cancelPendingSends: vi.fn(), trackPendingSend: vi.fn() })
 }))
 
 import { NativeChatComposer } from './NativeChatComposer'
@@ -206,6 +257,9 @@ describe('/resume in the native chat composer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.openHistory).not.toHaveBeenCalled()
-    expect(mocks.sendNativeChatTypedCommand).toHaveBeenCalledWith('pty-1', '/resume')
+    expect(mocks.sendNativeChatTypedCommand).toHaveBeenCalledWith(
+      { terminalTabId: 'tab-1', ptyId: 'pty-1' },
+      '/resume'
+    )
   })
 })

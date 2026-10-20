@@ -6631,6 +6631,11 @@
       "status": "permanent"
     },
     {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.resume-command.test.tsx",
+      "reason": "Upstream's /resume coverage, run against the fork composer field, keydown and draft hooks (upstream's mocks target components the fork composer does not render).",
+      "status": "permanent"
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-prompt-recall.test.tsx",
       "reason": "Exercises upstream's transcript prompt recall (useNativeChatComposerRecall), which the fork composer replaces with its own per-pane history; the fork's equivalent coverage is in fork-agent-composer.",
       "status": "permanent",
