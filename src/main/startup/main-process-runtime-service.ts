@@ -28,7 +28,7 @@ import { fingerprintOrchestrationPeer } from '../runtime/orchestration/environme
 import { callRuntimeEnvironment } from '../ipc/runtime-environments/runtime-environment-transport-routing'
 import { mainProcessState as state } from './main-process-state'
 import { installWslOrcadAccountShim } from './wsl-orcad-account-env-wiring'
-import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'
+import { forwardRuntimeAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'
 import { startHeimdall } from '../fork-heimdall/registration'
 import { wireHeimdallFleetWindows } from '../fork-heimdall/fleet-ipc-forward'
 import { startLoops } from '../fork-loops/registration'
@@ -167,11 +167,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
     agentHookServer.subscribePaneStatusClear((clear) => runtime.forgetHookStatusResume(clear))
     agentHookServer.subscribeStatusDrop((paneKey) => runtime.forgetHookStatusResume({ paneKey }))
   }
-  forwardAskEventsToRenderer(
-    runtime.getAskServices().registry,
-    () => state.mainWindow,
-    getDashboardPopoutWindow
-  )
+  forwardRuntimeAskEventsToRenderer(runtime, () => state.mainWindow, getDashboardPopoutWindow)
   state.heimdall = startHeimdall(runtime, store, state.isServeMode)
   wireHeimdallFleetWindows(runtime, () => state.mainWindow)
   state.loops = startLoops(runtime, store, state.isServeMode)

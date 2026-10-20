@@ -23,3 +23,18 @@ export function forwardAskEventsToRenderer(
     getDashboardPopoutWindow()?.webContents.send('ask:set', event)
   })
 }
+
+/** Forwards the runtime's ask events, or does nothing on a runtime (test double) that carries no ask services. */
+export function forwardRuntimeAskEventsToRenderer(
+  runtime: { getAskServices?: () => { registry: Pick<AskRegistry, 'onAskChanged'> } | undefined },
+  getMainWindow: () => BrowserWindow | null,
+  getDashboardPopoutWindow: () => BrowserWindow | null
+): Unsubscribe {
+  const registry =
+    'getAskServices' in runtime && typeof runtime.getAskServices === 'function'
+      ? runtime.getAskServices()?.registry
+      : undefined
+  return registry
+    ? forwardAskEventsToRenderer(registry, getMainWindow, getDashboardPopoutWindow)
+    : () => {}
+}

@@ -2923,13 +2923,10 @@
       "kind": "registration",
       "lines": [
         "import { app, ipcMain } from 'electron'",
-        "import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'",
+        "import { forwardRuntimeAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'",
         "import { startClaudeSuppressionVerdictPublisher } from '../fork-ask-question-tool/claude-suppression-verdict-publisher'",
         "import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'",
-        "  forwardAskEventsToRenderer(",
-        "    runtime.getAskServices().registry,",
-        "    () => state.mainWindow,",
-        "    getDashboardPopoutWindow",
+        "  forwardRuntimeAskEventsToRenderer(runtime, () => state.mainWindow, getDashboardPopoutWindow)",
         "  startClaudeSuppressionVerdictPublisher({",
         "    store,",
         "    ipcMain,",
@@ -6922,7 +6919,7 @@
       "removed": 0
     },
     "src/main/startup/main-process-runtime-service.ts": {
-      "added": 21,
+      "added": 17,
       "removed": 2
     },
     "src/main/startup/main-process-state.ts": {
@@ -8162,7 +8159,7 @@
       "removed": 5
     },
     "src/main/ipc/repos/repo-catalog-handlers.ts": {
-      "added": 12,
+      "added": 15,
       "removed": 2
     },
     "src/main/ipc/repos/repo-ipc-arg-schemas.ts": {
@@ -8670,7 +8667,7 @@
       "removed": 18
     },
     "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
-      "added": 27,
+      "added": 28,
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-in-new-tab.ts": {
