@@ -15,6 +15,7 @@ import {
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
   type RuntimeCapability
 } from '../../shared/protocol-version'
+import { HEIMDALL_PIPELINE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall-pipeline/capability'
 import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../shared/agent-session-create-capabilities'
 import { AGENT_SESSION_OPTIONAL_MODEL_CLIENT_CAPABILITY } from '../../shared/agent-session-optional-model-capability'
 import {
@@ -59,6 +60,7 @@ export const DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES: readonly RuntimeCapab
   PI_STRUCTURED_DIALOGS_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
   REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
+  ...HEIMDALL_PIPELINE_CLIENT_CAPABILITIES,
   // Without this `supportsAgentLaunch` refuses the renderer outright, while the same renderer
   // targeting a remote host is admitted — the asymmetry this constant exists to close.
   AGENT_LAUNCH_RUNTIME_CAPABILITY,

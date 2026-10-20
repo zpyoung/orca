@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import { evaluateStopPredicates } from '../fork-heimdall/stop-policy'
-import { HOSTED_REVIEW_STOP_PREDICATES } from './stop-policy'
+import { hostedReviewAttemptFingerprint } from './action-identity'
+import {
+  HOSTED_REVIEW_STOP_PREDICATES,
+  repeatedOwnFixExhausted,
+  repeatedOwnFixGroups
+} from './stop-policy'
 import type {
   HostedReviewCheckSnapshot,
+  HostedReviewSitterAction,
   HostedReviewSitterDefinition,
   HostedReviewSnapshot,
   HostedReviewWorld
@@ -48,7 +54,8 @@ function review(overrides: Partial<HostedReviewSnapshot> = {}): HostedReviewSnap
 }
 
 function definition(
-  mergeCheckScope: 'required' | 'all' = 'required'
+  mergeCheckScope: 'required' | 'all' = 'required',
+  repeatFixLimit?: number
 ): HostedReviewSitterDefinition {
   return {
     repoId: 'repo-1',
@@ -61,7 +68,8 @@ function definition(
     capabilities: { updateBranch: 'on', resolveConflicts: 'on', fixChecks: 'on', merge: 'on' },
     branchUpdateMode: 'merge-base-update',
     mergeMethod: null,
-    mergeCheckScope
+    mergeCheckScope,
+    ...(repeatFixLimit === undefined ? {} : { repeatFixLimit })
   }
 }
 
@@ -86,6 +94,47 @@ function fixAttributionEntry(): WatcherLedger['entries'][number] {
       failureSignature: 'failure:test',
       publishActionId: 'publish-1'
     }
+  }
+}
+
+function completedPublishFixEntry(
+  attemptId: string,
+  sourceHeadSha: string,
+  producedHeadSha: string,
+  atMs: number,
+  checkKey = 'test',
+  failureSignature = 'failure:test'
+): WatcherLedger['entries'][number] {
+  const action: HostedReviewSitterAction = {
+    kind: 'publish-fix',
+    capability: 'fixChecks',
+    visibility: 'external',
+    contentIdentity: JSON.stringify([sourceHeadSha, BASE]),
+    evidenceKey: `publish-fix:${attemptId}`,
+    expectedState: {
+      target: 'https://github.com/acme/repo/pull/42',
+      before: sourceHeadSha
+    },
+    headSha: sourceHeadSha,
+    reviewUrl: 'https://github.com/acme/repo/pull/42',
+    checkKey,
+    failureSignature,
+    preparationActionId: `prepare:${attemptId}`,
+    preparedCommitSha: producedHeadSha
+  }
+  return {
+    kind: 'attempt',
+    class: 'fact',
+    origin: 'owner',
+    watcherId: WATCHER_ID,
+    eventId: `event:${attemptId}`,
+    attemptId,
+    atMs,
+    action,
+    fingerprint: hostedReviewAttemptFingerprint(action),
+    state: 'settled',
+    effect: 'landed',
+    result: { kind: 'published', resultingHeadSha: producedHeadSha }
   }
 }
 
@@ -127,7 +176,7 @@ describe('hosted review sitter stop predicates opt into owner deviations', () =>
   it('reports a check-failed deviation when the sitter own-fix did not resolve the failure', () => {
     const world: HostedReviewWorld = {
       review: review({ checks: [check()] }),
-      definition: definition(),
+      definition: definition('required', 1),
       preparedCommit: null
     }
     const fired = evaluateStopPredicates(
@@ -140,16 +189,177 @@ describe('hosted review sitter stop predicates opt into owner deviations', () =>
       deviation: { kind: 'check-failed', criterionId: 'test', timedOut: null }
     })
   })
+
+  it('counts only completed publish fixes in the same check and signature group', () => {
+    const first = completedPublishFixEntry('publish-1', 'head-1', 'head-2', 1_000)
+    const second = completedPublishFixEntry('publish-2', 'head-2', 'head-3', 2_000)
+    const third = completedPublishFixEntry('publish-3', 'head-3', 'head-4', 3_000)
+    const reviewAfterTwo = review({
+      headSha: 'head-3',
+      checks: [check({ headSha: 'head-3', observationId: 'head-3:attempt' })]
+    })
+    const reviewAfterThree = review({
+      headSha: 'head-4',
+      checks: [check({ headSha: 'head-4', observationId: 'head-4:attempt' })]
+    })
+    const twoAttempts = repeatedOwnFixGroups(reviewAfterTwo, ledger([first, second]), 'required')
+    const threeAttempts = repeatedOwnFixGroups(
+      reviewAfterThree,
+      ledger([first, second, third]),
+      'required'
+    )
+
+    expect(twoAttempts).toEqual([
+      {
+        checkKey: 'test',
+        failureSignature: 'failure:test',
+        publishActionIds: ['publish-1', 'publish-2']
+      }
+    ])
+    expect(repeatedOwnFixExhausted(twoAttempts, 3)).toBeNull()
+    expect(repeatedOwnFixExhausted(threeAttempts, 3)).toEqual({
+      checkKey: 'test',
+      failureSignature: 'failure:test',
+      publishActionIds: ['publish-1', 'publish-2', 'publish-3']
+    })
+
+    const otherGroupAttempts = [
+      completedPublishFixEntry('publish-a1', 'head-1', 'head-2', 1_000),
+      completedPublishFixEntry('publish-b1', 'head-2', 'head-3', 2_000, 'other', 'failure:other'),
+      completedPublishFixEntry('publish-a2', 'head-3', 'head-4', 3_000),
+      completedPublishFixEntry('publish-b2', 'head-4', 'head-5', 4_000, 'other', 'failure:other')
+    ]
+    const twoCurrentFailures = review({
+      headSha: 'head-5',
+      checks: [
+        check({ checkKey: 'test', headSha: 'head-5', observationId: 'head-5:test' }),
+        check({
+          checkKey: 'other',
+          headSha: 'head-5',
+          observationId: 'head-5:other',
+          failureSignature: 'failure:other'
+        })
+      ]
+    })
+    const separateGroups = repeatedOwnFixGroups(
+      twoCurrentFailures,
+      ledger(otherGroupAttempts),
+      'required'
+    )
+    expect(separateGroups).toEqual([
+      {
+        checkKey: 'other',
+        failureSignature: 'failure:other',
+        publishActionIds: ['publish-b1', 'publish-b2']
+      },
+      {
+        checkKey: 'test',
+        failureSignature: 'failure:test',
+        publishActionIds: ['publish-a1', 'publish-a2']
+      }
+    ])
+    expect(repeatedOwnFixExhausted(separateGroups, 3)).toBeNull()
+  })
+
+  it('parks and reconciles only at the configured repeated-failure threshold', () => {
+    const first = completedPublishFixEntry('publish-1', 'head-1', 'head-2', 1_000)
+    const second = completedPublishFixEntry('publish-2', 'head-2', 'head-3', 2_000)
+    const third = completedPublishFixEntry('publish-3', 'head-3', 'head-4', 3_000)
+    const threshold = definition('required', 3)
+    const atSecondHead: HostedReviewWorld = {
+      review: review({
+        headSha: 'head-2',
+        checks: [check({ headSha: 'head-2', observationId: 'head-2:attempt' })]
+      }),
+      definition: threshold,
+      preparedCommit: null
+    }
+    const atThirdHead: HostedReviewWorld = {
+      ...atSecondHead,
+      review: review({
+        headSha: 'head-3',
+        checks: [check({ headSha: 'head-3', observationId: 'head-3:attempt' })]
+      })
+    }
+    const atFourthHead: HostedReviewWorld = {
+      ...atSecondHead,
+      review: review({
+        headSha: 'head-4',
+        checks: [check({ headSha: 'head-4', observationId: 'head-4:attempt' })]
+      })
+    }
+    const oneFailure = ledger([first])
+    const twoFailures = ledger([first, second])
+    const threeFailures = ledger([first, second, third])
+
+    expect(
+      evaluateStopPredicates(HOSTED_REVIEW_STOP_PREDICATES, snapshot(atSecondHead), oneFailure)
+    ).toBeNull()
+    expect(
+      evaluateStopPredicates(HOSTED_REVIEW_STOP_PREDICATES, snapshot(atThirdHead), twoFailures)
+    ).toBeNull()
+    expect(
+      evaluateStopPredicates(HOSTED_REVIEW_STOP_PREDICATES, snapshot(atFourthHead), threeFailures)
+    ).toMatchObject({
+      predicateId: 'repeated-failure-after-own-fix',
+      reason: 'repeated-failure-after-own-fix'
+    })
+
+    const legacyThresholdBeforeLimit: HostedReviewWorld = {
+      ...atThirdHead,
+      definition: definition()
+    }
+    expect(
+      evaluateStopPredicates(
+        HOSTED_REVIEW_STOP_PREDICATES,
+        snapshot(legacyThresholdBeforeLimit),
+        twoFailures
+      )
+    ).toBeNull()
+
+    const legacyThresholdWorld: HostedReviewWorld = {
+      ...atFourthHead,
+      definition: definition()
+    }
+    expect(
+      evaluateStopPredicates(
+        HOSTED_REVIEW_STOP_PREDICATES,
+        snapshot(legacyThresholdWorld),
+        threeFailures
+      )
+    ).toMatchObject({ reason: 'repeated-failure-after-own-fix' })
+
+    const changedSignature: HostedReviewWorld = {
+      ...atFourthHead,
+      review: review({
+        headSha: 'head-4',
+        checks: [
+          check({
+            headSha: 'head-4',
+            observationId: 'head-4:changed',
+            failureSignature: 'failure:changed'
+          })
+        ]
+      })
+    }
+    expect(
+      evaluateStopPredicates(
+        HOSTED_REVIEW_STOP_PREDICATES,
+        snapshot(changedSignature),
+        threeFailures
+      )
+    ).toBeNull()
+  })
   it('paces repeated optional failures only when all checks are in scope', () => {
     const optionalFailure = check({ required: false })
     const allScopeWorld: HostedReviewWorld = {
       review: review({ checks: [optionalFailure] }),
-      definition: definition('all'),
+      definition: definition('all', 1),
       preparedCommit: null
     }
     const requiredScopeWorld: HostedReviewWorld = {
       ...allScopeWorld,
-      definition: definition('required')
+      definition: definition('required', 1)
     }
     const history = ledger([fixAttributionEntry()])
 

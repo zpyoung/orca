@@ -1,12 +1,15 @@
 import { translate } from '@/i18n/i18n'
 import type { HeimdallApi } from '../../../shared/fork-heimdall/api'
-import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
+import type {
+  WatcherFleetEntryReader,
+  WatcherListEntryReader
+} from '../../../shared/fork-heimdall/remote-reader-schemas'
 import {
   getLatestEscalations,
   sameApprovalScope
 } from '../../../shared/fork-heimdall/ledger-queries'
 import type { ApprovalScope, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
-import type { WatcherListEntry } from '../../../shared/fork-heimdall/watcher-types'
 import type {
   HostedReviewEnrollmentPayload,
   HostedReviewMergeCheckScope,
@@ -62,7 +65,9 @@ function isHostedReviewEnrollmentPayload(
   )
 }
 
-export function hostedReviewPayload(entry: WatcherListEntry): HostedReviewEnrollmentPayload | null {
+export function hostedReviewPayload(
+  entry: WatcherListEntryReader
+): HostedReviewEnrollmentPayload | null {
   if (entry.enrollment.kind !== 'hosted-review') {
     return null
   }
@@ -90,7 +95,7 @@ export type HostedReviewSitterSelection = {
 }
 
 export function sameHostedReview(
-  row: WatcherFleetEntry,
+  row: WatcherFleetEntryReader,
   selection: HostedReviewSitterSelection
 ): boolean {
   const payload = hostedReviewPayload(row.entry)

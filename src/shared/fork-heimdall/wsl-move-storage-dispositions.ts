@@ -13,7 +13,9 @@ const tables = (database: string, names: readonly string[]): [string, WslMoveFie
 
 export const HEIMDALL_SQLITE_SCHEMA_FILE_DATABASES: Record<string, string> = {
   'src/main/fork-heimdall/database.ts': 'heimdall',
-  'src/main/fork-heimdall-objective/objective-database.ts': 'heimdall-objective'
+  'src/main/fork-heimdall-objective/objective-database.ts': 'heimdall-objective',
+  'src/main/fork-heimdall-pipeline/pipeline-database.ts': 'heimdall-pipeline',
+  'src/main/fork-heimdall-pipeline/pipeline-enrollment-table.ts': 'heimdall'
 }
 
 export const HEIMDALL_SQLITE_TABLE_DISPOSITIONS: Record<string, WslMoveFieldDisposition> =
@@ -23,7 +25,9 @@ export const HEIMDALL_SQLITE_TABLE_DISPOSITIONS: Record<string, WslMoveFieldDisp
       'heimdall_ledger',
       'heimdall_tick_trace',
       'heimdall_terminal_summary',
-      'heimdall_pending_kind_purge'
+      'heimdall_pending_kind_purge',
+      'heimdall_pipeline_enrollment',
+      'heimdall_pipeline_pending_purge'
     ]),
     ...tables('heimdall-objective', [
       'plan_revision',
@@ -38,5 +42,16 @@ export const HEIMDALL_SQLITE_TABLE_DISPOSITIONS: Record<string, WslMoveFieldDisp
       'plan_patch',
       'plan_review',
       'gate_attempt'
+    ]),
+    ...tables('heimdall-pipeline', [
+      'pipeline_run_pin',
+      'pipeline_node_output',
+      'pipeline_dispatch',
+      'pipeline_attempt_baseline',
+      'pipeline_swarm_expansion',
+      'pipeline_child_worktree',
+      'pipeline_merge_progress',
+      'pipeline_composite',
+      'pipeline_terminal_node_state'
     ])
   ])

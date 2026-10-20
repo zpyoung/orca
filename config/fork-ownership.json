@@ -212,6 +212,11 @@
         "skill-stubs/orca-loop.md",
         "skills/orca-loop/**"
       ]
+    },
+    {
+      "name": "heimdall-pipeline",
+      "purpose": "Pipeline engine (graph interpreter on the Heimdall runner), YAML format, canvas editor, run graph.",
+      "globs": ["**/fork-heimdall-pipeline/**"]
     }
   ],
   "seams": [
@@ -728,6 +733,7 @@
         "      'heimdall answer-escalation',",
         "      'heimdall stop-worker',",
         "      'heimdall budget',",
+        "      'heimdall create',",
         "      'heimdall set-concurrency'",
         "    ],",
         "    load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS"
@@ -766,7 +772,8 @@
         "  '  heimdall stop-worker      Stop a dispatched worker',",
         "  '  heimdall budget           Adjust watcher budget',",
         "  '  heimdall set-concurrency  Change objective concurrency',",
-        "  '',"
+        "  '',",
+        "  '  heimdall create --pipeline Start a pipeline run',"
       ]
     },
     {
@@ -786,7 +793,8 @@
         "  '  orca heimdall answer <watcherId> <messageId> --body <text> [--json]',",
         "  '  orca heimdall stop-worker <watcherId> <dispatchId> [--json]',",
         "  '  orca heimdall budget <watcherId> [--hours <n|none>] [--turns <n|none>] [--json]',",
-        "  '  orca heimdall set-concurrency <watcherId> <maxConcurrency> [--json]',"
+        "  '  orca heimdall set-concurrency <watcherId> <maxConcurrency> [--json]',",
+        "  '  orca heimdall create --pipeline <ref|path> --spec <task text> [--worktree <selector>] [--input name=value]... [--cap name=mode]... [--json]',"
       ]
     },
     {
@@ -5606,6 +5614,118 @@
         "import type { LoopWorktreeSummary } from './fork-loops/loop-types'",
         "  loop?: LoopWorktreeSummary"
       ]
+    },
+    {
+      "path": "src/main/automations/precheck-runner.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "passthrough",
+      "lines": [
+        "      extraEnv?: NodeJS.ProcessEnv",
+        "      env: target.extraEnv ? { ...process.env, ...target.extraEnv } : process.env,"
+      ]
+    },
+    {
+      "path": "src/main/issue-command-file.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { gitignoreAlreadyCoversOrcaDir } from './fork-heimdall-pipeline/orca-gitignore-rules'",
+        "      if (gitignoreAlreadyCoversOrcaDir(content)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/EditorContent.tsx",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { PipelineCanvasTab } from '@/fork-heimdall-pipeline/PipelineCanvasTab'",
+        "  if (activeFile.mode === 'pipeline') {",
+        "    return <PipelineCanvasTab file={activeFile} />",
+        "  }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-autosave-controller.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { savePipelineDraftForClose } from '@/fork-heimdall-pipeline/pipeline-tab-save'",
+        "    if (file.mode === 'pipeline' && !(await savePipelineDraftForClose(fileId))) {",
+        "      return",
+        "    }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-labels.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "  if (file.mode === 'pipeline') {",
+        "    return file.pipeline?.ref ?? getBaseLabel(file, variant)",
+        "  }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-save-queue.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { savePipelineDraftForEditor } from '@/fork-heimdall-pipeline/pipeline-tab-save'",
+        "        if (liveFile.mode === 'pipeline') {",
+        "          return savePipelineDraftForEditor(file.id, trigger)",
+        "        }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/editor/types/open-file.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "passthrough",
+      "lines": [
+        "  pipeline?: OpenPipelineTabState",
+        "  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details' | 'pipeline'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs-hydration.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { isPipelineVirtualTabId } from '@/fork-heimdall-pipeline/pipeline-virtual-tab-id'",
+        "        if (tab.contentType === 'editor' && isPipelineVirtualTabId(tab.entityId)) {",
+        "          return false",
+        "        }"
+      ]
+    },
+    {
+      "path": "src/shared/protocol-version.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import * as heimdallPipelineCapability from './fork-heimdall-pipeline/capability'",
+        "  ...heimdallPipelineCapability.HEIMDALL_PIPELINE_CLIENT_CAPABILITIES,",
+        "  ...heimdallPipelineCapability.HEIMDALL_PIPELINE_RUNTIME_CAPABILITIES,"
+      ]
+    },
+    {
+      "path": "src/main/ipc/desktop-renderer-runtime-capabilities.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_PIPELINE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall-pipeline/capability'",
+        "  ...HEIMDALL_PIPELINE_CLIENT_CAPABILITIES,"
+      ]
+    },
+    {
+      "path": "config/oxlint-dead-classes.json",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": ["              \"pipeline-*\","]
+    },
+    {
+      "path": "src/renderer/src/store/slices/editor/tabs/editor-tab-content-type.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": ["  return file.mode === 'check-details' || file.mode === 'pipeline'"]
     }
   ],
   "exceptions": [
@@ -6136,11 +6256,6 @@
       "reason": "Sidebar density: tighter 24px group header and 2px row gap. The host-header height fix is upstream as of v1.4.224.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#sidebar-density"
-    },
-    {
-      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
-      "reason": "Tests for the fork i18n aggregation machinery.",
-      "status": "permanent"
     },
     {
       "path": "src/renderer/src/i18n/en-runtime-required.json",
@@ -6698,6 +6813,17 @@
       "path": "src/shared/rpc-contract/rpc-params-catalog.generated.ts",
       "reason": "Generated by generate-rpc-params-catalog.mjs from this tree's RPC registry, which includes the fork's methods; upstream's copy fails verify:rpc-params-catalog here.",
       "status": "permanent"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "reason": "Records fork-added dependencies (@xyflow/react) that package.json (a permanent exception) declares; resetting it to the upstream tag de-syncs --frozen-lockfile CI.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/generate-rpc-params-catalog.mjs",
+      "reason": "Includes shared parameter schemas imported through registered off-directory RPC method collections without pulling unrelated main-process helpers into the generated catalog.",
+      "status": "pending-upstream",
+      "ledger": "bug-280"
     }
   ],
   "residuals": {
@@ -6818,7 +6944,7 @@
       "removed": 7
     },
     "src/shared/protocol-version.ts": {
-      "added": 35,
+      "added": 38,
       "removed": 0
     },
     "src/shared/remote-runtime-client-capabilities.ts": {
@@ -6922,7 +7048,7 @@
       "removed": 0
     },
     "src/cli/handler-group-manifest.ts": {
-      "added": 55,
+      "added": 56,
       "removed": 0
     },
     "src/cli/args.ts": {
@@ -6934,11 +7060,11 @@
       "removed": 0
     },
     "src/cli/root-help-text-primary.ts": {
-      "added": 42,
+      "added": 43,
       "removed": 0
     },
     "src/cli/root-help-text-secondary.ts": {
-      "added": 23,
+      "added": 24,
       "removed": 0
     },
     ".gitignore": {
@@ -8974,6 +9100,50 @@
       "removed": 0
     },
     ".github/workflows/e2e.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/tabs-hydration.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/ipc/desktop-renderer-runtime-capabilities.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/automations/precheck-runner.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/editor/types/open-file.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/editor-labels.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/main/issue-command-file.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/EditorContent.tsx": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/editor/editor-autosave-controller.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/editor/editor-save-queue.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "config/oxlint-dead-classes.json": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/editor/tabs/editor-tab-content-type.ts": {
       "added": 1,
       "removed": 1
     }

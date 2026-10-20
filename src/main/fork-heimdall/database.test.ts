@@ -172,4 +172,57 @@ describe('Heimdall database initialization', () => {
       HEIMDALL_DATABASE_SCHEMA_VERSION
     )
   })
+
+  it('creates idempotent side tables without changing Heimdall schema version 4', () => {
+    const first = new HeimdallDatabase(root)
+    opened.push(first)
+    const connection = first.connection()
+    expect(connection.pragma('user_version', { simple: true })).toBe(4)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: PRAGMA table_info exposes the literal name/type columns asserted here.
+    const builtinColumns = connection.prepare('PRAGMA table_info(heimdall_enrollment)').all() as {
+      name: string
+      type: string
+    }[]
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: PRAGMA table_info exposes the literal name/type columns asserted here.
+    const pipelineColumns = connection
+      .prepare('PRAGMA table_info(heimdall_pipeline_enrollment)')
+      .all() as { name: string; type: string }[]
+    expect(pipelineColumns.map(({ name, type }) => ({ name, type }))).toEqual(
+      builtinColumns.map(({ name, type }) => ({ name, type }))
+    )
+    expect(
+      connection
+        .prepare(
+          `SELECT name FROM sqlite_master
+            WHERE type = 'table'
+              AND name IN ('heimdall_pipeline_enrollment', 'heimdall_pipeline_pending_purge')
+            ORDER BY name`
+        )
+        .all()
+    ).toEqual([
+      { name: 'heimdall_pipeline_enrollment' },
+      { name: 'heimdall_pipeline_pending_purge' }
+    ])
+    expect(
+      connection
+        .prepare(
+          `SELECT name FROM sqlite_master
+            WHERE type = 'index' AND name = 'heimdall_pipeline_enrollment_live_workspace'`
+        )
+        .get()
+    ).toEqual({ name: 'heimdall_pipeline_enrollment_live_workspace' })
+
+    first.close()
+    const reopened = new HeimdallDatabase(root)
+    opened.push(reopened)
+    expect(reopened.connection().pragma('user_version', { simple: true })).toBe(
+      HEIMDALL_DATABASE_SCHEMA_VERSION
+    )
+    expect(
+      reopened
+        .connection()
+        .prepare('SELECT name FROM sqlite_master WHERE type = ? AND name = ?')
+        .get('table', 'heimdall_pipeline_enrollment')
+    ).toEqual({ name: 'heimdall_pipeline_enrollment' })
+  })
 })

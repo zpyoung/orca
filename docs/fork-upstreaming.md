@@ -542,3 +542,43 @@ PTY binding, native-chat eligibility, send queue, and migrated consumers/tests. 
 remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.
+
+## Repeatable CLI flags are not globally exclusive
+
+**Orca ledger:** `bug-253`.
+
+**What:** removes the global flag-exclusivity assertion from `src/cli/specs/search.test.ts`. Heimdall
+create commands legitimately accept repeatable flags, so a cross-command assertion that every flag
+is exclusive encodes an invalid CLI invariant.
+
+**Why upstream, not isolated:** this corrects a test in an upstream-owned CLI file rather than
+adding fork behavior. Keeping the deletion in-tree prevents stable-tag sync from restoring an
+assertion that conflicts with valid repeatable command flags.
+
+**Paths:** `src/cli/specs/search.test.ts`.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## RPC parameter schemas in registered method collections
+
+**What:** the parameter catalog follows visited method-collection imports from the host registry,
+including registered collections outside `src/main/runtime/rpc`, and indexes their shared schema
+exports. One registry-and-schema bundle still supplies the object identity used by the catalog.
+Tests, the generated catalog itself, and unrelated main-process helpers remain excluded.
+
+**Why upstream, not isolated:** registered methods need not live in the RPC directory. The old
+inventory omitted valid shared schemas imported by an off-directory collection and reported those
+methods as uncatalogued. A separate fork catalog would create a second contract instead of fixing
+the generic discovery rule.
+
+**Evidence:** the five Pipeline methods bound shared request schemas but appeared in
+`RPC_METHODS_WITHOUT_SHARED_PARAMS`, failing the node parameter-parity gate (Orca ledger bug-280).
+
+**Paths:**
+
+- `config/scripts/generate-rpc-params-catalog.mjs`
+
+**Excluded when preparing the upstream PR:** Pipeline handlers, schemas and generated catalog
+entries; only the generic discovery correction belongs in this change.
+
+**Status:** pending-upstream. Not yet submitted.

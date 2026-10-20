@@ -3,17 +3,11 @@ import {
   WatcherCommandRequestSchema,
   type WatcherCommandRequest,
   type WatcherCommandResult,
-  type WatcherOwnerFence,
-  type WatcherWorker
+  type WatcherOwnerFence
 } from '../../shared/fork-heimdall/fleet-types'
 import { getLatestApproval } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import {
-  appendAnsweredQuestionTransitions,
-  appendVoidedQuestionTransitions,
-  voidUnanswerableQuestion,
-  type QuestionLedgerAccess
-} from './question-resolution'
+import { WatcherQuestionControlLifecycle } from './control-question-lifecycle'
 import { WatcherEnrollmentControlLifecycle } from './control-enrollment-lifecycle'
 import { WatcherDeletionLifecycle } from './control-delete-lifecycle'
 import { WatcherControlEscalationLifecycle } from './control-escalation-lifecycle'
@@ -24,11 +18,11 @@ import {
   type EnrollmentRecord,
   type EnrollmentStore
 } from './enrollment-store'
+import { answerPipelineChoice, legacyPipelineApprovalRefusal } from './control-pipeline-choice'
 import type { HeimdallLedgerStore } from './ledger-store'
 import type { LeaseStore } from './lease-store'
 import {
   CoordinatorSeatLostError,
-  QuestionAlreadyAnsweredError,
   type HeimdallOrchestrationAdapter
 } from './orchestration/orchestration-contract'
 import type { WatcherRunnerLoop } from './runner-loop'
@@ -54,10 +48,24 @@ export class WatcherControlPlane {
   private readonly enrollmentLifecycle: WatcherEnrollmentControlLifecycle
   private readonly deletionLifecycle: WatcherDeletionLifecycle
   private readonly escalations: WatcherControlEscalationLifecycle
+  private readonly questions: WatcherQuestionControlLifecycle
 
   constructor(private readonly dependencies: ControlPlaneDependencies) {
     this.escalations = new WatcherControlEscalationLifecycle({
       ledger: dependencies.ledger,
+      now: dependencies.now,
+      createId: dependencies.createId
+    })
+    this.questions = new WatcherQuestionControlLifecycle({
+      ledger: dependencies.ledger,
+      orchestration: dependencies.orchestration,
+      runnerLoop: dependencies.runnerLoop,
+      runner: dependencies.runner,
+      escalations: this.escalations,
+      precondition: (watcherId, expectedOwner) => this.precondition(watcherId, expectedOwner),
+      commit: (watcherId, expectedOwner, change, appendWithinTransaction) =>
+        this.commit(watcherId, expectedOwner, change, appendWithinTransaction),
+      requireValidCommit: (commit) => this.requireValidCommit(commit),
       now: dependencies.now,
       createId: dependencies.createId
     })
@@ -145,15 +153,7 @@ export class WatcherControlPlane {
         return await this.enrollmentLifecycle.pause(enrollment, request.expectedOwner)
       case 'resume':
         // a question its worker can no longer answer must not keep refusing the only recovery
-        await voidUnanswerableQuestion(
-          this.questionLedger,
-          this.readQuestion(enrollment),
-          enrollment.watcherId,
-          (dispatchId) =>
-            this.dependencies.orchestration
-              .readDispatch(enrollment, dispatchId)
-              .then((observation) => observation.status)
-        )
+        await this.questions.voidUnanswerableQuestion(enrollment)
         return this.enrollmentLifecycle.resume(enrollment, request.expectedOwner)
       case 'disarm':
         return await this.enrollmentLifecycle.disarm(enrollment, request.expectedOwner)
@@ -172,7 +172,7 @@ export class WatcherControlPlane {
           request.command.maxConcurrency
         )
       case 'answer-question':
-        return await this.answerQuestion(
+        return await this.questions.answerQuestion(
           enrollment,
           request.expectedOwner,
           request.command.messageId,
@@ -186,6 +186,14 @@ export class WatcherControlPlane {
           request.expectedOwner,
           request.command.escalationId,
           request.command.body
+        )
+      case 'answer-pipeline-choice':
+        return answerPipelineChoice(
+          enrollment,
+          request.expectedOwner,
+          request.command,
+          this.dependencies,
+          this.escalations
         )
     }
   }
@@ -242,6 +250,10 @@ export class WatcherControlPlane {
     if (!scope.success) {
       return refused('invalid-command', scope.error.message)
     }
+    const pipelineRefusal = legacyPipelineApprovalRefusal(scope.data)
+    if (pipelineRefusal) {
+      return pipelineRefusal
+    }
     const previous = getLatestApproval(
       this.dependencies.ledger.read(enrollment.watcherId),
       scope.data
@@ -266,111 +278,6 @@ export class WatcherControlPlane {
     const runner = this.dependencies.runner(enrollment.watcherId)
     if (runner) {
       runner.enrollment = this.requireValidCommit(commit)
-      this.dependencies.runnerLoop.schedule(runner, 0)
-    }
-    return this.applied()
-  }
-
-  private async answerQuestion(
-    enrollment: WatcherEnrollment,
-    expectedOwner: WatcherOwnerFence,
-    messageId: string,
-    body: string
-  ): Promise<WatcherCommandResult> {
-    let workers: WatcherWorker[]
-    try {
-      workers = await this.dependencies.orchestration.listWorkers(enrollment)
-    } catch (error) {
-      return this.preSendError(error)
-    }
-    const workerStillPresentsQuestion = workers.some(
-      (worker) => worker.question?.messageId === messageId
-    )
-    const ledgerStillPresentsQuestion = this.escalations.hasOpenWorkerQuestion(
-      enrollment.watcherId,
-      messageId
-    )
-    if (!workerStillPresentsQuestion && !ledgerStillPresentsQuestion) {
-      return refused('question-already-answered', `Question ${messageId} is no longer pending`)
-    }
-    const fence = this.precondition(enrollment.watcherId, expectedOwner)
-    if ('status' in fence) {
-      return fence
-    }
-    const current = fence.enrollment
-    const restoreAutoQuestionPark =
-      !current.enabled &&
-      !current.paused &&
-      this.escalations.latestAutomaticParkKind(this.dependencies.ledger.read(current.watcherId)) ===
-        'park-worker-question'
-    try {
-      await this.dependencies.orchestration.answerQuestion(current, messageId, body)
-    } catch (error) {
-      if (
-        error instanceof QuestionAlreadyAnsweredError ||
-        errorCode(error) === 'question-already-answered' ||
-        errorCode(error) === 'question_not_found'
-      ) {
-        return refused('question-already-answered', errorText(error))
-      }
-      if (
-        error instanceof CoordinatorSeatLostError ||
-        errorCode(error) === 'coordinator-seat-lost'
-      ) {
-        return refused('coordinator-seat-lost', errorText(error))
-      }
-      if (errorCode(error) === 'dispatch_inactive') {
-        appendVoidedQuestionTransitions(this.questionLedger, current.watcherId, messageId, 'closed')
-        const runner = this.dependencies.runner(current.watcherId)
-        if (runner) {
-          this.dependencies.runnerLoop.schedule(runner, 0)
-        }
-        return refused('question-already-answered', errorText(error))
-      }
-      return { status: 'indeterminate', detail: errorText(error) }
-    }
-    const commit = this.commit(
-      current.watcherId,
-      expectedOwner,
-      restoreAutoQuestionPark ? { enabled: true } : {},
-      () => appendAnsweredQuestionTransitions(this.questionLedger, current.watcherId, messageId)
-    )
-    if (commit.status === 'refused') {
-      return {
-        status: 'indeterminate',
-        detail: `Question was answered but owner state could not be committed: ${commit.detail}`
-      }
-    }
-    const updated = this.requireValidCommit(commit)
-    const runner = this.dependencies.runner(updated.watcherId)
-    if (runner) {
-      runner.enrollment = updated
-      runner.status = updated.paused
-        ? {
-            ...runner.status,
-            enabled: true,
-            state: 'held',
-            phase: 'paused',
-            reason: 'paused',
-            nextPulseAtMs: null
-          }
-        : updated.enabled
-          ? {
-              ...runner.status,
-              enabled: true,
-              state: 'watching',
-              phase: 'question-answered',
-              reason: null,
-              parkReason: null
-            }
-          : {
-              ...runner.status,
-              enabled: false,
-              state: 'parked',
-              phase: 'parked',
-              reason: 'ready-to-resume',
-              parkReason: null
-            }
       this.dependencies.runnerLoop.schedule(runner, 0)
     }
     return this.applied()
@@ -415,20 +322,6 @@ export class WatcherControlPlane {
       this.dependencies.runnerLoop.schedule(runner, 0)
     }
     return this.applied()
-  }
-
-  private get questionLedger(): QuestionLedgerAccess {
-    return {
-      read: (watcherId) => this.dependencies.ledger.read(watcherId),
-      append: (entry) => this.dependencies.ledger.append(entry),
-      now: this.dependencies.now,
-      createId: this.dependencies.createId
-    }
-  }
-
-  private readQuestion(enrollment: WatcherEnrollment) {
-    return (messageId: string) =>
-      this.dependencies.orchestration.readQuestion(enrollment, messageId)
   }
 
   private precondition(
@@ -487,13 +380,6 @@ export class WatcherControlPlane {
       throw new Error('A control mutation produced an invalid Heimdall enrollment')
     }
     return commit.enrollment
-  }
-
-  private preSendError(error: unknown): WatcherCommandResult {
-    if (error instanceof CoordinatorSeatLostError || errorCode(error) === 'coordinator-seat-lost') {
-      return refused('coordinator-seat-lost', errorText(error))
-    }
-    return refused('owner-unreachable', errorText(error))
   }
 
   private applied(): WatcherCommandResult {

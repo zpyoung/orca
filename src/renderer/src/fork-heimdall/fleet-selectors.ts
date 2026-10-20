@@ -1,5 +1,6 @@
 import { isWatcherTickErrorStatus } from '../../../shared/fork-heimdall/watcher-tick-error'
-import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherFleetEntryReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
 import type { WatcherStatusState } from '../../../shared/fork-heimdall/watcher-types'
 
 /** Classifies each watcher by the fleet indicator it contributes to. */
@@ -13,7 +14,7 @@ export const HEIMDALL_FLEET_BUCKET_ORDER: readonly HeimdallFleetBucket[] = [
   'inactive'
 ]
 
-const STATE_RANK: Record<WatcherFleetEntry['entry']['status']['state'], number> = {
+const STATE_RANK: Record<WatcherFleetEntryReader['entry']['status']['state'], number> = {
   escalated: 0,
   parked: 1,
   unreachable: 2,
@@ -24,7 +25,7 @@ const STATE_RANK: Record<WatcherFleetEntry['entry']['status']['state'], number> 
   disabled: 7
 }
 
-export function isHeimdallAttentionRow(row: WatcherFleetEntry): boolean {
+export function isHeimdallAttentionRow(row: WatcherFleetEntryReader): boolean {
   const status = row.entry.status
   return (
     status.state === 'escalated' ||
@@ -34,7 +35,7 @@ export function isHeimdallAttentionRow(row: WatcherFleetEntry): boolean {
   )
 }
 
-function attentionRank(row: WatcherFleetEntry): number {
+function attentionRank(row: WatcherFleetEntryReader): number {
   if (isHeimdallAttentionRow(row)) {
     return STATE_RANK[row.entry.status.state]
   }
@@ -63,7 +64,7 @@ function bucketForWatcherState(state: WatcherStatusState): HeimdallFleetBucket {
 }
 
 /** Assigns exactly one bucket to a watcher, preserving urgent signals above inactivity. */
-export function heimdallFleetBucket(row: WatcherFleetEntry): HeimdallFleetBucket {
+export function heimdallFleetBucket(row: WatcherFleetEntryReader): HeimdallFleetBucket {
   if (isHeimdallAttentionRow(row)) {
     return 'attention'
   }
@@ -80,7 +81,7 @@ export function heimdallFleetBucket(row: WatcherFleetEntry): HeimdallFleetBucket
 
 /** Counts each watcher once, including buckets with no watchers. */
 export function countHeimdallFleetBuckets(
-  entries: readonly WatcherFleetEntry[]
+  entries: readonly WatcherFleetEntryReader[]
 ): Record<HeimdallFleetBucket, number> {
   const counts: Record<HeimdallFleetBucket, number> = {
     attention: 0,
@@ -94,7 +95,9 @@ export function countHeimdallFleetBuckets(
   return counts
 }
 
-export function sortHeimdallFleetRows(entries: readonly WatcherFleetEntry[]): WatcherFleetEntry[] {
+export function sortHeimdallFleetRows(
+  entries: readonly WatcherFleetEntryReader[]
+): WatcherFleetEntryReader[] {
   return [...entries].sort((left, right) => {
     const rankDelta = attentionRank(left) - attentionRank(right)
     if (rankDelta !== 0) {
@@ -107,7 +110,7 @@ export function sortHeimdallFleetRows(entries: readonly WatcherFleetEntry[]): Wa
   })
 }
 
-export function countHeimdallAttention(entries: readonly WatcherFleetEntry[]): number {
+export function countHeimdallAttention(entries: readonly WatcherFleetEntryReader[]): number {
   return entries.reduce((count, row) => count + Number(isHeimdallAttentionRow(row)), 0)
 }
 

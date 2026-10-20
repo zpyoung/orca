@@ -1,14 +1,25 @@
-import type { HeimdallPillTone } from './heimdall-tone-pill'
 import { translate } from '@/i18n/i18n'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
+import type {
+  WatcherFleetEntryReader,
+  WatcherKindIdReader
+} from '../../../shared/fork-heimdall/remote-reader-schemas'
 import { isWatcherTickErrorStatus } from '../../../shared/fork-heimdall/watcher-tick-error'
-import type { WatcherKindId, WatcherStatus } from '../../../shared/fork-heimdall/watcher-types'
+import type { WatcherStatus } from '../../../shared/fork-heimdall/watcher-types'
 import { isHeimdallAttentionRow } from './fleet-selectors'
+import type { HeimdallPillTone } from './heimdall-tone-pill'
 
-export function watcherKindLabel(kind: WatcherKindId): string {
-  return kind === 'hosted-review'
-    ? translate('fork.hostedReviewSitter.title', 'PR Sitter')
-    : translate('fork.heimdall.kind.objective', 'Objective watcher')
+export function watcherKindLabel(kind: WatcherKindIdReader): string {
+  switch (kind) {
+    case 'objective':
+      return translate('fork.heimdall.kind.objectiveV1', 'Objective v1')
+    case 'hosted-review':
+      return translate('fork.heimdall.kind.prSitterV1', 'PR sitter v1')
+    case 'pipeline':
+      return translate('fork.heimdall.kind.pipeline', 'Pipeline')
+    case 'unknown':
+      return translate('fork.heimdall.kind.unknown', 'Unknown watcher')
+  }
 }
 
 export function watcherStatusLabel(status: Pick<WatcherStatus, 'state' | 'phase'>): string {
@@ -28,7 +39,7 @@ export function watcherStatusLabel(status: Pick<WatcherStatus, 'state' | 'phase'
   return labels[status.state]
 }
 
-export function watcherHostLabel(row: WatcherFleetEntry): string {
+export function watcherHostLabel(row: WatcherFleetEntryReader): string {
   return row.target.connectionId
     ? translate('fork.heimdall.host.remote', 'Remote · {{host}}', {
         host: row.target.connectionId
@@ -36,7 +47,11 @@ export function watcherHostLabel(row: WatcherFleetEntry): string {
     : translate('fork.heimdall.host.local', 'This device')
 }
 
-export function watcherStatusTone(row: WatcherFleetEntry): HeimdallPillTone {
+function isKnownWatcherEntry(row: WatcherFleetEntryReader): row is WatcherFleetEntry {
+  return row.entry.enrollment.kind !== 'unknown'
+}
+
+export function watcherStatusTone(row: WatcherFleetEntryReader): HeimdallPillTone {
   if (
     row.contact === 'unverifiable' ||
     row.entry.status.state === 'unreachable' ||
@@ -44,7 +59,7 @@ export function watcherStatusTone(row: WatcherFleetEntry): HeimdallPillTone {
   ) {
     return 'warning'
   }
-  if (isHeimdallAttentionRow(row)) {
+  if (isKnownWatcherEntry(row) && isHeimdallAttentionRow(row)) {
     return 'warning'
   }
   if (row.entry.status.state === 'watching' || row.entry.status.state === 'acting') {

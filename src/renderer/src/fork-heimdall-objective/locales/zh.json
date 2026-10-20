@@ -1,1 +1,37 @@
-{}
+{
+  "fork": {
+    "heimdallObjective": {
+      "enrollment": {
+        "gatesHelpLabel": "检查帮助",
+        "gatesHelpSummary": "计划中的每个节点合并后、评审和着陆前，由内核在集成分支上运行的命名全树命令。",
+        "gatesHelp": {
+          "whenLabel": "运行时机",
+          "when": "最后一个计划节点合并后、评审和着陆前。",
+          "whatLabel": "适用内容",
+          "what": "完整测试套件及其他全树检查，而非逐节点检查。"
+        },
+        "removeGate": "移除检查 {{n}}",
+        "gates": "检查",
+        "gatesHelpLine": "每个计划节点合并后、评审和着陆前，检查会在集成分支上运行。请在此添加完整测试套件及其他全树检查，而非逐节点检查。",
+        "addGate": "添加检查",
+        "gatesUnsupportedHost": "此主机的 Orca 版本不支持检查。请移除下方的检查后继续。"
+      },
+      "validation": {
+        "gateNameInvalid": "检查名称 {{name}} 只能包含小写字母、数字或连字符，必须以字母或数字开头，且最多 40 个字符。",
+        "gateCommandInvalid": "请输入不超过 8,192 个字符的检查命令。",
+        "gateTimeoutInvalid": "检查超时必须是 10 到 14,400 秒之间的整数。",
+        "gateNameDuplicate": "检查名称必须唯一。",
+        "gatesTooMany": "目标最多可声明 8 项检查。",
+        "gatesUnsupportedHost": "此主机的 Orca 版本不支持检查。请移除所有检查后继续。"
+      },
+      "detail": {
+        "noGateDeclared": "未声明目标检查。",
+        "checks": "检查",
+        "lintCode": {
+          "duplicatesGate": "重复的检查",
+          "noGateDeclared": "未声明检查"
+        }
+      }
+    }
+  }
+}

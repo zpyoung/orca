@@ -2,7 +2,7 @@ import {
   HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY
 } from '../../../../../shared/fork-heimdall/capability'
-import type { WatcherDetail } from '../../../../../shared/fork-heimdall/fleet-types'
+import type { WatcherDetailReader } from '../../../../../shared/fork-heimdall/remote-reader-schemas'
 import type { LedgerEntry, WatcherLedger } from '../../../../../shared/fork-heimdall/ledger-types'
 import type { RuntimeCapability } from '../../../../../shared/protocol-version'
 import type { RpcContext } from '../../core'
@@ -79,10 +79,10 @@ export function projectHeimdallLedgerForClient(
   }
 }
 
-export function projectHeimdallDetailForClient(
-  detail: WatcherDetail,
+export function projectHeimdalDetailForClient(
+  detail: WatcherDetailReader,
   context: HeimdallWireProjectionContext
-): WatcherDetail {
+): WatcherDetailReader {
   const ledger = projectHeimdallLedgerForClient(detail.ledger, context)
   return ledger === detail.ledger ? detail : { ...detail, ledger }
 }

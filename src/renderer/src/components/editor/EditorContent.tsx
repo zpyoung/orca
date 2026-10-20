@@ -8,6 +8,7 @@ import { EditorConflictReviewSurface } from './EditorConflictReviewSurface'
 import { EditorDiffFileSurface } from './EditorDiffFileSurface'
 import { EditorEditFileSurface } from './EditorEditFileSurface'
 import { EditorFileLoadErrorView } from './EditorFileLoadErrorView'
+import { PipelineCanvasTab } from '@/fork-heimdall-pipeline/PipelineCanvasTab'
 import { MarkdownPreviewSizeGate } from './MarkdownPreviewSizeGate'
 import type { FileContent } from './editor-panel-content-types'
 import { buildPdfScalePreferenceKey } from './pdf-scale-preference-storage'
@@ -124,6 +125,9 @@ export function EditorContent({
       activeFile.diffSource === 'combined-branch' ||
       activeFile.diffSource === 'combined-commit')
 
+  if (activeFile.mode === 'pipeline') {
+    return <PipelineCanvasTab file={activeFile} />
+  }
   if (activeFile.mode === 'check-details') {
     const checkRunDetails = activeFile.checkRunDetails
     if (!checkRunDetails) {

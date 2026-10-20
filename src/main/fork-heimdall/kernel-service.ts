@@ -31,6 +31,7 @@ import {
 } from './enrollment-store'
 import { enrollmentForPresentation } from './kernel-enrollment'
 import { enrollWatcher } from './kernel-enrollment-lifecycle'
+import { pipelineEnrollmentHooks } from '../fork-heimdall-pipeline/registration'
 import type { HeimdallKernelHost } from './kernel-host'
 import { watcherListEntry } from './kernel-list-entry'
 import type {
@@ -134,6 +135,7 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   async enroll(untrustedInput: EnrollInput): Promise<EnrollResult> {
     this.ensureLoaded()
     return await enrollWatcher(untrustedInput, {
+      ...pipelineEnrollmentHooks(this.dependencies.runtime),
       registry: this.registry,
       storageAuthority: this.storageAuthority(),
       enrollments: this.requireEnrollments(),

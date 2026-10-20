@@ -25,6 +25,13 @@ import {
 } from '../desktop-browser-bridge-protocol'
 import { RegisterDeviceKeyParamsSchema } from '../device-key-registration-contract'
 import {
+  PipelineEnsureTrackedRequestSchema,
+  PipelineListRequestSchema,
+  PipelinePersonalRequestSchema,
+  PipelineResolveRequestSchema,
+  PipelineRunViewRequestSchema
+} from '../fork-heimdall-pipeline/rpc-schemas'
+import {
   EmptyHeimdallRequestSchema,
   HeimdallUnsubscribeRequestSchema,
   WatcherCommandRequestSchema,
@@ -1029,6 +1036,11 @@ export const RPC_PARAMS_BY_METHOD = {
   'heimdall:detail': WatcherTargetSchema,
   'heimdall:fleet': EmptyHeimdallRequestSchema,
   'heimdall:objectiveDetail': WatcherTargetSchema,
+  'heimdall:pipelineEnsureTracked': PipelineEnsureTrackedRequestSchema,
+  'heimdall:pipelineList': PipelineListRequestSchema,
+  'heimdall:pipelinePersonal': PipelinePersonalRequestSchema,
+  'heimdall:pipelineResolve': PipelineResolveRequestSchema,
+  'heimdall:pipelineRunView': PipelineRunViewRequestSchema,
   'heimdall:subscribe': EmptyHeimdallRequestSchema,
   'heimdall:unsubscribe': HeimdallUnsubscribeRequestSchema,
   'host.gitBash.isAvailable': null,

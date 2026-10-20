@@ -174,9 +174,10 @@ export async function harness(
     getRepo: () => null,
     getWorktreeMetaForHost: () => null
   } as unknown as Store
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double for OrcaRuntimeService; this harness never calls runtime methods directly.
+  const runtime = {} as OrcaRuntimeService
   const service = new HeimdallKernelServiceImpl({
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: partial test double for OrcaRuntimeService; this harness never calls runtime methods directly.
-    runtime: {} as OrcaRuntimeService,
+    runtime,
     store,
     ...(options.storageAuthority ? { storageAuthority: options.storageAuthority } : {}),
     database,
@@ -197,6 +198,8 @@ export async function harness(
     holderId: 'test-holder'
   })
   return {
+    runtime,
+    store,
     directory,
     service,
     database,

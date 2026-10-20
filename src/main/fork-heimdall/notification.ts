@@ -4,6 +4,7 @@ import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
 import { deliverNativeNotification } from '../ipc/native-notification-delivery'
 import type { Store } from '../persistence'
+import { approvalNotificationCopy } from '../fork-heimdall-pipeline/approval-notification-copy'
 
 export type WatcherNotificationPublication = 'seed' | 'live' | 'replay'
 
@@ -43,10 +44,13 @@ export function deriveWatcherNotificationTransitions(
       entry.foldCount === 1 &&
       entry.approvalScope
     ) {
+      const copy = approvalNotificationCopy(enrollment, {
+        kind: entry.approvalScope.actionKind,
+        evidenceKey: entry.approvalScope.evidenceKey
+      })
       transitions.push({
         enrollment,
-        title: 'Watcher approval requested',
-        body: `${entry.approvalScope.actionKind} is waiting for approval`,
+        ...copy,
         notificationId: `approval:${entry.eventId}`
       })
     }

@@ -1,3 +1,4 @@
+import { ensurePipelineSideTables } from '../fork-heimdall-pipeline/pipeline-enrollment-table'
 import type Database from '../sqlite/sync-database'
 import {
   ScopedSqliteDatabase,
@@ -103,6 +104,7 @@ const HEIMDALL_MIGRATIONS = [
 /** Lazily owns the single profile-scoped Heimdall registry database. */
 export class HeimdallDatabase {
   private readonly scoped: ScopedSqliteDatabase
+  private pipelineSideTablesEnsured = false
 
   constructor(profileDirectory: ScopedDatabaseDirectorySource) {
     this.scoped = new ScopedSqliteDatabase({
@@ -119,7 +121,12 @@ export class HeimdallDatabase {
   }
 
   connection(): Database.Database {
-    return this.scoped.connection()
+    const connection = this.scoped.connection()
+    if (!this.pipelineSideTablesEnsured && !this.scoped.isReadOnly()) {
+      ensurePipelineSideTables(connection)
+      this.pipelineSideTablesEnsured = true
+    }
+    return connection
   }
 
   isReadOnly(): boolean {
@@ -136,5 +143,6 @@ export class HeimdallDatabase {
 
   close(): void {
     this.scoped.close()
+    this.pipelineSideTablesEnsured = false
   }
 }

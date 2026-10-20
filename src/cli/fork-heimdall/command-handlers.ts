@@ -1,3 +1,4 @@
+import { hostname, userInfo } from 'node:os'
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
@@ -5,6 +6,7 @@ import {
   HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
+import { HEIMDALL_PIPELINE_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall-pipeline/capability'
 import type {
   WatcherCommand,
   WatcherCommandResult,
@@ -26,6 +28,7 @@ import {
   requireAnswerText
 } from './watcher-command-values'
 import { resolveWatcherRow } from './watcher-row'
+import { pipelineChoiceAnswerCommand } from '../fork-heimdall-pipeline/pipeline-choice-answer'
 
 type CommandFactory = (
   row: WatcherFleetEntry,
@@ -36,7 +39,8 @@ const CAPABILITY_DESCRIPTIONS: Record<string, string> = {
   [HEIMDALL_COMMANDS_RUNTIME_CAPABILITY]: 'Heimdall watcher commands',
   [HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY]: 'live objective concurrency changes',
   [HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY]: 'answering owner escalations',
-  [HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY]: 'permanent watcher deletion'
+  [HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY]: 'permanent watcher deletion',
+  [HEIMDALL_PIPELINE_RUNTIME_CAPABILITY]: 'pipeline gate and choice answers'
 }
 
 async function runCommand(
@@ -62,6 +66,15 @@ async function runCommand(
 
   const row = await resolveWatcherRow(context.client, watcherId)
   const command = await factory(row, context)
+  if (
+    command.kind === 'answer-pipeline-choice' &&
+    !capabilities?.includes(HEIMDALL_PIPELINE_RUNTIME_CAPABILITY)
+  ) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      `The running Orca runtime does not support ${CAPABILITY_DESCRIPTIONS[HEIMDALL_PIPELINE_RUNTIME_CAPABILITY]}. Update or restart Orca and try again.`
+    )
+  }
   const response = await context.client.call<WatcherCommandResult>(HEIMDALL_CHANNELS.command, {
     target: row.target,
     expectedOwner: row.ownerFence,
@@ -131,7 +144,18 @@ export const HEIMDALL_COMMAND_HANDLERS: Record<string, CommandHandler> = {
             `Escalation ${escalationId} is not the latest unresolved approval for Heimdall watcher ${watcherId}`
           )
         }
-        return { kind: 'approve', scope }
+        const pipelineChoice = pipelineChoiceAnswerCommand(scope, handlerContext.flags)
+        if (pipelineChoice === null) {
+          return { kind: 'approve', scope }
+        }
+        return {
+          ...pipelineChoice,
+          attribution: {
+            actor: { user: userInfo().username, host: hostname() },
+            surface: 'cli',
+            atMs: Date.now()
+          }
+        }
       },
       () => `Approved escalation ${escalationId} for Heimdall watcher ${watcherId}.`
     )

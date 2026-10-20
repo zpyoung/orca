@@ -1,0 +1,57 @@
+.pipeline-flow .pipeline-flow-edge__path {
+  stroke: var(--muted-foreground);
+}
+
+.pipeline-flow .pipeline-flow-edge__path[data-conditional='true'] {
+  stroke-dasharray: 6 4;
+}
+
+.pipeline-flow .pipeline-flow-edge__path[data-run-state='active'] {
+  stroke: var(--status-warning);
+  stroke-width: 2.5;
+}
+
+.pipeline-flow .pipeline-flow-edge__path[data-run-state='done'] {
+  stroke: var(--status-success);
+}
+
+.pipeline-flow .pipeline-flow-edge__path[data-run-state='skipped'] {
+  stroke: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+}
+
+.pipeline-flow-edge__spark {
+  fill: var(--status-warning);
+  stroke: var(--background);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.pipeline-flow-edge__label {
+  position: absolute;
+  max-width: 12rem;
+  overflow: hidden;
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pipeline-flow-edge__label[data-run-state='active'] {
+  border-color: var(--status-warning-border);
+}
+
+.pipeline-flow-edge__label[data-run-state='done'] {
+  border-color: var(--status-success-border);
+}
+
+.pipeline-flow-edge__label[data-run-state='skipped'] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}

@@ -7,7 +7,11 @@ import {
   getUnresolvedAttempts,
   hasPendingAttemptOutcome
 } from '../../shared/fork-heimdall/ledger-queries'
-import type { LedgerEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type {
+  EvidenceEntry,
+  LedgerEntry,
+  WatcherLedger
+} from '../../shared/fork-heimdall/ledger-types'
 import { errorBackoffMs, HEIMDALL_RAPID_POLL_MS } from '../../shared/fork-heimdall/pacing'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
 import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
@@ -23,6 +27,7 @@ import {
 import type { WatcherRunnerStatusLifecycle } from './runner-status'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 import { releaseSettledWorker } from './runner-worker-release'
+import { resolveAcceptedCompletionEffect } from './runner-accepted-completion'
 import { appendWorkerEscalation } from './worker-escalation-record'
 import {
   parkedForWorkerQuestion,
@@ -256,7 +261,8 @@ export class WatcherRunnerWorkerLifecycle {
           runner,
           body.dispatchId,
           body.outcome,
-          body.result ?? body.body
+          body.result ?? body.body,
+          entry
         )
       }
     }
@@ -298,7 +304,8 @@ export class WatcherRunnerWorkerLifecycle {
           runner,
           pending.dispatchId,
           completion.outcome,
-          completion.result ?? completion.body
+          completion.result ?? completion.body,
+          report
         )
       }
     }
@@ -408,13 +415,20 @@ export class WatcherRunnerWorkerLifecycle {
     runner: WatcherRunner,
     dispatchId: string,
     outcome: string | undefined,
-    result: unknown
+    result: unknown,
+    evidence: EvidenceEntry
   ): Promise<void> {
+    const effect = await resolveAcceptedCompletionEffect(runner, this.dependencies.ledgerStore, {
+      dispatchId,
+      outcome,
+      result,
+      evidence
+    })
     this.dependencies.dispatchLifecycle.settleWorker({
       watcherId: runner.enrollment.watcherId,
       dispatchId,
-      // a failed outcome still needs resolveOutcome to read the report and classify why
-      effect: outcome === 'succeeded' ? 'landed' : 'indeterminate',
+      // A failed outcome or unverified kind-owned completion still needs resolveOutcome to classify it.
+      effect,
       ...(result === undefined ? {} : { result }),
       reason: outcome
     })

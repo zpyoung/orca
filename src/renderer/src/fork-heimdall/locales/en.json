@@ -2,8 +2,10 @@
   "fork": {
     "heimdall": {
       "kind": {
-        "objective": "Objective watcher",
-        "hostedReview": "Hosted review"
+        "objectiveV1": "Objective v1",
+        "prSitterV1": "PR sitter v1",
+        "pipeline": "Pipeline",
+        "unknown": "Unknown watcher"
       },
       "status": {
         "watching": "Watching",
@@ -45,7 +47,8 @@
         "title": "Heimdall fleet",
         "summary": "{{active}} active · {{attention}} need attention",
         "refresh": "Refresh fleet",
-        "staleError": "Fleet refresh failed; showing the last confirmed snapshot: {{error}}"
+        "staleError": "Fleet refresh failed; showing the last confirmed snapshot: {{error}}",
+        "newRun": "New run"
       },
       "fleet": {
         "title": "Watcher fleet",

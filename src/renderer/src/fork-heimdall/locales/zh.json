@@ -2,7 +2,10 @@
   "fork": {
     "heimdall": {
       "kind": {
-        "objective": "目标监视器"
+        "objectiveV1": "Objective v1",
+        "prSitterV1": "PR sitter v1",
+        "pipeline": "Pipeline",
+        "unknown": "未知监视器"
       },
       "status": {
         "watching": "监视中",
@@ -44,7 +47,8 @@
         "title": "Heimdall 监视器集群",
         "summary": "{{active}} 个监视器运行中 · {{attention}} 个需要关注",
         "refresh": "刷新监视器集群",
-        "staleError": "监视器集群刷新失败；正在显示上次确认的快照：{{error}}"
+        "staleError": "监视器集群刷新失败；正在显示上次确认的快照：{{error}}",
+        "newRun": "新建运行"
       },
       "fleet": {
         "title": "监视器集群",

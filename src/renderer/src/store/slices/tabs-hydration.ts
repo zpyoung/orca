@@ -15,6 +15,7 @@ import {
   selectHydratedActiveGroupId
 } from './tab-group-state'
 import { dedupeTabOrder } from '../../../../shared/workspace-layout/tab-order'
+import { isPipelineVirtualTabId } from '@/fork-heimdall-pipeline/pipeline-virtual-tab-id'
 
 type HydratedTabState = {
   unifiedTabsByWorktree: Record<string, Tab[]>
@@ -132,6 +133,9 @@ export function buildHydratedTabState(
         // A preview is a browser tab now, and the worktree id inside that encoded id can itself
         // contain the separator, so re-deriving the document from it is guesswork. The reader
         // reopens the preview; nothing is left pointing at a surface that cannot exist.
+        if (tab.contentType === 'editor' && isPipelineVirtualTabId(tab.entityId)) {
+          return false
+        }
         if (tab.contentType === 'editor' && tab.entityId.startsWith('html-preview::')) {
           return false
         }

@@ -19,6 +19,7 @@ import {
 } from './editor-self-write-registry'
 import { getDiskBaselineSignature } from './diff-content-signature'
 import { trackExternalChangeConflictAction } from './editor-external-change-telemetry'
+import { savePipelineDraftForEditor } from '@/fork-heimdall-pipeline/pipeline-tab-save'
 import { editorTabFileAccess } from '@/lib/local-file-access'
 
 export type AppStoreApi = Pick<StoreApi<AppState>, 'getState' | 'subscribe'>
@@ -91,6 +92,9 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
             return
           }
           throw new Error('This file is still restoring its workspace owner. Try saving again.')
+        }
+        if (liveFile.mode === 'pipeline') {
+          return savePipelineDraftForEditor(file.id, trigger)
         }
 
         // Why: only autosave is blocked while suspended; explicit user saves proceed (the banner warned).

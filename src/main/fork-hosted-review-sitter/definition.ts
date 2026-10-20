@@ -8,6 +8,7 @@ import type {
   HostedReviewSitterDefinition
 } from '../../shared/fork-hosted-review-sitter/types'
 import { HostedReviewEnrollmentCandidateSchema } from '../../shared/fork-hosted-review-sitter/enrollment-candidate'
+import { HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT } from '../../shared/fork-hosted-review-sitter/stop-policy'
 import type { Store } from '../persistence'
 import { getAutomationSchedulerOwner } from '../persistence/scheduling-automations/automation-context-migration'
 import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
@@ -129,7 +130,10 @@ export async function authorizeHostedReviewSitterDefinition(
     reviewUrl: review.url,
     branchUpdateMode: candidatePayload.branchUpdateMode,
     mergeMethod: candidatePayload.mergeMethod,
-    mergeCheckScope: candidatePayload.mergeCheckScope
+    mergeCheckScope: candidatePayload.mergeCheckScope,
+    ...(candidatePayload.repeatFixLimit === undefined
+      ? {}
+      : { repeatFixLimit: candidatePayload.repeatFixLimit })
   }
   return {
     kind: 'hosted-review',
@@ -163,6 +167,7 @@ export function hostedReviewDefinitionFromEnrollment(
     worktreeId: enrollment.worktreeId,
     repoPath: enrollment.workspacePath,
     capabilities: parseCapabilities(enrollment.capabilities),
-    ...payload
+    ...payload,
+    repeatFixLimit: payload.repeatFixLimit ?? HOSTED_REVIEW_DEFAULT_REPEAT_FIX_LIMIT
   }
 }

@@ -27,6 +27,7 @@ export type HostedReviewEnrollmentPayload = {
   /** `null` follows the provider snapshot's repository default. */
   mergeMethod: HostedReviewMergeMethod | null
   mergeCheckScope: HostedReviewMergeCheckScope
+  repeatFixLimit?: number
 }
 
 /** Authorized view supplied to providers and the pure decision core. */

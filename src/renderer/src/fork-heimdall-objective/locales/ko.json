@@ -1,1 +1,37 @@
-{}
+{
+  "fork": {
+    "heimdallObjective": {
+      "enrollment": {
+        "gatesHelpLabel": "체크 도움말",
+        "gatesHelpSummary": "계획의 각 노드가 통합 브랜치에 병합된 뒤 리뷰와 랜딩 전에 커널이 실행하는 이름 있는 전체 트리 명령입니다.",
+        "gatesHelp": {
+          "whenLabel": "시점",
+          "when": "마지막 계획 노드가 병합된 뒤, 리뷰와 랜딩 전입니다.",
+          "whatLabel": "포함할 항목",
+          "what": "전체 테스트 모음과 기타 전체 트리 체크이며, 노드별 체크가 아닙니다."
+        },
+        "removeGate": "체크 {{n}} 제거",
+        "gates": "체크",
+        "gatesHelpLine": "체크는 각 계획 노드가 통합 브랜치에 병합된 뒤 리뷰와 랜딩 전에 실행됩니다. 전체 테스트 모음과 기타 전체 트리 체크를 여기에 넣고 계획 노드에는 넣지 마세요.",
+        "addGate": "체크 추가",
+        "gatesUnsupportedHost": "이 호스트의 Orca 버전에서는 체크를 사용할 수 없습니다. 계속하려면 아래 체크를 제거하세요."
+      },
+      "validation": {
+        "gateNameInvalid": "체크 이름 {{name}}은(는) 소문자, 숫자 또는 하이픈만 포함하고 문자나 숫자로 시작해야 하며 40자 이하여야 합니다.",
+        "gateCommandInvalid": "8,192자 이하의 체크 명령을 입력하세요.",
+        "gateTimeoutInvalid": "체크 시간 제한은 10~14,400초 범위의 정수여야 합니다.",
+        "gateNameDuplicate": "체크 이름은 중복될 수 없습니다.",
+        "gatesTooMany": "목표에는 최대 8개의 체크를 선언할 수 있습니다.",
+        "gatesUnsupportedHost": "이 호스트의 Orca 버전에서는 체크를 사용할 수 없습니다. 계속하려면 모든 체크를 제거하세요."
+      },
+      "detail": {
+        "noGateDeclared": "목표 체크가 선언되지 않았습니다.",
+        "checks": "체크",
+        "lintCode": {
+          "duplicatesGate": "체크가 중복됩니다",
+          "noGateDeclared": "체크가 선언되지 않았습니다"
+        }
+      }
+    }
+  }
+}

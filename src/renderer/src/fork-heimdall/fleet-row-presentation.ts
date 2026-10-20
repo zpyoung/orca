@@ -1,8 +1,6 @@
 import { getExecutionHostLabel } from '../../../shared/execution-host'
-import type {
-  WatcherFleetActivity,
-  WatcherFleetEntry
-} from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherFleetActivity } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherFleetEntryReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
 
 export type ResolvedFleetActivity =
   | { kind: 'unverifiable'; lastConfirmedAtMs: number }
@@ -22,7 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Contact authority wins over cached owner activity so a lost host never looks idle or active. */
-export function resolveFleetActivity(row: WatcherFleetEntry): ResolvedFleetActivity {
+export function resolveFleetActivity(row: WatcherFleetEntryReader): ResolvedFleetActivity {
   if (row.contact === 'unverifiable' || row.entry.status.state === 'unreachable') {
     return { kind: 'unverifiable', lastConfirmedAtMs: row.observedAtMs }
   }
@@ -30,14 +28,14 @@ export function resolveFleetActivity(row: WatcherFleetEntry): ResolvedFleetActiv
 }
 
 /** Objective phases only come from owner snapshot projection; runner phases are not substitutes. */
-export function resolveFleetWorkflowPhase(row: WatcherFleetEntry): string | null {
+export function resolveFleetWorkflowPhase(row: WatcherFleetEntryReader): string | null {
   if (row.workflowPhase !== undefined) {
     return row.workflowPhase
   }
   return row.entry.enrollment.kind === 'objective' ? null : row.entry.status.phase
 }
 
-export function resolveFleetWorkspace(row: WatcherFleetEntry): ResolvedFleetWorkspace {
+export function resolveFleetWorkspace(row: WatcherFleetEntryReader): ResolvedFleetWorkspace {
   const enrollment = row.entry.enrollment
   const payload = isRecord(enrollment.kindPayload) ? enrollment.kindPayload : null
   const objectiveWorkspaceKind =

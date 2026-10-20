@@ -12,10 +12,15 @@ import {
   type EnrollmentRecord,
   type EnrollmentStore
 } from './enrollment-store'
+import type { EnrollmentInsertRollbackResult } from './enrollment-insert-rollback'
 import { authorizeKindEnrollment, extendBudgetForRearm } from './kernel-enrollment'
 import { mintCoordinatorIdentity } from './orchestration/coordinator-identity'
 import type { WatcherKindRegistry, RegisteredWatcherKind } from './registry'
 import type { WatcherRunner } from './runner-state'
+
+type PipelineSourceRefusal = Extract<EnrollResult, { status: 'refused' }> & {
+  reason: 'invalid-payload'
+}
 
 export type KernelEnrollmentLifecycleDependencies = {
   registry: WatcherKindRegistry
@@ -32,6 +37,12 @@ export type KernelEnrollmentLifecycleDependencies = {
   publish(): void
   now(): number
   createId(): string
+  validatePipelineSource?(
+    input: EnrollInput,
+    authorized: AuthorizedEnrollment,
+    existing: WatcherEnrollment | null
+  ): Promise<PipelineSourceRefusal | null> | PipelineSourceRefusal | null
+  afterInsert?(inserted: WatcherEnrollment, input: EnrollInput): void
 }
 
 type InsertedEnrollmentActivation = Pick<
@@ -104,6 +115,32 @@ function authorizationUndo(): AuthorizationUndo {
       }
     }
   }
+}
+
+function rollbackInsertedEnrollmentAfterHookFailure(
+  inserted: WatcherEnrollment,
+  failure: unknown,
+  dependencies: KernelEnrollmentLifecycleDependencies,
+  undo: AuthorizationUndo
+): never {
+  let rollback: EnrollmentInsertRollbackResult
+  try {
+    rollback = dependencies.enrollments.rollbackInserted(inserted)
+  } catch (rollbackFailure) {
+    undo.markPersisted()
+    throw new AggregateError(
+      [failure, rollbackFailure],
+      'Post-insert enrollment hook failed and the inserted enrollment could not be safely rolled back'
+    )
+  }
+  if (rollback.status === 'rolled-back' || rollback.status === 'not-found') {
+    throw failure
+  }
+  undo.markPersisted()
+  throw new AggregateError(
+    [failure, new Error(rollback.detail)],
+    'Post-insert enrollment hook failed and the inserted enrollment could not be safely rolled back'
+  )
 }
 
 /** Enrolls or re-arms a watcher; authorization side effects are undone unless the enrollment persists. */
@@ -180,6 +217,14 @@ async function enrollAuthorizedWatcher(
     if (validationRefusal) {
       return validationRefusal
     }
+    const sourceRefusal = await dependencies.validatePipelineSource?.(
+      untrustedInput,
+      authorized,
+      existing
+    )
+    if (sourceRefusal) {
+      return sourceRefusal
+    }
     const ledger = dependencies.readLedger(existing.watcherId)
     const startsNewBudgetGeneration = latestHaltWasExplicitDisarm(ledger)
     const budget = startsNewBudgetGeneration
@@ -222,6 +267,14 @@ async function enrollAuthorizedWatcher(
   if (validationRefusal) {
     return validationRefusal
   }
+  const sourceRefusal = await dependencies.validatePipelineSource?.(
+    untrustedInput,
+    authorized,
+    null
+  )
+  if (sourceRefusal) {
+    return sourceRefusal
+  }
 
   const enrollment: WatcherEnrollment = {
     ...authorized,
@@ -235,6 +288,11 @@ async function enrollAuthorizedWatcher(
     terminalAtMs: null
   }
   const inserted = dependencies.enrollments.insert(enrollment)
+  try {
+    dependencies.afterInsert?.(inserted, untrustedInput)
+  } catch (error) {
+    rollbackInsertedEnrollmentAfterHookFailure(inserted, error, dependencies, undo)
+  }
   undo.markPersisted()
   activateInsertedEnrollment(inserted, kind, dependencies)
   return { status: 'enrolled', entry: dependencies.entry(inserted) }

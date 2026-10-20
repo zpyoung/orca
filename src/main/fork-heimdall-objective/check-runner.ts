@@ -12,6 +12,7 @@ export type CriterionCheckResult = {
   stdoutTail: string
   stderrTail: string
   error: string | null
+  stdoutTruncated?: boolean
   startedAtMs: number
   completedAtMs: number
   durationMs: number
@@ -21,9 +22,11 @@ export async function runCriterionCheck(args: {
   command: string
   target: ObjectiveWorkspaceTarget
   timeoutSeconds?: number
+  extraEnv?: NodeJS.ProcessEnv
+  preserveCommand?: boolean
 }): Promise<CriterionCheckResult> {
-  const command = args.command.trim()
-  if (!command) {
+  const command = args.preserveCommand ? args.command : args.command.trim()
+  if (!command.trim()) {
     throw new Error('Criterion check command cannot be empty')
   }
   const timeoutSeconds = args.timeoutSeconds ?? OBJECTIVE_CHECK_TIMEOUT_SECONDS
@@ -37,7 +40,11 @@ export async function runCriterionCheck(args: {
 
   const result = await runAutomationPrecheck({
     precheck: { command, timeoutSeconds },
-    target: { type: 'local', cwd: args.target.workspacePath }
+    target: {
+      type: 'local',
+      cwd: args.target.workspacePath,
+      ...(args.extraEnv !== undefined ? { extraEnv: args.extraEnv } : {})
+    }
   })
   return {
     command: result.command,
@@ -46,6 +53,7 @@ export async function runCriterionCheck(args: {
     timedOut: result.timedOut,
     stdoutTail: result.stdout.slice(-OBJECTIVE_CHECK_OUTPUT_TAIL_CHARS),
     stderrTail: result.stderr.slice(-OBJECTIVE_CHECK_OUTPUT_TAIL_CHARS),
+    ...(result.stdoutTruncated ? { stdoutTruncated: true } : {}),
     error: result.error,
     startedAtMs: result.startedAt,
     completedAtMs: result.completedAt,

@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { BudgetPolicySchema } from './budget'
 import { ApprovalScopeSchema, WatcherLedgerSchema } from './ledger-types'
+import {
+  PipelineAnswerAttributionSchema,
+  PipelineChoiceSchema
+} from '../fork-heimdall-pipeline/choice-types'
 import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from './owner/intervention'
 import { WatcherTickTraceSchema } from './tick-trace'
 import {
@@ -124,29 +128,54 @@ export const WatcherDetailSchema = z
   .strict()
 export type WatcherDetail = z.infer<typeof WatcherDetailSchema>
 
-export const WatcherCommandSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('delete') }).strict(),
-  z.object({ kind: z.literal('pause') }).strict(),
-  z.object({ kind: z.literal('resume') }).strict(),
-  z.object({ kind: z.literal('disarm') }).strict(),
-  z.object({ kind: z.literal('approve'), scope: ApprovalScopeSchema }).strict(),
-  z.object({ kind: z.literal('adjust-budget'), budget: BudgetPolicySchema }).strict(),
-  z
-    .object({
-      kind: z.literal('set-concurrency'),
-      maxConcurrency: z.number().int().min(1).max(1_024)
-    })
-    .strict(),
-  z.object({ kind: z.literal('answer-question'), messageId: IdSchema, body: IdSchema }).strict(),
-  z.object({ kind: z.literal('stop-worker'), dispatchId: IdSchema }).strict(),
-  z
-    .object({
-      kind: z.literal('answer-escalation'),
-      escalationId: IdSchema,
-      body: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
-    })
-    .strict()
-])
+export const WatcherCommandSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('delete') }).strict(),
+    z.object({ kind: z.literal('pause') }).strict(),
+    z.object({ kind: z.literal('resume') }).strict(),
+    z.object({ kind: z.literal('disarm') }).strict(),
+    z.object({ kind: z.literal('approve'), scope: ApprovalScopeSchema }).strict(),
+    z
+      .object({
+        kind: z.literal('answer-pipeline-choice'),
+        scope: ApprovalScopeSchema,
+        choice: PipelineChoiceSchema,
+        comment: z.string().trim().min(1).max(4_000).optional(),
+        extendMinutes: z.number().int().min(1).max(1_440).optional(),
+        surface: z.enum(['heimdall-detail', 'canvas-run']).optional(),
+        attribution: PipelineAnswerAttributionSchema.optional()
+      })
+      .strict(),
+    z.object({ kind: z.literal('adjust-budget'), budget: BudgetPolicySchema }).strict(),
+    z
+      .object({
+        kind: z.literal('set-concurrency'),
+        maxConcurrency: z.number().int().min(1).max(1_024)
+      })
+      .strict(),
+    z.object({ kind: z.literal('answer-question'), messageId: IdSchema, body: IdSchema }).strict(),
+    z.object({ kind: z.literal('stop-worker'), dispatchId: IdSchema }).strict(),
+    z
+      .object({
+        kind: z.literal('answer-escalation'),
+        escalationId: IdSchema,
+        body: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+      })
+      .strict()
+  ])
+  .superRefine((command, context) => {
+    if (
+      command.kind === 'answer-pipeline-choice' &&
+      command.choice !== 'extend' &&
+      command.extendMinutes !== undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['extendMinutes'],
+        message: 'extendMinutes is only valid for an extend choice'
+      })
+    }
+  })
 export type WatcherCommand = z.infer<typeof WatcherCommandSchema>
 
 export const WatcherCommandRequestSchema = z
@@ -173,9 +202,11 @@ export const WatcherCommandResultSchema = z.discriminatedUnion('status', [
         'question-already-answered',
         'worker-unverifiable',
         'coordinator-seat-lost',
-        'invalid-command'
+        'invalid-command',
+        'already-resolved'
       ]),
-      detail: z.string()
+      detail: z.string(),
+      resolvedBy: PipelineAnswerAttributionSchema.optional()
     })
     .strict(),
   z.object({ status: z.literal('indeterminate'), detail: z.string() }).strict()

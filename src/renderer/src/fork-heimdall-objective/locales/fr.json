@@ -1,1 +1,37 @@
-{}
+{
+  "fork": {
+    "heimdallObjective": {
+      "enrollment": {
+        "gatesHelpLabel": "Aide sur les vérifications",
+        "gatesHelpSummary": "Commandes de vérification nommées que le noyau exécute sur la branche intégrée après la fusion de chaque nœud du plan, avant la revue et l’atterrissage.",
+        "gatesHelp": {
+          "whenLabel": "Quand",
+          "when": "Après la fusion du dernier nœud du plan, avant la revue et l’atterrissage.",
+          "whatLabel": "Que mettre ici",
+          "what": "La suite complète de tests et les autres vérifications sur tout l’arbre, pas les vérifications par nœud."
+        },
+        "removeGate": "Supprimer la vérification {{n}}",
+        "gates": "Vérifications",
+        "gatesHelpLine": "Les vérifications s’exécutent sur la branche intégrée après la fusion de chaque nœud du plan, avant la revue et l’atterrissage. Ajoutez ici la suite complète de tests et les autres vérifications sur tout l’arbre, pas dans les nœuds du plan.",
+        "addGate": "Ajouter une vérification",
+        "gatesUnsupportedHost": "Les vérifications ne sont pas disponibles dans cette version d’Orca sur cet hôte. Supprimez les vérifications ci-dessous pour continuer."
+      },
+      "validation": {
+        "gateNameInvalid": "Le nom de la vérification {{name}} doit contenir uniquement des lettres minuscules, des chiffres ou des tirets, commencer par une lettre ou un chiffre et compter au plus 40 caractères.",
+        "gateCommandInvalid": "Saisissez une commande de vérification de 8 192 caractères maximum.",
+        "gateTimeoutInvalid": "Le délai de la vérification doit être un nombre entier de secondes compris entre 10 et 14 400.",
+        "gateNameDuplicate": "Les noms des vérifications doivent être uniques.",
+        "gatesTooMany": "Un objectif accepte au maximum 8 vérifications déclarées.",
+        "gatesUnsupportedHost": "Les vérifications ne sont pas disponibles dans cette version d’Orca sur cet hôte. Supprimez toutes les vérifications pour continuer."
+      },
+      "detail": {
+        "noGateDeclared": "Aucune vérification d’objectif n’a été déclarée.",
+        "checks": "Vérifications",
+        "lintCode": {
+          "duplicatesGate": "Duplique une vérification",
+          "noGateDeclared": "Aucune vérification déclarée"
+        }
+      }
+    }
+  }
+}

@@ -9,6 +9,7 @@ import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/de
 import { OBJECTIVE_LANDING_LADDER } from '../../../shared/fork-heimdall-objective/landing-ladder'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
+import type { WatcherFleetEntryReader } from '../../../shared/fork-heimdall/remote-reader-schemas'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import { formatHeimdallTime } from '../fork-heimdall/fleet-format'
 import { sameWatcherTarget } from '../fork-heimdall/fleet-selectors'
@@ -267,7 +268,7 @@ function ObjectiveParallelExecution({
   )
 }
 
-const EMPTY_FLEET: readonly WatcherFleetEntry[] = []
+const EMPTY_FLEET: readonly WatcherFleetEntryReader[] = []
 function latestLandingEvidence(
   detail: ObjectiveDetail,
   rung: ObjectiveDetail['landing'][number]['rung']
@@ -295,7 +296,11 @@ function ObjectiveLanding({
   const handoff = objectiveHandoffEvidence(ledger)
   const sitterTarget = handoff ? { ...row.target, watcherId: handoff.sitterWatcherId } : null
   const sitter = sitterTarget
-    ? fleet.find((candidate) => sameWatcherTarget(sitterTarget, candidate.target))
+    ? fleet.find(
+        (candidate) =>
+          candidate.entry.enrollment.kind === 'hosted-review' &&
+          sameWatcherTarget(sitterTarget, candidate.target)
+      )
     : undefined
   const sitterMerged =
     sitter?.entry.status.state === 'terminal' && sitter.entry.status.reason === 'review merged'

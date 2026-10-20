@@ -5,6 +5,7 @@ import {
   parseArgs,
   validateCommandAndFlags
 } from '../args'
+import { HANDLER_GROUPS } from '../handler-group-manifest'
 import { dispatch, HANDLER_COMMAND_KEYS, type HandlerContext } from '../dispatch'
 import { COMMAND_SPECS } from '../specs'
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
@@ -70,6 +71,27 @@ describe('orca heimdall CLI registration', () => {
         fields: {}
       },
       {
+        argv: [
+          'heimdall',
+          'create',
+          '--pipeline',
+          '.orca/pipelines/bugfix.yaml',
+          '--spec',
+          'Fix the bug',
+          '--input',
+          'priority=2',
+          '--cap',
+          'push=on'
+        ],
+        key: 'heimdall create',
+        fields: {
+          pipeline: '.orca/pipelines/bugfix.yaml',
+          spec: 'Fix the bug',
+          input: 'priority=2',
+          cap: 'push=on'
+        }
+      },
+      {
         argv: ['heimdall', 'pause', 'watcher-1'],
         key: 'heimdall pause',
         fields: { 'watcher-id': 'watcher-1' }
@@ -93,6 +115,25 @@ describe('orca heimdall CLI registration', () => {
         argv: ['heimdall', 'approve', 'watcher-1', 'escalation-1'],
         key: 'heimdall approve',
         fields: { 'watcher-id': 'watcher-1', 'escalation-id': 'escalation-1' }
+      },
+      {
+        argv: [
+          'heimdall',
+          'approve',
+          'watcher-1',
+          'escalation-1',
+          '--choice',
+          'extend',
+          '--extend-minutes',
+          '15'
+        ],
+        key: 'heimdall approve',
+        fields: {
+          'watcher-id': 'watcher-1',
+          'escalation-id': 'escalation-1',
+          choice: 'extend',
+          'extend-minutes': '15'
+        }
       },
       {
         argv: ['heimdall', 'answer', 'watcher-1', 'message-1', '--body', 'yes'],
@@ -128,6 +169,23 @@ describe('orca heimdall CLI registration', () => {
     expect(isCommandGroup(COMMAND_SPECS, ['heimdall', 'create'])).toBe(true)
   })
 
+  it('shows the create subcommands when no pipeline flag is supplied', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const context: HandlerContext = {
+      flags: new Map(),
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this group-help route must not call the runtime client.
+      client: { call: vi.fn() } as unknown as HandlerContext['client'],
+      cwd: '/workspace',
+      json: false
+    }
+
+    await dispatch(['heimdall', 'create'], context)
+
+    expect(logSpy).toHaveBeenCalledOnce()
+    expect(logSpy.mock.calls[0]?.[0]).toContain('objective')
+    expect(logSpy.mock.calls[0]?.[0]).toContain('hosted-review')
+  })
+
   it('dispatches debug to the watcher owner selected from the fleet', async () => {
     const target = { watcherId: 'watcher-1', connectionId: 'connection-1', pairingRevision: 4 }
     const callMock = vi.fn(async (method: string) => ({
@@ -156,5 +214,10 @@ describe('orca heimdall CLI registration', () => {
     expect(callMock).toHaveBeenCalledWith(HEIMDALL_CHANNELS.fleet, {})
     expect(callMock).toHaveBeenCalledWith(HEIMDALL_CHANNELS.debugReport, target)
     expect(logSpy).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 2 }, null, 2))
+  })
+
+  it('registers the Heimdall pipeline create command', () => {
+    const heimdall = HANDLER_GROUPS.find((group) => group.name === 'heimdall')
+    expect(heimdall?.keys).toContain('heimdall create')
   })
 })

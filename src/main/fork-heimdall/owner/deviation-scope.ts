@@ -3,12 +3,15 @@ import type { AttemptEntry, WatcherLedger } from '../../../shared/fork-heimdall/
 import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
 import type { WatcherRunner } from '../runner-state'
 
-/** True only when the deviation maps to the current isolated attempt for its dispatch or task. */
+/** Decides whether a human-routed owner escalation can remain scoped to this kind's live loop. */
 export function deviationIsDispatchScoped(
   deviation: Deviation,
   runner: WatcherRunner,
   ledger: WatcherLedger
 ): boolean {
+  if (runner.kind.owner?.humanEscalation === 'kind-handles') {
+    return true
+  }
   const concurrency = runner.kind.concurrency
   if (!concurrency) {
     return false

@@ -1,10 +1,10 @@
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
-import type {
-  WatcherDetail,
-  WatcherFleetEntry,
-  WatcherTarget
-} from '../../shared/fork-heimdall/fleet-types'
-import { WatcherDetailReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
+import { WatcherDetailSchema, type WatcherTarget } from '../../shared/fork-heimdall/fleet-types'
+import {
+  WatcherDetailReaderSchema,
+  type WatcherDetailReader,
+  type WatcherFleetEntryReader
+} from '../../shared/fork-heimdall/remote-reader-schemas'
 import type { Store } from '../persistence'
 import type {
   FleetEnvironmentIdentity,
@@ -29,8 +29,8 @@ export async function readConfirmedRemoteDetail(
   environments: FleetEnvironmentTransport,
   identity: FleetEnvironmentIdentity,
   target: WatcherTarget,
-  routeWatcher: (owner: WatcherFleetEntry) => WatcherFleetEntry
-): Promise<WatcherDetail> {
+  routeWatcher: (owner: WatcherFleetEntryReader) => WatcherFleetEntryReader
+): Promise<WatcherDetailReader> {
   const response = await environments.read(identity, HEIMDALL_CHANNELS.detail, {
     watcherId: target.watcherId,
     connectionId: null,
@@ -58,8 +58,8 @@ export async function readConfirmedRemoteDetail(
 
 export function projectRemoteDetail(
   projection: RemoteFleetProjection,
-  detail: WatcherDetail
-): WatcherDetail {
+  detail: WatcherDetailReader
+): WatcherDetailReader {
   const watcher = projectRemoteFleetEntry(detail.watcher, projection)
   if (watcher.contact === 'live') {
     return { ...detail, watcher }
@@ -76,12 +76,12 @@ export function projectRemoteDetail(
 }
 
 export async function captureRemoteDetailNotifications(args: {
-  entries: readonly WatcherFleetEntry[]
-  previousEntries: ReadonlyMap<string, WatcherFleetEntry>
-  details: Map<string, WatcherDetail>
+  entries: readonly WatcherFleetEntryReader[]
+  previousEntries: ReadonlyMap<string, WatcherFleetEntryReader>
+  details: Map<string, WatcherDetailReader>
   publication: WatcherNotificationPublication
   store: Pick<Store, 'getSettings'> | undefined
-  readDetail: (target: WatcherTarget) => Promise<WatcherDetail>
+  readDetail: (target: WatcherTarget) => Promise<WatcherDetailReader>
   isCurrent: (target: WatcherTarget) => boolean
 }): Promise<void> {
   const store = args.store
@@ -110,7 +110,16 @@ export async function captureRemoteDetailNotifications(args: {
         if (!args.isCurrent(entry.target)) {
           return
         }
-        notifyWatcherDetailTransition(store, previous, next, args.publication)
+        const notificationDetail = WatcherDetailSchema.safeParse(next)
+        if (notificationDetail.success) {
+          const notificationPrevious = previous ? WatcherDetailSchema.safeParse(previous) : null
+          notifyWatcherDetailTransition(
+            store,
+            notificationPrevious?.success ? notificationPrevious.data : null,
+            notificationDetail.data,
+            args.publication
+          )
+        }
         args.details.set(detailKey(entry.target), next)
       } catch {
         // Notification reads are best effort and never create an error notification.

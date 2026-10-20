@@ -79,7 +79,15 @@ export function gateRunnerAction(
   return gateAction(action, snapshot, enrollment, gateLedger)
 }
 
-function approvalAdvisory(snapshot: Snapshot<unknown>, action: KernelAction): string | null {
+function approvalAdvisory(
+  runner: WatcherRunner,
+  snapshot: Snapshot<unknown>,
+  action: KernelAction
+): string | null {
+  const kindAdvisory = runner.kind.describeApproval?.(snapshot, action)
+  if (kindAdvisory !== undefined && kindAdvisory !== null) {
+    return kindAdvisory.slice(0, 4_096)
+  }
   const world = ObjectiveWorldSchema.safeParse(snapshot.world)
   const objectiveAction = ObjectiveActionSchema.safeParse(action)
   return world.success && objectiveAction.success
@@ -206,7 +214,7 @@ export class WatcherRunnerGateLifecycle {
     if (gate.verdict !== 'allow') {
       const advisory =
         gate.verdict === 'hold' && gate.reason === 'awaiting-approval'
-          ? approvalAdvisory(snapshot, action)
+          ? approvalAdvisory(runner, snapshot, action)
           : null
       return {
         outcome: 'gated',

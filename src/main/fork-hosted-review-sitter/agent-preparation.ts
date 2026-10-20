@@ -1,9 +1,12 @@
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import { getRepeatedFailureAfterOwnFixEvidence } from '../../shared/fork-hosted-review-sitter/stop-policy'
 import {
   buildHostedReviewAgentPrompt,
   type HostedReviewAgentLaunchInput
 } from '../../shared/fork-hosted-review-sitter/agent-prompt'
 import type {
   HostedReviewSitterDefinition,
+  HostedReviewSnapshot,
   PrepareConflictResolutionAction,
   PrepareFixAction
 } from '../../shared/fork-hosted-review-sitter/types'
@@ -78,11 +81,24 @@ export function buildHostedReviewWorkerDispatch(
   store: Store,
   definition: HostedReviewSitterDefinition,
   action: PrepareAction,
-  preparationFingerprint: string
+  preparationFingerprint: string,
+  failureHistory: { review: HostedReviewSnapshot; ledger: WatcherLedger }
 ): HostedReviewWorkerDispatch {
   const recipeActionId =
     action.kind === 'prepare-fix' ? ('fixChecks' as const) : ('resolveConflicts' as const)
   const { agent, template } = configuredAgentForAction(store, definition, recipeActionId)
+  const previousFixAttempts =
+    action.kind === 'prepare-fix' && failureHistory.review.headSha === action.headSha
+      ? getRepeatedFailureAfterOwnFixEvidence(
+          failureHistory.review,
+          failureHistory.ledger,
+          definition.mergeCheckScope
+        ).filter(
+          (evidence) =>
+            evidence.checkKey === action.checkKey &&
+            evidence.failureSignature === action.failureSignature
+        )
+      : []
   const renderedBasePrompt = renderSourceControlActionCommandTemplate(
     template ?? DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[recipeActionId],
     { basePrompt: basePromptForAction(definition, action) }
@@ -99,6 +115,7 @@ export function buildHostedReviewWorkerDispatch(
       reviewUrl: definition.reviewUrl,
       expectedHeadSha: action.headSha,
       ...(action.kind === 'prepare-conflict-resolution' ? { expectedBaseSha: action.baseSha } : {}),
+      ...(previousFixAttempts.length > 0 ? { previousFixAttempts } : {}),
       unattended: true,
       preparationAttemptFingerprint: preparationFingerprint
     })
