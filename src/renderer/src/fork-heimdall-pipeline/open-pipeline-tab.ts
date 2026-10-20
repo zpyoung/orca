@@ -2,7 +2,7 @@ import { NodeIdSchema } from '../../../shared/fork-heimdall-pipeline/node-id'
 import { useAppStore } from '@/store'
 import { captureEditorFileOperationProvenance } from '@/lib/editor-file-operation-owner'
 import { activateAndRevealWorkspace } from '@/lib/worktree-activation'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdUnlessTwin } from '@/lib/resolve-owner'
 import { usePipelineCanvasDraftStore } from './pipeline-canvas-draft-store'
 import { watchPipelineTabClose } from './pipeline-tab-lifecycle'
 
@@ -37,7 +37,7 @@ export function openPipelineTab({
     return null
   }
   const state = useAppStore.getState()
-  const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+  const runtimeEnvironmentId = runtimeEnvironmentIdUnlessTwin(state, worktreeId)
   const pipeline: OpenPipelineTabState = {
     scope,
     ref: scope === 'builtin' ? `builtin:${id}` : scope === 'user' ? `user:${id}` : id,

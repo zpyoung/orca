@@ -28,7 +28,7 @@ import { getAutomationSchedulerOwnerForExecutionHost } from '../persistence/sche
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
-import type { ResolvedRuntimeFileTarget } from '../runtime/runtime-file-command-target'
+import type { ResolvedRuntimeFileTarget } from '../runtime/files/file-target'
 import {
   createEnrollmentWorktree,
   enrollmentWorktreeRollback

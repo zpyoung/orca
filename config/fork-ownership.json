@@ -5625,54 +5625,12 @@
       ]
     },
     {
-      "path": "src/main/ipc/hooks/register-worktree-hook-file-handlers.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { gitignoreAlreadyCoversOrcaDir } from '../../fork-heimdall-pipeline/orca-gitignore-rules'",
-        "          if (!result.isBinary && !gitignoreAlreadyCoversOrcaDir(result.content)) {"
-      ]
-    },
-    {
       "path": "src/main/issue-command-file.ts",
       "feature": "heimdall-pipeline",
       "kind": "registration",
       "lines": [
         "import { gitignoreAlreadyCoversOrcaDir } from './fork-heimdall-pipeline/orca-gitignore-rules'",
         "      if (gitignoreAlreadyCoversOrcaDir(content)) {"
-      ]
-    },
-    {
-      "path": "src/main/providers/filesystem-provider-contract.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "passthrough",
-      "lines": ["  readlink?(filePath: string): Promise<string>"]
-    },
-    {
-      "path": "src/main/providers/ssh-filesystem-provider.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { attachPipelineLinkReader } from '../fork-heimdall-pipeline/ssh-link-reader'",
-        "    attachPipelineLinkReader(this, mux, createSftp)"
-      ]
-    },
-    {
-      "path": "src/main/runtime/runtime-repository-issue-command.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { gitignoreAlreadyCoversOrcaDir } from '../fork-heimdall-pipeline/orca-gitignore-rules'",
-        "  if (result.isBinary || gitignoreAlreadyCoversOrcaDir(result.content)) {"
-      ]
-    },
-    {
-      "path": "src/relay/fs-handler.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { readRelayLinkTarget } from './fork-heimdall-pipeline/link-target-request'",
-        "    this.dispatcher.onRequest('fs.readlink', readRelayLinkTarget)"
       ]
     },
     {
@@ -5687,14 +5645,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/editor/EditorPanelHeaderPath.tsx",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "  const isVirtualEditorTab = activeFile.mode === 'check-details' || activeFile.mode === 'pipeline'"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/editor/editor-autosave-controller.ts",
       "feature": "heimdall-pipeline",
       "kind": "registration",
@@ -5703,14 +5653,6 @@
         "    if (file.mode === 'pipeline' && !(await savePipelineDraftForClose(fileId))) {",
         "      return",
         "    }"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/editor/editor-header.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "  return !isCombinedDiff && file.mode !== 'check-details' && file.mode !== 'pipeline'"
       ]
     },
     {
@@ -5774,19 +5716,16 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/editor/closed-editor-tab-disposal.ts",
-      "feature": "heimdall-pipeline",
-      "kind": "registration",
-      "lines": [
-        "import { disposePipelineMode } from '@/fork-heimdall-pipeline/pipeline-tab-lifecycle'",
-        "    if (!isStillClosed(closedFile) || disposePipelineMode(closedFile.id, closedFile.mode)) {"
-      ]
-    },
-    {
       "path": "config/oxlint-dead-classes.json",
       "feature": "heimdall-pipeline",
       "kind": "registration",
       "lines": ["              \"pipeline-*\","]
+    },
+    {
+      "path": "src/renderer/src/store/slices/editor/tabs/editor-tab-content-type.ts",
+      "feature": "heimdall-pipeline",
+      "kind": "registration",
+      "lines": ["  return file.mode === 'check-details' || file.mode === 'pipeline'"]
     }
   ],
   "exceptions": [
@@ -7005,7 +6944,7 @@
       "removed": 7
     },
     "src/shared/protocol-version.ts": {
-      "added": 35,
+      "added": 38,
       "removed": 0
     },
     "src/shared/remote-runtime-client-capabilities.ts": {
@@ -7109,7 +7048,7 @@
       "removed": 0
     },
     "src/cli/handler-group-manifest.ts": {
-      "added": 55,
+      "added": 56,
       "removed": 0
     },
     "src/cli/args.ts": {
@@ -7121,11 +7060,11 @@
       "removed": 0
     },
     "src/cli/root-help-text-primary.ts": {
-      "added": 42,
+      "added": 43,
       "removed": 0
     },
     "src/cli/root-help-text-secondary.ts": {
-      "added": 23,
+      "added": 24,
       "removed": 0
     },
     ".gitignore": {
@@ -9168,19 +9107,7 @@
       "added": 4,
       "removed": 0
     },
-    "src/renderer/src/components/editor/editor-header.ts": {
-      "added": 1,
-      "removed": 1
-    },
     "src/main/ipc/desktop-renderer-runtime-capabilities.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/main/runtime/runtime-repository-issue-command.ts": {
-      "added": 2,
-      "removed": 1
-    },
-    "src/main/providers/ssh-filesystem-provider.ts": {
       "added": 2,
       "removed": 0
     },
@@ -9196,33 +9123,13 @@
       "added": 3,
       "removed": 0
     },
-    "src/relay/fs-handler.ts": {
-      "added": 2,
-      "removed": 0
-    },
     "src/main/issue-command-file.ts": {
-      "added": 2,
-      "removed": 1
-    },
-    "src/main/providers/filesystem-provider-contract.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/components/editor/closed-editor-tab-disposal.ts": {
       "added": 2,
       "removed": 1
     },
     "src/renderer/src/components/editor/EditorContent.tsx": {
       "added": 4,
       "removed": 0
-    },
-    "src/main/ipc/hooks/register-worktree-hook-file-handlers.ts": {
-      "added": 2,
-      "removed": 1
-    },
-    "src/renderer/src/components/editor/EditorPanelHeaderPath.tsx": {
-      "added": 1,
-      "removed": 1
     },
     "src/renderer/src/components/editor/editor-autosave-controller.ts": {
       "added": 4,
@@ -9235,6 +9142,10 @@
     "config/oxlint-dead-classes.json": {
       "added": 1,
       "removed": 0
+    },
+    "src/renderer/src/store/slices/editor/tabs/editor-tab-content-type.ts": {
+      "added": 1,
+      "removed": 1
     }
   }
 }

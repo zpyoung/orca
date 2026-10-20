@@ -1,16 +1,13 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gitExecFileAsync } from '../git/runner'
-import { SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE } from '../providers/ssh-git-dispatch'
-import { SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE } from '../providers/ssh-filesystem-dispatch'
 import { ensurePipelineTracked, reincludePipelineFiles } from './pipeline-tracking'
 
 const target = {
   repoPath: '/repo',
   worktreePath: '/repo/worktree',
-  connectionId: null,
   pipelineId: 'bugfix-fast'
 }
 const pipelinePath = '.orca/pipelines/bugfix-fast.yaml'
@@ -189,35 +186,5 @@ describe('native Git and host routing', () => {
     expect(readFileSync(join(worktreePath, '.gitignore'), 'utf8')).toBe(
       '.orca/*\n!.orca/pipelines/\n'
     )
-  })
-
-  it('does not fall back to native Git when the SSH Git host is unavailable', async () => {
-    writeFileSync(join(worktreePath, '.gitignore'), '.orca\n')
-    const remoteTarget = {
-      ...target,
-      repoPath: worktreePath,
-      worktreePath,
-      connectionId: `missing-git-${basename(root)}`
-    }
-
-    await expect(ensurePipelineTracked(remoteTarget)).rejects.toThrow(
-      SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE
-    )
-    expect(readFileSync(join(worktreePath, '.gitignore'), 'utf8')).toBe('.orca\n')
-  })
-
-  it('does not fall back to native files when the SSH filesystem host is unavailable', async () => {
-    writeFileSync(join(worktreePath, '.gitignore'), '.orca/\n')
-    const remoteTarget = {
-      ...target,
-      repoPath: worktreePath,
-      worktreePath,
-      connectionId: `missing-files-${basename(root)}`
-    }
-
-    await expect(reincludePipelineFiles(remoteTarget)).rejects.toThrow(
-      SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
-    )
-    expect(readFileSync(join(worktreePath, '.gitignore'), 'utf8')).toBe('.orca/\n')
   })
 })

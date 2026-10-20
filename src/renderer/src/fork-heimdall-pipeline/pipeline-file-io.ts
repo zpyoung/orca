@@ -7,24 +7,28 @@ import { sha256 } from '../../../shared/sha256'
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import { useAppStore } from '@/store'
 import { getEditorFileOperationContext } from '@/lib/editor-file-operation-owner'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdUnlessTwin } from '@/lib/resolve-owner'
 import { joinPath, normalizeRelativePath } from '@/lib/path'
 import {
   recordSelfWrite,
   SELF_WRITE_REMOTE_TTL_MS
 } from '@/components/editor/editor-self-write-registry'
+import type {
+  RuntimeFileOperationArgs,
+  RuntimeFileReadArgs
+} from '@/runtime/runtime-file-client-types'
+import {
+  isMissingRuntimePathError,
+  runtimePathExists,
+  statRuntimePath
+} from '@/runtime/runtime-file-metadata-client'
 import {
   createRuntimePath,
   deleteRuntimePath,
-  isMissingRuntimePathError,
   readRuntimeDirectory,
-  readRuntimeFileContent,
-  runtimePathExists,
-  statRuntimePath,
-  writeRuntimeFile,
-  type RuntimeFileOperationArgs,
-  type RuntimeFileReadArgs
-} from '@/runtime/runtime-file-client'
+  writeRuntimeFile
+} from '@/runtime/runtime-file-mutation-client'
+import { readRuntimeFileContent } from '@/runtime/runtime-file-read-client'
 import {
   applyPipelineEdits,
   type PipelineEdit
@@ -104,13 +108,13 @@ function operationContext(
       (pipelineRef === undefined || candidate.pipeline.ref === pipelineRef)
   )
   const runtimeEnvironmentId =
-    file?.runtimeEnvironmentId ?? getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+    file?.runtimeEnvironmentId ?? runtimeEnvironmentIdUnlessTwin(state, worktreeId)
   const ownerFile = file ?? { worktreeId, runtimeEnvironmentId }
   const runtime = getEditorFileOperationContext(state, ownerFile, worktree?.path ?? null)
   return {
     runtime,
     read: {
-      settings: runtime.settings,
+      target: runtime.target,
       worktreeId: runtime.worktreeId,
       connectionId: runtime.connectionId,
       expectedExternalSshTargetId: file?.externalSshTargetId

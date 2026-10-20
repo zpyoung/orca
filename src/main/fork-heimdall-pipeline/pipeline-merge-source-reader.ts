@@ -16,7 +16,7 @@ import {
   type ObjectiveWorkspaceTarget,
   type ObjectiveWorkspaceTarget as RuntimeObjectiveWorkspaceTarget
 } from '../fork-heimdall-objective/content-identity'
-import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { readMergeSourceFacts, type ReadMergeSourceFactsInput } from './merge-executor'
 import { pipelineChildWorktreeMarker } from './swarm-executor'
@@ -89,11 +89,11 @@ export async function resolvePipelineChildTarget(args: {
   ) {
     throw new Error('Pipeline child worktree identity changed')
   }
+  requireLocalRuntimeFileRoute(target)
   return {
     kind: 'git',
     executionHostId: target.executionHostId,
     workspacePath: target.worktree.path,
-    fileProvider: requireRuntimeFileProvider(target),
     gitTarget: target
   }
 }

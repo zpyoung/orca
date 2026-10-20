@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { RuntimeManagedWorktreeCreateArgs } from '../runtime/runtime-managed-worktree-create-types'
-import type { Worktree } from '../../shared/worktree/types'
 import { createInMemoryPipelineStore } from './pipeline-store-test-fixtures'
 import { cleanupTemporaryDirectories } from '../fork-heimdall-objective/objective-temp-workspace-test-fixtures'
 import {
@@ -14,6 +13,8 @@ import {
 } from '../fork-heimdall-objective/objective-git-test-fixtures'
 import { gitTarget } from '../fork-heimdall-objective/objective-workspace-target-test-fixtures'
 import { expandSwarm, pipelineChildWorktreeMarker, prepareChildWorktree } from './swarm-executor'
+
+type ShownWorktree = Awaited<ReturnType<OrcaRuntimeService['showManagedWorktree']>>
 
 const temporaryDirectories: string[] = []
 
@@ -152,7 +153,7 @@ describe('prepareChildWorktree', () => {
       baseCommit: fixture.baseCommit
     })
     const childPath = await temporaryChildPath('managed-child')
-    const managed = new Map<string, Worktree>()
+    const managed = new Map<string, ShownWorktree>()
     const createManagedWorktree = async (args: RuntimeManagedWorktreeCreateArgs) => {
       if (!args.baseBranch) {
         throw new Error('missing base commit')
@@ -171,6 +172,10 @@ describe('prepareChildWorktree', () => {
         ...target.gitTarget.worktree,
         head: args.baseBranch,
         comment: args.comment ?? '',
+        parentWorktreeId: null,
+        childWorktreeIds: [],
+        lineage: null,
+        linkedItems: [],
         git: { ...target.gitTarget.worktree.git, head: args.baseBranch }
       }
       managed.set(worktree.id, worktree)
@@ -271,6 +276,7 @@ describe('prepareChildWorktree', () => {
       parentWorktreeId: null,
       childWorktreeIds: [],
       lineage: null,
+      linkedItems: [],
       git: { ...target.gitTarget.worktree.git, head: fixture.baseCommit }
     }
     const runtime = {

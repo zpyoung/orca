@@ -1,23 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   cleanupTemporaryDirectories,
   createLocalFolderTarget
 } from '../fork-heimdall-objective/objective-temp-workspace-test-fixtures'
 import { runCriterionCheck } from '../fork-heimdall-objective/check-runner'
-import { runAutomationPrecheck } from '../automations/precheck-runner'
-import { ScriptEnvRejectedError, posixEnvExportPrefix, runScriptNode } from './script-node-executor'
-
-vi.mock('../runtime/runtime-file-command-target', () => ({
-  runtimeFileSshTargetId: () => undefined
-}))
-
-vi.mock('../ssh/ssh-target-registry', () => ({
-  getRegisteredSshState: () => undefined
-}))
-
-vi.mock('../ipc/ssh', () => ({
-  getSshConnectionManager: () => null
-}))
+import { ScriptEnvRejectedError, runScriptNode } from './script-node-executor'
 
 const temporaryDirectories: string[] = []
 
@@ -45,20 +32,6 @@ describe('script-node-executor', () => {
       timedOut: false,
       error: null
     })
-  })
-
-  it('executes POSIX exports with literal apostrophe, newline, and dollar values', async () => {
-    const target = await createLocalFolderTarget(temporaryDirectories, 'orca-script-prefix-')
-    const env = { B: "it's", A: 'x$y\nz' }
-    const script = 'process.stdout.write(JSON.stringify([process.env.A, process.env.B]))'
-    const command = `${posixEnvExportPrefix(env)} ${nodeCommand(script)}`
-    const result = await runAutomationPrecheck({
-      precheck: { command, timeoutSeconds: 5 },
-      target: { type: 'local', cwd: target.workspacePath }
-    })
-
-    expect(result.exitCode).toBe(0)
-    expect(result.stdout).toBe(JSON.stringify([env.A, env.B]))
   })
 
   it('preserves process exit codes and caps a truncated stdout tail', async () => {

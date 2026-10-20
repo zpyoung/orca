@@ -1,5 +1,6 @@
 import {
   Bot,
+  Box,
   GitMerge,
   GitPullRequest,
   Hand,
@@ -7,7 +8,6 @@ import {
   Network,
   PlaneLanding,
   Repeat,
-  Shapes,
   Split,
   SquareTerminal,
   Target,
@@ -28,5 +28,5 @@ export const PIPELINE_NODE_TYPE_ICONS: Record<NodeType | 'unknown', LucideIcon> 
   land: PlaneLanding,
   objective: Target,
   'pr-sitter': GitPullRequest,
-  unknown: Shapes
+  unknown: Box
 }

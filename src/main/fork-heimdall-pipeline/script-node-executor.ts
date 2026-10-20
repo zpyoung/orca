@@ -23,18 +23,6 @@ function assertAllowedScriptEnv(env: Record<string, string>): void {
   }
 }
 
-function quotePosix(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`
-}
-
-export function posixEnvExportPrefix(env: Record<string, string>): string {
-  assertAllowedScriptEnv(env)
-  return Object.keys(env)
-    .sort()
-    .map((name) => `export ${name}=${quotePosix(env[name] ?? '')};`)
-    .join(' ')
-}
-
 export async function runScriptNode(input: {
   command: string
   env: Record<string, string>
@@ -48,18 +36,13 @@ export async function runScriptNode(input: {
   timedOut: boolean
   error: string | null
 }> {
-  const isLocal = input.target.fileProvider === null
-  const prefix = isLocal ? '' : posixEnvExportPrefix(input.env)
-  if (isLocal) {
-    assertAllowedScriptEnv(input.env)
-  }
-  const command = prefix ? `${prefix} ${input.command}` : input.command
+  assertAllowedScriptEnv(input.env)
   const result = await runCriterionCheck({
-    command,
+    command: input.command,
     target: input.target,
     timeoutSeconds: input.timeoutSeconds,
     preserveCommand: true,
-    ...(isLocal ? { extraEnv: input.env } : {})
+    extraEnv: input.env
   })
   const stdoutText =
     result.stdoutTail.length <= OBJECTIVE_CHECK_OUTPUT_TAIL_CHARS

@@ -4,7 +4,7 @@ import { createElement, Fragment, type ReactNode } from 'react'
 import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type * as RuntimeFileClient from '@/runtime/runtime-file-client'
+import type * as RuntimeFileReadClient from '@/runtime/runtime-file-read-client'
 import { useAppStore } from '@/store'
 import type { OpenFile } from '@/store/slices/editor'
 import { EditorContent } from '@/components/editor/EditorContent'
@@ -12,8 +12,8 @@ import { usePipelineCanvasDraftStore } from './pipeline-canvas-draft-store'
 
 const runtimeFileReads = vi.hoisted(() => ({ readRuntimeFileContent: vi.fn() }))
 
-vi.mock('@/runtime/runtime-file-client', async (importOriginal) => ({
-  ...(await importOriginal<typeof RuntimeFileClient>()),
+vi.mock('@/runtime/runtime-file-read-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof RuntimeFileReadClient>()),
   readRuntimeFileContent: runtimeFileReads.readRuntimeFileContent
 }))
 

@@ -2,11 +2,8 @@ import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { CreateHostedReviewInput, HostedReviewInfo } from '../../shared/hosted-review'
-import { OBJECTIVE_ABSENT_REMOTE_REF_STATE } from '../../shared/fork-heimdall-objective/contract-types'
 import type { PipelineLandingFacts } from '../../shared/fork-heimdall-pipeline/interpreter'
 import type { ForgeProvider } from '../source-control/forge-provider'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
-import type { SshGitProvider } from '../providers/ssh-git-provider'
 import {
   git,
   gitText,
@@ -24,18 +21,14 @@ import {
   executeLandOpenReview,
   executeLandPush,
   landExpectedState,
-  readPipelineLandingFacts,
   recoverLandCommit,
   recoverLandOpenReview,
   recoverLandPush
 } from './land-node-executor'
 
 const temporaryDirectories: string[] = []
-const SSH_CONNECTION_ID = 'pipeline-land-test'
-const SSH_EXECUTION_HOST = 'ssh:pipeline-land-test'
 
 afterEach(async () => {
-  unregisterSshGitProvider(SSH_CONNECTION_ID)
   await cleanupTemporaryDirectories(temporaryDirectories)
 })
 
@@ -502,94 +495,6 @@ describe('pipeline Land executor hosted reviews', () => {
 })
 
 describe('pipeline Land host-routed facts', () => {
-  it('runs commit, push, and hosted review through the SSH Git route', async () => {
-    const fixture = await landingFixture()
-    const runtimeTarget = fixture.target.gitTarget
-    if (!runtimeTarget) {
-      throw new Error('The test fixture has no Git target')
-    }
-    const calls: { args: string[]; cwd: string }[] = []
-    const sshProvider = {
-      async exec(args: string[], cwd: string) {
-        calls.push({ args, cwd })
-        return await git(fixture.root, args)
-      }
-    }
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only exec is exercised by the host-routed Objective Git adapter.
-    registerSshGitProvider(SSH_CONNECTION_ID, sshProvider as unknown as SshGitProvider)
-    const target: ObjectiveWorkspaceTarget = {
-      kind: 'git',
-      executionHostId: SSH_EXECUTION_HOST,
-      workspacePath: '/srv/pipeline-repo',
-      fileProvider: null,
-      gitTarget: { ...runtimeTarget, executionHostId: SSH_EXECUTION_HOST }
-    }
-    const facts = await readPipelineLandingFacts({
-      target,
-      repoKey: 'repo-id',
-      forge: reviewAccess('github', 'unavailable').forge
-    })
-    if (!facts.branch || !facts.headSha || !facts.pushTarget || !facts.hostedReview?.base) {
-      throw new Error('The Git host did not provide the required Land facts')
-    }
-    expect(facts.branch).toBe('main')
-    expect(facts.headSha).toBe(await gitText(fixture.root, ['rev-parse', 'HEAD']))
-    expect(facts.pushTarget).toMatchObject({ remote: 'origin', branch: 'main' })
-    expect(facts.pushTarget.remoteSha).toBe(OBJECTIVE_ABSENT_REMOTE_REF_STATE)
-    expect(facts.hostedReview).toEqual({
-      provider: 'github',
-      repoKey: 'repo-id',
-      base: 'main'
-    })
-
-    await writeFile(join(fixture.root, 'src', 'result.txt'), 'SSH pipeline change\n')
-    const committed = await executeLandCommit(
-      {
-        workspacePath: target.workspacePath,
-        attemptFingerprint: 'ssh-land-attempt',
-        message: 'Land through SSH'
-      },
-      { target }
-    )
-    if (committed.status !== 'committed') {
-      throw new Error('The SSH test fixture did not produce a commit')
-    }
-    const pushed = await executeLandPush(
-      {
-        workspacePath: target.workspacePath,
-        branch: facts.pushTarget.branch,
-        headSha: committed.headSha,
-        target: facts.pushTarget
-      },
-      { target }
-    )
-    expect(pushed).toEqual({ status: 'pushed', remoteHeadSha: committed.headSha })
-    const fake = reviewAccess('github', committed.headSha)
-    await expect(
-      executeLandOpenReview(
-        {
-          workspacePath: target.workspacePath,
-          branch: facts.pushTarget.branch,
-          title: 'Land through SSH',
-          body: 'Validated through host Git',
-          draft: false
-        },
-        {
-          target,
-          forge: fake.forge,
-          headSha: committed.headSha,
-          pushTarget: facts.pushTarget,
-          provider: facts.hostedReview.provider,
-          base: facts.hostedReview.base
-        }
-      )
-    ).resolves.toMatchObject({ headSha: committed.headSha, provider: 'github' })
-
-    expect(calls.some((call) => call.args.includes('push'))).toBe(true)
-    expect(calls.every((call) => call.cwd === '/srv/pipeline-repo')).toBe(true)
-    expect(await gitText(fixture.remote, ['rev-parse', 'refs/heads/main'])).toBe(committed.headSha)
-    expect(fake.state.createdCount).toBe(1)
-  })
   it('refuses an unreachable SSH route instead of running Git locally', async () => {
     const fixture = await landingFixture()
     const runtimeTarget = fixture.target.gitTarget
@@ -602,7 +507,6 @@ describe('pipeline Land host-routed facts', () => {
       kind: 'git',
       executionHostId: 'ssh:pipeline-land-unreachable',
       workspacePath: fixture.root,
-      fileProvider: null,
       gitTarget: {
         ...runtimeTarget,
         executionHostId: 'ssh:pipeline-land-unreachable'

@@ -6,7 +6,6 @@ import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { ObjectiveWorkspaceTarget } from '../fork-heimdall-objective/content-identity'
 import type { MergeTrainRepositoryFixture } from '../fork-heimdall-objective/objective-git-test-fixtures'
 import type { PipelineStore } from './pipeline-store'
-import type { Worktree } from '../../shared/worktree/types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { cleanupTemporaryDirectories } from '../fork-heimdall-objective/objective-temp-workspace-test-fixtures'
 import {
@@ -24,6 +23,8 @@ import {
 } from './merge-executor'
 import { prepareConflictResolution, verifyConflictResolved } from './pipeline-merge-git'
 import { cleanupChildWorktrees, pipelineChildWorktreeMarker } from './swarm-executor'
+
+type ShownWorktree = Awaited<ReturnType<OrcaRuntimeService['showManagedWorktree']>>
 
 const temporaryDirectories: string[] = []
 const lease: LeaseGuard = {
@@ -622,7 +623,7 @@ describe('cleanupChildWorktrees', () => {
     if (!appliedTarget.gitTarget || !pendingTarget.gitTarget) {
       throw new Error('Expected Git child targets')
     }
-    const worktrees = new Map<string, Worktree>([
+    const worktrees = new Map<string, ShownWorktree>([
       [
         appliedId,
         {
@@ -631,7 +632,11 @@ describe('cleanupChildWorktrees', () => {
             watcherId: 'watcher-cleanup',
             instanceId: 'swarm[applied]',
             epoch: 1
-          })
+          }),
+          parentWorktreeId: null,
+          childWorktreeIds: [],
+          lineage: null,
+          linkedItems: []
         }
       ],
       [
@@ -642,7 +647,11 @@ describe('cleanupChildWorktrees', () => {
             watcherId: 'watcher-cleanup',
             instanceId: 'swarm[pending]',
             epoch: 1
-          })
+          }),
+          parentWorktreeId: null,
+          childWorktreeIds: [],
+          lineage: null,
+          linkedItems: []
         }
       ]
     ])

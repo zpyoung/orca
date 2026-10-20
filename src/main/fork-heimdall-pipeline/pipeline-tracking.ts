@@ -3,9 +3,6 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { checkIgnoredPaths as checkIgnoredPathsLocally } from '../git/check-ignored-paths'
 import { isENOENT } from '../ipc/filesystem-auth'
-import { requireSshGitProvider } from '../providers/ssh-git-dispatch'
-import { requireSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
-import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
 import { reincludePipelines, rewriteBareOrcaLine } from './orca-gitignore-rules'
 
 const STILL_IGNORED_DETAIL = "ignored by a rule outside Orca's .orca line"
@@ -13,7 +10,6 @@ const STILL_IGNORED_DETAIL = "ignored by a rule outside Orca's .orca line"
 type PipelineTrackingTarget = {
   repoPath: string
   worktreePath: string
-  connectionId: string | null
   pipelineId: string
 }
 
@@ -29,32 +25,14 @@ type PipelineTrackingResult = {
 }
 
 function defaultDependencies(target: PipelineTrackingTarget): PipelineTrackingDependencies {
-  const { connectionId, worktreePath } = target
-  const gitignorePath = connectionId
-    ? joinWorktreeRelativePath(worktreePath, '.gitignore')
-    : join(worktreePath, '.gitignore')
+  const { worktreePath } = target
+  const gitignorePath = join(worktreePath, '.gitignore')
 
   return {
     checkIgnoredPaths(paths) {
-      return connectionId
-        ? requireSshGitProvider(connectionId).checkIgnoredPaths(worktreePath, paths)
-        : checkIgnoredPathsLocally(worktreePath, paths)
+      return checkIgnoredPathsLocally(worktreePath, paths)
     },
     async readGitignore() {
-      if (connectionId) {
-        try {
-          const result = await requireSshFilesystemProvider(connectionId).readFile(gitignorePath)
-          if (result.isBinary) {
-            throw new Error('The root .gitignore is not valid UTF-8 text')
-          }
-          return result.content
-        } catch (error) {
-          if (isENOENT(error)) {
-            return null
-          }
-          throw error
-        }
-      }
       try {
         const content = await readFile(gitignorePath)
         return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(content)
@@ -66,10 +44,6 @@ function defaultDependencies(target: PipelineTrackingTarget): PipelineTrackingDe
       }
     },
     async writeGitignore(content) {
-      if (connectionId) {
-        await requireSshFilesystemProvider(connectionId).writeFile(gitignorePath, content)
-        return
-      }
       await writeFile(gitignorePath, content, 'utf8')
     }
   }

@@ -7,9 +7,8 @@ import {
   NodeFileReadTooLargeError,
   readNodeFileHandleWithinLimit
 } from '../../shared/node-bounded-file-reader'
-import type { FileStat, IFilesystemProvider } from '../providers/types'
-import { FileReadCapExceededError } from '../ssh/ssh-filesystem-stream-reader'
-import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
+import type { FileStat } from '../providers/filesystem-provider-contract'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
 import {
   filesystemErrorCode,
   isMissingFilesystemError
@@ -191,77 +190,6 @@ function localFilesystem(target: {
   }
 }
 
-function remoteFilesystem(
-  provider: IFilesystemProvider,
-  target: { executionHostId: ExecutionHostId; workspacePath: string }
-): ProtectedFilesystem {
-  const lstatRemote = provider.lstat
-  if (typeof lstatRemote !== 'function') {
-    throw new ProtectedDigestUnverifiableError('Remote filesystem does not support lstat')
-  }
-  const pathFlavor = resolveLeasePathFlavor(target.executionHostId, target.workspacePath)
-  return {
-    join: (...parts) => pathFlavor.join(...parts),
-    async lstat(path) {
-      return lstatRemote.call(provider, path)
-    },
-    async readDir(path) {
-      const before = await lstatRemote.call(provider, path)
-      if (before.type !== 'directory') {
-        throw new ProtectedDigestUnverifiableError('Protected directory changed before traversal')
-      }
-      const names = (await provider.readDir(path)).map((entry) => entry.name).sort(comparePaths)
-      const after = await lstatRemote.call(provider, path)
-      if (after.type !== 'directory' || !sameProtectedFile(before, after)) {
-        throw new ProtectedDigestUnverifiableError('Protected directory changed during traversal')
-      }
-      return names
-    },
-    async readFile(path, maxBytes) {
-      const before = await lstatRemote.call(provider, path)
-      if (before.type !== 'file') {
-        throw new ProtectedDigestUnverifiableError('Protected file is not a regular file')
-      }
-      if (before.size > maxBytes) {
-        throw new ProtectedDigestOverCapError()
-      }
-      let result
-      try {
-        result = await provider.readFile(path, { maxTextBytes: maxBytes, maxBinaryBytes: maxBytes })
-      } catch (error) {
-        if (
-          error instanceof FileReadCapExceededError ||
-          (error instanceof Error && error.message === 'file_too_large')
-        ) {
-          throw new ProtectedDigestOverCapError()
-        }
-        throw error
-      }
-      const bytes = result.isBinary
-        ? Buffer.from(result.content, 'base64')
-        : Buffer.from(result.content, 'utf8')
-      if (bytes.byteLength > maxBytes) {
-        throw new ProtectedDigestOverCapError()
-      }
-      const after = await lstatRemote.call(provider, path)
-      if (
-        after.type !== 'file' ||
-        !sameProtectedFile(before, after) ||
-        bytes.byteLength !== after.size
-      ) {
-        throw new ProtectedDigestUnverifiableError('Protected file changed while it was being read')
-      }
-      return bytes
-    },
-    async readlink(path) {
-      if (typeof provider.readlink !== 'function') {
-        throw new ProtectedDigestUnverifiableError('Remote filesystem does not support readlink')
-      }
-      return provider.readlink(path)
-    }
-  }
-}
-
 async function captureEntries(
   target: { workspacePath: string },
   filesystem: ProtectedFilesystem
@@ -389,9 +317,8 @@ export async function captureProtectedDigest(
   target: Readonly<{ executionHostId: ExecutionHostId; workspacePath: string }>
 ): Promise<ProtectedDigest> {
   try {
-    const provider = requireRuntimeFileProvider(target)
-    const filesystem = provider ? remoteFilesystem(provider, target) : localFilesystem(target)
-    return await captureEntries(target, filesystem)
+    requireLocalRuntimeFileRoute(target)
+    return await captureEntries(target, localFilesystem(target))
   } catch (error) {
     if (error instanceof ProtectedDigestOverCapError) {
       return { status: 'over-cap' }
@@ -400,7 +327,6 @@ export async function captureProtectedDigest(
       throw error
     }
     if (
-      error instanceof FileReadCapExceededError ||
       error instanceof NodeFileReadTooLargeError ||
       filesystemErrorCode(error) === 'EFBIG' ||
       (error instanceof Error && error.message === 'file_too_large')

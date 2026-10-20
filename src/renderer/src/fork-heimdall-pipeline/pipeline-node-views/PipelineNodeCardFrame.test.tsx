@@ -149,23 +149,23 @@ describe('PipelineNodeStatusGlyph', () => {
     const { container } = render(<PipelineNodeStatusGlyph state="skipped" />)
 
     const glyph = container.querySelector('[data-glyph="skipped"]')
-    const shape = glyph?.firstElementChild
-    expect(shape?.tagName.toLowerCase()).toBe('svg')
-    expect(shape).toHaveAttribute('aria-hidden', 'true')
-    expect(shape).toHaveClass('text-muted-foreground')
+    const mark = glyph?.firstElementChild
+    expect(mark?.tagName.toLowerCase()).toBe('svg')
+    expect(mark).toHaveAttribute('aria-hidden', 'true')
+    expect(mark).toHaveClass('text-muted-foreground')
     expect(glyph?.querySelector('span')).toBeNull()
     expect(glyph?.innerHTML).not.toMatch(/opacity-/)
   })
 
   it('keeps the skipped glyph distinct from the waiting and pending rings', () => {
-    const shapes = (['skipped', 'waiting', 'pending'] as const).map((state) => {
+    const markups = (['skipped', 'waiting', 'pending'] as const).map((state) => {
       const { container, unmount } = render(<PipelineNodeStatusGlyph state={state} />)
       const markup = container.querySelector(`[data-glyph="${state}"]`)?.innerHTML
       unmount()
       return markup
     })
 
-    expect(new Set(shapes).size).toBe(3)
+    expect(new Set(markups).size).toBe(3)
   })
 
   it('reuses the agent spinner for the running state', () => {

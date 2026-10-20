@@ -2,9 +2,8 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { isENOENT } from '../ipc/filesystem-auth'
-import type { IFilesystemProvider } from '../providers/types'
-import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
-import type { ResolvedRuntimeFileTarget } from '../runtime/runtime-file-command-target'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
+import type { ResolvedRuntimeFileTarget } from '../runtime/files/file-target'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
 import type { Store } from '../persistence'
 import { isFolderRepo } from '../../shared/repo-kind'
@@ -90,17 +89,7 @@ function repoLayoutPath(target: ResolvedRuntimeFileTarget, id: string): string {
   return worktreePath(target, `.orca/pipelines/${id}.layout.json`)
 }
 
-async function readTextFile(
-  filePath: string,
-  provider: IFilesystemProvider | null
-): Promise<string> {
-  if (provider) {
-    const result = await provider.readFile(filePath, { maxTextBytes: MAX_PIPELINE_SOURCE_BYTES })
-    if (result.isBinary) {
-      throw new Error('Pipeline files must be text')
-    }
-    return result.content
-  }
+async function readTextFile(filePath: string): Promise<string> {
   const fileStat = await stat(filePath)
   if (fileStat.size > MAX_PIPELINE_SOURCE_BYTES) {
     throw new Error('Pipeline file exceeds the 256 KiB limit')
@@ -108,12 +97,9 @@ async function readTextFile(
   return readFile(filePath, 'utf8')
 }
 
-async function readOptionalTextFile(
-  filePath: string,
-  provider: IFilesystemProvider | null
-): Promise<string | null> {
+async function readOptionalTextFile(filePath: string): Promise<string | null> {
   try {
-    return await readTextFile(filePath, provider)
+    return await readTextFile(filePath)
   } catch (error) {
     if (isENOENT(error)) {
       return null
@@ -184,19 +170,8 @@ export async function resolvePipelineWorkspaceFileTarget(
   return { target, workspaceKind }
 }
 
-async function listPipelineIds(
-  directory: string,
-  provider: IFilesystemProvider | null
-): Promise<string[]> {
+async function listPipelineIds(directory: string): Promise<string[]> {
   try {
-    if (provider) {
-      const entries = await provider.readDir(directory)
-      return entries
-        .filter((entry) => !entry.isDirectory && !entry.isSymlink)
-        .map((entry) => PIPELINE_FILE_PATTERN.exec(entry.name)?.[1])
-        .filter((id): id is string => id !== undefined)
-        .sort()
-    }
     const entries = await readdir(directory, { withFileTypes: true })
     return entries
       .filter((entry) => entry.isFile())
@@ -216,9 +191,9 @@ async function readRepositoryPipeline(input: {
   id: string
   workspaceKind: PipelineWorkspaceFileTarget['workspaceKind']
 }): Promise<PipelineFileData> {
-  const provider = requireRuntimeFileProvider(input.target)
-  const sourceText = await readTextFile(repoPipelinePath(input.target, input.id), provider)
-  const layoutText = await readOptionalTextFile(repoLayoutPath(input.target, input.id), provider)
+  requireLocalRuntimeFileRoute(input.target)
+  const sourceText = await readTextFile(repoPipelinePath(input.target, input.id))
+  const layoutText = await readOptionalTextFile(repoLayoutPath(input.target, input.id))
   return parsePipelineData({
     ref: input.id,
     scope: 'repo',
@@ -234,8 +209,8 @@ async function readPersonalPipelineData(
   id: string,
   workspaceKind: PipelineWorkspaceFileTarget['workspaceKind']
 ): Promise<PipelineFileData> {
-  const sourceText = await readTextFile(personalPipelinePath(store, id), null)
-  const layoutText = await readOptionalTextFile(personalLayoutPath(store, id), null)
+  const sourceText = await readTextFile(personalPipelinePath(store, id))
+  const layoutText = await readOptionalTextFile(personalLayoutPath(store, id))
   return parsePipelineData({
     ref: `user:${id}`,
     scope: 'user',
@@ -295,11 +270,8 @@ export async function listPipelineFiles(input: {
   const resolved =
     input.resolvedWorkspace ??
     (await resolvePipelineWorkspaceFileTarget(input.runtime, input.store, input.workspace))
-  const provider = requireRuntimeFileProvider(resolved.target)
-  const repositoryIds = await listPipelineIds(
-    worktreePath(resolved.target, '.orca/pipelines'),
-    provider
-  )
+  requireLocalRuntimeFileRoute(resolved.target)
+  const repositoryIds = await listPipelineIds(worktreePath(resolved.target, '.orca/pipelines'))
   const entries = [
     builtinPipelineData('objective'),
     builtinPipelineData('pr-sitter'),
@@ -314,7 +286,7 @@ export async function listPipelineFiles(input: {
     )),
     ...(input.includePersonal
       ? await Promise.all(
-          (await listPipelineIds(personalPipelineDirectory(input.store), null)).map((id) =>
+          (await listPipelineIds(personalPipelineDirectory(input.store))).map((id) =>
             readPersonalPipelineData(input.store, id, resolved.workspaceKind)
           )
         )
@@ -417,7 +389,7 @@ export async function personalPipelineOperation(
   request: PipelinePersonalRequest
 ): Promise<PipelinePersonalResponse> {
   if (request.op === 'list') {
-    const ids = await listPipelineIds(personalPipelineDirectory(store), null)
+    const ids = await listPipelineIds(personalPipelineDirectory(store))
     const pipelines = await Promise.all(
       ids.map(async (id) => ({
         id,
@@ -432,7 +404,7 @@ export async function personalPipelineOperation(
     if (snapshot === null) {
       throw new Error('Pipeline file does not exist')
     }
-    const layoutText = await readOptionalTextFile(personalLayoutPath(store, id), null)
+    const layoutText = await readOptionalTextFile(personalLayoutPath(store, id))
     return { yamlText: snapshot.yamlText, layoutText, signature: snapshot.signature }
   }
   if (request.op === 'stat') {

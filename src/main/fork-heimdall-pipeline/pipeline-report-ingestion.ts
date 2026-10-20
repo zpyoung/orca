@@ -6,7 +6,7 @@ import type {
 } from '../../shared/fork-heimdall-pipeline/document-schema'
 import { TaskListSchema } from '../../shared/fork-heimdall-pipeline/task-list'
 import { readHardenedReportBytes } from '../fork-heimdall/hardened-report-file-reader'
-import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
+import { requireLocalRuntimeFileRoute } from '../runtime/files/file-target'
 import {
   issuePipelineReportPath,
   MAX_PIPELINE_REPORT_BYTES,
@@ -176,10 +176,9 @@ export async function readPipelineReport(
     return { status: 'unverifiable', reason: 'path-mismatch' }
   }
   try {
-    const fileProvider = requireRuntimeFileProvider(target)
+    requireLocalRuntimeFileRoute(target)
     const read = await readHardenedReportBytes({
       executionHostId: target.executionHostId,
-      fileProvider,
       reportPath: expectedPath,
       authorityRoot: pipelineReportAuthorityRoot(target),
       maxBytes: MAX_PIPELINE_REPORT_BYTES

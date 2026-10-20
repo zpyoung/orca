@@ -339,6 +339,9 @@ async function readConflictFile(
   target: ObjectiveWorkspaceTarget,
   relativePath: string
 ): Promise<ConflictFile> {
+  if (target.executionHostId !== 'local') {
+    return { status: 'unreadable' }
+  }
   const flavor = resolveLeasePathFlavor(target.executionHostId, target.workspacePath)
   const parts = flavor === win32 ? relativePath.split(/[\\/]/u) : relativePath.split('/')
   let absolutePath = target.workspacePath
@@ -350,46 +353,16 @@ async function readConflictFile(
       }
       absolutePath = flavor.join(absolutePath, part)
       const isLast = index === parts.length - 1
-      if (target.fileProvider) {
-        if (!target.fileProvider.lstat) {
-          return { status: 'unreadable' }
-        }
-        const stat = await target.fileProvider.lstat(absolutePath)
-        if (stat.type === 'symlink') {
-          return { status: 'unreadable' }
-        }
-        if (!isLast && stat.type !== 'directory') {
-          return { status: 'missing' }
-        }
-        if (isLast && (stat.type !== 'file' || stat.size > MAX_CONFLICT_TEXT_BYTES)) {
-          return { status: 'unreadable' }
-        }
-      } else {
-        if (target.executionHostId !== 'local') {
-          return { status: 'unreadable' }
-        }
-        const stat = await lstat(absolutePath)
-        if (stat.isSymbolicLink()) {
-          return { status: 'unreadable' }
-        }
-        if (!isLast && !stat.isDirectory()) {
-          return { status: 'missing' }
-        }
-        if (isLast && (!stat.isFile() || stat.size > MAX_CONFLICT_TEXT_BYTES)) {
-          return { status: 'unreadable' }
-        }
+      const stat = await lstat(absolutePath)
+      if (stat.isSymbolicLink()) {
+        return { status: 'unreadable' }
       }
-    }
-    if (target.fileProvider) {
-      const result = await target.fileProvider.readFile(absolutePath, {
-        maxTextBytes: MAX_CONFLICT_TEXT_BYTES
-      })
-      return result.isBinary
-        ? { status: 'unreadable' }
-        : { status: 'text', content: result.content }
-    }
-    if (target.executionHostId !== 'local') {
-      return { status: 'unreadable' }
+      if (!isLast && !stat.isDirectory()) {
+        return { status: 'missing' }
+      }
+      if (isLast && (!stat.isFile() || stat.size > MAX_CONFLICT_TEXT_BYTES)) {
+        return { status: 'unreadable' }
+      }
     }
     return { status: 'text', content: await readFile(absolutePath, 'utf8') }
   } catch (error) {

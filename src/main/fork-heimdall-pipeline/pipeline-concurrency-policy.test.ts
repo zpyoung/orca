@@ -492,6 +492,7 @@ describe('pipeline child worktree cleanup', () => {
       parentWorktreeId: null,
       childWorktreeIds: [],
       lineage: null,
+      linkedItems: [],
       git: {
         path: '/workspace/child',
         head: 'abc',

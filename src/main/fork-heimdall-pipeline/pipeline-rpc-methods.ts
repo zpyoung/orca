@@ -9,10 +9,7 @@ import {
 } from '../runtime/rpc/methods/fork-heimdall/kernel-binding'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
-import {
-  requireRuntimeGitProvider,
-  runtimeGitRouteForTarget
-} from '../runtime/runtime-git-command-target'
+import { requireLocalRuntimeGitRoute } from '../runtime/runtime-git-command-target'
 import { HEIMDALL_CHANNELS, type WatcherTarget } from '../../shared/fork-heimdall/api'
 import { ObjectiveEnrollmentPayloadSchema } from '../../shared/fork-heimdall-objective/contract-types'
 import { remoteReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
@@ -201,14 +198,10 @@ export async function ensurePipelineTrackedForWorkspace(input: {
   ) {
     throw new Error('Resolved Git pipeline workspace changed during tracking')
   }
-  const route = runtimeGitRouteForTarget(gitTarget)
-  if (route.kind === 'ssh') {
-    requireRuntimeGitProvider(gitTarget)
-  }
+  requireLocalRuntimeGitRoute(gitTarget)
   const trackingTarget = {
     repoPath: gitTarget.repo?.path ?? gitTarget.worktree.path,
     worktreePath: gitTarget.worktree.path,
-    connectionId: route.kind === 'ssh' ? route.connectionId : null,
     pipelineId: input.request.pipelineId
   }
   const result = await ensurePipelineTracked(trackingTarget)

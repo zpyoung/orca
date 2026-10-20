@@ -1,13 +1,7 @@
-import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { FileStat, IFilesystemProvider } from '../providers/types'
-import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
-} from '../providers/ssh-filesystem-dispatch'
 import { toSshExecutionHostId } from '../../shared/execution-host'
 import {
   captureProtectedDigest,
@@ -19,7 +13,6 @@ import {
 } from './protected-pipeline-files'
 
 const directories: string[] = []
-const remoteProviderIds: string[] = []
 
 async function createWorkspace(): Promise<string> {
   const workspace = await mkdtemp(join(tmpdir(), 'pipeline-protected-'))
@@ -27,102 +20,7 @@ async function createWorkspace(): Promise<string> {
   return workspace
 }
 
-function throwingFilesystemProvider(): IFilesystemProvider {
-  const unavailable = async () => {
-    throw new Error('filesystem transport lost')
-  }
-  return {
-    readDir: unavailable,
-    readFile: unavailable,
-    writeFile: unavailable,
-    writeFileBase64: unavailable,
-    writeFileBase64Chunk: unavailable,
-    stat: unavailable,
-    deletePath: unavailable,
-    createFile: unavailable,
-    createDir: unavailable,
-    createDirNoClobber: unavailable,
-    rename: unavailable,
-    renameNoClobber: unavailable,
-    copy: unavailable,
-    search: unavailable,
-    listFiles: unavailable,
-    watch: unavailable,
-    realpath: unavailable,
-    lstat: unavailable
-  }
-}
-
-function remoteFilesystemProvider(input: {
-  rootPath: string
-  fileContent: string
-  linkTarget?: string
-  provideReadlink?: boolean
-}): IFilesystemProvider {
-  const orcaPath = `${input.rootPath}/.orca`
-  const pipelinesPath = `${orcaPath}/pipelines`
-  const filePath = `${pipelinesPath}/main.yaml`
-  const linkPath = `${pipelinesPath}/link.yaml`
-  const stats: Record<string, FileStat> = {
-    [orcaPath]: { type: 'directory', size: 0, mtime: 1 },
-    [pipelinesPath]: { type: 'directory', size: 0, mtime: 1 },
-    [filePath]: {
-      type: 'file',
-      size: Buffer.byteLength(input.fileContent),
-      mtime: 1
-    },
-    ...(input.linkTarget === undefined
-      ? {}
-      : {
-          [linkPath]: {
-            type: 'symlink' as const,
-            size: Buffer.byteLength(input.linkTarget),
-            mtime: 1
-          }
-        })
-  }
-  const provider: IFilesystemProvider = {
-    ...throwingFilesystemProvider(),
-    async lstat(path) {
-      const result = stats[path]
-      if (!result) {
-        throw new Error(`missing remote path: ${path}`)
-      }
-      return result
-    },
-    async readDir(path) {
-      if (path !== pipelinesPath) {
-        throw new Error(`unexpected directory: ${path}`)
-      }
-      return [
-        { name: 'main.yaml', isDirectory: false, isSymlink: false },
-        ...(input.linkTarget === undefined
-          ? []
-          : [{ name: 'link.yaml', isDirectory: false, isSymlink: true }])
-      ]
-    },
-    async readFile(path) {
-      if (path !== filePath) {
-        throw new Error(`unexpected file read: ${path}`)
-      }
-      return { content: input.fileContent, isBinary: false }
-    }
-  }
-  if (input.provideReadlink) {
-    provider.readlink = async (path) => {
-      if (path !== linkPath || input.linkTarget === undefined) {
-        throw new Error(`unexpected link read: ${path}`)
-      }
-      return input.linkTarget
-    }
-  }
-  return provider
-}
-
 afterEach(async () => {
-  for (const id of remoteProviderIds.splice(0)) {
-    unregisterSshFilesystemProvider(id)
-  }
   await Promise.all(
     directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
   )
@@ -235,69 +133,15 @@ describe('captureProtectedDigest', () => {
       status: 'over-cap'
     })
   })
-  it('reads SSH files and literal link targets through the execution-host provider', async () => {
-    const id = 'pipeline-protected-ssh-test'
-    const workspacePath = '/remote/project'
-    const provider = remoteFilesystemProvider({
-      rootPath: workspacePath,
-      fileContent: 'version: 1\n',
-      linkTarget: '../outside.yaml',
-      provideReadlink: true
-    })
-    remoteProviderIds.push(id)
-    registerSshFilesystemProvider(id, provider)
-
-    const digest = await captureProtectedDigest({
-      executionHostId: toSshExecutionHostId(id),
-      workspacePath
-    })
-
-    expect(digest).toEqual({
-      status: 'ok',
-      entries: [
-        { path: '.orca/pipelines/link.yaml', kind: 'symlink', target: '../outside.yaml' },
-        {
-          path: '.orca/pipelines/main.yaml',
-          kind: 'file',
-          sha256: createHash('sha256').update('version: 1\n').digest('hex')
-        }
-      ]
-    })
-  })
-
-  it('fails unverifiably rather than following an SSH symlink without readlink support', async () => {
-    const id = 'pipeline-protected-no-readlink-test'
-    const workspacePath = '/remote/project'
-    remoteProviderIds.push(id)
-    registerSshFilesystemProvider(
-      id,
-      remoteFilesystemProvider({
-        rootPath: workspacePath,
-        fileContent: 'version: 1\n',
-        linkTarget: '../outside.yaml'
-      })
-    )
-
-    await expect(
-      captureProtectedDigest({
-        executionHostId: toSshExecutionHostId(id),
-        workspacePath
-      })
-    ).rejects.toBeInstanceOf(ProtectedDigestUnverifiableError)
-  })
-
-  it('wraps remote provider transport failure without falling back to local files', async () => {
+  it('refuses an SSH host without falling back to local files', async () => {
     const workspacePath = await createWorkspace()
     const pipelinesPath = join(workspacePath, '.orca', 'pipelines')
     await mkdir(pipelinesPath, { recursive: true })
     await writeFile(join(pipelinesPath, 'local-only.yaml'), 'must not be read')
-    const id = 'pipeline-protected-transport-test'
-    remoteProviderIds.push(id)
-    registerSshFilesystemProvider(id, throwingFilesystemProvider())
 
     await expect(
       captureProtectedDigest({
-        executionHostId: toSshExecutionHostId(id),
+        executionHostId: toSshExecutionHostId('pipeline-protected-unserved'),
         workspacePath
       })
     ).rejects.toBeInstanceOf(ProtectedDigestUnverifiableError)

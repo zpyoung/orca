@@ -162,8 +162,12 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     automationLaunchES,
     recipeOverridesES
   ],
-  fr: [heimdallCatalogs.fr, heimdallObjectiveCatalogs.fr, loopsCatalogs.fr],
-  fr: [heimdallCatalogs.fr, heimdallObjectiveCatalogs.fr, heimdallPipelineCatalogs.fr],
+  fr: [
+    heimdallCatalogs.fr,
+    heimdallObjectiveCatalogs.fr,
+    loopsCatalogs.fr,
+    heimdallPipelineCatalogs.fr
+  ],
   ja: [
     relayJA,
     worktreeGroupsJA,

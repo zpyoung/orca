@@ -1,11 +1,11 @@
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import { clearSelfWrite, getRecentSelfWrite } from '@/components/editor/editor-self-write-registry'
-import {
-  readRuntimeFileContent,
-  subscribeRuntimeFileChanges,
-  type RuntimeFileOperationArgs,
-  type RuntimeFileReadArgs
-} from '@/runtime/runtime-file-client'
+import type {
+  RuntimeFileOperationArgs,
+  RuntimeFileReadArgs
+} from '@/runtime/runtime-file-client-types'
+import { readRuntimeFileContent } from '@/runtime/runtime-file-read-client'
+import { subscribeRuntimeFileChanges } from '@/runtime/runtime-file-watch-client'
 
 type WatchedPipelineFile = { filePath: string; relativePath: string }
 

@@ -56,13 +56,7 @@ export async function fileExists(
     return false
   }
   try {
-    if (target.fileProvider === null) {
-      return (await lstat(absolutePath)).isFile()
-    }
-    const info = target.fileProvider.lstat
-      ? await target.fileProvider.lstat(absolutePath)
-      : await target.fileProvider.stat(absolutePath)
-    return info.type === 'file'
+    return (await lstat(absolutePath)).isFile()
   } catch (error) {
     if (error !== null && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
       return false

@@ -1,4 +1,4 @@
-import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdUnlessTwin } from '@/lib/resolve-owner'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { getObjectiveHeimdallApi } from '../fork-heimdall-objective/objective-heimdall-api'
@@ -190,14 +190,14 @@ async function pipelineRuntimeCapabilities(
 ): Promise<readonly string[] | null> {
   const state = useAppStore.getState()
   const repo = state.repos.find((candidate) => candidate.id === worktree.repoId)
-  const hostId = worktree.worktreeId
-    ? getExecutionHostIdForWorktree(state, worktree.worktreeId)
-    : repo
-      ? getRepoExecutionHostId(repo)
-      : 'local'
-  const host = parseExecutionHostId(hostId)
-  if (host?.kind === 'runtime') {
-    return state.runtimeStatusByEnvironmentId.get(host.environmentId)?.status?.capabilities ?? null
+  const repoHost = repo ? parseExecutionHostId(getRepoExecutionHostId(repo)) : null
+  const environmentId = worktree.worktreeId
+    ? runtimeEnvironmentIdUnlessTwin(state, worktree.worktreeId)
+    : repoHost?.kind === 'runtime'
+      ? repoHost.environmentId
+      : null
+  if (environmentId) {
+    return state.runtimeStatusByEnvironmentId.get(environmentId)?.status?.capabilities ?? null
   }
   return ensureLocalRuntimeCapabilities()
 }

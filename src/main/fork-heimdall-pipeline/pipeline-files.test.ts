@@ -2,13 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { DirEntry } from '../../shared/filesystem-entry-types'
-import type { IFilesystemProvider } from '../providers/types'
-import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
-} from '../providers/ssh-filesystem-dispatch'
-import type { ResolvedRuntimeFileTarget } from '../runtime/runtime-file-command-target'
+import { SSH_HOST_NOT_SERVED_MESSAGE } from '../providers/ssh-host-not-served-error'
+import type { ResolvedRuntimeFileTarget } from '../runtime/files/file-target'
 import { createInMemoryPipelineStore } from './pipeline-store-test-fixtures'
 import { listPipelineFiles, personalPipelineOperation, resolvePipelineFile } from './pipeline-files'
 import { ensurePipelineTrackedForWorkspace } from './pipeline-rpc-methods'
@@ -78,37 +73,8 @@ function profileStore(profileDirectory: string) {
   }
 }
 
-function filesystemProvider(
-  readDirectory: (path: string) => Promise<DirEntry[]>,
-  readText: (path: string) => Promise<string>
-): IFilesystemProvider {
-  const unavailable = async (): Promise<never> => {
-    throw new Error('Unexpected filesystem operation')
-  }
-  return {
-    readDir: readDirectory,
-    readFile: async (path) => ({ content: await readText(path), isBinary: false }),
-    writeFile: unavailable,
-    writeFileBase64: unavailable,
-    writeFileBase64Chunk: unavailable,
-    stat: unavailable,
-    deletePath: unavailable,
-    createFile: unavailable,
-    createDir: unavailable,
-    createDirNoClobber: unavailable,
-    rename: unavailable,
-    renameNoClobber: unavailable,
-    copy: unavailable,
-    realpath: unavailable,
-    search: unavailable,
-    listFiles: unavailable,
-    watch: unavailable
-  }
-}
-
 let temporaryDirectories: string[] = []
 afterEach(async () => {
-  unregisterSshFilesystemProvider('pipeline-files-test')
   await Promise.all(
     temporaryDirectories.map((directory) => rm(directory, { recursive: true, force: true }))
   )
@@ -202,32 +168,18 @@ describe('pipeline file operations', () => {
     expect(result.contentHash).toBeTruthy()
   })
 
-  it('lists and reads repository pipelines through the SSH filesystem route', async () => {
-    const seenPaths: string[] = []
-    const provider = filesystemProvider(
-      async (path) => {
-        seenPaths.push(path)
-        return [{ name: 'bugfix.yaml', isDirectory: false, isSymlink: false }]
-      },
-      async (path) => {
-        seenPaths.push(path)
-        return VALID_YAML
-      }
-    )
-    registerSshFilesystemProvider('pipeline-files-test', provider)
+  it('refuses an SSH workspace instead of reading local paths', async () => {
     const target = resolvedTarget('/srv/work/repo', 'ssh:pipeline-files-test')
-    const result = await listPipelineFiles({
-      runtime: localRuntime(target),
-      store: profileStore('/profile'),
-      pipelineStore: { liveRunsForRef: () => [] },
-      workspace: { repoId: 'repo-1', worktreeId: target.worktree.id },
-      liveWatcherIds: new Set(),
-      includePersonal: false
-    })
-
-    expect(result.pipelines.find((pipeline) => pipeline.ref === 'bugfix')?.name).toBe('Bugfix')
-    expect(seenPaths).toContain('/srv/work/repo/.orca/pipelines')
-    expect(seenPaths).toContain('/srv/work/repo/.orca/pipelines/bugfix.yaml')
+    await expect(
+      listPipelineFiles({
+        runtime: localRuntime(target),
+        store: profileStore('/profile'),
+        pipelineStore: { liveRunsForRef: () => [] },
+        workspace: { repoId: 'repo-1', worktreeId: target.worktree.id },
+        liveWatcherIds: new Set(),
+        includePersonal: false
+      })
+    ).rejects.toThrow(SSH_HOST_NOT_SERVED_MESSAGE)
   })
 
   it('uses mtime and content signatures for personal writes, stale conflicts and deletion', async () => {

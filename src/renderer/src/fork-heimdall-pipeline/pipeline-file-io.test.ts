@@ -39,7 +39,7 @@ const runtimeFs = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/runtime/runtime-file-client', () => {
+const runtimeFileFake = vi.hoisted(() => {
   const missingPath = (): Error & { code: string } =>
     Object.assign(new Error('Runtime path is missing'), { code: 'ENOENT' })
 
@@ -79,6 +79,26 @@ vi.mock('@/runtime/runtime-file-client', () => {
     }
   }
 })
+
+vi.mock('@/runtime/runtime-file-metadata-client', () => ({
+  isMissingRuntimePathError: runtimeFileFake.isMissingRuntimePathError,
+  runtimePathExists: runtimeFileFake.runtimePathExists,
+  statRuntimePath: runtimeFileFake.statRuntimePath
+}))
+
+vi.mock('@/runtime/runtime-file-mutation-client', () => ({
+  createRuntimePath: runtimeFileFake.createRuntimePath,
+  readRuntimeDirectory: runtimeFileFake.readRuntimeDirectory,
+  writeRuntimeFile: runtimeFileFake.writeRuntimeFile
+}))
+
+vi.mock('@/runtime/runtime-file-read-client', () => ({
+  readRuntimeFileContent: runtimeFileFake.readRuntimeFileContent
+}))
+
+vi.mock('@/runtime/runtime-file-watch-client', () => ({
+  subscribeRuntimeFileChanges: runtimeFileFake.subscribeRuntimeFileChanges
+}))
 
 const worktreeId = 'repo-a::/repo-a'
 const worktreePath = '/repo-a'

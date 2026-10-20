@@ -3,7 +3,7 @@ import { Check, CircleHelp, CircleSlash } from 'lucide-react'
 import { AgentWorkingSpinner } from '@/components/AgentWorkingSpinner'
 import type { PipelineNodeVisualState } from '../pipeline-run-visual-state'
 
-function GlyphShape({ state }: { state: PipelineNodeVisualState }): JSX.Element {
+function GlyphMark({ state }: { state: PipelineNodeVisualState }): JSX.Element {
   switch (state) {
     case 'running':
       return <AgentWorkingSpinner className="size-full" />
@@ -40,7 +40,7 @@ export function PipelineNodeStatusGlyph({
       data-glyph={state}
       className="pipeline-node-glyph inline-flex size-3.5 shrink-0 items-center justify-center"
     >
-      <GlyphShape state={state} />
+      <GlyphMark state={state} />
     </span>
   )
 }
