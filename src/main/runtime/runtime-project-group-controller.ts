@@ -19,7 +19,6 @@ import {
   runtimeVisibleProjectGroups
 } from './runtime-visible-catalog'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
 import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import {
   assertWslMoveProjectWritable,
@@ -151,11 +150,10 @@ export class RuntimeProjectGroupController {
     const reposBefore = store
       .getRepos()
       .filter((repo) => repo.projectGroupId && groupIds.has(repo.projectGroupId))
-      .map((repo) => ({ id: repo.id, hostId: getRepoExecutionHostId(repo) }))
     const operation = (): boolean => {
       if (options?.removeContainedProjects) {
         for (const repo of reposBefore) {
-          store.removeProjectForHost?.(repo.id, repo.hostId)
+          store.removeProjectForHost?.(repo)
         }
       }
       return store.deleteProjectGroup!(groupId)
