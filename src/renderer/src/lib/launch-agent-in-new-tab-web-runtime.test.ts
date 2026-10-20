@@ -184,7 +184,8 @@ describe('launchAgentInNewTab paired web runtime', () => {
           hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY,
           agentArgs: '--verbose',
           launchPreferences: { model: 'sonnet', optionValues: {} }
-        })
+        }),
+        { notifyFailure: false }
       )
     )
   })
