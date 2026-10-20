@@ -26,12 +26,15 @@ type AgentSessionContinuationDialogProps = {
   open: boolean
   request: AgentSessionContinuationRequest | null
   onOpenChange: (open: boolean) => void
+  /** Fires after the new session launched, so a host can step aside for the new tab. */
+  onStarted?: () => void
 }
 
 export function AgentSessionContinuationDialog({
   open,
   request,
-  onOpenChange
+  onOpenChange,
+  onStarted
 }: AgentSessionContinuationDialogProps): React.JSX.Element {
   const state = useHandoffDialogState({ open, request })
   const contentRef = useRef<HTMLDivElement>(null)
@@ -47,6 +50,7 @@ export function AgentSessionContinuationDialog({
   const start = async (): Promise<void> => {
     if (await state.start()) {
       onOpenChange(false)
+      onStarted?.()
     }
   }
   const sourceName = request?.source.sourceTitle?.trim()
