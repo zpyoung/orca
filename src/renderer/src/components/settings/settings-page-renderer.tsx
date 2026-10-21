@@ -129,45 +129,47 @@ export function renderSettingsPage(context: SettingsRenderContext): React.JSX.El
                 {translate('auto.components.settings.Settings.add3b97ee6', '"')}
               </div>
             ) : (
-              <ActiveSettingsSectionProvider value={model.activeSectionId}>
-                {renderAgentsSettingsSection(context)}
-                {renderAccountsSettingsSection(context)}
-                {renderOrchestrationSettingsSection(context)}
-                {renderLinearSettingsSection(context)}
-                {renderDesktopCapabilitySettingsSections(context)}
-                {renderOrcaAccountSettingsSection(context)}
-                {renderSetupGuideSettingsSection(context)}
-                {renderGeneralSettingsSection(context)}
-                {renderIntegrationsSettingsSection(context)}
-                {renderMobileSettingsSection(context)}
-                {renderAutomationsSettingsSection(context)}
-                {renderArtifactsSettingsSection(context)}
-                {renderShareSkillsSettingsSection(context)}
-                {renderSessionHistorySettingsSection(context)}
-                {renderGitSettingsSection(context)}
-                {renderTasksSettingsSection(context)}
-                {renderTerminalSettingsSection(context)}
-                {renderQuickCommandsSettingsSection(context)}
-                <ForkSessionHandoffSettingsSection />
-                {renderBrowserSettingsSection(context)}
-                {renderMobileEmulatorSettingsSection(context)}
-                {renderFloatingWorkspaceSettingsSection(context)}
-                {renderAppearanceSettingsSection(context)}
-                {renderChatSettingsSection(context)}
-                {renderInputSettingsSection(context)}
-                {renderNotificationsSettingsSection(context)}
-                {renderShortcutsSettingsSection(context)}
-                {renderStatsSettingsSection(context)}
-                {renderServersSettingsSection(context)}
-                {renderSshSettingsSection(context)}
-                {renderDeveloperPermissionsSettingsSection(context)}
-                {renderPrivacySettingsSection(context)}
-                {renderAdvancedSettingsSection(context)}
-                {renderDevSettingsSection(context)}
-                {renderExperimentalSettingsSection(context)}
-                {renderPluginsSettingsSection(context)}
-                {renderProjectSettingsSections(context)}
-              </ActiveSettingsSectionProvider>
+              <SettingsContentScrollElementProvider value={interactions.contentScrollElement}>
+                <ActiveSettingsSectionProvider value={model.activeSectionId}>
+                  {renderAgentsSettingsSection(context)}
+                  {renderAccountsSettingsSection(context)}
+                  {renderOrchestrationSettingsSection(context)}
+                  {renderLinearSettingsSection(context)}
+                  {renderDesktopCapabilitySettingsSections(context)}
+                  {renderOrcaAccountSettingsSection(context)}
+                  {renderSetupGuideSettingsSection(context)}
+                  {renderGeneralSettingsSection(context)}
+                  {renderIntegrationsSettingsSection(context)}
+                  {renderMobileSettingsSection(context)}
+                  {renderAutomationsSettingsSection(context)}
+                  {renderArtifactsSettingsSection(context)}
+                  {renderShareSkillsSettingsSection(context)}
+                  {renderSessionHistorySettingsSection(context)}
+                  {renderGitSettingsSection(context)}
+                  {renderTasksSettingsSection(context)}
+                  {renderTerminalSettingsSection(context)}
+                  {renderQuickCommandsSettingsSection(context)}
+                  <ForkSessionHandoffSettingsSection />
+                  {renderBrowserSettingsSection(context)}
+                  {renderMobileEmulatorSettingsSection(context)}
+                  {renderFloatingWorkspaceSettingsSection(context)}
+                  {renderAppearanceSettingsSection(context)}
+                  {renderChatSettingsSection(context)}
+                  {renderInputSettingsSection(context)}
+                  {renderNotificationsSettingsSection(context)}
+                  {renderShortcutsSettingsSection(context)}
+                  {renderStatsSettingsSection(context)}
+                  {renderServersSettingsSection(context)}
+                  {renderSshSettingsSection(context)}
+                  {renderDeveloperPermissionsSettingsSection(context)}
+                  {renderPrivacySettingsSection(context)}
+                  {renderAdvancedSettingsSection(context)}
+                  {renderDevSettingsSection(context)}
+                  {renderExperimentalSettingsSection(context)}
+                  {renderPluginsSettingsSection(context)}
+                  {renderProjectSettingsSections(context)}
+                </ActiveSettingsSectionProvider>
+              </SettingsContentScrollElementProvider>
             )}
           </div>
         </div>

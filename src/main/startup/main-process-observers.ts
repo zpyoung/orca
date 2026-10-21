@@ -126,13 +126,8 @@ export function initializeMainProcessObservers(): void {
   initCohortClassifier(store)
   initOnboardingCohortClassifier(store)
   state.stats = new StatsCollector()
-  // Agent-session stats come from hook status transitions, the same truth the
-  // sidebar and dashboard read — never from OSC terminal titles, which miss
-  // hook-only agents and count any spinner TUI as an agent (#10201).
-  const agentSessionRecorder = new AgentSessionTransitionRecorder(state.stats)
-  agentHookServer.subscribeEnrichedStatus((enriched) => agentSessionRecorder.onStatus(enriched))
+  feedAgentSessionStats(state.stats, agentHookServer)
   agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)
-  agentHookServer.subscribePaneStatusClear((clear) => agentSessionRecorder.onCleared(clear))
   state.claudeUsage = new ClaudeUsageStore(store)
   state.codexUsage = new CodexUsageStore(store)
   state.openCodeUsage = new OpenCodeUsageStore(store)

@@ -173,8 +173,12 @@ export function applyStructuredAgentSessionOptions(
       ...(current.fastMode !== undefined ? { fastMode: current.fastMode } : {}),
       ...(current.serviceTier ? { serviceTier: current.serviceTier } : {})
     },
-    undefined,
-    result.current.confirmed ?? []
+    (id) =>
+      current.defaulted?.some((key) => key === id)
+        ? 'default'
+        : current.confirmed?.includes(id)
+          ? 'reported'
+          : 'dispatched'
   )
   return {
     ...state,

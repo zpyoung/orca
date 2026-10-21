@@ -270,6 +270,10 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
           socket.connectionId,
           socket.clientCapabilities
         )
+        // Switch point: a client attaching sees every live terminal of this host in a tab.
+        if (ORCA_LAYOUT_OWNER_IS_MAIN) {
+          void placeUnshownLiveTerminalsBestEffort(this.runtime)
+        }
         // Why once per socket: only phones send runtime.clientCapabilities.update.
         if (socket.device.scope === 'runtime') {
           this.runtime.sidebarFacts?.noteRuntimeClient(

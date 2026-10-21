@@ -15,6 +15,8 @@ import { translate } from '@/i18n/i18n'
 import { toAgentLaunchPreferencesWithOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'
 import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
+import type { AgentTerminalLaunchCompletion } from './structured-agent-session-launch-admission'
 
 /**
  * Launch an agent terminal on the web runtime host instead of a local tab.

@@ -13,6 +13,7 @@ import {
   migrateLegacyAutomationLaunchArgs,
   normalizeAutomationLaunchOverrides
 } from '../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
+import type { WorkspaceRunContext } from '../../../shared/task-source-context'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
 import {
   assertAutomationExtraAgentArgs,

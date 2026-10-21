@@ -9,6 +9,7 @@ import { createTerminalGitHubPRLinkDetector } from '../../../../../shared/termin
 import { setRendererPtyVisibilityClaim } from '../pty-renderer-delivery-claims'
 import { AGENT_TASK_COMPLETE_NOTIFICATION_GRACE_MS } from '../agent-task-complete-policy'
 import { armTerminalInputQuarantine } from '../terminal-input-quarantine'
+import { hasPendingHookLaneCompletion } from '@/hooks/agent-hook-completion-notifications'
 
 import {
   isAgentTaskCompleteNotificationEnabled,

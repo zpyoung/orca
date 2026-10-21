@@ -26,6 +26,10 @@ export type NativeChatPickerItem =
       /** Owning plugin, when a single plugin owns every source behind this row. */
       pluginName?: string
       sources: { sourceKind: SkillSourceKind; skillFilePath: string; pluginName?: string }[]
+      /** The file the agent selects this skill by, when the agent reported it; a pick sends it. */
+      path?: string
+      /** Distinguishes same-named reported files independently of description or scanner scope. */
+      location?: string
     }
 
 export type NativeChatSkillDiscoverySnapshot = {
@@ -192,12 +196,16 @@ function mergeNativeChatSkills(
   const names =
     sessionSkills !== undefined
       ? [
-          ...sessionSkills.map((skill) => skill.name).filter(isTokenSafe),
+          ...sessionSkills
+            .filter((skill) => !skill.path)
+            .map((skill) => skill.name)
+            .filter(isTokenSafe),
           ...[...byName.keys()].filter((name) => unclassifiedNames.has(name))
         ]
       : [...byName.keys()]
-  return [...new Set(names)]
-    .flatMap((name) => {
+  return [
+    ...located,
+    ...[...new Set(names)].flatMap((name) => {
       const reported = sessionSkills?.find((entry) => entry.name === name)?.description
       return pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills).map(
         (skill) =>

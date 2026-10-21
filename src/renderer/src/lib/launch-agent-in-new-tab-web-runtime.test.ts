@@ -66,8 +66,8 @@ vi.mock('@/lib/telemetry', () => ({
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   runtimeEnvironmentSupportsCapability: vi.fn().mockResolvedValue(true)
 }))
-vi.mock('@/runtime/web-runtime-terminal-creation', () => ({
-  createWebRuntimeSessionTerminal: mocks.createWebRuntimeSessionTerminal
+vi.mock('@/runtime/web-runtime-terminal-create-operation', () => ({
+  createWebRuntimeSessionTerminalResult: mocks.createWebRuntimeSessionTerminal
 }))
 vi.mock('@/runtime/web-runtime-session-environment', () => ({
   isWebRuntimeSessionActive: vi.fn(() => true)

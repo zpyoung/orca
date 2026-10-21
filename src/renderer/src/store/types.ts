@@ -101,6 +101,7 @@ export type AppState = RepoSlice &
   RemoteServerUpdatesSlice &
   TerminalQuickCommandHostsSlice &
   StructuredSessionLaunchDirectorySlice &
+  StructuredChatSleptAtSlice &
   WorkspaceAttentionSlice &
   LedgerSlice &
   AsksSlice &

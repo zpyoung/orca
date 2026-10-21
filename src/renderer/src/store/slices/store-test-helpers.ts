@@ -116,6 +116,7 @@ export function createTestStore() {
     ...createRemoteServerUpdatesSlice(...a),
     ...createTerminalQuickCommandHostsSlice(...a),
     ...createStructuredSessionLaunchDirectorySlice(...a),
+    ...createStructuredChatSleptAtSlice(...a),
     ...createWorkspaceAttentionSlice(...a),
     ...createLedgerSlice(...a),
     ...createAsksSlice(...a),

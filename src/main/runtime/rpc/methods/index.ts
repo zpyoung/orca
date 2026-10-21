@@ -69,7 +69,11 @@ import { AGENT_LAUNCH_METHODS } from './agent-launch'
 import { ASK_METHODS } from './fork-ask-question-tool/ask'
 import { HEIMDALL_METHODS } from './fork-heimdall/heimdall'
 import { LOOPS_METHODS } from './fork-loops/loops'
-import { LAYOUT_APPLY_METHODS, WORKSPACE_LAYOUT_METHODS } from './workspace-layout'
+import {
+  LAYOUT_APPLY_METHODS,
+  LAYOUT_VIEW_REPORT_METHODS,
+  WORKSPACE_LAYOUT_METHODS
+} from './workspace-layout'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../shared/sidebar-inputs-switch'
 

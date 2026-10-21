@@ -8,6 +8,11 @@ import {
 } from './agent-status-primitives'
 import { isWebSessionTabsWorktreeRemovalFrame } from './session-tabs-inventory-absence'
 import { pruneExpiredTerminalDockPendingMutations } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'
+import { adoptMirroredEditorBuffers } from '../../store/slices/editor/buffers/editor-buffer-record'
+import {
+  EMPTY_EDITOR_BUFFER_VIEW_INDEX,
+  reconcileEditorBufferViewIndex
+} from '../../store/slices/editor/buffers/editor-buffer-views'
 
 type FinalPatchContext = ReturnType<typeof applyActiveStateUpdates>
 

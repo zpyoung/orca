@@ -143,6 +143,7 @@ export const useAppStore = create<AppState>()(
           ...createRemoteServerUpdatesSlice(...a),
           ...createTerminalQuickCommandHostsSlice(...a),
           ...createStructuredSessionLaunchDirectorySlice(...a),
+          ...createStructuredChatSleptAtSlice(...a),
           ...createWorkspaceAttentionSlice(...a),
           ...createLedgerSlice(...a),
           ...createAsksSlice(...a),

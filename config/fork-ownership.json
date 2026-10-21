@@ -1357,7 +1357,7 @@
       "kind": "import-swap",
       "lines": [
         "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'",
-        "  attachments: readonly AgentComposerImageAttachment[] = []"
+        "  attachments: readonly AgentComposerImageAttachment[] = [],"
       ]
     },
     {
@@ -2553,7 +2553,7 @@
       "kind": "registration",
       "lines": [
         "import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'",
-        "                <ForkSessionHandoffSettingsSection />"
+        "                  <ForkSessionHandoffSettingsSection />"
       ]
     },
     {
@@ -2578,15 +2578,6 @@
       "lines": [
         "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
         "    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)"
-      ]
-    },
-    {
-      "path": "config/tsconfig.cli.json",
-      "feature": "session-info",
-      "kind": "registration",
-      "lines": [
-        "    \"../src/main/fork-session-info/session-info-statusline-chain-script.ts\",",
-        "    \"../src/main/fork-session-info/session-info-statusline-chaining.ts\","
       ]
     },
     {
@@ -3192,12 +3183,6 @@
       "lines": [
         "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
       ]
-    },
-    {
-      "path": "src/shared/structured-agent-session-options.ts",
-      "feature": "native-chat-session-options",
-      "kind": "passthrough",
-      "lines": ["    undefined,"]
     },
     {
       "path": "src/main/ipc/native-chat.ts",
@@ -6992,7 +6977,7 @@
       "removed": 4
     },
     "AGENTS.md": {
-      "added": 145,
+      "added": 146,
       "removed": 1
     },
     "config/localization-coverage-allowlist.json": {
@@ -7851,10 +7836,6 @@
       "added": 3,
       "removed": 1
     },
-    "config/tsconfig.cli.json": {
-      "added": 2,
-      "removed": 0
-    },
     "src/main/agent-hooks/server/server-lifecycle.ts": {
       "added": 2,
       "removed": 0
@@ -8002,10 +7983,6 @@
     "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
       "added": 1,
       "removed": 1
-    },
-    "src/shared/structured-agent-session-options.ts": {
-      "added": 1,
-      "removed": 0
     },
     "src/main/persistence/applying-settings/ui-state-read.ts": {
       "added": 6,

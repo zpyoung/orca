@@ -61,6 +61,7 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
       return
     }
     const tail = captureWorkerExitTail(pty)
+    pending?.exitedIncarnations.add(exitIncarnationId ?? candidateIncarnation ?? null)
     this.invalidatePtyControllerInventoryForLifecycle(ptyId, pty?.connectionId)
     // A bare exit code is not enough to establish why a process ended: older
     // daemons and SSH relays can report 0 for crashes and wrapper exits.

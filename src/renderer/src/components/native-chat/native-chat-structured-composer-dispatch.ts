@@ -7,7 +7,8 @@ import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentCo
 export async function dispatchNativeChatStructuredComposerText(
   transport: NativeChatStructuredComposerTransport,
   draftText: string,
-  attachments: readonly AgentComposerImageAttachment[] = []
+  attachments: readonly AgentComposerImageAttachment[] = [],
+  skills: readonly AgentJournalSkillRef[] = []
 ): Promise<Omit<StructuredAgentSessionCommandOutcome, 'handled'> & { revealsTranscript: boolean }> {
   // The one place a chip's image gets its number: its place among the images this message carries.
   const prompt = imageReferencesToPromptMarkers(

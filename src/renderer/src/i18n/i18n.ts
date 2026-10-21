@@ -84,6 +84,10 @@ void i18n
     }
   })
 
+// Plugin packs can replace translations without changing the active language.
+i18n.store.on('added', advanceTranslationResourceVersion)
+i18n.store.on('removed', advanceTranslationResourceVersion)
+
 registerForkLocalizationCatalogs(i18n)
 
 export function translate(key: string, fallback: string, options?: TOptions): string {
