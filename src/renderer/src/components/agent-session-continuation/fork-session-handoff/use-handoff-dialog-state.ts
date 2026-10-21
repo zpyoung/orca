@@ -76,7 +76,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     () => (anchorWorktreeId ? listHandoffTargetCandidates(store, anchorWorktreeId) : []),
     [anchorWorktreeId, store]
   )
-  const targets = useMemo<HandoffDestinationOption[]>(
+  const destinations = useMemo<HandoffDestinationOption[]>(
     () =>
       candidates.map((candidate) => ({
         id: candidate.worktreeId,
@@ -455,7 +455,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
   }, [launchHandoff])
 
   return {
-    targets,
+    destinations,
     targetWorktreeId,
     targetPath: target?.workspacePath ?? null,
     selectTarget,

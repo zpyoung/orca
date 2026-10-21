@@ -32,7 +32,7 @@ export type HandoffDestinationOption = {
 
 type HandoffDestinationControlsProps = {
   disabled: boolean
-  targets: HandoffDestinationOption[]
+  destinations: HandoffDestinationOption[]
   targetWorktreeId: string
   targetPath: string | null
   onTargetChange: (worktreeId: string) => void
@@ -54,7 +54,7 @@ type HandoffDestinationControlsProps = {
 
 export function HandoffDestinationControls({
   disabled,
-  targets,
+  destinations,
   targetWorktreeId,
   targetPath,
   onTargetChange,
@@ -74,7 +74,7 @@ export function HandoffDestinationControls({
   agentDetectionFailed
 }: HandoffDestinationControlsProps): React.JSX.Element {
   const [targetPickerOpen, setTargetPickerOpen] = useState(false)
-  const selectedTarget = targets.find((target) => target.id === targetWorktreeId) ?? null
+  const selectedTarget = destinations.find((target) => target.id === targetWorktreeId) ?? null
 
   return (
     <fieldset disabled={disabled} className="min-w-0 space-y-3 disabled:opacity-60">
@@ -123,7 +123,7 @@ export function HandoffDestinationControls({
                     'No matching worktrees.'
                   )}
                 </CommandEmpty>
-                {targets.map((target) => (
+                {destinations.map((target) => (
                   <CommandItem
                     key={target.id}
                     value={`${target.name} ${target.path}`}

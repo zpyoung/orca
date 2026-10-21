@@ -128,7 +128,7 @@ export function AgentSessionContinuationDialog({
 
             <HandoffDestinationControls
               disabled={state.previewDetached}
-              targets={state.targets}
+              destinations={state.destinations}
               targetWorktreeId={state.targetWorktreeId}
               targetPath={state.targetPath}
               onTargetChange={state.selectTarget}
