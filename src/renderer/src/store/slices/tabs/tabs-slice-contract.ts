@@ -126,9 +126,13 @@ export type TabsSlice = TabTerminalDockSlice & {
     label: string | null,
     opts?: { recordInteraction?: boolean }
   ) => void
-  setUnifiedTabColor: (tabId: string, color: string | null) => void
-  pinTab: (tabId: string) => void
-  unpinTab: (tabId: string) => void
+  setUnifiedTabColor: (
+    tabId: string,
+    color: string | null,
+    opts?: { recordInteraction?: boolean }
+  ) => void
+  pinTab: (tabId: string, opts?: { recordInteraction?: boolean }) => void
+  unpinTab: (tabId: string, opts?: { recordInteraction?: boolean }) => void
   closeOtherTabs: (tabId: string) => string[]
   closeTabsToRight: (tabId: string) => string[]
   closeTabsToLeft: (tabId: string) => string[]
@@ -159,8 +163,6 @@ export type TabsSlice = TabTerminalDockSlice & {
       groupId: string
       index?: number
       splitDirection?: TabSplitDirection
-      /** The split's new group id, as main minted it; layout-owner builds only. */
-      newGroupId?: string
     }
   ) => boolean
   setTabGroupSplitRatio: (worktreeId: string, nodePath: string, ratio: number) => void

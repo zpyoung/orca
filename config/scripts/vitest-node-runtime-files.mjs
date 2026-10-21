@@ -2,7 +2,7 @@ import { SQLITE_RUNTIME_INCLUDE } from './vitest-sqlite-runtime-files.mjs'
 import { FORK_NODE_RUNTIME_INCLUDE } from './fork-vitest-node-runtime-files.mjs'
 
 // SQLite publication, native bindings, worker IPC, socket liveness, and V8 retention use Node.
-export const NODE_RUNTIME_INCLUDE = [
+const NODE_RUNTIME_INCLUDE = [
   'src/main/runtime/structured-agent-cli-writers.test.ts',
   'config/scripts/vitest-sqlite-runtime-boundary.test.ts',
   'config/scripts/cloud-security-history-workflow.test.mjs',
@@ -129,3 +129,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'config/scripts/vitest-node-runtime-boundary.test.ts',
   'config/scripts/vitest-node-runtime-pool.test.ts'
 ]
+
+export function getNodeRuntimeInclude() {
+  return [...NODE_RUNTIME_INCLUDE, ...findSqliteRuntimeTests()]
+}

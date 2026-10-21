@@ -1,4 +1,5 @@
 import { ActiveSettingsSectionProvider } from './SettingsSection'
+import { SettingsContentScrollElementProvider } from './settings-content-scroll-element'
 import { SettingsSidebar } from './SettingsSidebar'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'

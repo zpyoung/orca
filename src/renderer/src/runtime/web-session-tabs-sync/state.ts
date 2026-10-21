@@ -239,6 +239,7 @@ export type WebSessionTabsSyncState = Pick<
   | 'browserPagesByWorkspace'
   | 'browserCertificateFailuresByPageId'
   | 'browserTabsByWorktree'
+  | 'editorBuffers'
   | 'groupsByWorktree'
   | 'layoutByWorktree'
   | 'openFiles'
@@ -261,7 +262,6 @@ export type WebSessionTabsSyncState = Pick<
       // Why: a client draft is the evidence that a mirrored file's dirty flag is the client's
       // own and must survive a host republish (#21392); absent here, the host flag wins.
       | 'editorDrafts'
-      | 'editorBuffers'
       | 'localOnlyScrollbackByTabId'
       | 'migrationUnsupportedByPtyId'
       | 'manuallyUnreadTurnsByPaneKey'

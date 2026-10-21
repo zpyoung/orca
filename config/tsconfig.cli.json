@@ -1,8 +1,11 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  // Why only roots: src/main files come in through imports. check-runtime-electron-ratchet.mjs
+  // keeps Electron out of that graph.
   "include": [
     "../src/cli/**/*",
     "../src/shared/**/*",
+    "../src/shared/editor-language/monaco-language-associations.json",
     "../src/packages/process-host/src/__fixtures__/**/*",
     "../src/main/agent-state-file-reader.ts",
     "../src/main/gitlab/project-ref-parser.ts",
@@ -298,7 +301,6 @@
     "../src/main/win32-utils.ts"
   ],
   "compilerOptions": {
-    "composite": true,
     // The CLI runs on Node 24; Node20 models synchronous ESM imports from CommonJS.
     "module": "Node20",
     "moduleResolution": "Node16",

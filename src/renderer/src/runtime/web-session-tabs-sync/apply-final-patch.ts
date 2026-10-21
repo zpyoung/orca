@@ -29,7 +29,6 @@ export function buildWebSessionTabsFinalPatch(
     removedTerminalResourceIds,
     mirroredTerminalIds,
     nextOpenFiles,
-    nextEditorBuffers,
     nextBrowserTabsByWorktree,
     nextUnifiedTabsByWorktree,
     nextGroupsByWorktree,
@@ -110,7 +109,14 @@ export function buildWebSessionTabsFinalPatch(
       ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
       : {}),
     ...(nextOpenFiles !== state.openFiles
-      ? { openFiles: nextOpenFiles, editorBuffers: nextEditorBuffers }
+      ? {
+          openFiles: nextOpenFiles,
+          editorBuffers: adoptMirroredEditorBuffers(
+            state.editorBuffers,
+            nextOpenFiles,
+            reconcileEditorBufferViewIndex(EMPTY_EDITOR_BUFFER_VIEW_INDEX, nextOpenFiles)
+          )
+        }
       : {}),
     ...(nextTabsByWorktree !== state.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
     ...(nextBrowserTabsByWorktree !== state.browserTabsByWorktree

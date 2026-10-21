@@ -15,7 +15,7 @@ import { recoverPendingSkillTransactions } from '../skills/skill-transaction-sta
 import { initCohortClassifier } from '../telemetry/cohort-classifier'
 import { initOnboardingCohortClassifier } from '../telemetry/onboarding-cohort-classifier'
 import { StatsCollector } from '../stats/collector'
-import { AgentSessionTransitionRecorder } from '../stats/agent-session-transition-recorder'
+import { feedAgentSessionStats } from '../stats/agent-session-stats-feed'
 import { ClaudeUsageStore } from '../claude-usage/store'
 import { CodexUsageStore } from '../codex-usage/store'
 import { OpenCodeUsageStore } from '../opencode-usage/store'

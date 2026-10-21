@@ -1,3 +1,4 @@
+import type { AgentJournalSkillRef } from '../../../../shared/agent-session-journal-types'
 import { imageReferencesToPromptMarkers } from '../../../../shared/native-chat-image-transcript-markers'
 import type { StructuredAgentSessionCommandOutcome } from '../../../../shared/structured-agent-session-composer'
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
@@ -18,6 +19,9 @@ export async function dispatchNativeChatStructuredComposerText(
   if (handled) {
     return { ...command, revealsTranscript: false }
   }
-  const admission = transport.send(prompt, attachments)
+  const admission =
+    skills.length > 0
+      ? transport.send(prompt, attachments, { skills })
+      : transport.send(prompt, attachments)
   return { accepted: admission !== false, error: null, revealsTranscript: admission === true }
 }
