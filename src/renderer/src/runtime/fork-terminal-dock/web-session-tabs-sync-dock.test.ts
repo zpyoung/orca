@@ -42,6 +42,7 @@ function makeState(overrides: Partial<WebSessionTabsSyncState> = {}): WebSession
     browserCertificateFailuresByPageId: {},
     browserPagesByWorkspace: {},
     browserTabsByWorktree: {},
+    editorBuffers: {},
     groupsByWorktree: {},
     layoutByWorktree: {},
     openFiles: [],
