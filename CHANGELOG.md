@@ -1,6 +1,6 @@
 ---
-last_released_commit: 9bd674f464eb47d9b0416982ecec45dfa65fdc06
-upstream_synced: v1.4.233
+last_released_commit: c1b3d60777bc61c024c12a682fe5cf4002275ee0
+upstream_synced: v1.4.237
 ---
 
 # Changelog
@@ -12,17 +12,38 @@ line per release, and detailed in each GitHub release's generated notes.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
 
+## [1.4.238-rc.0.zy01] - 2026-10-22
+
+Synced to upstream [v1.4.237](https://github.com/stablyai/orca/releases/tag/v1.4.237).
+
+### Changed
+
+- The upstream sync automation adds the daemon protocol-bump label when it opens a sync PR that
+  moves the protocol version, and retargets an open sync PR in place when a newer stable tag fixes
+  what blocked it.
+
+### Fixed
+
+- Fork features that hang off code upstream reworked in this release keep working: the fork's chat
+  composer disables attachments while a remote chat session is still starting, native paste keeps
+  the fork's focus routing and image-only fallback, the session handoff settings sit inside
+  upstream's new scrolling settings page, and fork loops and the project ledger resolve a repo's
+  host the way upstream's new checks expect.
+- Claude Code keeps loading the fork's agent rules. Upstream removed `CLAUDE.md`; the fork keeps it.
+
 ## [1.4.234-rc.0.zy01] - 2026-10-20
 
 Synced to upstream [v1.4.233](https://github.com/stablyai/orca/releases/tag/v1.4.233), by way of
 [v1.4.232](https://github.com/stablyai/orca/releases/tag/v1.4.232).
 
 ### Added
+
 - Typing `/resume` in a structured chat, optionally followed by a search, opens Agent Session
   History for that chat's workspace instead of sending the text to the agent. Terminal-backed
   chats and the terminal dock still pass `/resume` to the agent.
 
 ### Fixed
+
 - Signing in from a protected artifact's share panel shows the same sign-in progress as upstream,
   with a link to copy and a way to cancel while the browser sign-in is pending.
 - Fork features that hang off code upstream reworked in these releases keep working: removing a
@@ -38,6 +59,7 @@ Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4
 [v1.4.227](https://github.com/stablyai/orca/releases/tag/v1.4.227).
 
 ### Added
+
 - Loops run an agent in a worktree's terminal over and over until a check command or an evaluator
   says the work is done. Pick until-done, a fixed interval, or a queue of prompts, from the + menu
   or with `orca loop`. A loop rail shows each iteration and lets you pause, steer, edit, or stop
@@ -45,6 +67,7 @@ Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4
   closes, works over SSH, and shows its status in `worktree ps` and on mobile worktree rows.
 
 ### Changed
+
 - Native chat code blocks now use upstream's syntax highlighter. The fork's own code-block
   coloring is gone, so inline code in chat prose no longer gets the fork's accent chip. Tool
   icons in chat keep their fork coloring.
@@ -55,10 +78,12 @@ Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4
   what PR CI would reject before it pushes.
 
 ### Removed
+
 - The fork's additions to the SSH relay are retired, because upstream replaced the relay with its
   managed remote host. Native chat transcript paging and live tail keep working for local chats.
 
 ### Fixed
+
 - Pasting into the terminal dock's chat composer with Cmd+V, a paste event, or the app menu goes
   to the composer again, instead of to the terminal beside it.
 - The hosted-review sitter now checks a pull request's conflicts against the base branch's current
@@ -76,15 +101,18 @@ Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4
 [v1.4.227](https://github.com/stablyai/orca/releases/tag/v1.4.227).
 
 ### Changed
+
 - Native chat code blocks now use upstream's syntax highlighter. The fork's own code-block
   coloring is gone, so inline code in chat prose no longer gets the fork's accent chip. Tool
   icons in chat keep their fork coloring.
 
 ### Removed
+
 - The fork's additions to the SSH relay are retired, because upstream replaced the relay with its
   managed remote host. Native chat transcript paging and live tail keep working for local chats.
 
 ### Fixed
+
 - Pasting into the terminal dock's chat composer with Cmd+V, a paste event, or the app menu goes
   to the composer again, instead of to the terminal beside it.
 - The hosted-review sitter now checks a pull request's conflicts against the base branch's current
@@ -102,15 +130,18 @@ Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4
 [v1.4.227](https://github.com/stablyai/orca/releases/tag/v1.4.227).
 
 ### Changed
+
 - Native chat code blocks now use upstream's syntax highlighter. The fork's own code-block
   coloring is gone, so inline code in chat prose no longer gets the fork's accent chip. Tool
   icons in chat keep their fork coloring.
 
 ### Removed
+
 - The fork's additions to the SSH relay are retired, because upstream replaced the relay with its
   managed remote host. Native chat transcript paging and live tail keep working for local chats.
 
 ### Fixed
+
 - Pasting into the terminal dock's chat composer with Cmd+V, a paste event, or the app menu goes
   to the composer again, instead of to the terminal beside it.
 - The hosted-review sitter now checks a pull request's conflicts against the base branch's current
@@ -123,6 +154,7 @@ Synced to upstream [v1.4.230](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4.224).
 
 ### Changed
+
 - The daily upstream sync now runs a cheap precheck first and skips the full run when upstream
   has shipped no new stable release, the newest fork release is published, and there are no
   unreleased fork commits. If the check can't decide, the sync runs as before.
@@ -136,6 +168,7 @@ Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4.224).
 
 ### Changed
+
 - Claude chat sends from the composer now report delivery the way upstream does. A message the
   terminal refused shows "Message not sent", and one whose delivery couldn't be confirmed is held
   as unconfirmed instead of being sent twice. Sends are still dropped safely when a terminal
@@ -153,6 +186,7 @@ Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4
   it's fixed.
 
 ### Fixed
+
 - Fork releases build and publish again. Since the v1.4.222 sync, every release stopped before
   the macOS build because the release pipeline expected an analytics key this fork doesn't have.
   Telemetry stays off.
@@ -176,6 +210,7 @@ Not published: the build failed. Superseded by 1.4.225-rc.0.zy02.
 Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4.224).
 
 ### Changed
+
 - Claude chat sends from the composer now report delivery the way upstream does. A message the
   terminal refused shows "Message not sent", and one whose delivery couldn't be confirmed is held
   as unconfirmed instead of being sent twice. Sends are still dropped safely when a terminal
@@ -193,6 +228,7 @@ Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4
   it's fixed.
 
 ### Fixed
+
 - An image pasted into a question card's answer box attaches to the composer again instead of
   being dropped.
 - Pasting into the fork composer works with upstream's paste handling again.
@@ -208,6 +244,7 @@ Synced to upstream [v1.4.224](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.218](https://github.com/stablyai/orca/releases/tag/v1.4.218).
 
 ### Fixed
+
 - Stopping a structured agent session before it picks up a message puts that message back in the
   composer again, including while an IME composition is in progress. Text put back while the
   composer was closed appears when it reopens.
@@ -217,11 +254,13 @@ Synced to upstream [v1.4.218](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4.215).
 
 ### Added
+
 - The `orca` CLI can now manage Heimdall watchers end to end: create, budget (decimal `--hours`
   are rounded), approve, and answer escalations, with workspace selection and enrollment refusals
   reported consistently.
 
 ### Fixed
+
 - A pull-request sitter no longer merges until every check on the current head commit has passed;
   failures the sitter can fix itself are recovered first, and GitLab hosts without status checks
   are tolerated.
@@ -237,6 +276,7 @@ Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4.215).
 
 ### Added
+
 - Automations and source-control agent recipes can set the model, reasoning effort, and extra
   agent arguments for the agents they launch, and each automation run records the launch settings
   it used.
@@ -252,6 +292,7 @@ Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4
   active, or are inactive.
 
 ### Fixed
+
 - An owner's answer aimed at a question it could not reach no longer stalls the watcher on every
   tick and starves later questions. The owner is told why the answer was refused, and an answer
   that stays undeliverable is handed to you after the stall window.
@@ -265,6 +306,7 @@ Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4.215).
 
 ### Added
+
 - Heimdall watchers. A hosted-review sitter watches a pull request, runs gated fixes, keeps the
   branch up to date, and merges it once it is green. An objective runner takes a structured plan
   through to a landed change, tracking each step from files on disk to committed, pushed, reviewed,
@@ -273,6 +315,7 @@ Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4
   reports a watcher's state from the CLI.
 
 ### Fixed
+
 - Sending a message from the terminal dock into a fresh Claude Code session no longer lands below
   a wall of blank lines without submitting. Claude Code read the dock's input-clearing keystrokes
   as a paste; they now go out in small, paced writes, and a cancelled send finishes its cleanup
@@ -282,6 +325,7 @@ Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4
 - Heimdall watchers keep working against v1.4.215's stricter orchestration caller checks.
 
 ### Changed
+
 - Adapted the fork's features and tests to upstream v1.4.215's changed signatures, removed helpers,
   and new test harnesses, with no change in fork behaviour.
 - CI's real-IME end-to-end step runs only its own spec again instead of the full e2e suite, which
@@ -297,11 +341,13 @@ Synced to upstream [v1.4.215](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.207](https://github.com/stablyai/orca/releases/tag/v1.4.207).
 
 ### Fixed
+
 - Typing in the quick-open file search or the right sidebar's file-explorer filter no longer leaves
   the previous query's results on screen for a moment; both lists now clear and re-filter as the
   query changes. This comes from upstream.
 
 ### Changed
+
 - The fork's own record of which upstream files it copies wholesale was advanced to this release.
   Nothing upstream changed in any copied file, so no fork behaviour moved with it.
 
@@ -312,16 +358,19 @@ retracted the v1.4.206 tag that 1.4.207-rc.0.zy01 was built on and re-cut it fro
 different commit, adding 325 commits the retracted tag never carried.
 
 ### Added
+
 - Upstream's mobile web app bundle, terminal performance work, editor diff improvements and
   OpenCode 2 beta support arrive with the re-cut release.
 
 ### Fixed
+
 - The docked terminal composer no longer crashes pane close in setups that report no settings
   snapshot, which previously surfaced as a failure when closing a split or a pending pane.
 - Mobile browser frames decode image data again in the browser-served mobile app; the frame reader
   had been importing Node's Buffer in a form the web bundle cannot resolve.
 
 ### Changed
+
 - The fork's packaging and sandbox test inventories now describe this repository's own job set
   rather than upstream's, so they stop reporting a Windows packaging job the fork does not run and
   they skip the same relay region suites CI does.
@@ -334,6 +383,7 @@ Synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4
 v1.4.204, v1.4.205 and v1.4.206 in one step.
 
 ### Fixed
+
 - A parked `orca ask` no longer starves worker-to-coordinator messaging. Waiting on a human used to
   hold one of eight shared long-poll slots for the full chunk, so eight agents waiting at once shed
   every later `orchestration.ask` — which has no shed tolerance — and browser attach with it. Waits
@@ -353,6 +403,7 @@ v1.4.204, v1.4.205 and v1.4.206 in one step.
   test host; it feeds the real shell filter a synthetic listing instead.
 
 ### Changed
+
 - Fork code adopts the eight `anti-slop` lint rules upstream enabled in v1.4.206, following
   upstream's own renames for each rule. Symbol names and parameter types only — no behaviour
   changed.
@@ -364,6 +415,7 @@ v1.4.204, v1.4.205 and v1.4.206 in one step.
 Synced to upstream [v1.4.203](https://github.com/stablyai/orca/releases/tag/v1.4.203).
 
 ### Fixed
+
 - Release-notes links opened a 404 for everyone on a fork build, and the dev build picker listed
   upstream's releases instead of this fork's. Stable and RC lookups now both resolve against the
   fork's own repository.
@@ -386,6 +438,7 @@ Synced to upstream [v1.4.203](https://github.com/stablyai/orca/releases/tag/v1.4
   editor looking as though the change had been kept.
 
 ### Changed
+
 - Orca ask worktrees now carry their own sidebar icon.
 - Two suites that read the POSIX shell lookup are isolated from the developer's zsh startup files,
   and the sandbox shard runner's exclude list matches CI's shell contracts again, so live-shell
@@ -399,6 +452,7 @@ Synced to upstream [v1.4.202](https://github.com/stablyai/orca/releases/tag/v1.4
 v1.4.201 in the same step.
 
 ### Fixed
+
 - `npx skills add` cloned upstream, so every skill this fork ships that upstream does not have was
   missing from the tree the installer read. It now installs from this fork's own repository.
 - The docked agent composer kept focus when a pane had one, but upstream's new chat-cover rule
@@ -406,6 +460,7 @@ v1.4.201 in the same step.
   straight to it, and every other pane follows upstream's rule.
 
 ### Changed
+
 - The mid-prompt `/` picker is now upstream's: it offers commands as well as skills mid-draft, and
   opens for any agent with a known grammar. A pick made mid-sentence still completes the token
   rather than sending it.
@@ -417,6 +472,7 @@ Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4
 upstream stable release since the previous fork build.
 
 ### Added
+
 - `orca ask` lets an agent working in an Orca terminal put a real question to you and block until
   you answer it — select, multi-select, text, number, date, or confirm — with the answer coming back
   as a structured JSON envelope. A question that outlives a single invocation is resumed with
@@ -438,6 +494,7 @@ Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4
 upstream stable release since the previous fork build.
 
 ### Added
+
 - Project and group ledgers: a durable, validated record of decisions and findings that lives with a
   project rather than in a scratch file. Entries carry provenance, revision history, and a triage
   state, can be imported in bulk, and are browsable from a new sidebar view that filters by scope —
@@ -448,6 +505,7 @@ upstream stable release since the previous fork build.
   project can say for itself when an entry counts as going stale.
 
 ### Changed
+
 - Removing a project or group checks its ledger first and refuses on a revision conflict rather than
   silently discarding entries, and a rejected save keeps its error visible while leaving the form
   usable instead of clearing what you typed.
@@ -461,12 +519,14 @@ Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4
 v1.4.199 and v1.4.200 in one span.
 
 ### Added
+
 - The sidebar can now hide workspaces you are not working on: filter by how recently a workspace was
   active — including a custom date range — and by whether its review is finished and its checks are
   passing. The choices persist per pairing, and the header says how many workspaces are hidden so a
   filtered list never looks like a missing one.
 
 ### Changed
+
 - A file dropped on a chat composer now attaches only to the composer it landed on. Upstream shipped
   its own version of the fix this fork had been carrying, so the fork's copy is retired in favour of
   it; the behaviour is the same and it now covers every composer, not just this fork's.
@@ -477,6 +537,7 @@ v1.4.199 and v1.4.200 in one span.
   cannot use are gone. Sync pull requests stop burning their budget on checks that could not finish.
 
 ### Fixed
+
 - The terminal no longer loses its composer draft or its focus after a window wake while a chat view
   covers the pane — an effect had stopped re-running when the chat view was toggled.
 
@@ -486,11 +547,13 @@ Synced to upstream [v1.4.198](https://github.com/stablyai/orca/releases/tag/v1.4
 v1.4.196, v1.4.197 and v1.4.198 in one span.
 
 ### Added
+
 - Optional divider lines between the sidebar's top-level projects and groups, switchable from
   Appearance and findable through settings search. They do not affect layout, and default to on, so
   an existing sidebar looks the same until the setting is turned off.
 
 ### Changed
+
 - The fork's seams survived upstream's largest module split yet. v1.4.198 broke `main/index.ts`, the
   chat composer and the terminal pane into separate modules; nine seam barrels were re-homed onto the
   new files, and the terminal dock now reaches the pane through a controller bridge inside
@@ -501,6 +564,7 @@ v1.4.196, v1.4.197 and v1.4.198 in one span.
   seeing them.
 
 ### Fixed
+
 - The sidebar-separator setting has the French catalog it was missing. v1.4.198 adds French to the
   locale set and the setting was written before it, so its keys had no French bundle to resolve from
   and the catalog gate rejected the merged tree.
@@ -514,6 +578,7 @@ draft and `1.4.195-rc.0.zy01`'s are left in place; neither was ever published, a
 artifacts.
 
 ### Fixed
+
 - Releases build again. Both release workflows pinned pnpm 10.24.0 while `packageManager` — which
   the fork takes from upstream — had moved to pnpm 12, and the setup action refuses that
   combination outright rather than picking one. Every cut since 2026-09-01 therefore tagged a
@@ -523,6 +588,7 @@ artifacts.
   failed yet only because it runs behind the jobs that did.
 
 ### Changed
+
 - The sync procedure gained what the last two syncs cost. The merge and ownership commits now
   bypass the pre-commit hook, which otherwise lints a deliberately half-resolved tree and reverts
   the resolution it was about to repair. Reset upstream tests are swept for pinned upstream
@@ -540,6 +606,7 @@ artifacts.
 Synced to upstream [v1.4.195](https://github.com/stablyai/orca/releases/tag/v1.4.195).
 
 ### Fixed
+
 - The Session Info sidebar still reports Claude's hook status. Upstream removed the `agentHooks`
   IPC surface as dead code — it had no callers left there, but the fork's panel read
   `claudeStatus()` from it. The row now goes over the fork's own Session Info bridge, which reaches
@@ -549,6 +616,7 @@ Synced to upstream [v1.4.195](https://github.com/stablyai/orca/releases/tag/v1.4
   in an effect. Filed for upstream.
 
 ### Changed
+
 - The fork's composer picks up upstream's app-menu Select All fix. Upstream landed it in the chat
   composer it replaced, so it is replayed into the shared composer core, where it reaches the
   docked terminal composer as well.
@@ -565,6 +633,7 @@ Synced to upstream [v1.4.195](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.194](https://github.com/stablyai/orca/releases/tag/v1.4.194).
 
 ### Added
+
 - A Session Info sidebar for the focused agent terminal, showing live context, usage, identity,
   activity, files, hooks, and MCP servers for that exact session and pane. A custom Claude
   statusline survives, because the fork chains its own telemetry rather than replacing it, and MCP
@@ -574,6 +643,7 @@ Synced to upstream [v1.4.194](https://github.com/stablyai/orca/releases/tag/v1.4
   all work from the CLI, the RPC layer, and the desktop UI.
 
 ### Fixed
+
 - Passphrase protection is now reachable from the desktop app at all. Every protect, rotate,
   make-public and reveal action threw for the renderer, whose IPC bridge dispatches as a runtime
   client, so only the CLI could use the feature. The same pass fixed a replacement passphrase being
@@ -589,6 +659,7 @@ Synced to upstream [v1.4.194](https://github.com/stablyai/orca/releases/tag/v1.4
   resolution failure rather than on the code. Filed for upstream.
 
 ### Changed
+
 - The remote test sandbox follows upstream onto pnpm 12 and off the deleted `.npmrc`.
 - Contributor docs now describe the forked Native Chat architecture and its runtime changes, and
   point local typechecking at the per-project commands so a full sweep cannot saturate the machine.
@@ -598,10 +669,12 @@ Synced to upstream [v1.4.194](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.193](https://github.com/stablyai/orca/releases/tag/v1.4.193).
 
 ### Added
+
 - The docked terminal composer now renders Markdown as you type, over a draft that stays raw
   underneath, so styling never rewrites what will actually be sent.
 
 ### Changed
+
 - Focus goes to an enabled dock composer before falling back to the terminal beneath it, so typing
   after a reveal or reattach lands where the composer is showing.
 - Upstream's updated structured native-chat session (Codex, off by default behind
@@ -610,6 +683,7 @@ Synced to upstream [v1.4.193](https://github.com/stablyai/orca/releases/tag/v1.4
   attachment path.
 
 ### Fixed
+
 - Continue-in-new-session no longer hands over a stale transcript. A fork-owned probe authorizes
   against the Vault's agent-source roots and walks an ordered candidate chain — reported path,
   session id, pane history, then project scan — recording where each answer came from. Ambiguous
@@ -630,6 +704,7 @@ Synced to upstream [v1.4.193](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.190](https://github.com/stablyai/orca/releases/tag/v1.4.190).
 
 ### Added
+
 - Continue a coding-agent session in a new one. A continuation dialog composes a handoff brief from
   the source pane or an AI Vault session, previews and edits it, scans it for secrets, resolves the
   target environment, and launches the receiving agent. Parent and child sessions are linked, and
@@ -649,6 +724,7 @@ Synced to upstream [v1.4.190](https://github.com/stablyai/orca/releases/tag/v1.4
   still bring the composer back.
 
 ### Fixed
+
 - The skill picker scanned the frozen cache copy of a `directory`-sourced Claude Code marketplace
   rather than the live directory the harness actually loads plugins from, so it offered whatever
   skill set existed at the last `claude plugin update`. Directory marketplaces now resolve to their
@@ -661,6 +737,7 @@ Synced to upstream [v1.4.190](https://github.com/stablyai/orca/releases/tag/v1.4
   `wsl.exe` runner. The read now goes through that runner instead of spawning `wsl.exe` itself.
 
 ### Changed
+
 - The upstream sync no longer runs the test suite locally before opening its pull request. That run
   went to a single shared Docker host, where sharding it produced timeout, perf-budget, and
   temp-file failures on a different random subset each time — none of them caused by the code. The
@@ -672,6 +749,7 @@ Synced to upstream [v1.4.190](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4.188).
 
 ### Changed
+
 - Upstream syncs now land through a pull request rather than pushing `main` directly, so the fork
   ownership guard and the rest of PR CI run on every resolution before `main` moves. The sync
   procedure also gained a fix policy that separates failures a run may resolve on its own from ones
@@ -685,6 +763,7 @@ Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4.188).
 
 ### Fixed
+
 - Closing the docked composer no longer leaves a dead strip below the terminal. The pane's geometry
   effect used to re-run after the composer's own cleanup had zeroed the slot and write the gutter
   height straight back, so the terminal never grew into the space it had just been given.
@@ -697,6 +776,7 @@ Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4
   skill-update roundtrip check across every matrix job the last time a sync took them.
 
 ### Changed
+
 - The agent composer's draft, history, and attachment caches are built from one shared scope cache
   instead of three copies, the terminal-dock gutter clamp lives in one module rather than six call
   sites, and the dock-state merge paths are collapsed onto a single routine. Net 195 lines removed,
@@ -707,6 +787,7 @@ Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.187](https://github.com/stablyai/orca/releases/tag/v1.4.187).
 
 ### Added
+
 - A rich-input composer can now be docked beneath a terminal pane running a supported coding-agent
   CLI, so a prompt can be drafted, edited, and sent without typing into the TUI, with the terminal
   still visible underneath as a fallback. Send and Stop are separate controls rather than one button
@@ -716,6 +797,7 @@ Synced to upstream [v1.4.187](https://github.com/stablyai/orca/releases/tag/v1.4
   on a remote host. Shards no longer see each other's temp files, git config, or build output.
 
 ### Changed
+
 - File ownership across the fork is now declared in `config/fork-ownership.json` and enforced in CI,
   instead of being inferred from commit authorship. Each fork change belongs to one of four tiers,
   and a PR that adds a fork file matching no manifest entry fails the ownership guard. This is what
@@ -727,6 +809,7 @@ Synced to upstream [v1.4.187](https://github.com/stablyai/orca/releases/tag/v1.4
   access to repository contents, with write scoped to the single job that needs it.
 
 ### Fixed
+
 - The workspace sidebar's tighter row spacing is applied again. Upstream moved the module holding it
   during a refactor, and because the fork still claimed the old path, the build had been shipping
   upstream's roomier spacing while the fork's copy sat unused. Drop targets line up with the rows as
@@ -741,6 +824,7 @@ Synced to upstream [v1.4.187](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.184](https://github.com/stablyai/orca/releases/tag/v1.4.184).
 
 ### Changed
+
 - Native Chat continues to read transcripts over this fork's SSH relay. Upstream replaced that path
   with a WSL filesystem admission gate, which this build does not adopt, so reading transcripts from
   a remote host behaves exactly as it did before the sync.
@@ -754,6 +838,7 @@ Synced to upstream [v1.4.184](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.182](https://github.com/stablyai/orca/releases/tag/v1.4.182).
 
 ### Added
+
 - The native chat transcript is colored. Each recognized agent tool takes its own glyph and hue on
   its line, and a collapsed run of tool calls shows one dot per distinct kind of work in the order
   it first appeared — so a folded run says what happened without being expanded. Code blocks and
@@ -764,12 +849,14 @@ Synced to upstream [v1.4.182](https://github.com/stablyai/orca/releases/tag/v1.4
   so color is never the only signal.
 
 ### Fixed
+
 - Electron downloads that fail with an HTTP status response are retried instead of failing the run.
   The transient-error check read only `statusCode`, but the error raised for a rejected fetch
   carries `status`, so release-CDN 503s aborted on the first attempt and took several test lanes
   down at once.
 
 ### Changed
+
 - Upstream code the fork does not own now tracks v1.4.182 directly. Where this release extended the
   same code the fork's SSH-relay chat feature touches, both sides are kept: upstream's transcript
   read cancellation, subscription teardown, quick-command matching, and cross-device workspace
@@ -783,6 +870,7 @@ Synced to upstream [v1.4.182](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
 
 ### Fixed
+
 - Chat view now reads transcripts over the SSH relay when a pane is hosted on a remote machine.
   Previously it always read from local disk, so an SSH-hosted conversation showed a read error and
   the first message only appeared after toggling to the terminal and back. A transcript that does
@@ -800,11 +888,13 @@ Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
 
 ### Added
+
 - An architecture reference for the plugin subsystem, covering the trust tiers, the contribution
   types a manifest can declare, the host API available to each runtime, and the limits that apply
   to plugin workers and panels.
 
 ### Fixed
+
 - Skill updates verify again. The v1.4.180 sync adopted upstream's skill ledger, whose release rows
   name upstream tags that do not exist on this fork, so the roundtrip check failed outright. The
   ledger is now rebuilt from the fork's own release tags, and the check stands down for a skill that
@@ -814,6 +904,7 @@ Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4
   automation would have called a skill its checkout could not see.
 
 ### Changed
+
 - Local memsearch index data is ignored instead of surfacing as untracked files.
 
 ## [1.4.181-rc.0.zy01] - 2026-08-11
@@ -821,11 +912,13 @@ Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
 
 ### Added
+
 - Worktrees can be placed in a project group independently of the group their repo belongs to, so
   the sidebar can group related work across repositories. Grouping is presentational — running
   commands stays scoped to each worktree's own repo.
 
 ### Fixed
+
 - The native chat view no longer blanks to a loading pane when an agent finishes its turn. Session
   retention could discard messages the live view had already committed to showing; it now only ever
   adds to that list.
@@ -836,6 +929,7 @@ Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4
   digit shortcuts. The fork had been holding an earlier draft of the same work.
 
 ### Changed
+
 - Upstream code the fork does not modify now tracks each upstream stable release directly, instead
   of preserving whatever variant an earlier sync happened to inherit. Several subsystems had drifted
   onto stale copies that upstream had since reworked.
@@ -849,6 +943,7 @@ Synced to upstream [v1.4.177](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.176](https://github.com/stablyai/orca/releases/tag/v1.4.176).
 
 ### Added
+
 - Native chat panes have a configurable reading column. Pick a width from the new menu in the pane
   header, or set the default for every pane from the experimental chat settings. The tier names and
   descriptions are translated into Spanish, Japanese, Korean, and Chinese.
@@ -856,11 +951,13 @@ Synced to upstream [v1.4.176](https://github.com/stablyai/orca/releases/tag/v1.4
   requires. Upstream removed the file; the fork keeps it.
 
 ### Fixed
+
 - The chat width menu no longer appears in the pane header when the experimental native chat
   surface is switched off. It read the tab's raw view mode rather than the mode actually in effect,
   so a chat-only control could surface on a plain terminal pane.
 
 ### Changed
+
 - The fork no longer carries its own copy of the orchestration subsystem. It was restored here
   after upstream pulled it from the v1.4.161 release branch, but upstream has since shipped a newer
   version of the same code, so the fork now tracks upstream's directly. This brings creator-dispatch
@@ -874,12 +971,14 @@ Synced to upstream [v1.4.176](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.162](https://github.com/stablyai/orca/releases/tag/v1.4.162).
 
 ### Added
+
 - Orchestration is back. Upstream pulled its orchestration primitives and connected-server workers
   out of the v1.4.161 release branch, and the fork inherited that removal when it synced. Upstream
   shipped the subsystem again in v1.4.162, so the orchestration CLI, runtime, and federation
   workers return with it.
 
 ### Fixed
+
 - The macOS permission-prompt watcher new in v1.4.162 now recognises this fork. It counts the
   consent dialogs macOS raises in Orca's name, but matched only upstream's bundle identifiers, so on
   a fork build it silently counted nothing.
@@ -892,12 +991,14 @@ Synced to upstream [v1.4.162](https://github.com/stablyai/orca/releases/tag/v1.4
 Synced to upstream [v1.4.161](https://github.com/stablyai/orca/releases/tag/v1.4.161).
 
 ### Fixed
+
 - The `orca` command-line tool works again on this fork. Its launcher looked for a binary named
   `Orca` inside the app bundle, but fork builds ship it as `Orca Dev` so the app can install beside
   official Orca — so every invocation failed with "No such file or directory". The launcher now
   reads the bundle's own executable name instead of assuming upstream's.
 
 ### Changed
+
 - Upstream's new local-build compatibility contract is pinned to this fork's application identity
   (`com.zpyoung.orca`). Locally-built artifacts are validated against the fork rather than upstream,
   so a local build installs over a fork build instead of being rejected as foreign.
@@ -909,14 +1010,16 @@ Synced to upstream [v1.4.159](https://github.com/stablyai/orca/releases/tag/v1.4
 This build re-bases the fork on upstream's stable v1.4.159. Earlier `zy` builds were cut from
 upstream trunk, which had already moved past 1.4.159 and carried an unreleased regression that left
 a stale terminal pane painted over file tabs. The fork now follows upstream stable tags only, so
-this release intentionally carries *older* upstream code than 1.4.160-rc.0.zy05 despite the higher
+this release intentionally carries _older_ upstream code than 1.4.160-rc.0.zy05 despite the higher
 version number.
 
 ### Added
+
 - A `release` skill that records fork-owned changes in this changelog and dispatches the release
   pipeline, so fork cuts no longer collide with upstream's inherited rc numbering.
 
 ### Changed
+
 - Releases are signed, notarized, macOS-only, and published to this fork, so a second Mac
   auto-updates from `zpyoung/orca` instead of upstream. The build installs under its own identity
   ("Orca Dev", `com.zpyoung.orca`) and runs alongside official Orca.
@@ -930,6 +1033,7 @@ version number.
   trunk merge base, which would otherwise freeze once the sync tracks stable releases.
 
 ### Fixed
+
 - Release builds no longer die mid-notarization. Apple takes ~43 minutes for this fork where
   upstream clears in ~9, so job and attempt timeouts are sized for the slower queue.
 - The homebrew tap bump no longer runs on the fork, which has neither the upstream tap nor the app
