@@ -432,4 +432,180 @@ describe('bounded judgment service', () => {
     expect(replay.status).toBe('unavailable')
     expect(calls).toBe(0)
   })
+
+  it('clips retained draft criteria after omitting oversized plan history', async () => {
+    const current = world()
+    current.contract = {
+      ...current.contract,
+      existingPlan: 'existing-plan-seed'.padEnd(16_000, 'p')
+    }
+    const rejectedCriteria = Array.from({ length: 56 }, (_, index) => ({
+      id: `revision-rejected-criterion-${index + 1}`,
+      ordinal: index,
+      body: `revision-rejected-criterion-${index + 1}`.padEnd(8_192, 'x'),
+      shellCheckable: false,
+      checkCommand: null,
+      lastCheck: null,
+      lastReview: null
+    }))
+    const draftCriteria = Array.from({ length: 61 }, (_, index) => ({
+      id: `revision-draft-criterion-${index + 1}`,
+      ordinal: index,
+      body: `revision-draft-criterion-${index + 1}`.padEnd(8_192, 'x'),
+      shellCheckable: false,
+      checkCommand: null,
+      lastCheck: null,
+      lastReview: null
+    }))
+    current.plan = {
+      ...current.plan,
+      revisions: [
+        {
+          id: 'revision-rejected',
+          number: 1,
+          status: 'rejected',
+          digest: 'rejected-digest',
+          createdByDispatchId: 'planner-rejected',
+          createdAtMs: 1,
+          approvedAtMs: null
+        },
+        {
+          id: 'revision-draft',
+          number: 2,
+          status: 'draft',
+          digest: 'draft-digest',
+          createdByDispatchId: 'planner-draft',
+          createdAtMs: 2,
+          approvedAtMs: null
+        }
+      ],
+      nodes: [
+        {
+          revisionId: 'revision-rejected',
+          taskKey: 'rejected-task',
+          deps: [],
+          orchestrationTaskId: 'rejected-orchestration-task',
+          dispatchId: 'rejected-dispatch',
+          state: 'failed',
+          criteria: rejectedCriteria
+        },
+        {
+          revisionId: 'revision-draft',
+          taskKey: 'draft-task',
+          deps: [],
+          orchestrationTaskId: null,
+          dispatchId: null,
+          state: 'pending',
+          criteria: draftCriteria
+        }
+      ],
+      patches: [
+        {
+          id: 'rejected-patch',
+          revisionId: 'revision-rejected',
+          createdByDispatchId: 'rejected-patcher',
+          repairOrdinal: 1,
+          digest: 'rejected-patch-digest',
+          status: 'rejected',
+          rejection: 'plan-review-revise',
+          touchedTaskKeys: ['rejected-task'],
+          createdAtMs: 3,
+          resolvedAtMs: 4
+        }
+      ],
+      planReviews: [
+        {
+          id: 'rejected-revision-review',
+          targetKind: 'revision',
+          targetId: 'revision-rejected',
+          round: 1,
+          dispatchId: 'rejected-revision-reviewer',
+          verdict: 'revise',
+          reportDigest: 'rejected-revision-review-digest',
+          createdAtMs: 3
+        },
+        {
+          id: 'rejected-patch-review',
+          targetKind: 'patch',
+          targetId: 'rejected-patch',
+          round: 1,
+          dispatchId: 'rejected-patch-reviewer',
+          verdict: 'revise',
+          reportDigest: 'rejected-patch-review-digest',
+          createdAtMs: 4
+        }
+      ],
+      gateAttempts: [
+        {
+          gateName: 'retained-gate',
+          contentIdentity: 'content-1',
+          executionHostId: 'test-host',
+          command: 'npm test -- --run core',
+          exitCode: 0,
+          timedOut: false,
+          stdoutTail: 'passed',
+          stderrTail: '',
+          startedAtMs: 5,
+          completedAtMs: 6
+        }
+      ]
+    }
+    dependencies.maxStateBytes = 32_768
+    let capturedState: unknown
+    const request: JudgmentQuestionRequest = {
+      id: 'draft-plan-screen',
+      questionId: OBJECTIVE_JUDGMENT_QUESTION_IDS.preflight,
+      subjectId: 'implement',
+      question: {
+        type: 'choice',
+        instructions: 'Check the retained draft plan.',
+        criteria: { proceed: 'Proceed', hold: 'Hold' }
+      }
+    }
+    dependencies.createClient = () => ({
+      evaluate: async (state) => {
+        calls += 1
+        capturedState = state
+        return {
+          model: 'jev-test-1',
+          answers: {
+            [request.id]: {
+              type: 'choice',
+              choice: 'proceed',
+              probabilities: { proceed: 1, hold: 0 },
+              confidence: 1
+            }
+          }
+        }
+      }
+    })
+
+    const result = await new JudgmentService(dependencies).evaluate({
+      watcherId,
+      contentIdentity: 'content-1',
+      world: current,
+      requests: [request],
+      authority: 'local-desktop'
+    })
+
+    expect(result.status).toBe('answered')
+    expect(calls).toBe(1)
+    expect(capturedState).toBeDefined()
+    const serializedState = JSON.stringify(capturedState)
+    if (serializedState === undefined) {
+      throw new Error('expected the client state to be serializable')
+    }
+    expect(Buffer.byteLength(serializedState, 'utf8')).toBeLessThanOrEqual(32_768)
+    expect(serializedState).toContain('revision-draft')
+    expect(serializedState).toContain('draft-criterion-61')
+    expect(serializedState).toContain('retained-gate')
+    expect(serializedState).not.toContain('existing-plan-seed')
+    expect(serializedState).not.toContain('revision-rejected')
+    expect(serializedState).not.toContain('rejected-patch')
+    expect(serializedState).not.toContain('rejected-revision-review')
+    expect(serializedState).not.toContain('rejected-patch-review')
+    expect(
+      result.notices.some((notice) => notice.includes('clipped 61 criterion string(s) to'))
+    ).toBe(true)
+  })
 })
