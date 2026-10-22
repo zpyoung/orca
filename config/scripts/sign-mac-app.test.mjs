@@ -94,11 +94,9 @@ it.each([
       Object.assign(process.env, env)
       delete require.cache[configPath]
       const config = require(configPath)
-      if (
-        ['ORCA_MAC_ADHOC', 'ORCA_MAC_RELEASE', 'ORCA_MAC_HOURLY', 'ORCA_MAC_DAILY'].some(
-          (name) => env[name] === '1'
-        )
-      ) {
+      // The fork ships only the ORCA_MAC_RELEASE channel; upstream's hourly, daily and adhoc
+      // channels build from workflows gated to stablyai/orca, so the fork's config leaves them unsigned.
+      if (env.ORCA_MAC_RELEASE === '1') {
         expect(config.mac.sign).toBe(resolve('config/scripts/sign-mac-app.mjs'))
         const hook = await resolveFunction(undefined, config.mac.sign, 'sign', process.cwd())
         expect(typeof hook).toBe('function')
