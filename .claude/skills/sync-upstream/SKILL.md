@@ -84,7 +84,17 @@ Run `git remote get-url upstream`. If missing, add it:
 `git remote add upstream git@github.com:stablyai/orca.git`. If it exists but points anywhere other
 than stablyai/orca, STOP and report.
 
-Fetch: `git fetch upstream main` then `git fetch origin main upstream`.
+Fetch both trunks by explicit refspec:
+
+```sh
+git fetch upstream "refs/heads/main:refs/remotes/upstream/main"
+git fetch origin "refs/heads/main:refs/remotes/origin/main" "refs/heads/upstream:refs/remotes/origin/upstream"
+```
+
+A bare `git fetch upstream main` updates only `FETCH_HEAD` whenever `remote.<name>.fetch` does not
+map `main`, and this clone's `upstream` refspec is narrowed to one branch pattern. `upstream/main`
+then stays wherever it last was, which silently skews every `--not upstream/main` count below and
+turns Step 12 into a no-op. Check `git config --get-all remote.upstream.fetch` if in doubt.
 
 Resolve upstream's latest stable release tag from the **remote**, never from local tags — the fork's
 own release tags (`vX.Y.Z-rc.N.zyNN`) live in the local tag namespace and must never be mistaken for
