@@ -8,6 +8,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { AgentComposerHandle } from '../../native-chat/fork-agent-composer/agent-composer-types'
 
 vi.mock('@/i18n/i18n', () => ({
+  i18n: { language: 'en' },
   translate: (_key: string, fallback: string) => fallback
 }))
 vi.mock('@/lib/agent-paste-draft', () => ({
