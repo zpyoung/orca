@@ -5826,6 +5826,11 @@
       "status": "permanent"
     },
     {
+      "path": "CLAUDE.md",
+      "reason": "Claude Code loads project instructions from CLAUDE.md, and this one line (@AGENTS.md) is what puts the fork's ledger, ownership and sandbox-test rules in front of every agent session. Upstream deleted it (#31242).",
+      "status": "permanent"
+    },
+    {
       "path": "config/electron-builder.config.cjs",
       "reason": "Fork ships macOS-only arm64 artifacts under com.zpyoung.orca; upstream's multi-platform matrix must not win.",
       "status": "permanent"
