@@ -190,7 +190,8 @@ function insertAdditionalAgentArgs(args: {
 
 export function planCommitMessageGeneration(
   input: CommitMessagePlanInput,
-  prompt: string
+  prompt: string,
+  options: { strictMcp?: boolean } = {}
 ): CommitMessagePlanResult {
   if (isCustomAgentId(input.agentId)) {
     const command = input.customAgentCommand?.trim() ?? ''
@@ -251,11 +252,6 @@ export function planCommitMessageGeneration(
   }
 
   const argvPrompt = spec.promptDelivery === 'argv' ? prompt : ''
-  const baseArgs = spec.buildArgs({
-    prompt: argvPrompt,
-    model: input.model,
-    thinkingLevel: input.thinkingLevel
-  })
   const agentArgs = planAdditionalAgentArgs(input.agentArgs, input.backslash)
   if (!agentArgs.ok) {
     return agentArgs
@@ -264,6 +260,13 @@ export function planCommitMessageGeneration(
   if (!command.ok) {
     return { ok: false, error: command.error }
   }
+  const baseArgs = spec.buildArgs({
+    prompt: argvPrompt,
+    model: input.model,
+    thinkingLevel: input.thinkingLevel,
+    strictMcp: options.strictMcp,
+    userArgs: [...command.prefixArgs, ...agentArgs.args]
+  })
   // Why: repeating a singleton flag makes yargs-based CLIs parse it as an array and
   // crash (OpenCode's `model.split('/')`). User values replace Orca's, never stack.
   const merged = applySingletonOptionOverrides({

@@ -9,6 +9,7 @@ import { initReactI18next } from 'react-i18next'
 import enRuntimeRequired from './en-runtime-required.json'
 import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'
 import { isPseudoLocalizationLocale, pseudoLocalizeString } from './pseudo-localization'
+import { advanceTranslationResourceVersion } from './translation-resource-version'
 import { DEFAULT_LOCALE, resolveUiLocale } from './supported-languages'
 import type { SupportedUiLocale } from '../../../shared/ui-locale'
 import { isPluginUiLanguage, type UiLanguage } from '../../../shared/ui-language'
@@ -82,6 +83,10 @@ void i18n
       useSuspense: false
     }
   })
+
+// Plugin packs can replace translations without changing the active language.
+i18n.store.on('added', advanceTranslationResourceVersion)
+i18n.store.on('removed', advanceTranslationResourceVersion)
 
 registerForkLocalizationCatalogs(i18n)
 

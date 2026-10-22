@@ -67,7 +67,7 @@ const request: AgentSessionContinuationRequest = {
 
 function state(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    targets: [],
+    destinations: [],
     targetWorktreeId: 'wt-1',
     targetPath: '/repo',
     selectTarget: vi.fn(),

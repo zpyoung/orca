@@ -5,7 +5,8 @@ const mocks = vi.hoisted(() => ({
   createTab: vi.fn(),
   closeTab: vi.fn(),
   createWebRuntimeSessionTerminal: vi.fn(),
-  setActiveTabType: vi.fn()
+  setActiveTabType: vi.fn(),
+  toastError: vi.fn()
 }))
 
 const store = {
@@ -55,7 +56,7 @@ const store = {
 }
 
 vi.mock('@/store', () => ({ useAppStore: { getState: () => store } }))
-vi.mock('sonner', () => ({ toast: { message: vi.fn(), error: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { message: vi.fn(), error: mocks.toastError } }))
 vi.mock('@/components/tab-bar/reconcile-order', () => ({ reconcileTabOrder: vi.fn(() => []) }))
 vi.mock('@/lib/agent-paste-draft', () => ({ pasteDraftWhenAgentReady: vi.fn() }))
 vi.mock('@/lib/telemetry', () => ({
@@ -65,14 +66,11 @@ vi.mock('@/lib/telemetry', () => ({
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   runtimeEnvironmentSupportsCapability: vi.fn().mockResolvedValue(true)
 }))
-vi.mock('@/runtime/web-runtime-terminal-creation', () => ({
-  createWebRuntimeSessionTerminal: mocks.createWebRuntimeSessionTerminal
+vi.mock('@/runtime/web-runtime-terminal-create-operation', () => ({
+  createWebRuntimeSessionTerminalResult: mocks.createWebRuntimeSessionTerminal
 }))
 vi.mock('@/runtime/web-runtime-session-environment', () => ({
   isWebRuntimeSessionActive: vi.fn(() => true)
-}))
-vi.mock('../../../shared/terminal-surface-id', () => ({
-  isWebTerminalSurfaceTabId: vi.fn(() => false)
 }))
 
 describe('launchAgentInNewTab paired web runtime', () => {
@@ -85,15 +83,28 @@ describe('launchAgentInNewTab paired web runtime', () => {
       activeRuntimeEnvironmentId: 'web-runtime'
     }
     store.tabsByWorktree = { 'wt-1': [{ id: 'tab-1' }] }
-    mocks.createWebRuntimeSessionTerminal.mockResolvedValue({ status: 'created' })
+    mocks.createWebRuntimeSessionTerminal.mockResolvedValue({
+      outcome: { status: 'created' },
+      hostTabId: 'host-tab::leaf-1'
+    })
   })
 
-  it('delegates agent quick launch to the host runtime', async () => {
+  it.each([true, false, 'failed'] as const)('delegates agent quick launch (%s)', async (mode) => {
+    const activate = mode === true
+    const status = mode === 'failed' ? 'failed' : 'created'
+    mocks.createWebRuntimeSessionTerminal.mockResolvedValue({
+      outcome: {
+        status,
+        ...(status === 'failed' ? { message: 'The host refused the launch.' } : {})
+      },
+      hostTabId: 'host-tab::leaf-1'
+    })
     store.tabsByWorktree['wt-1'].push({ id: 'local-agent-tab', launchAgent: 'claude' })
     const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
 
     const result = launchAgentInNewTab({
       requestId: 'request-1',
+      activate,
       agent: 'claude',
       worktreeId: 'wt-1',
       groupId: 'group-1'
@@ -105,22 +116,26 @@ describe('launchAgentInNewTab paired web runtime', () => {
         pasteDraftAfterLaunch: false
       })
     )
-    expect(mocks.createWebRuntimeSessionTerminal).toHaveBeenCalledWith(
-      {
-        worktreeId: 'wt-1',
-        environmentId: 'web-runtime',
-        targetGroupId: 'group-1',
-        activate: true,
-        agentSessionKind: 'fresh',
-        agent: 'claude',
-        viewMode: 'terminal'
-      },
-      { notifyFailure: false }
-    )
+    expect(mocks.createWebRuntimeSessionTerminal).toHaveBeenCalledWith({
+      worktreeId: 'wt-1',
+      environmentId: 'web-runtime',
+      targetGroupId: 'group-1',
+      activate,
+      ...(activate ? {} : { selectWorktree: false }),
+      agentSessionKind: 'fresh',
+      agent: 'claude',
+      viewMode: 'terminal'
+    })
     expect(mocks.createTab).not.toHaveBeenCalled()
-    await Promise.resolve()
-    // Why: host creation is async, so the user may be viewing another worktree by the time it lands.
-    expect(mocks.setActiveTabType).toHaveBeenCalledExactlyOnceWith('terminal', 'wt-1')
+    await expect(result?.terminalCompletion).resolves.toMatchObject({
+      outcome: { status },
+      ...(status === 'created' ? { tabId: 'web-terminal-host-tab' } : {})
+    })
+    expect(mocks.setActiveTabType).toHaveBeenCalledTimes(activate && status === 'created' ? 1 : 0)
+    expect(mocks.toastError).toHaveBeenCalledTimes(status === 'failed' ? 1 : 0)
+    if (status === 'failed') {
+      expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith('The host refused the launch.')
+    }
     // A local tab closes locally (the host close no-ops), so a launch leaves it alone.
     expect(mocks.closeTab).not.toHaveBeenCalled()
   })
@@ -144,28 +159,25 @@ describe('launchAgentInNewTab paired web runtime', () => {
         pasteDraftAfterLaunch: false
       })
     )
-    expect(mocks.createWebRuntimeSessionTerminal).toHaveBeenCalledWith(
-      {
-        worktreeId: 'wt-1',
-        environmentId: 'web-runtime',
-        targetGroupId: 'group-1',
-        activate: true,
-        agentSessionKind: 'fresh',
-        launchAgent: 'codex',
-        command: "codex '--model' 'gpt-5' '--reasoning-effort' 'high' 'fix the spinner'",
-        env: { CODEX_PROFILE: 'captured' },
-        launchConfig: {
-          agentCommand: "codex '--model' 'gpt-5' '--reasoning-effort' 'high'",
-          agentArgs: '--model gpt-5 --reasoning-effort high',
-          agentEnv: { CODEX_PROFILE: 'captured' }
-        },
-        startupCommandDelivery: 'shell-ready',
-        prompt: 'fix the spinner',
-        promptDelivery: 'auto-submit',
-        viewMode: 'terminal'
+    expect(mocks.createWebRuntimeSessionTerminal).toHaveBeenCalledWith({
+      worktreeId: 'wt-1',
+      environmentId: 'web-runtime',
+      targetGroupId: 'group-1',
+      activate: true,
+      agentSessionKind: 'fresh',
+      launchAgent: 'codex',
+      command: "codex '--model' 'gpt-5' '--reasoning-effort' 'high' 'fix the spinner'",
+      env: { CODEX_PROFILE: 'captured' },
+      launchConfig: {
+        agentCommand: "codex '--model' 'gpt-5' '--reasoning-effort' 'high'",
+        agentArgs: '--model gpt-5 --reasoning-effort high',
+        agentEnv: { CODEX_PROFILE: 'captured' }
       },
-      { notifyFailure: false }
-    )
+      startupCommandDelivery: 'shell-ready',
+      prompt: 'fix the spinner',
+      promptDelivery: 'auto-submit',
+      viewMode: 'terminal'
+    })
     expect(mocks.createTab).not.toHaveBeenCalled()
   })
 
@@ -187,8 +199,7 @@ describe('launchAgentInNewTab paired web runtime', () => {
           hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY,
           agentArgs: '--verbose',
           launchPreferences: { model: 'sonnet', optionValues: {} }
-        }),
-        { notifyFailure: false }
+        })
       )
     )
   })

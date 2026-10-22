@@ -1,4 +1,5 @@
 import type { DiscoveredSkill, SkillSourceKind } from './skills'
+import { locatedPickerSkill } from './native-chat-reported-skill'
 import type { NativeChatSessionSkill, SlashCommandSuggestion } from './native-chat-slash-commands'
 import { isSafeDisplayCharacter, stripUnsafeDisplayCharacters } from './skill-display-text'
 import { compareBaseSensitivityLocaleText } from './locale-text-collators'
@@ -25,6 +26,10 @@ export type NativeChatPickerItem =
       /** Owning plugin, when a single plugin owns every source behind this row. */
       pluginName?: string
       sources: { sourceKind: SkillSourceKind; skillFilePath: string; pluginName?: string }[]
+      /** The file the agent selects this skill by, when the agent reported it; a pick sends it. */
+      path?: string
+      /** Distinguishes same-named reported files independently of description or scanner scope. */
+      location?: string
     }
 
 export type NativeChatSkillDiscoverySnapshot = {
@@ -169,15 +174,38 @@ function mergeNativeChatSkills(
   // actually loaded (plugin roots, setting-source filters), and a scanned root
   // the session ignored must not be offered. The scan stays the source of
   // description and scope for the names both know about.
+  // A reported skill with its file is its own row: two skills may share a name, and the pick
+  // tells the agent which file it means.
+  const nameCounts = new Map<string, number>()
+  for (const skill of sessionSkills ?? []) {
+    nameCounts.set(skill.name, (nameCounts.get(skill.name) ?? 0) + 1)
+  }
+  const located = (sessionSkills ?? []).flatMap((skill) =>
+    skill.path && isTokenSafe(skill.name)
+      ? [
+          locatedPickerSkill(
+            skill,
+            skill.path,
+            exactPaths.get(skill.path),
+            skillSigil,
+            (nameCounts.get(skill.name) ?? 0) > 1
+          )
+        ]
+      : []
+  )
   const names =
     sessionSkills !== undefined
       ? [
-          ...sessionSkills.map((skill) => skill.name).filter(isTokenSafe),
+          ...sessionSkills
+            .filter((skill) => !skill.path)
+            .map((skill) => skill.name)
+            .filter(isTokenSafe),
           ...[...byName.keys()].filter((name) => unclassifiedNames.has(name))
         ]
       : [...byName.keys()]
-  return [...new Set(names)]
-    .flatMap((name) => {
+  return [
+    ...located,
+    ...[...new Set(names)].flatMap((name) => {
       const reported = sessionSkills?.find((entry) => entry.name === name)?.description
       return pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills).map(
         (skill) =>
@@ -186,7 +214,7 @@ function mergeNativeChatSkills(
             : skill
       )
     })
-    .sort(comparePickerSkills)
+  ].sort(comparePickerSkills)
 }
 
 /** One row per plugin only helps if the rows dispatch differently, so the split
@@ -361,48 +389,9 @@ function comparePickerSkills(
   )
 }
 
-// `/` is the composer's trigger for every agent. A draft-leading slash is the one
-// that can dispatch; elsewhere the token starts after whitespace and its query
-// stops at the next `/` so file paths stay prose.
-export const LEADING_SLASH_TRIGGER = /^\/(\S*)$/
-export const MID_PROMPT_SLASH_TRIGGER = /\s\/([^\s/]*)$/
-// An agent whose skills carry their own sigil (Codex `$`) also opens its skills alone on it.
-const SKILL_SIGIL_TRIGGER = /(?:^|\s)\$(\S*)$/
-const COMMON_ENV_VARS = new Set(
-  'PATH HOME USER SHELL PWD TMPDIR TEMP TMP LANG TERM XDG_CONFIG_HOME'.split(' ')
-)
-
-/** The query after a `$` skill sigil at the caret, or null when it reads as shell
- *  syntax (`$HOME`, `$5`, `$(pwd)`, `$?`), by the same rule as Codex's own composer. */
-export function matchSkillSigil(before: string): string | null {
-  const query = before.match(SKILL_SIGIL_TRIGGER)?.[1] ?? null
-  // A bare `$` still opens the full list.
-  if (!query) {
-    return query
-  }
-  const name = query.match(/^[\w:-]*/)?.[0] ?? ''
-  if (name === '' || name === '_' || /^[-\d]/.test(name)) {
-    return null
-  }
-  // Why: a lowercase spelling stays a skill, so a skill named `home` still completes.
-  return !/[a-z]/.test(name) && COMMON_ENV_VARS.has(name.toUpperCase()) ? null : query
-}
-
-/** Replaces the typed trigger token with the item's own token, which for a skill
- *  is the agent-native form whichever trigger opened the menu. */
-export function applyPickerSuggestion(
-  draft: string,
-  caret: number,
-  item: NativeChatPickerItem
-): { draft: string; caret: number; insertedToken: string } {
-  const before = draft.slice(0, caret)
-  const after = draft.slice(caret)
-  const slashMatch = before.match(LEADING_SLASH_TRIGGER) ?? before.match(MID_PROMPT_SLASH_TRIGGER)
-  const query = slashMatch?.[1] ?? (item.kind === 'skill' ? matchSkillSigil(before) : null)
-  if (query === null) {
-    return { draft, caret, insertedToken: '' }
-  }
-  const tokenStart = before.length - query.length - 1
-  const nextBefore = `${before.slice(0, tokenStart)}${item.token} `
-  return { draft: nextBefore + after, caret: nextBefore.length, insertedToken: item.token }
-}
+export {
+  LEADING_SLASH_TRIGGER,
+  MID_PROMPT_SLASH_TRIGGER,
+  applyPickerSuggestion,
+  matchSkillSigil
+} from './native-chat-picker-triggers'

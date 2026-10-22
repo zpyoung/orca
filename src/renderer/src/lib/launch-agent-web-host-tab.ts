@@ -1,9 +1,11 @@
+import { createWebRuntimeSessionTerminalResult } from '@/runtime/web-runtime-terminal-create-operation'
+import { webTerminalPlacementParentTabId } from '@/runtime/web-session-terminal-placement'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import {
   createWebRuntimeAgentSessionTerminal,
   createWebRuntimeAgentSessionTerminalWithLaunchDraft,
-  createWebRuntimeSessionTerminal
+  type createWebRuntimeSessionTerminal
 } from '@/runtime/web-runtime-terminal-creation'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { Tab } from '../../../shared/tab-types'
@@ -13,6 +15,8 @@ import { translate } from '@/i18n/i18n'
 import { toAgentLaunchPreferencesWithOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'
 import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
+import type { AgentTerminalLaunchCompletion } from './structured-agent-session-launch-admission'
 
 /**
  * Launch an agent terminal on the web runtime host instead of a local tab.
@@ -34,8 +38,10 @@ export async function launchAgentInWebHostTab(args: {
   agentArgs?: string | null
   useLaunchOverrides?: boolean
   viewMode?: Tab['viewMode']
+  /** False opens the host's tab without selecting it. */
+  activate?: boolean
   onPromptDelivered?: () => void
-}): Promise<{ delivered: boolean; failureNotified: boolean }> {
+}): Promise<{ delivered: boolean; failureNotified: boolean } & AgentTerminalLaunchCompletion> {
   const {
     agent,
     worktreeId,
@@ -69,7 +75,8 @@ export async function launchAgentInWebHostTab(args: {
     worktreeId,
     environmentId,
     targetGroupId: groupId,
-    activate: true,
+    activate: args.activate !== false,
+    ...(!hasPrompt && args.activate === false ? { selectWorktree: false } : {}),
     ...(cwd?.trim() ? { cwd } : {}),
     ...(viewMode ? { viewMode } : {}),
     agentSessionKind: 'fresh',
@@ -97,11 +104,13 @@ export async function launchAgentInWebHostTab(args: {
 
   const handleCreation = ({
     outcome,
-    promptDelivered
+    promptDelivered,
+    hostTabId
   }: {
     outcome: Awaited<ReturnType<typeof createWebRuntimeSessionTerminal>>
     promptDelivered: boolean
-  }): { delivered: boolean; failureNotified: boolean } => {
+    hostTabId?: string
+  }): { delivered: boolean; failureNotified: boolean } & AgentTerminalLaunchCompletion => {
     if (outcome.status === 'failed') {
       toast.error(
         outcome.message ||
@@ -111,13 +120,22 @@ export async function launchAgentInWebHostTab(args: {
             { value0: agent }
           )
       )
-      return { delivered: false, failureNotified: true }
+      return { delivered: false, failureNotified: true, outcome }
     }
-    useAppStore.getState().setActiveTabType('terminal', worktreeId)
+    if (args.activate !== false) {
+      useAppStore.getState().setActiveTabType('terminal', worktreeId)
+    }
     if (hasPrompt && promptDelivered) {
       onPromptDelivered?.()
     }
-    return { delivered: promptDelivered, failureNotified: false }
+    return {
+      delivered: promptDelivered,
+      failureNotified: false,
+      outcome,
+      ...(hostTabId
+        ? { tabId: toWebTerminalSurfaceTabId(webTerminalPlacementParentTabId(hostTabId)) }
+        : {})
+    }
   }
 
   if (pastePromptAfterReady !== null) {
@@ -138,7 +156,10 @@ export async function launchAgentInWebHostTab(args: {
       launchDraft: prompt
     }).then((outcome) => handleCreation({ outcome, promptDelivered: outcome.status === 'created' }))
   }
-  return createWebRuntimeSessionTerminal(launch, { notifyFailure: false }).then((outcome) =>
-    handleCreation({ outcome, promptDelivered: outcome.status === 'created' && hasPrompt })
+  return createWebRuntimeSessionTerminalResult(launch).then((created) =>
+    handleCreation({
+      ...created,
+      promptDelivered: created.outcome.status === 'created' && hasPrompt
+    })
   )
 }

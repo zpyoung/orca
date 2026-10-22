@@ -30,6 +30,8 @@ export function createWebNativeChatApi(): NativeChatApi {
   }
 
   return {
+    // The full output stays on the host that ran the agent; the web client shows the message.
+    getConversationNameFailureOutput: async () => null,
     readSession: readNativeChatSession,
     subscribe: (args, onFrame) => {
       // No paired runtime yet: return a no-op teardown so the chat view mounts cleanly; only the not-paired case is swallowed.

@@ -3,6 +3,7 @@ import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-cha
 import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
 import { transcriptFallbackId } from './transcript-fallback-id'
 import { extendTranscriptBoundary } from './transcript-file-version'
+import { inTranscriptFileOrder } from './transcript-file-order'
 import {
   MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES,
   type NativeChatLineDecoder
@@ -18,6 +19,8 @@ export type IncrementalTranscriptState = {
   pendingStart: number
   pendingBytes: number
   droppingOversizedRecord: boolean
+  /** Newest row time read so far, so an append never sorts above earlier rows. */
+  latestTimestamp: number
 }
 
 export function createIncrementalTranscriptState(): IncrementalTranscriptState {
@@ -27,7 +30,8 @@ export function createIncrementalTranscriptState(): IncrementalTranscriptState {
     pendingChunks: [],
     pendingStart: 0,
     pendingBytes: 0,
-    droppingOversizedRecord: false
+    droppingOversizedRecord: false,
+    latestTimestamp: Number.NEGATIVE_INFINITY
   }
 }
 
@@ -38,6 +42,7 @@ export function resetIncrementalTranscriptState(state: IncrementalTranscriptStat
   state.pendingStart = 0
   state.pendingBytes = 0
   state.droppingOversizedRecord = false
+  state.latestTimestamp = Number.NEGATIVE_INFINITY
 }
 
 export async function readIncrementalTranscriptMessages(
@@ -129,7 +134,9 @@ export async function readIncrementalTranscriptMessages(
     if (!message) {
       return
     }
-    messages.push(message)
+    const ordered = inTranscriptFileOrder(message, state.latestTimestamp)
+    state.latestTimestamp = ordered.latest
+    messages.push(ordered.message)
     if (onBatch && messages.length >= APPEND_BATCH_MESSAGE_LIMIT) {
       onBatch(messages.splice(0))
     }

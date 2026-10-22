@@ -8,6 +8,11 @@ import {
 } from './agent-status-primitives'
 import { isWebSessionTabsWorktreeRemovalFrame } from './session-tabs-inventory-absence'
 import { pruneExpiredTerminalDockPendingMutations } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'
+import { adoptMirroredEditorBuffers } from '../../store/slices/editor/buffers/editor-buffer-record'
+import {
+  EMPTY_EDITOR_BUFFER_VIEW_INDEX,
+  reconcileEditorBufferViewIndex
+} from '../../store/slices/editor/buffers/editor-buffer-views'
 
 type FinalPatchContext = ReturnType<typeof applyActiveStateUpdates>
 
@@ -29,7 +34,6 @@ export function buildWebSessionTabsFinalPatch(
     removedTerminalResourceIds,
     mirroredTerminalIds,
     nextOpenFiles,
-    nextEditorBuffers,
     nextBrowserTabsByWorktree,
     nextUnifiedTabsByWorktree,
     nextGroupsByWorktree,
@@ -110,7 +114,14 @@ export function buildWebSessionTabsFinalPatch(
       ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
       : {}),
     ...(nextOpenFiles !== state.openFiles
-      ? { openFiles: nextOpenFiles, editorBuffers: nextEditorBuffers }
+      ? {
+          openFiles: nextOpenFiles,
+          editorBuffers: adoptMirroredEditorBuffers(
+            state.editorBuffers,
+            nextOpenFiles,
+            reconcileEditorBufferViewIndex(EMPTY_EDITOR_BUFFER_VIEW_INDEX, nextOpenFiles)
+          )
+        }
       : {}),
     ...(nextTabsByWorktree !== state.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
     ...(nextBrowserTabsByWorktree !== state.browserTabsByWorktree

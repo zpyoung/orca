@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/use-worktree-card-review-details.ts
-// FORK-COPY-SHA: 49109f362f057cd2dc3d81cd378cb84d140c3dc5
+// FORK-COPY-SHA: 071747853f5995ee233b36751613f09a60007c2b
 import { useMemo } from 'react'
 import { getDetachedWorkspaceReviewRequest } from '../workspace-detached-review-request'
 import { getTaskSourceCacheScope } from '../../../../../shared/task-source-context'

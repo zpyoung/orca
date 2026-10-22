@@ -1357,7 +1357,7 @@
       "kind": "import-swap",
       "lines": [
         "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'",
-        "  attachments: readonly AgentComposerImageAttachment[] = []"
+        "  attachments: readonly AgentComposerImageAttachment[] = [],"
       ]
     },
     {
@@ -2553,7 +2553,7 @@
       "kind": "registration",
       "lines": [
         "import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'",
-        "                <ForkSessionHandoffSettingsSection />"
+        "                  <ForkSessionHandoffSettingsSection />"
       ]
     },
     {
@@ -2578,15 +2578,6 @@
       "lines": [
         "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
         "    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)"
-      ]
-    },
-    {
-      "path": "config/tsconfig.cli.json",
-      "feature": "session-info",
-      "kind": "registration",
-      "lines": [
-        "    \"../src/main/fork-session-info/session-info-statusline-chain-script.ts\",",
-        "    \"../src/main/fork-session-info/session-info-statusline-chaining.ts\","
       ]
     },
     {
@@ -3192,12 +3183,6 @@
       "lines": [
         "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
       ]
-    },
-    {
-      "path": "src/shared/structured-agent-session-options.ts",
-      "feature": "native-chat-session-options",
-      "kind": "passthrough",
-      "lines": ["    undefined,"]
     },
     {
       "path": "src/main/ipc/native-chat.ts",
@@ -5841,6 +5826,11 @@
       "status": "permanent"
     },
     {
+      "path": "CLAUDE.md",
+      "reason": "Claude Code loads project instructions from CLAUDE.md, and this one line (@AGENTS.md) is what puts the fork's ledger, ownership and sandbox-test rules in front of every agent session. Upstream deleted it (#31242).",
+      "status": "permanent"
+    },
+    {
       "path": "config/electron-builder.config.cjs",
       "reason": "Fork ships macOS-only arm64 artifacts under com.zpyoung.orca; upstream's multi-platform matrix must not win.",
       "status": "permanent"
@@ -5920,6 +5910,11 @@
       "path": "config/scripts/release-cut-token-permissions.test.mjs",
       "status": "permanent",
       "reason": "Asserts upstream's release-cut job matrix and github.repository == 'stablyai/orca'; the fork publishes macOS-only arm64 artifacts from zpyoung/orca, so upstream's version can never describe this pipeline."
+    },
+    {
+      "path": "config/scripts/sign-mac-app.test.mjs",
+      "reason": "Upstream's batched mac signing contract, kept against the fork's electron-builder config: the fork ships only the ORCA_MAC_RELEASE channel, so only it is asserted to sign, where upstream also signs its hourly, daily and adhoc channels.",
+      "status": "permanent"
     },
     {
       "path": "config/scripts/release-windows-signing-gate.test.mjs",
@@ -6992,7 +6987,7 @@
       "removed": 4
     },
     "AGENTS.md": {
-      "added": 145,
+      "added": 146,
       "removed": 1
     },
     "config/localization-coverage-allowlist.json": {
@@ -7851,10 +7846,6 @@
       "added": 3,
       "removed": 1
     },
-    "config/tsconfig.cli.json": {
-      "added": 2,
-      "removed": 0
-    },
     "src/main/agent-hooks/server/server-lifecycle.ts": {
       "added": 2,
       "removed": 0
@@ -8002,10 +7993,6 @@
     "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
       "added": 1,
       "removed": 1
-    },
-    "src/shared/structured-agent-session-options.ts": {
-      "added": 1,
-      "removed": 0
     },
     "src/main/persistence/applying-settings/ui-state-read.ts": {
       "added": 6,
@@ -8684,7 +8671,7 @@
       "removed": 18
     },
     "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
-      "added": 28,
+      "added": 27,
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-in-new-tab.ts": {

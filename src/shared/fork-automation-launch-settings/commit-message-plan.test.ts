@@ -26,6 +26,9 @@ describe('commit-message launch recipe arguments', () => {
           'plan',
           '--effort',
           'high',
+          '--strict-mcp-config',
+          '--settings',
+          '{"disableAllHooks":true}',
           '--verbose'
         ]
       }

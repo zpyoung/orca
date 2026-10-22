@@ -422,6 +422,10 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     return (
       <AgentComposerField
         {...fieldProps}
+        attachDisabled={
+          fieldProps.attachDisabled ||
+          (structuredTransport?.runtime === 'remote' && structuredTransport.sessionPending === true)
+        }
         sessionOptionsPickerRequest={structuredTransport?.optionPickerRequest ?? null}
         agent={agent}
       />

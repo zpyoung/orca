@@ -12,6 +12,7 @@ import {
 import { normalizeLedgerLocation } from '../../shared/ledger-locations'
 import type { OrchestrationCompatibilityEvidence } from '../../shared/orchestration-compatibility-evidence'
 import { isTuiAgent } from '../../shared/tui-agent-config'
+import { getRepoRoutingConnectionId } from '../../shared/execution-host'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { parseWslUncPath, toWindowsWslPath } from '../../shared/wsl-paths'
 import { LedgerRuntimeService, ledgerDirectoryForStore } from '../ledger/ledger-service'
@@ -133,7 +134,7 @@ export abstract class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCata
     if (!rootPath) {
       return null
     }
-    if (repo?.connectionId ?? folder?.connectionId) {
+    if ((repo ? getRepoRoutingConnectionId(repo) : null) ?? folder?.connectionId) {
       return null
     }
     const folderWslDistro =
@@ -226,7 +227,9 @@ export abstract class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCata
     if (!candidates.length) {
       throw new LedgerError('owner-missing', 'Location project has no registered source repository')
     }
-    const hosts = [...new Set(candidates.map((repo) => repo.connectionId ?? 'local'))]
+    const hosts = [
+      ...new Set(candidates.map((repo) => getRepoRoutingConnectionId(repo) ?? 'local'))
+    ]
     if (location.base.host && !hosts.includes(location.base.host)) {
       throw new LedgerError('workspace-missing', 'Location host is not registered')
     }
@@ -234,9 +237,11 @@ export abstract class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCata
       throw new LedgerError('owner-ambiguous', 'Location project host is ambiguous')
     }
     const host = location.base.host ?? hosts[0]
-    const scoped = candidates.filter((repo) => (repo.connectionId ?? 'local') === host)
+    const scoped = candidates.filter(
+      (repo) => (getRepoRoutingConnectionId(repo) ?? 'local') === host
+    )
     const contexts = scoped.map((repo) => {
-      if (repo.connectionId) {
+      if (getRepoRoutingConnectionId(repo)) {
         throw new LedgerError('workspace-missing', 'Location host platform is unavailable')
       }
       const localGitOptions = getLocalProjectWorktreeGitOptions(this.requireStore(), repo)

@@ -48,6 +48,7 @@ import {
   type AiVaultSessionListKeyboard
 } from './use-ai-vault-session-keyboard-navigation'
 import { useAiVaultPanelHandle, type AiVaultPanelProps } from './ai-vault-panel-handle'
+import { aiVaultSearchHitHostLabels } from './ai-vault-search-hit-hosts'
 
 export default function AiVaultPanel({
   ref,
@@ -219,6 +220,10 @@ export default function AiVaultPanel({
     projectLabelByKey,
     hideEmptySessions
   })
+  const searchHitHostLabels = useMemo(
+    () => (searching ? aiVaultSearchHitHostLabels(filteredSessions, hostScopeOptions) : null),
+    [filteredSessions, hostScopeOptions, searching]
+  )
 
   const copyText = useCallback(async (text: string, label: string): Promise<void> => {
     await window.api.ui.writeClipboardText(text)
@@ -321,6 +326,7 @@ export default function AiVaultPanel({
           <AiVaultSessionVirtualList
             key={searching ? search.resetKey : 'history'}
             searchHits={searching ? searchHits : undefined}
+            searchHitHostLabels={searchHitHostLabels}
             groups={groups}
             collapsedGroups={collapsedGroups}
             loading={searching ? search.loading : loading}

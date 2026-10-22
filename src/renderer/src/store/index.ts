@@ -49,6 +49,7 @@ import { createTaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
 import { createStructuredSessionLaunchDirectorySlice } from './slices/structured-session-launch-directories'
+import { createStructuredChatSleptAtSlice } from './slices/structured-chat-slept-at'
 import { createWorkspaceAttentionSlice } from './slices/workspace-attention/workspace-attention-slice'
 import { createAsksSlice } from './slices/fork-ask-question-tool/asks'
 import { createLedgerSlice } from './slices/ledger'
@@ -81,10 +82,12 @@ const withDevelopmentStoreProbes = (createState: StateCreator<AppState, [], []>)
     ? withStoreIdentityChurnProbe(createState)
     : createState
 
+// Why buffer records outermost: the probes must see each caller's own partial and frame.
+// Why e2e checks the buffer invariant too: a writer that skips the record must fail there, not drift.
 export const useAppStore = create<AppState>()(
-  withDevelopmentStoreProbes(
-    withReactCommitCascadeWriteProbe(
-      withEditorBufferRecords((...a) => {
+  withEditorBufferRecords(
+    withDevelopmentStoreProbes(
+      withReactCommitCascadeWriteProbe((...a) => {
         // Why first: settling inside the bump's own notify means hook subscribers never see it unsettled.
         // Switch point: the stamp-sorted list reads no settled epoch.
         if (!ORCA_SIDEBAR_INPUTS_IS_MAIN) {
@@ -140,6 +143,7 @@ export const useAppStore = create<AppState>()(
           ...createRemoteServerUpdatesSlice(...a),
           ...createTerminalQuickCommandHostsSlice(...a),
           ...createStructuredSessionLaunchDirectorySlice(...a),
+          ...createStructuredChatSleptAtSlice(...a),
           ...createWorkspaceAttentionSlice(...a),
           ...createLedgerSlice(...a),
           ...createAsksSlice(...a),
@@ -147,7 +151,8 @@ export const useAppStore = create<AppState>()(
           ...createHeimdallFleetSlice(...a)
         }
       })
-    )
+    ),
+    import.meta.env.DEV || e2eConfig.exposeStore
   )
 )
 

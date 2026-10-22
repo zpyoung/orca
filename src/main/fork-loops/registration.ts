@@ -1,4 +1,8 @@
-import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from '../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  getRepoRoutingConnectionId,
+  parseExecutionHostId
+} from '../../shared/execution-host'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import { agentHookServer } from '../agent-hooks/server'
@@ -82,7 +86,7 @@ function createEvidenceTools(store: Store): LoopEvidenceTools {
   const usage: LoopUsageDeps = {
     isSshWorktree: (worktreeId) => {
       const repo = store.getRepo(getRepoIdFromWorktreeId(worktreeId))
-      return Boolean(repo?.connectionId) || (repo?.executionHostId ?? '').startsWith('ssh:')
+      return repo ? getRepoRoutingConnectionId(repo) !== null : false
     },
     getProviderSessionIdentities: () => agentHookServer.getProviderSessionIdentities(),
     readSessionTotals: (args) =>
