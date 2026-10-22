@@ -1,5 +1,5 @@
 ---
-last_released_commit: c1b3d60777bc61c024c12a682fe5cf4002275ee0
+last_released_commit: 98b5867f0bd06ac1ea7b9cd22c43fc8ef15dda73
 upstream_synced: v1.4.237
 ---
 
@@ -11,6 +11,16 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.238-rc.0.zy02] - 2026-10-22
+
+Synced to upstream [v1.4.237](https://github.com/stablyai/orca/releases/tag/v1.4.237).
+
+### Fixed
+
+- The upstream sync automation now fetches upstream's trunk by an explicit refspec, so its
+  fork-commit counts and the fork's `upstream` mirror branch no longer read a stale copy of
+  upstream's `main`.
 
 ## [1.4.238-rc.0.zy01] - 2026-10-22
 
