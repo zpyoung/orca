@@ -30,6 +30,7 @@ import {
   objectiveWorkspaceKindLabel
 } from './objective-copy'
 import { ObjectivePlan } from './ObjectivePlan'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
 
 function ContractValue({
   label,
@@ -61,11 +62,11 @@ function ObjectiveContract({
       return null
     }
     const owner = findIndexedFolderWorkspaceOwner(
-      state.folderWorkspaces,
+      selectFolderWorkspaces(state),
       folderScope.folderWorkspaceId,
       enrollment.executionHostId
     )
-    return state.folderWorkspaces.find((workspace) => workspace === owner)?.name ?? null
+    return selectFolderWorkspaces(state).find((workspace) => workspace === owner)?.name ?? null
   })
   const roleAgents = OBJECTIVE_ROLES.flatMap((role) => {
     const agent = contract.roleAgents[role]

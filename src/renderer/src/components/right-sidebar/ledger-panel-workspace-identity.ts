@@ -25,7 +25,8 @@ export function getLedgerPanelWorkspaceIdentity(
   }
   const scope = parseWorkspaceKey(workspaceId)
   if (scope?.type === 'folder') {
-    const folder = source.folderWorkspaces?.find(
+    const { folderWorkspaces } = source
+    const folder = folderWorkspaces?.find(
       (workspace) => workspace.id === scope.folderWorkspaceId
     )
     return { name: folder?.name ?? null, hasGroup: Boolean(folder?.projectGroupId) }

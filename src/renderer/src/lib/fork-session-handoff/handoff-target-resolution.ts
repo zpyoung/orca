@@ -15,6 +15,7 @@ import { isFolderRepo } from '../../../../shared/repo-kind'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
+import { selectFolderWorkspaces, selectWorktreesByRepo } from '@/store/workspace-record-selectors'
 
 export type HandoffTargetResolution = {
   worktreeId: string
@@ -67,7 +68,7 @@ export function listHandoffTargetCandidates(
   const repoIds = getAnchorRepoIds(state, anchorWorktreeId)
 
   for (const repoId of repoIds) {
-    for (const worktree of state.worktreesByRepo[repoId] ?? []) {
+    for (const worktree of selectWorktreesByRepo(state)[repoId] ?? []) {
       candidates.set(worktree.id, {
         worktreeId: worktree.id,
         displayName: worktree.displayName,
@@ -77,7 +78,7 @@ export function listHandoffTargetCandidates(
     }
   }
 
-  for (const workspace of state.folderWorkspaces) {
+  for (const workspace of selectFolderWorkspaces(state)) {
     const workspaceRepoIds = getFolderWorkspaceCandidateRepos(state, workspace.id).map(
       (repo) => repo.id
     )
@@ -105,7 +106,7 @@ export function resolveHandoffTarget(
 ): HandoffTargetResolution | null {
   const workspaceScope = parseWorkspaceKey(requestedWorktreeId)
   if (workspaceScope?.type === 'folder') {
-    const workspace = state.folderWorkspaces.find(
+    const workspace = selectFolderWorkspaces(state).find(
       (entry) => entry.id === workspaceScope.folderWorkspaceId
     )
     if (!workspace) {
@@ -120,7 +121,7 @@ export function resolveHandoffTarget(
 
   const worktreeId =
     workspaceScope?.type === 'worktree' ? workspaceScope.worktreeId : requestedWorktreeId
-  const worktree = getIndexedWorktreeMap(state.worktreesByRepo).get(worktreeId)
+  const worktree = getIndexedWorktreeMap(selectWorktreesByRepo(state)).get(worktreeId)
   if (!worktree) {
     return null
   }
@@ -142,7 +143,7 @@ export function getHandoffAnchorRepoId(
   }
   const worktreeId =
     workspaceScope?.type === 'worktree' ? workspaceScope.worktreeId : anchorWorktreeId
-  const worktree = getIndexedWorktreeMap(state.worktreesByRepo).get(worktreeId)
+  const worktree = getIndexedWorktreeMap(selectWorktreesByRepo(state)).get(worktreeId)
   const repoId = worktree?.repoId ?? getRepoIdFromWorktreeId(worktreeId)
   const repo = state.repos.find((entry) => entry.id === repoId)
   return repo && !isFolderRepo(repo) ? repo.id : null
@@ -242,6 +243,6 @@ function getAnchorRepoIds(state: HandoffTargetState, anchorWorktreeId: string): 
   }
   const worktreeId =
     workspaceScope?.type === 'worktree' ? workspaceScope.worktreeId : anchorWorktreeId
-  const worktree = getIndexedWorktreeMap(state.worktreesByRepo).get(worktreeId)
+  const worktree = getIndexedWorktreeMap(selectWorktreesByRepo(state)).get(worktreeId)
   return new Set([worktree?.repoId ?? getRepoIdFromWorktreeId(worktreeId)])
 }
