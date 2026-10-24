@@ -80,6 +80,7 @@ if (
 }
 const baselineFile = path.join(root, 'config/scripts', `.benchmark-baseline-${baselineName}`)
 const runnerFile = path.join(output, 'baseline-smoke-runner.mjs')
+const mobileBundle = path.join(output, 'smoke-mobile-web')
 writeFileSync(
   baselineFile,
   withNativeHeapEstimatesInSource(baselineSource(`config/scripts/${baselineName}`))
@@ -153,6 +154,8 @@ for (const [program, args] of ${JSON.stringify(steps)}) {
       let result
       if (comparison === 'smoke') {
         clearBuildOutputKeepingMobileWeb(root)
+        // Both measured builds require the same mobile bundle prepared outside the timer.
+        cpSync(mobileBundle, path.join(root, 'out', 'mobile-web'), { recursive: true })
         result =
           arm === 'baseline'
             ? await command(process.execPath, [runnerFile], `smoke-${pair}-${arm}`)

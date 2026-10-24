@@ -67,8 +67,7 @@ export type NativeChatAppendedPayload = {
         hasMore: boolean
         beforeOffset?: number
         error?: string
-        /** No transcript exists behind this window yet — render it, but do not
-         *  treat it as a settled read of the session's history. */
+        /** The current window has no transcript yet; do not treat it as settled history. */
         pending?: boolean
       }
     | {

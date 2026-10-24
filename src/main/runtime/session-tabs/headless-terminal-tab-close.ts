@@ -16,7 +16,6 @@ import { appendRetiredTerminalSurfaceProofs } from '../../../shared/terminal-ret
 import type { RuntimePtyWorktreeRecord } from '../runtime-terminal-state-records'
 import type { TerminalPaneLayoutNode } from '../../../shared/terminal-tab-types'
 import type { RuntimeTerminalRename } from '../../../shared/runtime-terminal-contracts'
-import type { TerminalDockPropsPatch } from '../fork-terminal-dock/terminal-dock-session-tab-props'
 import type { RuntimeSessionTabCloseReason } from '../../../shared/runtime-session-contracts'
 
 export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWithMainLayoutTabMoves {
@@ -266,83 +265,6 @@ export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends Orca
         ...(acceptedLayout.titlesByLeafId ? { titlesByLeafId: acceptedLayout.titlesByLeafId } : {})
       })
     }
-    return { updated: true }
-  }
-
-  // Why: tab color/pin are host-authoritative for remote-server tabs but had no
-  // push path, so pinning or coloring a tab reverted on the next snapshot and
-  // was never persisted. Persist to the workspace session + live snapshot.
-  /** What `title` reads once a manual name is cleared; readers that predate `customTitle` show it. */
-  protected headlessTerminalFallbackTitle(worktreeId: string, tabId: string): string {
-    const tab = this.getWorkspaceSessionForWorktree(worktreeId)?.tabsByWorktree[worktreeId]?.find(
-      (candidate) => candidate.id === tabId
-    )
-    return (
-      tab?.generatedTitle?.trim() || tab?.title?.trim() || tab?.defaultTitle?.trim() || 'Terminal'
-    )
-  }
-
-  async setMobileSessionTabProps(
-    worktreeSelector: string,
-    args: {
-      tabId: string
-      color?: string | null
-      isPinned?: boolean
-      viewMode?: 'terminal' | 'chat'
-      customTitle?: string | null
-      terminalDock?: TerminalDockPropsPatch
-    }
-  ): Promise<{ updated: true }> {
-    const explicitWorktreeId = this.getExplicitSessionWorktreeIdSelector(worktreeSelector)
-    const worktreeId =
-      explicitWorktreeId ?? (await this.resolveWorktreeSelector(worktreeSelector)).id
-    // Why: a renderer-authoritative host owns + republishes tab props, so a
-    // headless write would be overwritten. Persist only when headless.
-    const snapshot = this.mobileSessionTabsByWorktree.get(worktreeId)
-    const hostTabId = snapshot
-      ? (this.resolveMobileSessionHostTabId(snapshot, args.tabId) ?? args.tabId)
-      : args.tabId
-    // Why by tab: a sleeping or starting pane has no handle for terminal.rename to name (#29975).
-    const customTitle =
-      args.customTitle === undefined ? undefined : args.customTitle?.trim() || null
-    if (this.getAvailableAuthoritativeWindow()) {
-      if (customTitle !== undefined) {
-        this.notifier?.renameTerminal(hostTabId, customTitle)
-      }
-      // Why: dock state has no renderer-side editor, so the client patch is its only writer and
-      // must land on the stored snapshot to survive the renderer's next dock-unaware publication.
-      if (args.terminalDock !== undefined) {
-        const dockArgs = { terminalDock: args.terminalDock }
-        this.persistHeadlessSessionTabProps(worktreeId, hostTabId, dockArgs)
-        this.applyHeadlessSessionTabPropsToSnapshot(worktreeId, hostTabId, dockArgs)
-      }
-      return { updated: true }
-    }
-    this.persistHeadlessSessionTabProps(worktreeId, hostTabId, args)
-    // Why: a live pane's own title outranks the snapshot's, so name it the way terminal.rename does.
-    const liveHandles =
-      customTitle === undefined
-        ? []
-        : this.getPtyIdsForExplicitTabClose(worktreeId, hostTabId).flatMap((ptyId) => {
-            const handle = this.handleByPtyId.get(ptyId)
-            return handle ? [handle] : []
-          })
-    for (const handle of liveHandles) {
-      await this.renameTerminal(handle, customTitle ?? null)
-    }
-    if (customTitle !== undefined && liveHandles.length === 0) {
-      this.persistHeadlessTerminalTitle(worktreeId, hostTabId, customTitle)
-    }
-    // A live pane's rename above already set its title; only a paneless tab needs `title` here.
-    this.applyHeadlessSessionTabPropsToSnapshot(worktreeId, hostTabId, {
-      ...args,
-      ...(customTitle !== undefined && liveHandles.length === 0
-        ? {
-            customTitle,
-            title: customTitle ?? this.headlessTerminalFallbackTitle(worktreeId, hostTabId)
-          }
-        : {})
-    })
     return { updated: true }
   }
 }

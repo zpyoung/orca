@@ -52,6 +52,7 @@ export abstract class RuntimeHeadlessTabProperties extends OrcaRuntimeWithCloseH
       isPinned?: boolean
       viewMode?: 'terminal' | 'chat'
       customTitle?: string | null
+      terminalDock?: TerminalDockPropsPatch
     }
   ): Promise<{ updated: true }> {
     const explicitWorktreeId = this.getExplicitSessionWorktreeIdSelector(worktreeSelector)
@@ -81,6 +82,13 @@ export abstract class RuntimeHeadlessTabProperties extends OrcaRuntimeWithCloseH
       }
       if (customTitle !== undefined) {
         this.notifier?.renameTerminal(hostTabId, customTitle)
+      }
+      // Why: dock state has no renderer-side editor, so the client patch is its only writer and
+      // must land on the stored snapshot to survive the renderer's next dock-unaware publication.
+      if (args.terminalDock !== undefined) {
+        const dockArgs = { terminalDock: args.terminalDock }
+        this.persistHeadlessSessionTabProps(worktreeId, hostTabId, dockArgs)
+        this.applyHeadlessSessionTabPropsToSnapshot(worktreeId, hostTabId, dockArgs)
       }
       return { updated: true }
     }

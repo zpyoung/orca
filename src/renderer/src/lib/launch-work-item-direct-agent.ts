@@ -51,7 +51,7 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     args.agentArgs === undefined
       ? resolveTuiAgentLaunchArgs(args.agent, args.settings)
       : args.agentArgs
-  const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings?.agentDefaultEnv)
+  const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings, args.launchPlatform)
   const recipeSessionOptions = args.launchOptions?.model
     ? agentLaunchOverridesToSessionOptionValues(args.launchOptions)
     : undefined

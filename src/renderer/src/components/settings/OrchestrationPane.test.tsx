@@ -13,11 +13,6 @@ import { useAppStore } from '../../store'
 import { OrchestrationPane } from './OrchestrationPane'
 import { getOrchestrationPaneSearchEntries } from './orchestration-search'
 import { matchesSettingsSearch } from './settings-search'
-import { SKILLS_CLI_VERSION } from '../../../../shared/agent-feature-install-commands'
-import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
-
-const INSTALL_COMMAND = `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orchestration --global`
-const WINDOWS_INSTALL_COMMAND = `cmd.exe /d /s /c "where.exe npx >nul 2>nul & if errorlevel 1 (echo ERROR: npx was not found. Install Node.js LTS from https://nodejs.org/ to get npx. & echo Then close this terminal and start skill setup again - a new terminal picks up the updated PATH. & exit /b 1) else (npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orchestration --global)"`
 
 const mocks = vi.hoisted(() => ({
   panelProps: [] as Record<string, unknown>[],

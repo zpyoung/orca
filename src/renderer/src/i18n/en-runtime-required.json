@@ -2188,6 +2188,10 @@
           "34f733dda2": "Go to Worktree",
           "3e5f66564e": "Workspace unavailable"
         },
+        "WorktreeCardReviewDetailSection": {
+          "copyLink": "Copy link",
+          "reviewHeader": "{{value0}} #{{value1}}"
+        },
         "WorktreeContextMenu": {
           "76865d827f": "Move to group",
           "d35dfeae58": "Remove from group"

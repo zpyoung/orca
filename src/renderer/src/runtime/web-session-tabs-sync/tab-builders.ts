@@ -12,6 +12,7 @@ import type { WebSessionExistingTabIndex } from '../web-session-existing-tab-ind
 import { isReadyEditorTab } from './terminal-surfaces'
 import { createMirroredEditorFileResolver } from './mirrored-editor-file-identity'
 import type { TerminalDockPaneState } from '../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import { buildOwnedEditorFileId } from '../../store/slices/editor/file-ids/editor-file-ids'
 
 export function buildTerminalUnifiedTab(
   tab: TerminalTab,

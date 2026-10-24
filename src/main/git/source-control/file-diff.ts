@@ -171,7 +171,6 @@ async function loadDiff(
       readFailed = leftBlob.failed === true || workingTreeBlob.failed === true
     }
   } catch {
-    // Fallback
     options.signal?.throwIfAborted()
     readFailed = true
   }

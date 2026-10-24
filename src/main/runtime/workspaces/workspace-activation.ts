@@ -7,6 +7,7 @@ import {
 } from '../../../shared/runtime-navigation'
 import { getRepoExecutionHostId } from '../../../shared/execution-host'
 import { repoIsRemote } from '../../../shared/agent-launch-remote'
+import { phoneWakeReport } from '../../../shared/workspace-sleep'
 import type { Repo } from '../../../shared/repo-types'
 import type { TerminalWorkspaceLaunchScope } from '../runtime-legacy-worker-terminal-recovery-types'
 import type { TuiAgent } from '../../../shared/tui-agent'

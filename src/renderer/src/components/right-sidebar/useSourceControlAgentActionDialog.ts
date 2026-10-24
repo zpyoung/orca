@@ -6,7 +6,6 @@ import {
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
 import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import { ensureDetectedAgentsForWorktree } from '@/lib/agent-detection-target-inventory'
 import { renderSourceControlActionCommandTemplate } from '../../../../shared/source-control-ai-actions'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import type { TuiAgent } from '../../../../shared/tui-agent'
@@ -189,38 +188,47 @@ export function useSourceControlAgentActionDialog({
     ...(repo ? { executionHostId: getRepoExecutionHostId(repo) } : {})
   })
 
-  const { deliveryPlan, resetDeliveryPlan, isStarting, handleStart, startWithDetectedAgents } =
-    useSourceControlAgentActionStart({
-      selectedAgent,
-      commandInput,
-      trimmedCommandInput,
-      agentArgs,
-      agentArgsApply,
-      launchOptions,
-      commandTemplate,
-      saveLaunchRecipe,
-      saveTargetValue,
-      actionId,
-      repoId,
-      settings,
-      repo,
-      worktreeId,
-      groupId,
-      promptDelivery,
-      launchPlatform,
-      // Why: an SSH host runs the plain `orca` shim; keep the previewed command
-      // label aligned with the real remote launch (no `orca-ide` rename).
-      isRemote: typeof connectionId === 'string',
-      launchSource,
-      connectionUnavailable,
-      refreshDetectedAgents,
-      onStart,
-      onSaveAgentDefault,
-      onLaunchAccepted,
-      onLaunchAborted,
-      onLaunched,
-      onClose: closeDialog
-    })
+  const {
+    deliveryPlan,
+    resetDeliveryPlan,
+    cancelStart,
+    isStarting,
+    handleStart,
+    startWithDetectedAgents
+  } = useSourceControlAgentActionStart({
+    open,
+    connectionId,
+    selectedAgent,
+    commandInput,
+    trimmedCommandInput,
+    agentArgs,
+    agentArgsApply,
+    launchOptions,
+    commandTemplate,
+    saveLaunchRecipe,
+    saveTargetValue,
+    actionId,
+    repoId,
+    settings,
+    repo,
+    worktreeId,
+    groupId,
+    promptDelivery,
+    launchPlatform,
+    // Why: an SSH host runs the plain `orca` shim; keep the previewed command
+    // label aligned with the real remote launch (no `orca-ide` rename).
+    isRemote: typeof connectionId === 'string',
+    launchSource,
+    recoveryContext,
+    connectionUnavailable,
+    refreshDetectedAgents: refreshLaunchableAgents,
+    onStart,
+    onSaveAgentDefault,
+    onLaunchAccepted,
+    onLaunchAborted,
+    onLaunched,
+    onClose: closeDialog
+  })
 
   const canStart =
     Boolean(trimmedCommandInput && selectedAgent) &&

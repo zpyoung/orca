@@ -112,9 +112,7 @@ export function NativeChatResolvedView({
   )
   // Why: Stop suppression must clear on a newer working epoch even when status
   // never leaves 'working' (interrupt + immediate next turn coalesced).
-  const hookWorkingEpoch = useAppStore(
-    (s) => s.agentStatusByPaneKey[paneKey]?.stateStartedAt ?? null
-  )
+  const workingEpoch = useAppStore((s) => s.agentStatusByPaneKey[paneKey]?.stateStartedAt ?? null)
   const canSend = useNativeChatCanSend(terminalTabId, targetPtyId)
   // Reuse the verified composer send path for interactive cards and composer
   // stop (Stop sends ESC, the agent-TUI interrupt key).

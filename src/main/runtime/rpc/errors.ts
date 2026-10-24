@@ -106,6 +106,8 @@ const RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'remote_update_not_available',
   'remote_update_not_downloaded',
   'runtime_busy',
+  'connectors_disabled',
+  'external_conversation_not_found',
   ...AGENT_SESSION_RPC_ERROR_CODES
 ])
 

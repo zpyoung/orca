@@ -3,7 +3,7 @@ import type { BrowserCertificateFailure, BrowserLoadError } from './browser-work
 import type { RuntimeBrowserPlacement } from './runtime-browser-placement'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
-import type { TerminalLayoutSnapshot } from './terminal-tab-types'
+import type { TerminalLayoutSnapshot, TerminalTab } from './terminal-tab-types'
 import type { TuiAgent } from './tui-agent'
 import type { StructuredAgentId } from './agent-session-provider-handle'
 

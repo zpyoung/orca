@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { RuntimeGitContext } from '@/runtime/runtime-git-client-context'
 import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import type {
@@ -196,7 +197,7 @@ export function useSourceControlAgentActionStart({
       agentArgs,
       agentArgsApply,
       launchOptions,
-      buildPlan,
+      commandInput,
       commandTemplate,
       connectionUnavailable,
       groupId,

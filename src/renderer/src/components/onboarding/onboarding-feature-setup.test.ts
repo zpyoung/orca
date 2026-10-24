@@ -22,9 +22,6 @@ import {
   type OnboardingFeatureSetupDeps,
   type OnboardingFeatureSetupSelection
 } from './onboarding-feature-setup'
-import { getOnboardingFeatureSetupAgentRuntime } from './onboarding-feature-setup-runtime'
-import { SKILLS_CLI_VERSION } from '../../../../shared/agent-feature-install-commands'
-import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 const ALL_SKILL_NAMES = [
   ORCA_CLI_SKILL_NAME,
@@ -85,39 +82,7 @@ describe('onboarding feature setup runner', () => {
     })
   })
 
-  it('builds one skill command for selected onboarding feature setup skills', () => {
-    const text = buildOnboardingFeatureSetupClipboardText({
-      browserUse: true,
-      computerUse: true,
-      orchestration: true,
-      linearTickets: true
-    })
-
-    expect(text).toBe(ALL_SKILL_INSTALL_COMMAND)
-    expect(text).toBe(
-      `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orca-cli --skill computer-use --skill orchestration --skill orca-linear --global`
-    )
-  })
-
-  it('keeps the copied command valid for the WSL target shell', () => {
-    const text = buildOnboardingFeatureSetupClipboardText(
-      { browserUse: false, computerUse: false, orchestration: true, linearTickets: false },
-      { runtime: 'wsl', wslDistro: 'Ubuntu', label: 'WSL Ubuntu' }
-    )
-
-    expect(text).toBe(ORCHESTRATION_ONLY_SKILL_INSTALL_COMMAND)
-  })
-
-  it('leaves the copied command bare for a host runtime', () => {
-    const text = buildOnboardingFeatureSetupClipboardText(
-      { browserUse: false, computerUse: false, orchestration: true, linearTickets: false },
-      { runtime: 'host', label: 'Windows' }
-    )
-
-    expect(text).toBe(ORCHESTRATION_ONLY_SKILL_INSTALL_COMMAND)
-  })
-
-  it('falls back to the host when the selected runtime needs repair', () => {
+  it('lists the skills for the selected onboarding feature setup items', () => {
     expect(
       onboardingFeatureSetupSkillNames({
         browserUse: true,

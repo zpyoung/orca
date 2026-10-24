@@ -230,8 +230,8 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       agent,
       worktreeId: targetWorktreeId,
       groupId: args.groupId ?? targetWorktreeId,
-      prompt: commandInput,
-      agentArgs: recipe.agentArgs,
+      prompt,
+      agentArgs: recipe().agentArgs,
       ...(recipeSessionOptions ? { sessionOptions: recipeSessionOptions } : {}),
       includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
       promptDelivery: 'submit-after-ready',
@@ -288,8 +288,8 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     launchSource: args.launchSource,
     telemetrySource: args.telemetrySource,
     promptDelivery: 'submit-after-ready',
-    agentArgs: recipe.agentArgs,
-    launchOptions: recipe.launchOptions,
+    agentArgs: recipe().agentArgs,
+    launchOptions: recipe().launchOptions,
     ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
     openModalFallback: args.openModalFallback
   })

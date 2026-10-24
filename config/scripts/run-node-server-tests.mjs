@@ -9,7 +9,6 @@ import {
   ORCAD_VERSION_FILENAME
 } from '../../src/shared/orcad-artifacts.ts'
 import { NODE_RUNTIME_PIN } from '../../src/shared/node-runtime-pin.ts'
-import { ORCA_SKILLS_REPOSITORY_URL } from '../../src/shared/fork-skills-repository/skills-repository-url.ts'
 import {
   ORCAD_PROFILE_PREFLIGHT_FLAG,
   parseOrcadProfilePreflight
@@ -83,33 +82,7 @@ if (artifact) {
   )
   process.stdout.write(`${JSON.stringify({ target, ...response })}\n`)
 
-  const source = `${ORCA_SKILLS_REPOSITORY_URL}/tree/${resolveBuildSourceCommit()}`
-  const cli = runProcessSync({
-    program: runtimePath,
-    args: [
-      join(packageDir, ORCAD_CLI_ENTRY_FILENAME),
-      'skills',
-      'install',
-      '--skill',
-      'orca-cli',
-      '--agent',
-      'universal',
-      '--dry-run'
-    ],
-    cwd: root,
-    env,
-    timeoutMs: 90_000
-  })
-  if (
-    cli.code !== 0 ||
-    cli.timedOut ||
-    cli.outputTruncated ||
-    !cli.stdout.split('\n')[0].split(' ').includes(source)
-  ) {
-    throw new Error(
-      `Bundled CLI skills source did not match ${source}: ${describeProcessFailure(cli)}`
-    )
-  }
+  assertBundledCliPlansSkillInstall()
 }
 run(runtimePath, [
   join(root, 'node_modules/vitest/vitest.mjs'),

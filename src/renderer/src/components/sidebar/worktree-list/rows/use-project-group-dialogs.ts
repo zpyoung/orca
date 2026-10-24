@@ -15,6 +15,10 @@ import {
 import type { LedgerRemovalPreview } from '../../../../../../shared/ledger'
 import { requestLedger } from '@/runtime/runtime-ledger-client'
 import { isLedgerRemovalConflict } from '@/store/repos/ledger-removal-conflict'
+import {
+  selectDetectedWorktreesByRepo,
+  selectWorktreesByRepo
+} from '@/store/workspace-record-selectors'
 
 export type ProjectGroupNameDialogState =
   | { type: 'create-from-repo'; repo: Repo }
@@ -278,6 +282,7 @@ export function useProjectGroupDialogs(args: {
         await deleteProjectGroupWithContainedProjects(deleteDialog.groupId, {
           removeContainedProjects,
           hostId: deleteDialog.hostId,
+          confirmedDiscards,
           // Why: the guard asserts the preview the user saw, so a preview that never loaded has
           // nothing to assert and must not be sent as an empty expectation.
           ...(deleteDialog.ledgerPreviewLoading || deleteDialog.ledgerPreviewError
@@ -312,7 +317,12 @@ export function useProjectGroupDialogs(args: {
     }
     // Why: deleting contained projects can unmount this dialog before its close handler runs, so the parent owns cleanup.
     setDeleteDialog(null)
-  }, [deleteProjectGroupWithContainedProjects, removeContainedProjects, deleteDialog])
+  }, [
+    deleteProjectGroupWithContainedProjects,
+    removeContainedProjects,
+    deleteDialog,
+    deleteUnsavedTargets
+  ])
 
   return {
     nameDialog,

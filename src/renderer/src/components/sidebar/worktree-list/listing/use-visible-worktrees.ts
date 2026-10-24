@@ -55,7 +55,7 @@ export function useVisibleSidebarWorktrees(args: {
   } = filterState
   const workspaceActivity = useWorkspaceActivityFilter()
   const workspaceReview = useWorkspaceReviewFilter()
-  const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
+  const worktreesByRepo = useAppStore((s) => selectWorktreesByRepo(s))
   const agentStatusEpoch = useAppStore((s) => (!showSleepingWorkspaces ? s.agentStatusEpoch : 0))
   // Why: skip the clock entirely when the epoch is the opt-out sentinel, so a
   // sleeping-workspaces list cannot evict the sample the live lists share.

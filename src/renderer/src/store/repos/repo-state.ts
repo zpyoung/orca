@@ -119,6 +119,8 @@ export type DeleteProjectGroupWithContainedProjectsOptions = {
   // hostId disambiguates which host's group row to delete when the id exists on multiple hosts.
   hostId?: ExecutionHostId
   expectedLedgers?: ExpectedLedgerRevision[]
+  /** The text a dialog listed when the user confirmed discarding it; other edits are offered back. */
+  confirmedDiscards?: ConfirmedUnsavedDiscards
 }
 
 export type AllHostCatalogFetchOptions = {
@@ -283,6 +285,7 @@ export type RepoSlice = {
       errorFeedback?: 'toast' | 'silent'
       automaticCleanup?: boolean
       expectedLedgers?: ExpectedLedgerRevision[]
+      confirmedDiscards?: ConfirmedUnsavedDiscards
     }
   ) => Promise<void>
   updateProject: (

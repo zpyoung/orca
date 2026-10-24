@@ -7,7 +7,6 @@ import type { DiscoveredSkill } from '../../../../shared/skills'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '../ui/tooltip'
 import { LinearAgentSkillInstallCta } from './linear-agent-skill-install-cta'
-import { SKILLS_CLI_VERSION } from '../../../../shared/agent-feature-install-commands'
 import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 const mocks = vi.hoisted(() => ({
@@ -119,9 +118,8 @@ describe('LinearAgentSkillInstallCta', () => {
     expect(rendered.textContent).toContain(
       'Full guided setup (connect + skill + visibility) is under Settings → Task Sources.'
     )
-    expect(rendered.textContent).toContain(
-      `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orca-linear --global`
-    )
+    expect(rendered.textContent).toContain('Install skill')
+    expect(rendered.textContent).not.toContain('Copy command')
   })
 
   it("installs the skill directly on the agents' host", async () => {
@@ -133,10 +131,8 @@ describe('LinearAgentSkillInstallCta', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(mocks.clipboardWrite).toHaveBeenCalledWith(
-      `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orca-linear --global`
-    )
-    expect(mocks.toastSuccess).toHaveBeenCalled()
+    expect(mocks.plan).toHaveBeenCalledWith({ kind: 'local' }, { names: ['orca-linear'] })
+    expect(rendered.textContent).toContain('Update Orca on the server to install its skills.')
   })
 
   it('shows a subtle confirmation and Update when installed', async () => {
@@ -146,10 +142,7 @@ describe('LinearAgentSkillInstallCta', () => {
     const rendered = await renderCta()
 
     expect(rendered.textContent).toContain('Installed')
-    expect(rendered.textContent).toContain('Agent skill installed. To update it, run:')
-    expect(rendered.textContent).toContain(
-      `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orca-linear --global`
-    )
+    expect(rendered.textContent).toContain('Update')
     expect(rendered.textContent).not.toContain('Not installed')
   })
 
@@ -165,9 +158,13 @@ describe('LinearAgentSkillInstallCta', () => {
 
     const rendered = await renderCta()
 
-    expect(rendered.textContent).toContain(
-      `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill linear-tickets --global`
-    )
+    await act(async () => {
+      Array.from(rendered.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Update')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(mocks.plan).toHaveBeenCalledWith({ kind: 'local' }, { names: ['linear-tickets'] })
   })
 
   it('notes that remote agent environments need their own setup', async () => {
@@ -184,7 +181,7 @@ describe('LinearAgentSkillInstallCta', () => {
     mocks.agentRuntime = { runtime: 'wsl', wslDistro: 'Debian', label: 'WSL Debian' }
     const rendered = await renderCta()
     expect(rendered.textContent).toContain(
-      `npx skills@1.7.2 add https://github.com/stablyai/orca/tree/${'0'.repeat(40)} --skill orca-linear --global`
+      `npx skills@1.7.2 add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${'0'.repeat(40)} --skill orca-linear --global`
     )
     expect(rendered.textContent).not.toContain('Install skill')
     expect(mocks.plan).not.toHaveBeenCalled()

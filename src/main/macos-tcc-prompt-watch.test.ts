@@ -32,7 +32,6 @@ describe('parseTccPromptEvent', () => {
 
   it('separates the accessing binary from the responsible app', () => {
     const event = parseTccPromptEvent(ORCA_APPDATA_LINE)
-    // The whole point of #9756: the dialog says Orca, but node did the access.
     expect(event?.responsibleIdentifier).toBe('com.zpyoung.orca')
     expect(event?.accessingIdentifier).toBe('node-5555494487fbc7467d473fd8b0a397018cbf954b')
     expect(event?.binaryPath).toBe('/opt/homebrew/Cellar/node/26.5.0/bin/node')

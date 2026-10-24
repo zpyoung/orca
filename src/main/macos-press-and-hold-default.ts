@@ -4,28 +4,8 @@ import { runProcessSync } from '@orca/process-host'
 import type { ProcessResult } from '@orca/process-host/process-spec'
 import { writeFileAtomically } from './codex-accounts/fs-utils'
 
-/**
- * Turns off the macOS accent picker for Orca's own preferences domain (#14746).
- *
- * macOS routes press-and-hold to the accent popup unless an app opts out via
- * `ApplePressAndHoldEnabled`, so holding `j` in vim inserts one character instead of repeating.
- * The key is unset by default, which is why every terminal-hosting Mac app ships this opt-out.
- *
- * Written once and never again: a user who wants the accent picker back sets
- * `defaults write <bundle-id> ApplePressAndHoldEnabled -bool true` (or deletes the key), and
- * the recorded decision below keeps a later launch from overwriting that choice.
- *
- * A fresh write is assumed to land for the *next* launch, not the current one: it goes out through
- * a separate `defaults` process, so this app's own cached copy may not observe it. Whether AppKit
- * re-reads sooner is untested, so the conservative assumption is the one encoded here.
- *
- * If this is ever reverted, delete the key as well — AppKit reads the plist, not this file, so
- * removing the code alone leaves press-and-hold disabled forever for everyone who ran an affected
- * build, with nothing left in the tree to explain it.
- *
- * The `defaults`-binary behaviour this relies on is pinned by the sibling test file, which runs
- * only on a developer Mac: CI has no macOS test runner, so those tests never execute there.
- */
+// Opt out of the accent picker once so terminal keys repeat (#14746); later user choices win.
+// The separate defaults process may affect only the next launch. Reverting this also requires deleting the key.
 
 export const PRESS_AND_HOLD_KEY = 'ApplePressAndHoldEnabled'
 export const PRESS_AND_HOLD_RECORD_FILE = 'macos-press-and-hold-default.json'

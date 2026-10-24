@@ -69,6 +69,7 @@ import { AGENT_LAUNCH_METHODS } from './agent-launch'
 import { ASK_METHODS } from './fork-ask-question-tool/ask'
 import { HEIMDALL_METHODS } from './fork-heimdall/heimdall'
 import { LOOPS_METHODS } from './fork-loops/loops'
+import { CONNECTOR_METHODS } from './connector'
 import {
   LAYOUT_APPLY_METHODS,
   LAYOUT_VIEW_REPORT_METHODS,

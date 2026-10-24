@@ -4,8 +4,8 @@ import {
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
 import { RUNTIME_CAPABILITIES, RUNTIME_PROTOCOL_VERSION } from '../../shared/protocol-version'
-import { createSharedControlSubscription } from '../../shared/remote-runtime-shared-control-subscriptions'
-import { getCleanupRequest } from '../../shared/remote-runtime-shared-control-protocol'
+import { createSharedControlSubscription } from '../../shared/remote-runtime/requests/remote-runtime-shared-control-subscriptions'
+import { getCleanupRequest } from '../../shared/remote-runtime/control/remote-runtime-shared-control-protocol'
 import { shouldRouteSubscriptionBySupport } from '../ipc/runtime-environments/runtime-environment-support-routing'
 
 describe('Heimdall remote shared-control route', () => {

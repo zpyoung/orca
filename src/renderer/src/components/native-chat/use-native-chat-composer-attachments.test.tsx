@@ -57,101 +57,25 @@ vi.mock('../../../../shared/remote-runtime-pty-id', async (importOriginal) => ({
   isRemoteRuntimePtyId: () => runtimeTarget.remote
 }))
 
-type AttachmentApi = ReturnType<typeof useNativeChatComposerAttachments>
-type ProbeApi = AttachmentApi & { adoptDraft: (draft: string) => void }
-
-const target: NativeChatResolvedTarget = {
-  terminalTabId: 'tab-1',
-  ptyId: 'pty-1'
-}
-
-function Probe({
-  scopeKey,
-  structured = false,
-  disabled = false,
-  isComposing,
-  onReady
-}: {
-  scopeKey: string
-  structured?: boolean
-  disabled?: boolean
-  isComposing: () => boolean
-  onReady: (api: ProbeApi) => void
-}): React.JSX.Element {
-  const [caret, setCaret] = useState(0)
-  const [draftValue, setDraftValue] = useState('')
-  const [notice, setNotice] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const api = useNativeChatComposerAttachments({
-    attachmentScopeKey: scopeKey,
-    allowWithoutTarget: structured,
-    imageReferences: structured,
-    caret,
-    disabled,
-    isComposing,
-    resolveTarget: () => (structured ? null : target),
-    textareaRef,
-    setCaret,
-    setDraft: (updater) => setDraftValue((previous) => updater(previous)),
-    setNotice
-  })
-  useEffect(() => {
-    onReady({ ...api, adoptDraft: setDraftValue })
-  }, [api, onReady])
-  return (
-    <div>
-      <textarea ref={textareaRef} />
-      <output data-draft>{draftValue}</output>
-      <output data-notice>{notice}</output>
-    </div>
-  )
-}
-
-async function renderProbe(
-  scopeKey: string,
-  structured = false,
-  options: { disabled?: boolean; isComposing?: () => boolean } = {}
-): Promise<{
-  draft: () => string
-  latest: () => ProbeApi
-  notice: () => string
-  rerender: (scopeKey: string, disabled?: boolean) => Promise<void>
-  root: Root
-  textarea: () => HTMLTextAreaElement
-}> {
-  const container = document.createElement('div')
-  document.body.append(container)
-  // onReady fires on every render, so keep the freshest snapshot — reading a
-  // single captured `api` would go stale after attach/remove triggers a render.
-  let api: ProbeApi | null = null
-  const root = createRoot(container)
-  const onReady = (next: ProbeApi): void => {
-    api = next
-  }
-  const isComposing = options.isComposing ?? (() => false)
-  const render = async (nextScopeKey: string, disabled: boolean): Promise<void> => {
-    await act(async () => {
-      root.render(
-        createElement(Probe, {
-          scopeKey: nextScopeKey,
-          structured,
-          disabled,
-          isComposing,
-          onReady
-        })
-      )
-    })
-  }
-  await render(scopeKey, options.disabled ?? false)
-  if (!api) {
-    throw new Error('Probe did not render')
-  }
-  return {
-    draft: () => container.querySelector('[data-draft]')?.textContent ?? '',
-    root,
-    latest: () => {
-      if (!api) {
-        throw new Error('Probe is not mounted')
+function publishUnrelatedStatuses(): void {
+  for (let tick = 1; tick <= 24; tick += 1) {
+    useAppStore.setState((state) => ({
+      runtimeStatusByEnvironmentId: new Map(state.runtimeStatusByEnvironmentId).set('other-host', {
+        status: null,
+        checkedAt: tick
+      })
+    }))
+    useAppStore.setState((state) => ({
+      agentStatusByPaneKey: {
+        ...state.agentStatusByPaneKey,
+        'other-tab:other-pane': {
+          paneKey: 'other-tab:other-pane',
+          state: 'working',
+          prompt: 'background work',
+          updatedAt: tick,
+          stateStartedAt: 1,
+          stateHistory: []
+        }
       }
     }))
   }

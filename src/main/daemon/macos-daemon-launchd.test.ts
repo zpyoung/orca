@@ -218,7 +218,6 @@ it('launches the copied helper on plain Node and leaves no inherited credentials
   expect(job).toMatchObject({
     Label: macDaemonJobLabel(state.root),
     KeepAlive: false,
-    // Local Network access for a plist-launched job resolves through its associated app.
     AssociatedBundleIdentifiers: [LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId],
     EnvironmentVariables: { ORCA_TEST_SECRET: 'test-value' }
   })

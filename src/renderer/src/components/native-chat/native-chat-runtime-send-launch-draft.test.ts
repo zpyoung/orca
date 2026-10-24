@@ -30,7 +30,7 @@ import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,
   NATIVE_CHAT_SUBMIT
-} from './native-chat-send'
+} from '../../../../shared/native-chat-paste-bytes'
 import {
   AGENT_TUI_CLEAR_INPUT_MAX,
   buildAgentTuiClearInputForText

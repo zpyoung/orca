@@ -104,6 +104,20 @@ export function buildWebSessionTabsFinalPatch(
     ? { ...prunedTerminalDockPendingMutationsByPaneKey, ...rekeyedHandoffPendingMutationsByPaneKey }
     : prunedTerminalDockPendingMutationsByPaneKey
 
+  const adoptedEditorBuffers =
+    nextOpenFiles === state.openFiles
+      ? null
+      : adoptMirroredEditorBuffers(
+          state.editorBuffers,
+          nextOpenFiles,
+          // Why the live index for existing views: it holds sticky detachments. New views take the
+          // resolver the record middleware uses (host views of one file share a record).
+          buildEditorBufferViewIndex(
+            nextOpenFiles,
+            (file) => state.editorBufferIdOf?.[file.id] ?? editorBufferIdForFile(file, state)
+          )
+        )
+
   const patch: Partial<WebSessionTabsSyncState> = {
     ...agentStatusPatch,
     ...retractedTabSweepPatch,
@@ -111,15 +125,8 @@ export function buildWebSessionTabsFinalPatch(
     ...(nextTerminalDockPendingMutationsByPaneKey !== state.terminalDockPendingMutationsByPaneKey
       ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
       : {}),
-    ...(nextOpenFiles !== state.openFiles
-      ? {
-          openFiles: nextOpenFiles,
-          editorBuffers: adoptMirroredEditorBuffers(
-            state.editorBuffers,
-            nextOpenFiles,
-            reconcileEditorBufferViewIndex(EMPTY_EDITOR_BUFFER_VIEW_INDEX, nextOpenFiles)
-          )
-        }
+    ...(adoptedEditorBuffers
+      ? { openFiles: adoptedEditorBuffers.views, editorBuffers: adoptedEditorBuffers.editorBuffers }
       : {}),
     ...(nextTabsByWorktree !== state.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
     ...(nextBrowserTabsByWorktree !== state.browserTabsByWorktree

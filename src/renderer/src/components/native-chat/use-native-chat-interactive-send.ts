@@ -121,6 +121,11 @@ export function useNativeChatInteractiveSend(
       selections: AskAnswerSelection[],
       onDeliverySettled?: (delivered: boolean) => void
     ): { settleAfterMs: number } => {
+      if (nativeChatAskRequiresTerminal(agent)) {
+        cancelInFlight()
+        onDeliverySettled?.(false)
+        return { settleAfterMs: 0 }
+      }
       if (
         !targetPtyId ||
         !hasAskAnswer(prompt, selections) ||

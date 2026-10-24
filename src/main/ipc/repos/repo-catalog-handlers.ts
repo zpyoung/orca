@@ -115,7 +115,6 @@ export function registerRepoCatalogHandlers(
         .find((repo) => repo.id === args.repoId && getRepoExecutionHostId(repo) === hostId)
       // Runtime sweeps stop local/SSH sessions absent from renderer listings; paired-server rows are residue.
       if (row && parseExecutionHostId(hostId)?.kind !== 'runtime') {
-        // It notifies the renderer and paired clients itself.
         const { expectedLedgers } = args
         await withLedgerErrorCode(() =>
           expectedLedgers

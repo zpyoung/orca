@@ -7,6 +7,7 @@ type AttachmentApi = ReturnType<typeof useNativeChatComposerAttachments>
 type ProbeApi = AttachmentApi & { adoptDraft: (draft: string) => void }
 
 const target: NativeChatResolvedTarget = {
+  terminalTabId: 'tab-1',
   ptyId: 'pty-1'
 }
 

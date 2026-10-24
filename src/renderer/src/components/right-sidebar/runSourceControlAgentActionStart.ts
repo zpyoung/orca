@@ -92,6 +92,16 @@ export async function runSourceControlAgentActionStart({
   onLaunched,
   onClose
 }: RunSourceControlAgentActionStartArgs): Promise<boolean> {
+  // Detection and delivery planning can outlive the state that opened the composer.
+  if (signal?.aborted) {
+    return false
+  }
+  if (recoveryContext && !(await admitSourceControlRecovery(recoveryContext, signal))) {
+    return false
+  }
+  if (signal?.aborted) {
+    return false
+  }
   const useLaunchOptions = Boolean(launchOptions.model)
   let launched = false
   let launchFailureNotified = false

@@ -11934,7 +11934,7 @@
         "src/renderer/src/runtime/remote-runtime-terminal-parse-backpressure.test.ts",
         "src/renderer/src/runtime/runtime-client-events.test.ts",
         "src/renderer/src/components/terminal-pane/remote-runtime-pty-transport-activation-inventory-fallback.test.ts",
-        "src/shared/remote-runtime-shared-control-connection.test.ts",
+        "src/shared/remote-runtime/control/remote-runtime-shared-control-connection.test.ts",
         "tests/e2e/paired-remote-terminal-truncated-tail-first-paint.spec.ts",
         "tests/e2e/paired-remote-terminal-stall-recovery.spec.ts",
         "tests/e2e/paired-remote-terminal-probe-gap-recovery.spec.ts",

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -179,6 +179,7 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
         await removeProject(repoId, {
           hostId,
           errorFeedback: 'toast',
+          confirmedDiscards: confirmUnsavedDiscard(useAppStore.getState, unsavedTargets),
           expectedLedgers: ledgerPreview.map(({ ledgerId, revision }) => ({ ledgerId, revision }))
         })
       } catch (error) {
@@ -194,7 +195,7 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
       }
     }
     closeModal()
-  }, [closeModal, hostId, ledgerPreview, removeProject, repoId])
+  }, [closeModal, hostId, ledgerPreview, removeProject, repoId, unsavedTargets])
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -240,6 +241,7 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
             </div>
           )}
         </div>
+        <RemovalUnsavedFilesNotice targets={unsavedTargets} enabled={isOpen} />
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             {translate('auto.components.sidebar.RemoveFolderDialog.d36883e046', 'Cancel')}

@@ -28,6 +28,11 @@ import {
   deleteWorkspaceChatDrafts
 } from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
 import { isLedgerRemovalConflict } from './ledger-removal-conflict'
+import {
+  flushPurgedWorkspaceEdits,
+  noticeRemovedUnsavedFiles
+} from '../slices/worktrees/teardown/removed-workspace-unsaved-files'
+import { worktreePurgeClosedFileIds } from '../slices/worktrees/teardown/worktree-purge-closed-files'
 
 export function worktreeBelongsToHost(worktree: { hostId?: string }, hostId: string): boolean {
   return (worktree.hostId ?? LOCAL_EXECUTION_HOST_ID) === hostId

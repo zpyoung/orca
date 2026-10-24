@@ -212,7 +212,7 @@ function mergeNativeChatSkills(
   return [
     ...located,
     ...[...new Set(names)].flatMap((name) => {
-      const reported = sessionSkills?.find((entry) => entry.name === name)?.description
+      const reported = firstReportedByName.get(name)?.description
       return pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills).map(
         (skill) =>
           skill.description === null && reported

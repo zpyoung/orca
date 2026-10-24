@@ -1,6 +1,6 @@
-import { isUsableSkillsCliAgentKey } from './skills-cli-agent-keys'
 import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'
 
+// COMPAT(wsl-bridge): removed when WSL runs as an orcad host.
 export { ORCA_SKILLS_REPOSITORY_URL }
 
 // Why: one skills CLI for every install rail. 1.5.x cannot fetch a commit, and a bare

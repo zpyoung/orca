@@ -114,7 +114,6 @@ export async function listSubmodulePaths(
       .filter((value) => value.length > 0)
   } catch {
     options.signal?.throwIfAborted()
-    // No .gitmodules (or ordinary git config failure) — treat as a repo without submodules.
     paths = []
   }
   if (cacheGeneration === submodulePathsCacheGeneration) {

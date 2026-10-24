@@ -100,7 +100,7 @@ export function createProviderAccountServices(
   rateLimits.setClaudeAuthPreparationResolver((target) =>
     claudeRuntimeAuth.prepareForRateLimitFetch(target)
   )
-  // Why: live Claude sessions stream usage windows through their statusLine command; feeding them here avoids OAuth usage-endpoint polling (and its 429s).
+  // Live statusLine usage avoids OAuth endpoint polling and its 429s.
   options.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()

@@ -33,6 +33,10 @@
     "mobile-fit-debug": [
       "84aa7cc18ed03df90f40c3c70650a0ad3df941a5e1f80870bd00cf6b9b7f7eab"
     ],
+    "orca-ask": [
+      "1539e71fceafbb06881e5d61d5806dc69390d462318edbd477137fcabfc086de",
+      "74fa11d3c4a0323206887672b2a6f8cd04909a962da9fbb711b411e5d328af91"
+    ],
     "orca-cli": [
       "1c7be78ed388d2c094967a007283ce73e95905a3d48effd858deef112583bab5",
       "236008f441d16f1d4c92681776798b787dc67357f9110dac11d8b0191b00a368",
@@ -92,8 +96,15 @@
       "ae242330d98c9335160fbd4356894e15633d63c02da4edfd7109ab1845368002",
       "ebc1ce862f3e5489e9bd94388386a28116241748f5957116509de7f759250844"
     ],
+    "orca-heimdall": [
+      "9c1901990ce40f13e0e3d378831fc0d7953000c0eaa42f8bec9f8d48c306d6f4"
+    ],
     "orca-jira": [
       "ca83c4662fbc2306efb9043674998b0ca5abacc78ec2e5f85e5db80288e6777a"
+    ],
+    "orca-ledger": [
+      "a4e9b4dbe95cca8512f546fc8fb3b7d1467425db94328fe3ba977a1fda22056e",
+      "c419852107ef8be2d9d9322f4049c29f1237b9963b89b24c4e112b3bb954373c"
     ],
     "orca-linear": [
       "04ef6cb0377bc7c2dd38dc713b4ef5196ee6851dc90e9fdcddbc2347faa678e6",
@@ -106,6 +117,9 @@
       "af855a87af929e2da19d51c46e5f2bf156b026c6f3b9cfbf23708a0d53b6a764",
       "bd158d47ba6f7090d73e8d86b9c4cd02610c14a96bf6a03402fe1f725ca84c3f",
       "bff571bc0e4fae51782f2077bbda182bbead11e67d1bc684267e59a7ff791d13"
+    ],
+    "orca-loop": [
+      "828c795c986afe86544672c31cfd4da17a134dc02749cca03412279b115113e7"
     ],
     "orca-per-workspace-env": [
       "58e479bd18c4c553df0dfcb408eece2fbe550a0f9688bc289414420f72ed7ea7",
