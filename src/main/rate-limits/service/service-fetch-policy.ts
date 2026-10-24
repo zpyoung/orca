@@ -151,7 +151,7 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
       isSameClaudeUsageWindow(previous?.session ?? null, session) &&
       isSameClaudeUsageWindow(previous?.weekly ?? null, weekly)
     ) {
-      return
+      return true
     }
     if (
       previous?.status === 'ok' &&
