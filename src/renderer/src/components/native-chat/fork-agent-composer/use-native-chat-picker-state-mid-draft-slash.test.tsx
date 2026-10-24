@@ -52,6 +52,7 @@ function renderPickerState(draft: string): NativeChatPickerState {
       agentCommands: [{ name: 'clear' }, { name: 'compact' }],
       recalledFromHistory: false,
       disabled: false,
+      isComposing: () => false,
       textareaRef: createRef<HTMLTextAreaElement>(),
       setDraft: () => {},
       setCaret: () => {},
