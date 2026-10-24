@@ -222,8 +222,8 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       return false
     }
     let revealFailed = false
-    const recipeSessionOptions = recipe.launchOptions?.model
-      ? agentLaunchOverridesToSessionOptionValues(recipe.launchOptions)
+    const recipeSessionOptions = recipe().launchOptions?.model
+      ? agentLaunchOverridesToSessionOptionValues(recipe().launchOptions)
       : undefined
     const result = launchAgentInNewTab({
       requestId: newAgentLaunchRequestId(),
