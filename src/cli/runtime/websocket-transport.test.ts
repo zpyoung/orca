@@ -1,4 +1,5 @@
 import { SKILL_INSTALL_RESULT_V2_CAPABILITY } from '../../shared/skill-install-capability'
+import { AGENT_LAUNCH_RUNTIME_CAPABILITY } from '../../shared/agent-launch-runtime-capability'
 import { createServer, type Server } from 'node:http'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -91,7 +92,8 @@ describe('CLI remote WebSocket transport', () => {
           AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY,
           REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
           TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY,
-          ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES
+          ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES,
+          AGENT_LAUNCH_RUNTIME_CAPABILITY
         ]
       })
     )

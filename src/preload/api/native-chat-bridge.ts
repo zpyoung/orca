@@ -23,7 +23,6 @@ const readNativeChatSession = (
 
 export const nativeChatApi = {
   readSession: readNativeChatSession,
-  /** Start live tailing; onAppended fires with only newly-appended messages. Returns an unsubscribe fn that closes the watcher. */
   subscribe: (
     args: {
       subscriptionId: string

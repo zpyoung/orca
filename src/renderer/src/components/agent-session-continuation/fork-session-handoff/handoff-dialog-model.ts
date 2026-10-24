@@ -23,6 +23,11 @@ import {
 import type { ForkSessionHandoffSettings } from '../../../../../shared/fork-session-handoff/handoff-settings-types'
 import type { TuiAgent } from '../../../../../shared/tui-agent'
 import type { HandoffDialogWarning } from './HandoffWarningsBanner'
+import {
+  selectDetectedWorktreesByRepo,
+  selectFolderWorkspaces,
+  selectWorktreesByRepo
+} from '@/store/workspace-record-selectors'
 
 export type HandoffDialogStoreInputs = Pick<
   AppState,
@@ -43,13 +48,13 @@ export function selectHandoffDialogStoreInputs(state: AppState): HandoffDialogSt
     activeWorkspaceExecutionHostId: state.activeWorkspaceExecutionHostId,
     activeWorkspaceKey: state.activeWorkspaceKey,
     activeWorktreeId: state.activeWorktreeId,
-    detectedWorktreesByRepo: state.detectedWorktreesByRepo,
-    folderWorkspaces: state.folderWorkspaces,
+    detectedWorktreesByRepo: selectDetectedWorktreesByRepo(state),
+    folderWorkspaces: selectFolderWorkspaces(state),
     projectGroups: state.projectGroups,
     repos: state.repos,
     restoredRuntimeHostIdByWorkspaceSessionKey: state.restoredRuntimeHostIdByWorkspaceSessionKey,
     settings: state.settings,
-    worktreesByRepo: state.worktreesByRepo
+    worktreesByRepo: selectWorktreesByRepo(state)
   }
 }
 

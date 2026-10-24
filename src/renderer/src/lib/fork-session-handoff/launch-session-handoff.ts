@@ -1,5 +1,4 @@
 import { submitPromptToAgentPty } from '@/lib/agent-paste-draft'
-import { detectAgentSessionContinuationAgents } from '@/lib/launch-agent-session-continuation'
 import {
   launchAgentInNewTab,
   type LaunchAgentInNewTabArgs,
@@ -18,7 +17,7 @@ import type {
   LineageEndpointIdentity
 } from '../../../../shared/fork-session-handoff/session-lineage-types'
 import { clearHandoffDraft } from '../../components/agent-session-continuation/fork-session-handoff/handoff-draft-preservation'
-import type { HandoffTargetResolution } from './handoff-target-resolution'
+import { detectHandoffAgents, type HandoffTargetResolution } from './handoff-target-resolution'
 import {
   resolveHandoffDeliveryEvidence,
   type HandoffDeliveryOutcome,
@@ -282,7 +281,7 @@ function resolveCollaborators(
   return {
     getState: overrides.getState ?? useAppStore.getState,
     subscribeToStore: overrides.subscribeToStore ?? ((listener) => useAppStore.subscribe(listener)),
-    detectAgents: overrides.detectAgents ?? detectAgentSessionContinuationAgents,
+    detectAgents: overrides.detectAgents ?? detectHandoffAgents,
     isAgentEnabled:
       overrides.isAgentEnabled ??
       ((agent, state) => isTuiAgentEnabled(agent, state.settings?.disabledTuiAgents)),

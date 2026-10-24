@@ -24,7 +24,7 @@ import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,
   NATIVE_CHAT_SUBMIT
-} from './native-chat-send'
+} from '../../../../shared/native-chat-paste-bytes'
 import {
   cancelNativeChatPtySends,
   invalidateNativeChatPtySends,

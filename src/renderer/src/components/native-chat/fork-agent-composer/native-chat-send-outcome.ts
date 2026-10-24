@@ -8,7 +8,7 @@ import {
   sendRuntimePtyInputDelivery
 } from '@/runtime/runtime-terminal-inspection'
 import type { NativeChatSendOptions } from '../native-chat-runtime-send'
-import { NATIVE_CHAT_SUBMIT } from '../native-chat-send'
+import { NATIVE_CHAT_SUBMIT } from '../../../../../shared/native-chat-paste-bytes'
 
 /**
  * Best-effort read of whether a send's submit CR landed. Never proof of

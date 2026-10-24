@@ -10,7 +10,7 @@ import {
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS
 } from '../../../../../shared/native-chat-answer-stepping'
-import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../native-chat-send'
+import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../../../../../shared/native-chat-paste-bytes'
 import { enqueueNativeChatPtySend } from '../native-chat-pty-send-queue'
 import { sendNativeChatAskAnswer as sendNativeChatAskAnswerRaw } from './native-chat-ask-answer-send'
 import type { AskAnswerKeyGroup } from '../native-chat-interactive-prompt'

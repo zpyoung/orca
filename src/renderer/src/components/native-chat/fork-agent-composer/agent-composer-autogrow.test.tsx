@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx
-// FORK-COPY-SHA: 071747853f5995ee233b36751613f09a60007c2b
+// FORK-COPY-SHA: 47f77cf7018ebc0d046b82c6dde31cf704909162
 // @vitest-environment happy-dom
 
 /** The composer grows with the draft up to 8 lines, then scrolls internally.

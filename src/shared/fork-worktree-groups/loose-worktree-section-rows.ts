@@ -107,7 +107,7 @@ export function appendLooseWorktreeSectionRows(
     return
   }
   const baselineHostId = getProjectGroupExecutionHostIdForRows(projectGroup, ctx.defaultHostId)
-  appendWorktreeRows(ctx.result, ctx.repoMap, ctx.occurrencePlan, {
+  appendWorktreeRows(ctx.result, ctx.repoOf, ctx.occurrencePlan, {
     collapsedGroups: ctx.collapsedGroups,
     groupDepth: depth + 1,
     sectionKey,

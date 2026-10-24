@@ -150,6 +150,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       caret: core.caret,
       recalledFromHistory: core.history.index !== null,
       disabled: core.disabled,
+      isComposing: core.imeEnterGesture.isComposing,
       structuredTransport,
       editor: {
         textareaRef: core.textareaRef,

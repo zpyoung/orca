@@ -6,6 +6,7 @@ import { isTerminalLeafId, makePaneKey } from '../../../../../shared/stable-pane
 import { parseWorkspaceKey } from '../../../../../shared/workspace-scope'
 import { resolvePaneWslDistro } from '../../terminal-pane/terminal-pane-wsl-distro'
 import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
 
 export type FocusedSessionSelection = {
   tabId: string | null
@@ -85,7 +86,7 @@ export function resolveFocusedSession(state: FocusedSessionState): FocusedSessio
   const workspaceScope = parseWorkspaceKey(state.activeWorktreeId ?? '')
   const folderWorkspace =
     workspaceScope?.type === 'folder'
-      ? state.folderWorkspaces.find(
+      ? selectFolderWorkspaces(state).find(
           (workspace) => workspace.id === workspaceScope.folderWorkspaceId
         )
       : undefined

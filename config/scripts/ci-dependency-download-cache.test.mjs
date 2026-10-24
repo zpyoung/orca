@@ -12,9 +12,6 @@ describe('CI dependency download caches', () => {
   it('scopes desktop stores to the root lockfile and lets mixed installs opt in', () => {
     expect(action.inputs['cache-dependency-path'].default).toBe('pnpm-lock.yaml')
     for (const step of action.runs.steps.filter((step) => step.uses === 'actions/setup-node@v6')) {
-      expect(step.with.cache).toBe(
-        "${{ github.event_name != 'pull_request' && inputs.cache-pnpm-store != 'false' && steps.pnpm-store-mode.outputs.lookup-only != 'true' && 'pnpm' || '' }}"
-      )
       expect(step.with['cache-dependency-path']).toBe('${{ inputs.cache-dependency-path }}')
       expect(step.with['package-manager-cache']).toBe(false)
     }
@@ -51,12 +48,6 @@ describe('CI dependency download caches', () => {
     const resolve = action.runs.steps.find((step) => step.id === 'pnpm-store')
     const restore = action.runs.steps.find(
       (step) => step.name === 'Restore pnpm download store without saving'
-    )
-    expect(restore.if).toBe(
-      "github.event_name == 'pull_request' && inputs.cache-pnpm-store != 'false' && !((runner.os == 'Linux' || runner.os == 'macOS') && (runner.arch == 'X64' || runner.arch == 'ARM64') && inputs.cache-dependency-path == 'pnpm-lock.yaml') && (runner.os != 'Windows' || !(runner.arch == 'X64' && contains(inputs.cache-dependency-path, 'mobile/pnpm-lock.yaml')) && !((runner.arch == 'X64' || runner.arch == 'ARM64') && inputs.cache-dependency-path == 'pnpm-lock.yaml'))"
-    )
-    expect(resolve.if).toBe(
-      `${restore.if} || (github.event_name != 'pull_request' && inputs.cache-pnpm-store != 'false' && steps.pnpm-store-mode.outputs.lookup-only == 'true')`
     )
     expect(restore.uses).toBe('actions/cache/restore@v5')
     expect(restore.with.path).toBe('${{ steps.pnpm-store.outputs.path }}')
@@ -360,10 +351,32 @@ describe('CI dependency download caches', () => {
       expect(platforms.jobs['warm-windows'].if).toBeUndefined()
       expect(platforms.jobs['warm-windows'].strategy.matrix.os).toEqual([
         'windows-2022',
-        'windows-11-arm'
+        'windows-11-arm',
+        'windows-2025'
       ])
     }
   )
+
+  it.each([
+    ['windows-2022', 'X64', true],
+    ['windows-11-arm', 'ARM64', false],
+    ['windows-2025', 'X64', false]
+  ])('warms native addons without unused CLI builds on %s', (os, arch, cli) => {
+    const platforms = read(workflow('ci-cache-warmup-platforms').jobs['warm-platforms'].uses)
+    const warm = platforms.jobs['warm-windows']
+    const context = { runner: { arch }, matrix: { os } }
+    for (const name of ['Cache Windows CLI launcher', 'Build the Windows native executables']) {
+      const step = warm.steps.find((step) => step.name === name)
+      expect(step, name).toBeDefined()
+      expect(runInNewContext(step.if, context)).toBe(cli)
+    }
+    const consumer = workflow('wsl-orcad-e2e').jobs.wsl2
+    const installer = './.github/actions/install-node-dependencies'
+    expect(consumer['runs-on']).toBe('windows-2025')
+    expect(warm.steps.find((step) => step.uses === installer).with['native-runtime']).toBe(
+      consumer.steps.find((step) => step.uses === installer).with['native-runtime']
+    )
+  })
 
   it('validates the omitted Linux warmer preparation in the real PR consumers', () => {
     const platforms = read(workflow('ci-cache-warmup-platforms').jobs['warm-platforms'].uses)

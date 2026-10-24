@@ -35,7 +35,7 @@ import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,
   NATIVE_CHAT_SUBMIT
-} from './native-chat-send'
+} from '../../../../shared/native-chat-paste-bytes'
 import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'
 import { sendNativeChatMessageWithImageAttachments as sendNativeChatMessageWithAgentImageAttachments } from './native-chat-runtime-image-send'
 

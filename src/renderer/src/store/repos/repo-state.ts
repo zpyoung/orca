@@ -28,6 +28,7 @@ import type {
   FolderWorkspacePathStatusRequest
 } from '../../../../shared/folder-workspace-path-status'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ConfirmedUnsavedDiscards } from '../slices/worktrees/teardown/removed-workspace-unsaved-files'
 
 export const ERROR_TOAST_DURATION = 60_000
 
@@ -118,6 +119,8 @@ export type DeleteProjectGroupWithContainedProjectsOptions = {
   // hostId disambiguates which host's group row to delete when the id exists on multiple hosts.
   hostId?: ExecutionHostId
   expectedLedgers?: ExpectedLedgerRevision[]
+  /** The text a dialog listed when the user confirmed discarding it; other edits are offered back. */
+  confirmedDiscards?: ConfirmedUnsavedDiscards
 }
 
 export type AllHostCatalogFetchOptions = {
@@ -282,6 +285,7 @@ export type RepoSlice = {
       errorFeedback?: 'toast' | 'silent'
       automaticCleanup?: boolean
       expectedLedgers?: ExpectedLedgerRevision[]
+      confirmedDiscards?: ConfirmedUnsavedDiscards
     }
   ) => Promise<void>
   updateProject: (

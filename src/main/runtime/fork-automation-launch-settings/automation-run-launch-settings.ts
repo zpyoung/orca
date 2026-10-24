@@ -31,10 +31,7 @@ export function resolveAutomationRunLaunchSettings(args: {
         terminalWindowsShell: args.settings.terminalWindowsShell
       })
     )
-  const inheritedAgentArgs = resolveTuiAgentLaunchArgs(
-    args.automation.agentId,
-    args.settings.agentDefaultArgs
-  )
+  const inheritedAgentArgs = resolveTuiAgentLaunchArgs(args.automation.agentId, args.settings)
   let effectiveAgentArgs = inheritedAgentArgs
   if (hasExtraAgentArgs(args.automation.extraAgentArgs)) {
     try {

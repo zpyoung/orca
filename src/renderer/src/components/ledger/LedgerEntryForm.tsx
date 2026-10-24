@@ -139,7 +139,7 @@ export function LedgerEntryForm({
         base: { kind: 'project', id: project.id }
       })
     )
-    catalog?.folderWorkspaces.forEach((workspace: FolderWorkspace) =>
+    catalog?.folders.forEach((workspace: FolderWorkspace) =>
       options.push({
         key: JSON.stringify(['workspace', workspace.id]),
         label: translate('ledger.form.workspaceBase', 'Workspace: {{name}}', {

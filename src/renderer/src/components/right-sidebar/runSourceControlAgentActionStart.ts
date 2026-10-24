@@ -5,6 +5,7 @@ import {
 } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
+import type { RuntimeGitContext } from '@/runtime/runtime-git-client-context'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
@@ -18,6 +19,7 @@ import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { sourceControlActionRecipeMatchesTarget } from './source-control-action-recipe-match'
 import { resolveSourceControlAgentSaveTarget } from './source-control-agent-action-dialog-support'
+import { admitSourceControlRecovery } from './source-control-recovery-admission'
 
 type RunSourceControlAgentActionStartArgs = {
   selectedAgent: TuiAgent
@@ -37,6 +39,8 @@ type RunSourceControlAgentActionStartArgs = {
   promptDelivery: 'auto-submit' | 'draft' | 'submit-after-ready'
   launchPlatform?: NodeJS.Platform
   launchSource: LaunchSource
+  recoveryContext?: RuntimeGitContext | null
+  signal?: AbortSignal
   onStart?: (args: {
     agent: TuiAgent
     commandInput: string
@@ -79,6 +83,8 @@ export async function runSourceControlAgentActionStart({
   promptDelivery,
   launchPlatform,
   launchSource,
+  recoveryContext,
+  signal,
   onStart,
   onSaveAgentDefault,
   onLaunchAccepted,
@@ -86,6 +92,16 @@ export async function runSourceControlAgentActionStart({
   onLaunched,
   onClose
 }: RunSourceControlAgentActionStartArgs): Promise<boolean> {
+  // Detection and delivery planning can outlive the state that opened the composer.
+  if (signal?.aborted) {
+    return false
+  }
+  if (recoveryContext && !(await admitSourceControlRecovery(recoveryContext, signal))) {
+    return false
+  }
+  if (signal?.aborted) {
+    return false
+  }
   const useLaunchOptions = Boolean(launchOptions.model)
   let launched = false
   let launchFailureNotified = false
@@ -188,6 +204,8 @@ export async function runSourceControlAgentActionStart({
     }
   }
   onLaunched?.()
-  onClose()
+  if (!signal?.aborted) {
+    onClose()
+  }
   return true
 }

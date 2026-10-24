@@ -18,6 +18,10 @@ import {
   retentionSummary,
   retentionTitle
 } from '../ledger/ledger-retention-notice-copy'
+import type { WorktreePurgeTarget } from '@/store/slices/worktree-helpers'
+import { RemovalUnsavedFilesNotice } from './RemovalUnsavedFilesNotice'
+
+const NO_UNSAVED_TARGETS: readonly WorktreePurgeTarget[] = []
 
 type ProjectGroupDeleteDialogProps = {
   open: boolean
@@ -31,6 +35,8 @@ type ProjectGroupDeleteDialogProps = {
   ledgerPreview?: LedgerRemovalPreview[]
   ledgerPreviewLoading?: boolean
   ledgerPreviewError?: string | null
+  /** Workspaces the contained-project removal closes. */
+  unsavedTargets?: readonly WorktreePurgeTarget[]
 }
 const EMPTY_LEDGER_PREVIEW: LedgerRemovalPreview[] = []
 
@@ -45,7 +51,8 @@ export function ProjectGroupDeleteDialog({
   onConfirm,
   ledgerPreview = EMPTY_LEDGER_PREVIEW,
   ledgerPreviewLoading = false,
-  ledgerPreviewError = null
+  ledgerPreviewError = null,
+  unsavedTargets = NO_UNSAVED_TARGETS
 }: ProjectGroupDeleteDialogProps): React.JSX.Element {
   const [deleting, setDeleting] = useState(false)
   const [wasOpen, setWasOpen] = useState(open)
@@ -112,6 +119,7 @@ export function ProjectGroupDeleteDialog({
       }}
     >
       <DialogContent
+        surface="security"
         ref={handleDialogContentRef}
         className="max-w-sm sm:max-w-sm"
         showCloseButton={false}
@@ -214,6 +222,7 @@ export function ProjectGroupDeleteDialog({
             </div>
           )}
         </div>
+        <RemovalUnsavedFilesNotice targets={unsavedTargets} enabled={open} />
         <DialogFooter>
           <Button
             type="button"

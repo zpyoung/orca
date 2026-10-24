@@ -20,7 +20,7 @@ import {
 } from '@/components/terminal-pane/pty-dispatcher'
 import { subscribeToPtyData } from '@/components/terminal-pane/pty-data-sidecar-subscriptions'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
-import { runtimeEnvironmentIdWithLegacyFallbackUnlessTwin } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/worktree-runtime-owner'
 import { retireProvider } from '@/lib/retire-unowned-background-terminal'
 import { createRuntimeAgentBackgroundSession } from '@/lib/fork-automation-launch-settings/runtime-agent-background-session-create'
 import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-stream'
@@ -68,7 +68,7 @@ export async function launchAgentBackgroundSession(
   const { platform: launchPlatform, isRemote, isLocalHost } = launchHost
   // Route by the worktree's owner host, not the focused runtime.
   const runtimeTarget = runtimeTargetForOwnerEnvironment(
-    runtimeEnvironmentIdWithLegacyFallbackUnlessTwin(store, worktreeId)
+    runtimeEnvironmentIdOrLocalUnlessTwin(store, worktreeId)
   )
   if (hasExtraAgentArgs(args.extraAgentArgs) && runtimeTarget.kind === 'environment') {
     // Why: that server rebuilds the command from its own settings and would drop the extras.

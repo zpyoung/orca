@@ -3,7 +3,7 @@ import type { BrowserCertificateFailure, BrowserLoadError } from './browser-work
 import type { RuntimeBrowserPlacement } from './runtime-browser-placement'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
-import type { TerminalLayoutSnapshot } from './terminal-tab-types'
+import type { TerminalLayoutSnapshot, TerminalTab } from './terminal-tab-types'
 import type { TuiAgent } from './tui-agent'
 import type { StructuredAgentId } from './agent-session-provider-handle'
 
@@ -15,6 +15,10 @@ export type RuntimeMobileSessionTerminalTab = {
    *  client keeps its own record then rather than reading absence as a cleared name. */
   customTitle?: string | null
   quickCommandLabel?: string | null
+  /** Window-to-main only: the names the desktop ranks above the live title. `generatedTitle` is
+   *  sent only while the desktop shows generated names. */
+  aiVaultTitle?: TerminalTab['aiVaultTitle']
+  generatedTitle?: string | null
   parentTabId: string
   leafId: string
   ptyId?: string | null
@@ -110,10 +114,23 @@ export type RuntimeMobileSessionAgentTab = {
   /** An agent the host registered. Beyond Claude and Codex, published only to clients advertising
    *  the registered-agents capability. */
   agent: StructuredAgentId
+  /** The host's structured status row for this chat. Optional: old hosts never send it. */
+  chatStatus?: RuntimeMobileSessionAgentTabStatus
   color?: string | null
   isPinned?: boolean
   isActive: boolean
 }
+
+export type RuntimeMobileSessionAgentTabStatus = Pick<
+  AgentStatusEntry,
+  | 'state'
+  | 'workingMode'
+  | 'interrupted'
+  | 'mainAgent'
+  | 'updatedAt'
+  | 'evidenceObservedAt'
+  | 'structuredHostOwned'
+>
 
 export type RuntimeMobileSessionSnapshotTab =
   | RuntimeMobileSessionTerminalTab
