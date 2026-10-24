@@ -31,38 +31,26 @@ export const PRESS_AND_HOLD_KEY = 'ApplePressAndHoldEnabled'
 export const PRESS_AND_HOLD_RECORD_FILE = 'macos-press-and-hold-default.json'
 export const PRESS_AND_HOLD_RECORD_VERSION = 1
 
-/** Why not `systemPreferences.getUserDefault`: it reads through the whole NSUserDefaults search
- *  list and is typed non-nullable, so an unset key and an explicit `false` both come back `false` —
- *  and the system default is unset, so it reports `false` on a Mac where press-and-hold is on.
- *  `defaults read <domain> <key>` is domain-scoped and exits 1 when the key is absent. */
+// defaults read distinguishes an absent key from explicit false; systemPreferences.getUserDefault cannot.
 const DEFAULTS_BINARY = '/usr/bin/defaults'
-/** A hang cutoff, not a latency budget: the probe measures ~6ms, and cutting a slow-but-working
- *  `defaults` short costs the user the feature for that launch. The shared 30s default is what
- *  must not apply — this runs before `ready`, so a 30s block is a hung app. */
+// This runs before ready; bound a wedged defaults process more tightly than the shared 30s timeout.
 const DEFAULTS_TIMEOUT_MS = 5_000
-/** Why: `defaults` exits 1 for "does not exist"; anything else means the probe itself failed. */
+// defaults uses exit 1 for an absent key; other failures leave its presence unknown.
 const DEFAULTS_MISSING_STATUS = 1
 
 const ORCA_BUNDLE_ID = 'com.stablyai.orca'
 const FORK_BUNDLE_ID = 'com.zpyoung.orca'
 
 export type PressAndHoldDecision =
-  /** Not macOS — nothing is read or written. */
   | 'not-macos'
-  /** A previous launch already decided; the domain is never touched again. */
   | 'already-decided'
-  /** The running bundle is not Orca's (e.g. a bare `Electron.app`), whose domain we do not own. */
   | 'foreign-bundle'
-  /** `defaults read` could not answer, so we cannot tell an unset key from a user's choice. */
   | 'probe-failed'
-  /** `defaults write` failed. */
   | 'write-failed'
-  /** The domain already carries an explicit value; the user's choice stands. */
   | 'kept-user-preference'
-  /** The key was unset and we wrote `false`. */
   | 'applied'
 
-/** Decisions about the domain itself. Anything else is a condition that can change by next launch. */
+// Transient failures are retried on later launches; completed decisions preserve user changes.
 const TERMINAL_DECISIONS = new Set<PressAndHoldDecision>(['applied', 'kept-user-preference'])
 
 export type PressAndHoldRecord = {
@@ -82,8 +70,7 @@ export type PressAndHoldHost = {
   now: () => string
 }
 
-/** Only Orca's own bundle: an unpackaged run is `com.github.Electron`, shared with every other
- *  unpackaged Electron app on the machine. */
+// Unpackaged Electron apps share com.github.Electron; do not change that domain.
 export function isOrcaPreferencesDomain(domain: string): boolean {
   return (
     domain === ORCA_BUNDLE_ID ||
@@ -93,7 +80,6 @@ export function isOrcaPreferencesDomain(domain: string): boolean {
   )
 }
 
-/** `<bundle>/Contents/MacOS/<exe>` → `<bundle>/Contents/Info.plist`. */
 export function readBundleIdentifierFromExecutablePath(execPath: string): string | null {
   try {
     const plist = readFileSync(join(dirname(dirname(execPath)), 'Info.plist'), 'utf8')
@@ -105,20 +91,15 @@ export function readBundleIdentifierFromExecutablePath(execPath: string): string
   }
 }
 
-/**
- * Why this distinction carries the whole design: only a real "does not exist" answer may be read as
- * unset. A killed or timed-out probe never answered, and calling that unset would let a broken
- * probe overwrite a value the user chose.
- */
+/** Failed probes cannot establish absence and must never authorize overwriting a preference. */
 export function interpretDefaultsRead(probe: () => ProcessResult): 'set' | 'unset' | 'unknown' {
   let result: ProcessResult
   try {
     result = probe()
   } catch {
-    // `runProcessSync` throws only when the child never started, which answers nothing at all.
     return 'unknown'
   }
-  // Why before the code: a timeout kills mid-run, so any exit it leaves behind is not an answer.
+  // A timeout invalidates any exit status from the interrupted probe.
   if (result.timedOut) {
     return 'unknown'
   }
@@ -129,8 +110,7 @@ export function interpretDefaultsRead(probe: () => ProcessResult): 'set' | 'unse
 }
 
 export function readDomainPressAndHoldPreference(domain: string): 'set' | 'unset' | 'unknown' {
-  // Why no captured output: the exit code is the whole answer, and reading only presence is what
-  // makes an explicit `true` and an explicit `false` both count as the user's.
+  // Presence alone preserves both explicit true and explicit false as user choices.
   return interpretDefaultsRead(() =>
     runProcessSync({
       program: DEFAULTS_BINARY,
@@ -143,8 +123,6 @@ export function readDomainPressAndHoldPreference(domain: string): 'set' | 'unset
 
 export function writeDomainPressAndHoldPreference(domain: string, value: boolean): boolean {
   try {
-    // Why the code check: a non-zero `defaults write` returns rather than throwing, so treating a
-    // completed run as success would record 'applied' for a write that never landed.
     return (
       runProcessSync({
         program: DEFAULTS_BINARY,
@@ -175,13 +153,7 @@ function parseRecord(raw: string): PressAndHoldRecord | null {
   }
 }
 
-/**
- * Apply Orca's press-and-hold default at most once, leaving any explicit user value alone.
- *
- * Returns the decision so startup can log it; the same value is persisted for support triage.
- */
 export function ensureMacPressAndHoldDefault(host: PressAndHoldHost): PressAndHoldDecision {
-  // Why first and without touching disk: Windows and Linux must do no work at all here.
   if (host.platform !== 'darwin') {
     return 'not-macos'
   }
@@ -192,7 +164,7 @@ export function ensureMacPressAndHoldDefault(host: PressAndHoldHost): PressAndHo
   }
 
   const record = (decision: PressAndHoldDecision, domain: string | null): PressAndHoldDecision => {
-    // Why skip an unchanged rewrite: the non-terminal decisions are re-evaluated every launch.
+    // Transient decisions recur on every launch; persist only changed results.
     if (!previous || previous.decision !== decision || previous.domain !== domain) {
       host.writeRecord({
         version: PRESS_AND_HOLD_RECORD_VERSION,
@@ -222,15 +194,12 @@ export function ensureMacPressAndHoldDefault(host: PressAndHoldHost): PressAndHo
   return record('applied', domain)
 }
 
-/** Why log: silently rewriting a macOS default for the user's login account should leave a trace,
- *  and the failure paths are otherwise invisible. The quiet decisions are the steady state. */
 const REPORTED_DECISIONS: Partial<Record<PressAndHoldDecision, string>> = {
   applied: `set ${PRESS_AND_HOLD_KEY}=false so held keys repeat; takes effect next launch`,
   'probe-failed': `could not read ${PRESS_AND_HOLD_KEY}; leaving it alone`,
   'write-failed': `could not write ${PRESS_AND_HOLD_KEY}; held keys will not repeat`
 }
 
-/** Wires {@link ensureMacPressAndHoldDefault} to the real bundle, `defaults`, and userData. */
 export function applyMacPressAndHoldDefaultAtStartup(userDataPath: string): PressAndHoldDecision {
   const recordPath = pressAndHoldRecordPath(userDataPath)
   const decision = ensureMacPressAndHoldDefault({
@@ -245,11 +214,11 @@ export function applyMacPressAndHoldDefaultAtStartup(userDataPath: string): Pres
     },
     writeRecord: (record) => {
       try {
-        // Why: this runs before `ready`, and Electron has not necessarily created userData yet.
+        // Before ready, Electron may not have created userData yet.
         mkdirSync(userDataPath, { recursive: true })
         writeFileAtomically(recordPath, `${JSON.stringify(record, null, 2)}\n`)
       } catch {
-        // Best-effort: an unwritten record only costs one repeated probe next launch.
+        // If persistence fails, a later launch safely probes the preference again.
       }
     },
     readDomainPreference: readDomainPressAndHoldPreference,

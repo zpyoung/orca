@@ -1,6 +1,3 @@
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delimiter, join } from 'node:path'
 import type * as CodexCliCommandModule from '../shared/node-cli-command-resolution'
@@ -27,31 +24,15 @@ const {
 } = vi.hoisted(() => ({
   detectCommandsMock: vi.fn(() => new Set<string>(['claude'])),
   guideModuleLoadMock: vi.fn(),
-  readOrcaCliBuildCommitMock: vi.fn<() => string | null>(() => null),
-  resolveCliCommandMock: vi.fn(() => 'npx'),
-  runtimeClientConstructorMock: vi.fn(),
-  spawnMock: vi.fn()
+  previewMock: vi.fn(),
+  runtimeClientConstructorMock: vi.fn()
 }))
 
-// Why: agent detection probes the real machine, so pin it or every install
-// assertion depends on what the test runner happens to have installed.
-vi.mock('../shared/local-agent-install-dir-detection', () => ({
-  detectCommandsInInstallDirs: detectCommandsMock
-}))
-
-// Why: override only the npx lookup so the real Windows .cmd rail still runs.
-vi.mock('../shared/node-cli-command-resolution', async (importOriginal) => ({
-  ...(await importOriginal<typeof CodexCliCommandModule>()),
-  resolveCliCommand: resolveCliCommandMock
-}))
-
-// Why: the install pins to the build's commit; a test run has no compiled package boundary.
-vi.mock('./cli-version', () => ({
-  readOrcaCliBuildCommit: readOrcaCliBuildCommitMock
-}))
-
-vi.mock('node:child_process', () => ({
-  spawn: spawnMock
+// Installer behavior is covered separately in skills-install.test.ts.
+vi.mock('../main/skills/bundled-skill-install/cli-entry', () => ({
+  localBundledSkillInput: previewMock,
+  previewBundledSkillInstall: previewMock,
+  installBundledSkills: previewMock
 }))
 
 vi.mock('./bundled-skill-guides.js', () => {
@@ -86,10 +67,7 @@ vi.mock('./bundled-skill-guides.js', () => {
 })
 
 vi.mock('./runtime-client', async () => {
-  // Why: re-export the REAL error classes rather than redefining them. format.ts
-  // narrows with `instanceof` against ./runtime/types, so a look-alike class
-  // here would make every CLI error fall through to the generic `runtime_error`
-  // shape — mirroring the barrel keeps the mock faithful to production.
+  // Error formatting uses instanceof, so the mock must preserve the production classes.
   const { RuntimeClientError, RuntimeRpcFailureError } = await import('./runtime/types.js')
 
   class RuntimeClient {
@@ -114,13 +92,7 @@ describe('orca skills CLI', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     runtimeClientConstructorMock.mockClear()
-    resolveCliCommandMock.mockReset()
-    resolveCliCommandMock.mockReturnValue('npx')
-    detectCommandsMock.mockReset()
-    detectCommandsMock.mockReturnValue(new Set<string>(['claude']))
-    spawnMock.mockReset()
-    readOrcaCliBuildCommitMock.mockReset()
-    readOrcaCliBuildCommitMock.mockReturnValue(COMMIT)
+    previewMock.mockReset()
     process.exitCode = undefined
   })
 
@@ -281,7 +253,6 @@ describe('orca skills CLI', () => {
         ''
       ].join('\n')
     )
-    expect(spawnMock).not.toHaveBeenCalled()
     expect(runtimeClientConstructorMock).not.toHaveBeenCalled()
   })
 
@@ -302,7 +273,6 @@ describe('orca skills CLI', () => {
 
     expect(process.exitCode).toBe(1)
     expect(errorSpy).toHaveBeenCalledWith('Use either --all or --skill, not both.')
-    expect(spawnMock).not.toHaveBeenCalled()
   })
 
   it('rejects an unknown --skill name', async () => {
@@ -314,7 +284,6 @@ describe('orca skills CLI', () => {
     expect(errorSpy).toHaveBeenCalledWith(
       'Unknown skill "missing". Available skills: alpha, gamma, zeta'
     )
-    expect(spawnMock).not.toHaveBeenCalled()
   })
 
   it('rejects --skill without a value', async () => {
@@ -624,11 +593,9 @@ describe('orca skills CLI', () => {
 
     await main(['skills', 'install', '--skill', 'alpha'], '/tmp/repo')
 
-    // Why: the SSH relay and WSL bridge run argv on the Orca host, so a real
-    // install there would silently skip the machine the user is sitting on.
-    expect(spawnMock).not.toHaveBeenCalled()
     expect(process.exitCode).toBe(1)
     expect(String(errorSpy.mock.calls[0]?.[0])).toContain('writes to the machine that runs it')
+    expect(previewMock).not.toHaveBeenCalled()
   })
 
   it('refuses --dry-run through the host-forwarding shim too', async () => {
@@ -637,9 +604,6 @@ describe('orca skills CLI', () => {
 
     await main(['skills', 'install', '--skill', 'alpha', '--dry-run'], '/tmp/repo')
 
-    // Why: the targets are resolved from THIS host's agents, so a command printed
-    // here would name the wrong machine's agents. Point at the target instead.
-    expect(spawnMock).not.toHaveBeenCalled()
     expect(process.exitCode).toBe(1)
     expect(String(errorSpy.mock.calls[0]?.[0])).toContain('writes to the machine that runs it')
   })
@@ -1004,8 +968,4 @@ describe('orca skills CLI', () => {
 
 function stdoutText(spy: ReturnType<typeof vi.spyOn>): string {
   return spy.mock.calls.map((call) => String(call[0])).join('')
-}
-
-function createFakeChild(): EventEmitter {
-  return new EventEmitter()
 }

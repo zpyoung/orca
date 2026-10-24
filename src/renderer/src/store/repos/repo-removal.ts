@@ -232,7 +232,15 @@ export function createRepoRemovalActions(
         }
 
         // Why: use the canonical per-worktree purge to evict all worktree-scoped maps (hand-deletion leaked most); runs before the set() below so it still sees tabsByWorktree.
-        closeRemovedHostTwinState(get, set, twins, preCallTwins)
+        const purgeTargets = worktreeIds.map((id) => ({ id, hostId: ownerHostId }))
+        flushPurgedWorkspaceEdits(get(), purgeTargets)
+        // Why before the twin close: it closes tabs one by one; the purge below shares this batch.
+        const keepEditorBuffer = noticeRemovedUnsavedFiles(
+          get(),
+          worktreePurgeClosedFileIds(get(), purgeTargets),
+          options.confirmedDiscards
+        )
+        closeRemovedHostTwinState(get, set, twins, preCallTwins, keepEditorBuffer)
         get().purgeWorktreeTerminalState(exclusiveWorktreeIds)
         deleteWorkspaceChatDrafts(chatDraftKeys)
         get().clearLocalDetectedAgentContextsForProjects(localAgentContextProjectIds)

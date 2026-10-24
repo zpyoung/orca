@@ -1,6 +1,7 @@
 import type { RuntimeMobileSessionTerminalTab } from '../../shared/runtime-types'
 import type { TerminalTab } from '../../shared/terminal-tab-types'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
+import { resolveTerminalTabTitle } from '../../shared/tab-title-resolution'
 import {
   readCanonicalPtyOwners,
   resolveCanonicalPtyClaim
@@ -45,7 +46,8 @@ function withoutAbsorbedLegacyRows(
 export function buildHeadlessMobileSessionTerminalTabs(
   worktreeId: string,
   persistedTabs: readonly TerminalTab[],
-  session: WorkspaceSessionState
+  session: WorkspaceSessionState,
+  generatedTitlesEnabled = false
 ): RuntimeMobileSessionTerminalTab[] {
   const { rows, selection } = withoutAbsorbedLegacyRows(worktreeId, persistedTabs, session)
   // Why: the dock record lives only on the unified Tab, not the legacy
@@ -68,12 +70,15 @@ export function buildHeadlessMobileSessionTerminalTabs(
       const terminalDockByPaneKey = terminalDockByPaneKeyByTabId.get(tab.id)
       return leafIds.flatMap((leafId) => {
         const ptyId = layout?.ptyIdsByLeafId?.[leafId] ?? (leafIds.length === 1 ? tab.ptyId : null)
-        const title =
-          tab.customTitle?.trim() ||
-          tab.generatedTitle?.trim() ||
-          tab.title?.trim() ||
-          tab.defaultTitle?.trim() ||
-          `Terminal ${index + 1}`
+        const fallbackTitle = tab.defaultTitle?.trim() || `Terminal ${index + 1}`
+        const liveTitle = layout?.titlesByLeafId?.[leafId]?.trim() || tab.title?.trim()
+        const title = tabWide
+          ? resolveTerminalTabTitle(
+              { ...tab, title: liveTitle },
+              generatedTitlesEnabled,
+              fallbackTitle
+            )
+          : tab.customTitle?.trim() || liveTitle || fallbackTitle
         return [
           {
             type: 'terminal' as const,
@@ -82,6 +87,15 @@ export function buildHeadlessMobileSessionTerminalTabs(
             leafId,
             title,
             customTitle: tab.customTitle?.trim() || null,
+            ...(tabWide && tab.quickCommandLabel?.trim()
+              ? { quickCommandLabel: tab.quickCommandLabel.trim() }
+              : {}),
+            ...(tabWide && tab.aiVaultTitle?.title.trim()
+              ? { aiVaultTitle: tab.aiVaultTitle }
+              : {}),
+            ...(tabWide && generatedTitlesEnabled && tab.generatedTitle?.trim()
+              ? { generatedTitle: tab.generatedTitle.trim() }
+              : {}),
             ...(ptyId ? { ptyId } : {}),
             ...(tab.startupCwd ? { startupCwd: tab.startupCwd } : {}),
             ...(tab.launchAgent ? { launchAgent: tab.launchAgent } : {}),

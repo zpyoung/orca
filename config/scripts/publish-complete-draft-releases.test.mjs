@@ -9,6 +9,7 @@ import {
   publishCompleteDraftReleases,
   writeGithubOutputs
 } from './publish-complete-draft-releases.mjs'
+import { getRequiredReleaseAssetNames } from './verify-release-required-assets.mjs'
 
 function git(cwd, args) {
   return execFileSync('git', args, {
@@ -18,13 +19,13 @@ function git(cwd, args) {
   }).trim()
 }
 
-function withGitRepo(run) {
+async function withGitRepo(run) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-draft-release-'))
   try {
     git(dir, ['init', '--initial-branch=main'])
     git(dir, ['config', 'user.name', 'Test Bot'])
     git(dir, ['config', 'user.email', 'test@example.com'])
-    run(dir)
+    return await run(dir)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -84,12 +85,26 @@ describe('isReleaseCutDraft', () => {
         tag_name: 'v1.4.2-rc.7.zy01'
       })
     ).toBe(false)
+    expect(
+      isReleaseCutDraft({
+        draft: false,
+        tag_name: 'v1.4.2-rc.7',
+        author: { login: 'github-actions[bot]' }
+      })
+    ).toBe(false)
+    expect(
+      isReleaseCutDraft({
+        draft: true,
+        tag_name: 'v1.4.2-rc.7',
+        author: { login: 'release-maintainer' }
+      })
+    ).toBe(false)
   })
 })
 
 describe('isTagBuiltFromCurrentRef', () => {
-  it('accepts a tag on the current release commit', () => {
-    withGitRepo((repo) => {
+  it('accepts a tag on the current release commit', async () => {
+    await withGitRepo((repo) => {
       commit(repo, 'initial')
       commit(repo, 'release: v1.4.36-rc.6')
       git(repo, ['tag', 'v1.4.36-rc.6'])
@@ -98,8 +113,8 @@ describe('isTagBuiltFromCurrentRef', () => {
     })
   })
 
-  it('accepts a tag whose release commit is built from the current ref', () => {
-    withGitRepo((repo) => {
+  it('accepts a tag whose release commit is built from the current ref', async () => {
+    await withGitRepo((repo) => {
       commit(repo, 'initial')
       const source = git(repo, ['rev-parse', 'HEAD'])
       commit(repo, 'release: v1.4.36-rc.6')
@@ -110,8 +125,8 @@ describe('isTagBuiltFromCurrentRef', () => {
     })
   })
 
-  it('rejects a stale tag when the current ref has moved on', () => {
-    withGitRepo((repo) => {
+  it('rejects a stale tag when the current ref has moved on', async () => {
+    await withGitRepo((repo) => {
       commit(repo, 'initial')
       commit(repo, 'release: v1.4.36-rc.6')
       git(repo, ['tag', 'v1.4.36-rc.6'])

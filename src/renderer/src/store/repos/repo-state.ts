@@ -28,6 +28,7 @@ import type {
   FolderWorkspacePathStatusRequest
 } from '../../../../shared/folder-workspace-path-status'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ConfirmedUnsavedDiscards } from '../slices/worktrees/teardown/removed-workspace-unsaved-files'
 
 export const ERROR_TOAST_DURATION = 60_000
 

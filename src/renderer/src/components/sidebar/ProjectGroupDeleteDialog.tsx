@@ -112,6 +112,7 @@ export function ProjectGroupDeleteDialog({
       }}
     >
       <DialogContent
+        surface="security"
         ref={handleDialogContentRef}
         className="max-w-sm sm:max-w-sm"
         showCloseButton={false}

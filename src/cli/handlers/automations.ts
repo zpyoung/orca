@@ -178,7 +178,7 @@ function buildAutomationRunContextFromSetup(setup: ProjectHostSetup): WorkspaceR
   return runContext
 }
 
-// Why: an older runtime strips the field and would run the automation without it.
+// Older runtimes silently strip extraAgentArgs and would run without the requested arguments.
 async function assertExtraAgentArgsSupported(
   client: RuntimeClient,
   extraAgentArgs: string | undefined

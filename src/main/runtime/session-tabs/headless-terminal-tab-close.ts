@@ -1,7 +1,8 @@
 import type { RuntimeHeadlessTabProperties as HeadlessTabPropertiesMethods } from './headless-tab-properties'
 import type { RuntimeHeadlessTabGroups as HeadlessTabGroupsMethods } from './headless-tab-group-moves'
 import type { OrcaRuntimeWithPersistHeadlessTerminalTitle as PersistHeadlessTerminalTitleMethods } from '../workspaces/workspace-file-session-targets'
-import { OrcaRuntimeWithCloseStructuredAgentSessionTab } from './structured-session-tab-close'
+import { OrcaRuntimeWithMainLayoutTabMoves } from './main-layout-session-tab-move'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
 import type {
   RuntimeMobileSessionTabMove,
   RuntimeMobileSessionTabMoveResult,
@@ -18,11 +19,7 @@ import type { RuntimeTerminalRename } from '../../../shared/runtime-terminal-con
 import type { TerminalDockPropsPatch } from '../fork-terminal-dock/terminal-dock-session-tab-props'
 import type { RuntimeSessionTabCloseReason } from '../../../shared/runtime-session-contracts'
 
-export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWithCloseStructuredAgentSessionTab {
-  protected abstract applyHeadlessSessionTabPropsToSnapshot(
-    ...args: Parameters<HeadlessTabPropertiesMethods['applyHeadlessSessionTabPropsToSnapshot']>
-  ): ReturnType<HeadlessTabPropertiesMethods['applyHeadlessSessionTabPropsToSnapshot']>
-
+export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWithMainLayoutTabMoves {
   protected abstract applyHeadlessTerminalPaneLayoutToSnapshot(
     ...args: Parameters<HeadlessTabPropertiesMethods['applyHeadlessTerminalPaneLayoutToSnapshot']>
   ): ReturnType<HeadlessTabPropertiesMethods['applyHeadlessTerminalPaneLayoutToSnapshot']>
@@ -35,10 +32,6 @@ export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends Orca
     ...args: Parameters<PersistHeadlessTerminalTitleMethods['normalizeMobileSessionTabOrder']>
   ): ReturnType<PersistHeadlessTerminalTitleMethods['normalizeMobileSessionTabOrder']>
 
-  protected abstract persistHeadlessSessionTabProps(
-    ...args: Parameters<HeadlessTabPropertiesMethods['persistHeadlessSessionTabProps']>
-  ): ReturnType<HeadlessTabPropertiesMethods['persistHeadlessSessionTabProps']>
-
   protected abstract persistHeadlessTerminalPaneLayout(
     ...args: Parameters<HeadlessTabPropertiesMethods['persistHeadlessTerminalPaneLayout']>
   ): ReturnType<HeadlessTabPropertiesMethods['persistHeadlessTerminalPaneLayout']>
@@ -46,14 +39,6 @@ export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends Orca
   protected abstract getPtyIdsForExplicitTabClose(worktreeId: string, tabId: string): string[]
 
   abstract renameTerminal(handle: string, title: string | null): Promise<RuntimeTerminalRename>
-
-  protected abstract persistHeadlessTerminalTitle(
-    ...args: Parameters<PersistHeadlessTerminalTitleMethods['persistHeadlessTerminalTitle']>
-  ): ReturnType<PersistHeadlessTerminalTitleMethods['persistHeadlessTerminalTitle']>
-
-  protected abstract resolveMobileSessionHostTabId(
-    ...args: Parameters<PersistHeadlessTerminalTitleMethods['resolveMobileSessionHostTabId']>
-  ): ReturnType<PersistHeadlessTerminalTitleMethods['resolveMobileSessionHostTabId']>
 
   protected async closeHeadlessMobileTerminalTab(
     worktreeId: string,
@@ -80,6 +65,7 @@ export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends Orca
       return proof ? [proof] : []
     })
     const acknowledgeRetirement = this.captureTerminalTabRetirement(worktreeId, closedParentTabId)
+    const liveTerminalOf = this.liveTerminalsOfClosedTab(worktreeId, snapshot, closedParentTabId)
     const projectedPtyIds = await this.closeTerminalSurface(
       worktreeId,
       { kind: 'tab', tabId: closedParentTabId },
@@ -112,7 +98,7 @@ export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends Orca
         this.getMobileTerminalLeafPtyIds(candidate).includes(options.authorizedPty.ptyId)
           ? options.authorizedPty
           : null
-      const livePty = this.findPtyForMobileTerminalTab(worktreeId, candidate) ?? authorizedPty
+      const livePty = liveTerminalOf(candidate) ?? authorizedPty
       const ptyId = livePty?.ptyId ?? candidate.ptyId
       const hasOtherOwner = snapshot.tabs.some(
         (other) =>
@@ -180,6 +166,10 @@ export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends Orca
     if (!snapshot) {
       throw new Error('tab_not_found')
     }
+    const movedInMain = await this.moveTabInMainLayout(worktreeId, snapshot, move)
+    if (movedInMain) {
+      return movedInMain
+    }
     if (!this.notifier?.moveSessionTab) {
       return this.moveHeadlessMobileSessionTab(worktreeId, snapshot, move)
     }
@@ -239,6 +229,10 @@ export abstract class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends Orca
     const hostTabId = snapshot
       ? (this.resolveMobileSessionHostTabId(snapshot, args.tabId) ?? args.tabId)
       : args.tabId
+    // Switch point: pane names in a tab main owns are main's renames, so only geometry goes on.
+    if (ORCA_LAYOUT_OWNER_IS_MAIN) {
+      args = await this.nameMainPanes(worktreeId, hostTabId, args)
+    }
     // Why: when a renderer is authoritative (desktop host reached via shared
     // control), it owns pane geometry and republishes it — a headless write here
     // would be overwritten and could fight the renderer. Only pane names, which

@@ -39,6 +39,7 @@ export function SourceControlDialogLayer({
   onUsePrimaryBaseRef,
   sourceControlAiActionsVisible,
   resolveConflictsComposerOpen,
+  recoveryContext,
   onResolveConflictsComposerOpenChange,
   resolveConflictsPrompt,
   worktreeId,
@@ -82,6 +83,7 @@ export function SourceControlDialogLayer({
   onUsePrimaryBaseRef: NonNullable<BaseRefPickerProps['onUsePrimary']>
   sourceControlAiActionsVisible: boolean
   resolveConflictsComposerOpen: boolean
+  recoveryContext?: AgentDialogProps['recoveryContext']
   onResolveConflictsComposerOpenChange: AgentDialogProps['onOpenChange']
   resolveConflictsPrompt: string
   worktreeId: AgentDialogProps['worktreeId']
@@ -184,6 +186,7 @@ export function SourceControlDialogLayer({
         open={sourceControlAiActionsVisible && resolveConflictsComposerOpen}
         onOpenChange={onResolveConflictsComposerOpenChange}
         actionId="resolveConflicts"
+        recoveryContext={recoveryContext}
         title={translate(
           'auto.components.right.sidebar.SourceControl.19652ddd76',
           'Resolve Conflicts With AI'

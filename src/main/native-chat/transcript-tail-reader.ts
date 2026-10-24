@@ -69,7 +69,6 @@ export async function readNativeChatTranscriptTailFile(
   consumedTo: number
   hasMore: boolean
   beforeOffset: number
-  /** Newest row time up to `consumedTo`, where an incremental read continues. */
   latestTimestamp?: number
   malformedRecordCount?: number
   oversizedRecordCount?: number
@@ -102,7 +101,6 @@ export async function readNativeChatTranscriptTailFile(
     const newestFirst: { message: NativeChatMessage; offset: number }[] = []
     const finalByte = await readTranscriptByteAt(handle, filePath, consumedTo - 1, signal)
     if (finalByte === null) {
-      // File shrank between stat and probe: report empty, the next poll re-stats.
       return { messages: [], consumedTo: 0, hasMore: false, beforeOffset: 0 }
     }
     ignoreNextMalformedRecord = finalByte !== 0x0a
@@ -127,8 +125,7 @@ export async function readNativeChatTranscriptTailFile(
         signal
       )
       signal?.throwIfAborted()
-      // A short read means the file shrank mid-walk: stop paging back rather
-      // than stitch non-adjacent bytes into records.
+      // Short reads mean shrink; never stitch non-adjacent bytes into a record.
       if (bytesRead < buffer.length) {
         break
       }
@@ -162,8 +159,7 @@ export async function readNativeChatTranscriptTailFile(
       latest = ordered.latest
       return { message: ordered.message, offset: entry.offset }
     })
-    // Why: slice(-0) returns the whole array, so a non-positive limit must
-    // window to nothing explicitly rather than leak every buffered record.
+    // slice(-0) returns everything; non-positive limits must explicitly select nothing.
     const selected = limit > 0 ? chronological.slice(Math.max(0, chronological.length - limit)) : []
     return {
       messages: selected.map((entry) => entry.message),
@@ -203,7 +199,7 @@ export async function readNativeChatTranscriptTailFile(
     lineOffset: number,
     messages: { message: NativeChatMessage; offset: number }[]
   ): void {
-    // Positional reads own these bytes; only multi-part records need joining in reverse order.
+    // Positional reads own their buffers; only split records require a reverse-order join.
     const bytes = lineParts.length === 1 ? lineParts[0] : Buffer.concat(lineParts.toReversed())
     let line = bytes.toString('utf8')
     if (line.endsWith('\r')) {
@@ -274,13 +270,11 @@ export async function readNativeChatTranscriptTail(
       args.filePath ?? (await resolveSessionFilePath(args.agent, args.sessionId, args, signal))
   } catch (error) {
     signal?.throwIfAborted()
-    // Why: gate refusal is transient unavailability with retry guidance —
-    // `notFound` would settle callers into a false "missing" state.
+    // Gate refusal is unavailable, never proof of a missing transcript.
     return { error: wslTranscriptFsRefusal(error).message }
   }
   signal?.throwIfAborted()
-  // Why: a new agent session can report its id before the first JSONL flush;
-  // callers keep that miss in loading/retry rather than showing a false error.
+  // Session IDs can arrive before the first flush; missing paths stay retryable.
   if (!filePath) {
     return { error: 'Transcript unavailable', notFound: true }
   }

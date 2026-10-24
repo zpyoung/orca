@@ -4,6 +4,7 @@ import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-verified-input'
 import type { AgentType } from '../../../../shared/native-chat-types'
 import {
+  nativeChatAskRequiresTerminal,
   resolveNativeChatTranscriptAgent,
   shouldStepNativeChatAskAnswer
 } from '../../../../shared/native-chat-agent-support'
@@ -134,7 +135,7 @@ export function useNativeChatInteractiveSend(
       cancelInFlight()
       const target = { terminalTabId, ptyId: targetPtyId }
       // Selector TUIs ignore pasted labels; Codex uses a different key sequence.
-      const stepsAnswer = shouldStepNativeChatAskAnswer(agent)
+      const stepsAnswer = !prompt.replyAsMessage && shouldStepNativeChatAskAnswer(agent)
       const buildsCodexAnswer = resolveNativeChatTranscriptAgent(agent) === 'codex'
       // Why: pin the answered question's baseline BEFORE delivery. A late settle
       // callback (paced writes + remote acceptance can span seconds on SSH) must
@@ -190,8 +191,11 @@ export function useNativeChatInteractiveSend(
 
   const cancelAsk = useCallback(() => {
     cancelInFlight()
+    if (nativeChatAskRequiresTerminal(agent)) {
+      return Promise.resolve(false)
+    }
     return sendRawVerified(ESC)
-  }, [cancelInFlight, sendRawVerified])
+  }, [agent, cancelInFlight, sendRawVerified])
 
   const cancel = useCallback(() => {
     cancelInFlight()

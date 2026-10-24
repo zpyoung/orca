@@ -23,7 +23,6 @@ import type { BaseRefDefaultResult, BaseRefSearchResult, Repo } from '../../shar
 
 export type RepositoryApi = {
   list: () => Promise<Repo[]>
-  // Why: error union matches the IPC handler's return shape; renderer callers branch on `'error' in result`.
   add: (args: {
     path: string
     kind?: 'git' | 'folder'
@@ -78,7 +77,6 @@ export type RepositoryApi = {
   pickDirectory: () => Promise<string | null>
   clone: (args: { url: string; destination: string }) => Promise<Repo>
   cloneAbort: () => Promise<void>
-  // Why: error union matches the IPC handler's return shape; renderer callers branch on `'error' in result`.
   create: (args: {
     parentPath: string
     name: string
@@ -87,7 +85,6 @@ export type RepositoryApi = {
   isGitAvailable: () => Promise<boolean>
   getDefaultCreateProjectParent: () => Promise<string>
   onCloneProgress: (callback: (data: { phase: string; percent: number }) => void) => () => void
-  getGitUsername: (args: { repoId: string }) => Promise<string>
   getBaseRefDefault: (args: {
     repoId: string
     hostId?: ExecutionHostId

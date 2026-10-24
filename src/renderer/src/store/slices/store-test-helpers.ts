@@ -57,6 +57,7 @@ import { createLedgerSlice } from './ledger'
 import { createLoopsSlice } from '@/fork-loops/loops-slice'
 import { createHeimdallFleetSlice } from './fork-heimdall/fleet'
 import '@/i18n/i18n'
+import { withEditorBufferRecords } from '../editor-buffer-record-lifecycle'
 import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
 export { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
 export {

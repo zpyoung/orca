@@ -320,7 +320,7 @@ jobs:
       needs.code_paths.outputs.cross-version-wire == 'true' &&
       needs.preflight.result == 'success'
     # Why ARM: source-only: tagged checkout plus in-process vitest, no docker or browser.
-    runs-on: ubuntu-24.04-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
 
     steps:
       # Why fetch-depth 0: the harness extracts the newest release tag to skew
