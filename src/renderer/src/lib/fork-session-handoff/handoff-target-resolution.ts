@@ -53,6 +53,11 @@ type HandoffTargetState = Pick<
 
 type DetectAgents = (worktreeId: string) => Promise<TuiAgent[]>
 
+/** Agents whose CLI was detected on the worktree's host; chat-only offers are not handoff targets. */
+export async function detectHandoffAgents(worktreeId: string): Promise<TuiAgent[]> {
+  return [...((await detectAgentSessionContinuationAgents(worktreeId)).detected ?? [])]
+}
+
 /** Lists same-repository worktrees and folder workspaces that contain the anchor repo. */
 export function listHandoffTargetCandidates(
   state: HandoffTargetState,
@@ -171,7 +176,7 @@ export function resolveHandoffHostChange(
 
 /** Creates a target detector that discards completions from older request generations. */
 export function createHandoffAgentDetectionGeneration(
-  detectAgents: DetectAgents = detectAgentSessionContinuationAgents
+  detectAgents: DetectAgents = detectHandoffAgents
 ): {
   detect: (
     worktreeId: string,
