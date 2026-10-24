@@ -12,7 +12,7 @@ import {
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { type ProspectiveWorkspace, worktreeLaunchWorkspace } from '@/lib/agent-launch-route-input'
 import { readAgentLaunchChoice } from '@/lib/host-chat-program'
-import { getRepoExecutionHostId } from '../../../shared/execution-host'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../../shared/execution-host'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
@@ -31,7 +31,6 @@ import {
   renderSourceControlActionCommandTemplate
 } from '../../../shared/source-control-ai-actions'
 import { buildHostedReviewAgentPrompt } from '../../../shared/fork-hosted-review-sitter/agent-prompt'
-import { parseExecutionHostId } from '../../../shared/execution-host'
 import { isTuiAgentEnabled } from '../../../shared/tui-agent-selection'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { AppState } from '@/store/types'
