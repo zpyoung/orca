@@ -65,7 +65,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('refuses OMP question answers and cancellation without writing or clearing the wait', async () => {
-    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'omp'))
+    const { result } = renderHook(() => useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'omp'))
     const settled = vi.fn()
     act(() => {
       expect(result.current.sendAnswer(PROMPT, [{ indices: [1] }], settled)).toEqual({
@@ -155,7 +155,7 @@ describe('useNativeChatInteractiveSend', () => {
   })
 
   it('sends a Codex async answer as an ordinary message that quotes each answered question', () => {
-    const { result } = renderHook(() => useNativeChatInteractiveSend(PANE_KEY, 'pty-1', 'codex'))
+    const { result } = renderHook(() => useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'codex'))
     const prompt: AskPrompt = {
       replyAsMessage: true,
       questions: [
