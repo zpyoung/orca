@@ -34,7 +34,7 @@ import {
   NATIVE_CHAT_SUBMIT_DELAY_MS,
   resetNativeChatPtySendQueuesForTests
 } from '../native-chat-runtime-send'
-import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../native-chat-send'
+import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../../../../../shared/native-chat-paste-bytes'
 import { NATIVE_CHAT_CLEAR_CHUNK_GAP_MS } from './native-chat-runtime-clear'
 
 function useHarness(props: AgentComposerCoreProps) {
