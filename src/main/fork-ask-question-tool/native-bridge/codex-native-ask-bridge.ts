@@ -1,7 +1,7 @@
 import type {
   CodexAppServerConnection,
   CodexAppServerServerRequest
-} from '../../codex/codex-app-server-connection'
+} from '../../codex/app-server/codex-app-server-connection-types'
 import type { CodexSession } from '../../codex/codex-structured-session-state'
 import {
   answerCodexPrompt,

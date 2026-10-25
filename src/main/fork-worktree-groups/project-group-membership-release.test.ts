@@ -17,7 +17,7 @@ vi.mock('electron', () => ({
 
 async function createStore() {
   const { Store } = await import('../persistence')
-  const { createSqliteTestStore } = await import('../persistence-test-harness')
+  const { createSqliteTestStore } = await import('../persistence/persistence-test-harness')
   return createSqliteTestStore(Store, { dataFile: join(dataDir, 'orca-data.json') })
 }
 
@@ -26,7 +26,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  const { closeTestStores } = await import('../persistence-test-harness')
+  const { closeTestStores } = await import('../persistence/persistence-test-harness')
   await closeTestStores()
   rmSync(dataDir, { recursive: true, force: true })
 })

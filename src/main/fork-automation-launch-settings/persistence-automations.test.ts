@@ -9,7 +9,7 @@ import {
   readDataFile,
   testState,
   writeDataFile
-} from '../persistence-test-harness'
+} from '../persistence/persistence-test-harness'
 import { legacyLaunchOverrides } from '../../shared/fork-automation-launch-settings/legacy-launch-overrides.test-support'
 
 const { trackMock, getCohortAtEmitMock } = vi.hoisted(() => ({

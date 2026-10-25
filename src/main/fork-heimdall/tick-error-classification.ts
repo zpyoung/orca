@@ -1,7 +1,7 @@
 import {
   isRecoverableRemoteRuntimeConnectionError,
   toRemoteRuntimeClientErrorLike
-} from '../../shared/remote-runtime-client-error-classification'
+} from '../../shared/remote-runtime/remote-runtime-client-error-classification'
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import { isSshRequestOutcomeUnverifiable } from '../ssh/ssh-channel-multiplexer'
 
