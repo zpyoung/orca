@@ -30,6 +30,6 @@ export function parseLabel(line: string): { key: string; value: string } | undef
 }
 
 export function parseHeading(value: string): { id?: string; title?: string } {
-  const match = /^\[?([A-Za-z][A-Za-z0-9_-]*-\d+)\]?\s*[:—-]?\s*(.*)$/.exec(cleanInline(value))
+  const match = /^\[?([A-Za-z][A-Za-z0-9_-]*-\d+)\]?\s*[:\u2014-]?\s*(.*)$/.exec(cleanInline(value))
   return match ? { id: match[1], title: match[2] || undefined } : { title: cleanInline(value) }
 }
