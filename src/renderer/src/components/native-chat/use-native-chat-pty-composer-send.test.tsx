@@ -102,5 +102,8 @@ it('rejects reserved unavailable identities while ordinary large terminal text s
   expect(sendNativeChatMessage).not.toHaveBeenCalled()
   const text = 'x'.repeat(300000)
   send('codex', 'chat', text)
-  expect(vi.mocked(sendNativeChatMessage).mock.calls[0]?.slice(0, 2)).toEqual(['pty', text])
+  expect(vi.mocked(sendNativeChatMessage).mock.calls[0]?.slice(0, 2)).toEqual([
+    { terminalTabId: 'tab', ptyId: 'pty' },
+    text
+  ])
 })

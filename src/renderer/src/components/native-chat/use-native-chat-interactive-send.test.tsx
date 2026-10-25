@@ -174,7 +174,10 @@ describe('useNativeChatInteractiveSend', () => {
     )
 
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      'pty-1',
+      {
+        terminalTabId: 'tab-1',
+        ptyId: 'pty-1'
+      },
       '> Which color?\n\nRed\n\n> Any constraints?\n\nNone',
       { onDeliverySettled: expect.any(Function) }
     )

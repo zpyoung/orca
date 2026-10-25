@@ -317,7 +317,10 @@
       "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["      resolveTarget: () => ({ terminalTabId: 'tab', ptyId: 'pty' }),"]
+      "lines": [
+        "      resolveTarget: () => ({ terminalTabId: 'tab', ptyId: 'pty' }),",
+        "    { terminalTabId: 'tab', ptyId: 'pty' },"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-context-command.test.tsx",
@@ -6932,8 +6935,8 @@
       "removed": 5
     },
     "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.test.tsx": {
-      "added": 1,
-      "removed": 1
+      "added": 5,
+      "removed": 2
     },
     "src/renderer/src/components/native-chat/native-chat-context-command.test.tsx": {
       "added": 1,
