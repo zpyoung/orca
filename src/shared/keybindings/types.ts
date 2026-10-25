@@ -86,6 +86,7 @@ export type KeybindingActionId =
   | 'browser.reload'
   | 'browser.hardReload'
   | 'browser.focusAddressBar'
+  | 'browser.showHistory'
   | 'browser.grabElement'
   | 'browser.annotateElement'
   | 'editor.find'
@@ -206,4 +207,6 @@ export type KeybindingConflict = {
 export type FindKeybindingConflictOptions = {
   ignoredActionIds?: Iterable<KeybindingActionId>
   relevantActionIds?: Iterable<KeybindingActionId>
+  /** Settings-only diagnostic; the loader and writes keep the scope-only check so saved overrides still load. */
+  includeMainProcessInterception?: boolean
 }

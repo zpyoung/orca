@@ -12,7 +12,7 @@ import type { SessionOptionValue } from '../../../../shared/native-chat-session-
 import {
   canonicalizeAgentSessionIdentity,
   type ProviderExecutionNamespace
-} from '../../agent-session-claim-identity'
+} from '../../agent-session/ownership/agent-session-claim-identity'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import { buildAgentResumeStartupPlan } from '../../../../shared/tui-agent-startup'
 import { agentLaunchQuotingShell } from '../../../../shared/agent-launch-runtime'

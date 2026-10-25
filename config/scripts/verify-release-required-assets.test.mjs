@@ -82,6 +82,22 @@ path: orca-linux.AppImage`
 })
 
 describe('verifyRequiredReleaseAssets', () => {
+  function releaseFetch(release, manifestAsset, manifestText) {
+    return vi.fn(async (url) => {
+      const releasesUrl = 'https://api.github.com/repos/stablyai/orca/releases'
+      if (url === `${releasesUrl}?per_page=100`) {
+        return jsonResponse([release])
+      }
+      if (url === `${releasesUrl}/assets/${manifestAsset.id}`) {
+        return jsonResponse(manifestText)
+      }
+      if (release.assets.some((asset) => url === `${releasesUrl}/assets/${asset.id}`)) {
+        return jsonResponse('version: 1.4.27\n')
+      }
+      throw new Error(`Unexpected release request: ${url}`)
+    })
+  }
+
   it('fails when a manifest-referenced asset has not been uploaded', async () => {
     const tag = 'v1.4.27'
     // The mac .zip is referenced by latest-mac.yml but never uploaded, so
