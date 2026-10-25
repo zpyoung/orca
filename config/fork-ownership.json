@@ -3507,7 +3507,7 @@
       "feature": "heimdall",
       "kind": "passthrough",
       "lines": [
-        "        body: `Worker ${handle} stopped while running task ${named}. ${errorContext}.${settled?.status === 'circuit_broken' ? ' This task has now failed too many times, so it will not be retried automatically.' : settled?.status === 'failed' ? ' The task is ready to be dispatched again.' : ''}${exitTailText ?? ''}`,"
+        "          body: `Worker ${handle} stopped while running task ${task}. ${errorContext}.${settled?.status === 'circuit_broken' ? ' This task has now failed too many times, so it will not be retried automatically.' : settled?.status === 'failed' ? ' The task is ready to be dispatched again.' : ''}${exitTailText ?? ''}`"
       ]
     },
     {
@@ -7104,7 +7104,7 @@
     },
     "AGENTS.md": {
       "added": 146,
-      "removed": 1
+      "removed": 2
     },
     "config/localization-coverage-allowlist.json": {
       "added": 7,
