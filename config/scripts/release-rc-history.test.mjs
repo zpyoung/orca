@@ -83,6 +83,8 @@ describe('release RC history', () => {
       commit(repo, 'release: v1.4.36-rc.5.zy01')
       git(repo, ['tag', 'v1.4.36-rc.5.zy01'])
       commit(repo, 'release: v1.4.36-rc.6.zy01')
+      git(repo, ['tag', 'v1.4.36-rc.6.zy01'])
+      git(repo, ['tag', '--delete', 'v1.4.36-rc.6.zy01'])
 
       expect(highestRcForBase('1.4.36', { cwd: repo })).toBe(6)
     })
@@ -150,9 +152,9 @@ describe('release RC history', () => {
     withGitRepo((repo) => {
       commit(repo, 'initial')
       expect(highestRcForBase('1.4.36', { cwd: repo })).toBeNull()
-      git(repo, ['tag', 'v1.4.36-rc.7'])
+      git(repo, ['tag', 'v1.4.36-rc.7.zy01'])
       expect(highestRcForBase('1.4.36', { cwd: repo })).toBe(7)
-      git(repo, ['tag', '--delete', 'v1.4.36-rc.7'])
+      git(repo, ['tag', '--delete', 'v1.4.36-rc.7.zy01'])
       expect(highestRcForBase('1.4.36', { cwd: repo })).toBeNull()
     })
   })

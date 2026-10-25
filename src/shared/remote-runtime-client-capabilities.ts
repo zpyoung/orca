@@ -12,7 +12,10 @@ import {
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
   type RuntimeCapability
 } from './protocol-version'
-import { TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY } from './terminal-quick-command-capabilities'
+import {
+  TERMINAL_QUICK_COMMAND_LARGE_LISTS_RUNTIME_CAPABILITY,
+  TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY
+} from './terminal-quick-command-capabilities'
 import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from './fork-heimdall/capability'
 import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from './agent-session-background-task-child-views-capability'
 import { SKILL_INSTALL_RESULT_V2_CAPABILITY } from './skill-install-capability'
@@ -39,6 +42,7 @@ export function remoteRuntimeClientCapabilities(
       AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY,
       REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
       TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY,
+      TERMINAL_QUICK_COMMAND_LARGE_LISTS_RUNTIME_CAPABILITY,
       ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES,
       // Switch point: every desktop socket, browser hosting's included, leaves the unread flag to
       // a host that raises it.

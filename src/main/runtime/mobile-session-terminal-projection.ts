@@ -68,7 +68,7 @@ export function buildHeadlessMobileSessionTerminalTabs(
         leafIds.push(deriveHeadlessLegacyTerminalLeafId(tab.id))
       }
       const terminalDockByPaneKey = terminalDockByPaneKeyByTabId.get(tab.id)
-      // As the window publishes them: tab-wide names describe a sole pane.
+      // As the window publishes them: tab-wide names and the launch agent describe a sole pane.
       const tabWide = leafIds.length === 1
       return leafIds.flatMap((leafId) => {
         const ptyId = layout?.ptyIdsByLeafId?.[leafId] ?? (leafIds.length === 1 ? tab.ptyId : null)

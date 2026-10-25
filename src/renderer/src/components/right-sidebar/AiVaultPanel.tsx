@@ -103,7 +103,6 @@ export default function AiVaultPanel({
     resetViewOptions
   } = usePersistedAiVaultViewOptions(initialAgents)
   useSessionInfoVaultNavigation(setQuery, setAgentEnabled)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const { executionHostScope, onExecutionHostScopeChange, hostScopeOptions } =
     useAiVaultPanelHostScope(activeWorktreeId ?? null, resumeTargetState)
   const activeWorktreePath = activeWorktree?.path ?? null

@@ -1,5 +1,5 @@
 import { bridgeCodexUserInput } from '../fork-ask-question-tool/native-bridge/codex-native-ask-bridge'
-import type { CodexAppServerServerRequest } from './codex-app-server-connection'
+import type { CodexAppServerServerRequest } from './app-server/codex-app-server-connection-types'
 import { disposeCodexServerRequest } from './codex-server-request-disposition'
 import type { CodexJournalTranslationAdmission } from './codex-structured-journal-translation'
 import * as codexRewind from './codex-structured-rewind'

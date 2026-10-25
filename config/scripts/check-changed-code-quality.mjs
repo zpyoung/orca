@@ -74,7 +74,7 @@ const SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS = new Map([
     // cover them: react-doctor lives only in config/oxlint-react-doctor.json, so the
     // directive reads as unused under the root-config scan in this same gate.
     new Set([
-      'src/renderer/src/components/use-task-page-github-issue-draft.ts',
+      'src/renderer/src/components/task-page/github/use-task-page-github-issue-draft.ts',
       'src/renderer/src/components/use-task-page-jira-creation-state.ts',
       'src/renderer/src/components/ledger/LedgerEntryDetail.tsx',
       'src/renderer/src/components/ledger/LedgerEntryForm.tsx',

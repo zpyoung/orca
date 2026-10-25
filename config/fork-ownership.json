@@ -3628,13 +3628,13 @@
       "lines": ["export const ProjectGroupDeleteArgs = ProjectGroupSelectorArgs.extend({"]
     },
     {
-      "path": "src/main/persistence-right-sidebar-tab.test.ts",
+      "path": "src/main/persistence/applying-settings/persistence-right-sidebar-tab.test.ts",
       "feature": "project-ledger",
       "kind": "registration",
       "lines": ["    expect(normalizeRightSidebarTab('ledger')).toBe('ledger')"]
     },
     {
-      "path": "src/main/persistence-ui-state.test.ts",
+      "path": "src/main/persistence/applying-settings/persistence-ui-state.test.ts",
       "feature": "project-ledger",
       "kind": "registration",
       "lines": [
@@ -8278,11 +8278,11 @@
       "added": 6,
       "removed": 0
     },
-    "src/main/persistence-right-sidebar-tab.test.ts": {
+    "src/main/persistence/applying-settings/persistence-right-sidebar-tab.test.ts": {
       "added": 4,
       "removed": 0
     },
-    "src/main/persistence-ui-state.test.ts": {
+    "src/main/persistence/applying-settings/persistence-ui-state.test.ts": {
       "added": 12,
       "removed": 0
     },

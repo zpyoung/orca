@@ -31,7 +31,7 @@ import { matchesRepositoryIdentitySearch } from './repository/identity/repositor
 import { RepositoryWorktreeDefaultsSection } from './repository/execution/RepositoryWorktreeDefaultsSection'
 import { RepositoryJiraProjectSection } from './repository/RepositoryJiraProjectSection'
 import { RepositoryLedgerSection } from './RepositoryLedgerSection'
-import { getProjectRuntimeSessionSummary } from './repository-runtime-session-summary'
+import { getProjectRuntimeSessionSummary } from './repository/execution/repository-runtime-session-summary'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../store/worktree-visibility-defaults-by-host'
 export { getRepositoryPaneSearchEntries }
 
