@@ -77,7 +77,7 @@ export type RuntimePtyWorktreeRecord = RuntimeTerminalTailState & {
   launchAgent: TuiAgent | null
   /** Which agent Orca launched here. Authority retires on the shell's first command-finished
    *  marker; the identity must outlive it, or a prompt write races that marker. */
-  launchedAgent: TuiAgent | null
+  launchedAgent?: TuiAgent | null
   agentSessionOwners: AgentSessionOwnerBinding[]
   /** Conversations the `incarnationId` execution reported; a later row can't hide them. In memory only. */
   cliConversations?: {
