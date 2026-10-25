@@ -35,7 +35,7 @@ it.each([
   expect(runnerFor(workflow.jobs.persistence, os, true)).toBe(fastRunner)
   expect(runnerFor(workflow.jobs.persistence, os, undefined)).toBe(os)
   for (const event of ['pull_request', 'schedule']) {
-    expect(runnerFor(workflow.jobs.persistence, os, undefined, event)).toBe(fastRunner)
+    expect(runnerFor(workflow.jobs.persistence, os, undefined, event)).toBe(os)
   }
 })
 
@@ -68,8 +68,8 @@ it.each([
 ])('sizes %s while preserving the signing workflow override', (name, hostedRunner, fastRunner) => {
   expect(runnerFor(workflow.jobs[name], undefined, false)).toBe(hostedRunner)
   expect(runnerFor(workflow.jobs[name], undefined, true)).toBe(fastRunner)
-  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'pull_request')).toBe(fastRunner)
-  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'schedule')).toBe(fastRunner)
+  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'pull_request')).toBe(hostedRunner)
+  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'schedule')).toBe(hostedRunner)
 })
 
 it('still builds and uploads cross-compiled Windows template addons on the x64 lane', () => {

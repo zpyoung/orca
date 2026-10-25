@@ -5641,6 +5641,28 @@
       "lines": ["    runs-on: ubuntu-slim"]
     },
     {
+      "path": "config/scripts/pr-test-loc-summary.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    expect(locJob['runs-on']).toBe('ubuntu-slim')"]
+    },
+    {
+      "path": "config/scripts/node-server-fast-runners.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "    expect(runnerFor(workflow.jobs.persistence, os, undefined, event)).toBe(os)",
+        "  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'pull_request')).toBe(hostedRunner)",
+        "  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'schedule')).toBe(hostedRunner)"
+      ]
+    },
+    {
+      "path": "config/scripts/ssh-windows-mobile-bundle.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  expect(producer['runs-on']).toBe('ubuntu-latest')"]
+    },
+    {
       "path": ".github/workflows/preflight-cli-platforms.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -9163,6 +9185,18 @@
       "removed": 1
     },
     ".github/workflows/pr-test-loc.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    "config/scripts/pr-test-loc-summary.test.mjs": {
+      "added": 1,
+      "removed": 1
+    },
+    "config/scripts/node-server-fast-runners.test.mjs": {
+      "added": 3,
+      "removed": 3
+    },
+    "config/scripts/ssh-windows-mobile-bundle.test.mjs": {
       "added": 1,
       "removed": 1
     },
