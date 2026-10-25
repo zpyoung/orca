@@ -1209,7 +1209,10 @@
       "path": "src/main/telemetry/client.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["const TELEMETRY_ENABLED = false"]
+      "lines": [
+        "const TELEMETRY_ENABLED = false",
+        "    (!TELEMETRY_ENABLED && !testTransportEnabled) ||"
+      ]
     },
     {
       "path": "src/main/updater.feed-attempt-lifetime.test.ts",
@@ -7309,8 +7312,8 @@
       "removed": 2
     },
     "src/main/telemetry/client.ts": {
-      "added": 2,
-      "removed": 1
+      "added": 8,
+      "removed": 2
     },
     "src/main/updater.feed-attempt-lifetime.test.ts": {
       "added": 1,

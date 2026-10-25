@@ -61,7 +61,12 @@ export function initTelemetry(store: Store): void {
   appOpenedTrackedThisSession = false
   trackedDashboardActiveDays.clear()
 
-  if (!TELEMETRY_ENABLED || !IS_OFFICIAL_BUILD || BUILD_IDENTITY === null || WRITE_KEY === null) {
+  if (
+    (!TELEMETRY_ENABLED && !testTransportEnabled) ||
+    !IS_OFFICIAL_BUILD ||
+    BUILD_IDENTITY === null ||
+    WRITE_KEY === null
+  ) {
     return
   }
 
