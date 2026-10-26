@@ -12,6 +12,9 @@ import { resolveStartupShell, type AgentStartupShell } from './tui-agent-startup
 import { TUI_AGENT_CONFIG } from './tui-agent-config'
 import type { TuiAgent } from './tui-agent'
 import { buildAgentResumeLaunchCommand } from './agent-resume-launch-command'
+import { buildAiVaultResumeShellCommand } from './ai-vault-resume-command'
+import { normalizeRuntimePathForComparison } from './cross-platform-path'
+import { parseWslUncPath } from './wsl-paths'
 import { applyClaudeSuppressionFlagsToResumeCommand } from './fork-ask-question-tool/claude-suppression-flag-composition'
 
 export function buildAgentResumeStartupPlan(args: {

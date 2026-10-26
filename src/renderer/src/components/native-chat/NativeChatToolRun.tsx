@@ -39,6 +39,7 @@ import { NativeChatToolRunIcon } from './NativeChatToolIcon'
 import { NativeChatToolRunCallCounts } from './NativeChatToolRunCallCounts'
 import { NativeChatToolRunMembers, revealNativeChatToolRunMember } from './NativeChatToolRunMembers'
 import { NativeChatToolRunMemberList } from './NativeChatToolRunMemberList'
+import { NativeChatBrowserRunPageButton } from './NativeChatBrowserPageButton'
 import { NativeChatToolCategoryDots } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
 
 /** Insert keyed asides before their block or after the final block. */
@@ -207,25 +208,12 @@ export function NativeChatToolRun({
             aria-live="polite"
             data-native-chat-tool-run-state={live ? 'live' : 'settled'}
           >
-            {runSentence ?? fallbackLabel}
-          </span>
-          <NativeChatToolCategoryDots blocks={blocks} />
-          <NativeChatToolRunCallCounts
-            failed={failedCallCount}
-            interrupted={interruptedCallCount}
-          />
-          {/* Only a stated success is marked done — see nativeChatToolRunOutcome —
-              and never while live: between two calls nothing is running, and a
-              mark that appeared then would flash on every call. */}
-          {!live && runSucceeded ? (
-            <span className="flex h-[1lh] shrink-0 items-center">
-              <Check aria-hidden className="size-3 shrink-0 text-chat-foreground-faint" />
-            </span>
-          ) : null}
-          {latestCallLabel ? (
-            <span className="flex h-[1lh] min-w-0 items-center">
-              <span className="min-w-0 truncate font-sans text-xs text-chat-foreground-faint">
-                {latestCallLabel}
+            {settledHeaderIcon ? (
+              <span className="flex h-[1lh] shrink-0 items-center">
+                <NativeChatToolRunIcon
+                  iconName={settledHeaderIcon}
+                  className="text-chat-foreground-faint"
+                />
               </span>
             ) : null}
             {/* Keep the collapsed header bounded; the tool detail carries the full command. */}
@@ -239,6 +227,7 @@ export function NativeChatToolRun({
             >
               {runSentence ?? fallbackLabel}
             </span>
+            <NativeChatToolCategoryDots blocks={blocks} />
             <NativeChatToolRunCallCounts
               failed={failedCallCount}
               interrupted={interruptedCallCount}

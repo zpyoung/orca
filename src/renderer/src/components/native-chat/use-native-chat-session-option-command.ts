@@ -71,10 +71,7 @@ export function useNativeChatSessionOptionCommand(args: {
         if (!mountedRef.current || sendController.signal.aborted) {
           throw new Error('Chat UI command was canceled because the composer closed.')
         }
-        // Why: chat sends keep a delayed Enter for 500ms. Drain them *before*
-        // arming the model-switch observer so (a) that Enter cannot hit Claude's
-        // confirmation UI and (b) any Ctrl+U cleanup is outside the observation
-        // window (Ctrl+U mid-observe can miss "Set model to …" markers).
+        // Drain delayed chat Enter/Ctrl+U before observing so they cannot answer the model dialog or hide confirmation markers.
         cancelNativeChatPtySends(target.ptyId)
         await waitForNativeChatPtyIdle(target.ptyId)
         if (!mountedRef.current || sendController.signal.aborted) {

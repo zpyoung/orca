@@ -1,7 +1,3 @@
-// Runtime send for native chat: clear any unsubmitted TUI line, write the framed
-// body, then Enter as a SEPARATE delayed pty write. Kept apart from the pure
-// byte builders in native-chat-send.ts so those stay IO-free and unit-testable.
-
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import {
   isTerminalInputQuarantined,
@@ -76,14 +72,7 @@ function rejectQuarantinedNativeChatSend(options?: NativeChatSendOptions): Nativ
   return NOOP_NATIVE_CHAT_SEND_HANDLE
 }
 
-/**
- * Chat message path:
- *   1. clear any unsubmitted TUI line
- *   2. write framed body
- *   3. delayed Enter (separate write — same-write CR can be swallowed by paste)
- *
- * Serialized per PTY so rapid sends cannot glue before Enter.
- */
+/** Serialize clear/body/delayed Enter per PTY; a CR sharing the paste write can be swallowed. */
 export function sendNativeChatMessage(
   target: NativeChatResolvedTarget,
   text: string,
@@ -101,13 +90,8 @@ export function sendNativeChatMessage(
 }
 
 /**
- * Session-option / slash command path (model switch, /effort, …).
- *
- * Does not pre-clear the line (model-switch confirmation watches the PTY).
- * Cancels any in-flight chat clear/body/Enter on this PTY first so a delayed
- * chat Enter cannot dismiss Claude's "Switch model?" dialog, then queues its
- * own body+Enter on the same per-PTY sequence (r5-3) so a card's selector
- * write cannot land mid-body or mid-Enter of this command.
+ * Cancel and await chat sends before verified commands; delayed Enter or pre-clear could disrupt model confirmation.
+ * Queues its own body+Enter on the same per-PTY sequence so a card's selector write cannot land mid-command.
  */
 export async function sendNativeChatMessageVerified(
   target: NativeChatResolvedTarget,
@@ -124,9 +108,6 @@ export async function sendNativeChatMessageVerified(
     if (signal?.aborted || invalidated) {
       return false
     }
-    // Why: chat sends hold a delayed Enter for 500ms. Opening the model picker in
-    // that window used to let that Enter hit Claude's confirmation UI, so
-    // verification timed out with "Could not verify the model change".
     cancelNativeChatPtySends(target.ptyId)
     await waitForNativeChatPtyIdle(target.ptyId)
     if (signal?.aborted || invalidated) {
@@ -201,8 +182,6 @@ export function sendNativeChatImagePastes(
   })
 }
 
-/** Submit a TUI prompt with no body (Enter only) — e.g. a plain submit when the
- *  composer is empty. */
 export function submitNativeChatPrompt(target: NativeChatResolvedTarget): void {
   if (!isTerminalInputQuarantined(target.terminalTabId)) {
     sendRuntimePtyInput(target.ptyId, NATIVE_CHAT_SUBMIT, 'driving')

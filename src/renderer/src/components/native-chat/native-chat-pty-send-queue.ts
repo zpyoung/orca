@@ -16,10 +16,8 @@ export type NativeChatPtySendQueueHandle = {
 export type EnqueueNativeChatPtySendOptions = {
   terminalTabId: string
   /**
-   * Called when cancel aborts after `start` began but before Enter was marked
-   * submitted. Used to clear leftover body text from the agent TUI. A returned
-   * promise keeps the line held until it settles; writes paced through `delay`
-   * are dropped if the PTY is invalidated meanwhile.
+   * Clear leftover TUI input only if cancellation follows start but precedes submission. A returned
+   * promise keeps the line held until it settles; writes paced through `delay` are dropped if the PTY is invalidated meanwhile.
    */
   onCancelUnsubmitted?: (delay: (ms: number, fn: () => void) => void) => Promise<void> | void
   /** Called when a started send is abandoned without a cleanup write (quarantine invalidation
@@ -80,7 +78,6 @@ export function invalidateNativeChatPtySends(ptyId: string): void {
   }
 }
 
-/** Wait until every chat sequence on this PTY has finished or been cancelled. */
 export async function waitForNativeChatPtyIdle(ptyId: string): Promise<void> {
   const state = ptyQueues.get(ptyId)
   if (!state) {
@@ -215,10 +212,7 @@ export function enqueueNativeChatPtySend(
       clearTimeout(timer)
     }
     const shouldClear = mode === 'cancel' && bodyStarted && !submitted
-    // Why: refund only THIS sequence's charged window rather than collapsing
-    // freeAt to now — later queued sends still hold the line, so a blanket
-    // reset would understate the next enqueue's settle time and let a send
-    // card drop while a queued Enter is still pending.
+    // Refund only this sequence’s window; later queued Enters still hold the line and their cards.
     state.freeAt = Math.max(Date.now(), state.freeAt - Math.max(0, durationMs))
     if (!shouldClear) {
       finishEntry()

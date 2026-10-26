@@ -100,7 +100,8 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     agentEnv: effectiveAgentEnv,
     sessionOptions: recipeSessionOptions,
     includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
-    allowEmptyPromptLaunch: true
+    allowEmptyPromptLaunch: true,
+    ...(args.promptDelivery === 'submit-after-ready' ? { suppressStartupUpdatePrompt: true } : {})
   })
   if (startupPlan && args.promptDelivery === 'draft') {
     startupPlan.draftPrompt = args.draftContent

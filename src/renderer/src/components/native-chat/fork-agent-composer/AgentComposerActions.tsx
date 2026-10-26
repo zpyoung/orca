@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: 86de8f90e22a15846a49912015278c1e440d00c7
+// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
 import { ArrowUp, CircleAlert, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -217,7 +217,6 @@ export function AgentComposerActions({
   )
 }
 
-/** Shown only after storage refused the draft, so it never appears on a normal save. */
 function DraftNotSavedIcon({ shown }: { shown: boolean }): React.JSX.Element | null {
   if (!shown) {
     return null

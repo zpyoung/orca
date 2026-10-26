@@ -167,9 +167,7 @@ export class RuntimeRepositorySettingsController {
           removeFromCatalog
         )
       : { result: removeFromCatalog(), ledgers: [] }
-    // Why again: a terminal spawned while the first stop ran is past that sweep's snapshot, and
-    // nothing can spawn into the project once it is gone. Chats only now: retiring their tabs is
-    // irreversible, and the WSL fence above can still refuse the removal.
+    // Sweep again for terminals spawned during stop. Retire chats only after the final WSL fence because that step is irreversible.
     await stopProjectTerminals(teardownStops('project-removal', 'structured-chat'))
     this.deps.forgetTerminalTopology(repo.id)
     this.deps.invalidateResolvedWorktrees()

@@ -103,7 +103,7 @@ export abstract class OrcaRuntimeWithPublishPtyBackedMobileSessionTerminal exten
           candidate.parentTabId === args.tabId &&
           candidate.terminalDockByPaneKey !== undefined
       )?.terminalDockByPaneKey
-    // Why: republishing a surface must not drop the tab's manual name; a new split leaf inherits it.
+    // Republished tabs retain manual names; new split leaves inherit them.
     const customTitle = (
       existingTab ??
       existing?.tabs.find(

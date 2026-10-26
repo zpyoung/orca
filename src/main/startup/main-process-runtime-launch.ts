@@ -184,8 +184,7 @@ async function launchServeMode(
   // Headless automation cannot wait for a renderer that never opens.
   state.automations?.start()
   state.heimdall?.start()
-  // Why: serve deletes worktrees too, and the history GC that normally drains delete tombstones is
-  // armed from the main window — without this, a quit mid-removal leaks the tree until a desktop launch.
+  // Arm history-removal GC without a window so interrupted serve deletions do not leak until desktop launch.
   void scheduleAllPendingHistoryTreeRemovals()
   emitServeBrowserIdentityActionLine(getBrowserIdentityModeStatus())
   await printServeReady(serveOptions)

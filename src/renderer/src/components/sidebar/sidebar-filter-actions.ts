@@ -112,10 +112,7 @@ const RESET_SIDEBAR_FILTER: Record<
   visibleHostIds: (store) => store.setVisibleWorkspaceHostIds(null)
 }
 
-/**
- * Clear filters: resets every active filter to its default, and only those, so a click with
- * nothing set issues no write.
- */
+/** Reset only active filters so an unfiltered click performs no writes. */
 export function clearSidebarFilters(
   state: SidebarFilterState,
   store: SidebarFilterSetters & Partial<ForkFilterSetters>

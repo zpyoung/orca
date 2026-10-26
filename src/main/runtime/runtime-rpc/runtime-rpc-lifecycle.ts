@@ -256,7 +256,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
           socket.connectionId,
           socket.clientCapabilities
         )
-        // Switch point: a client attaching sees every live terminal of this host in a tab.
+        // Publish every live host terminal as a tab on attach.
         if (ORCA_LAYOUT_OWNER_IS_MAIN) {
           void placeUnshownLiveTerminalsBestEffort(this.runtime)
         }

@@ -46,11 +46,7 @@ export function RightSidebarPanelContent({
         {effectiveTab === 'ledger' && (
           <LedgerPanel isVisible={rightSidebarOpen && effectiveTab === 'ledger'} />
         )}
-        {/* Plugin-contributed tabs route by key prefix; the panel itself
-            handles plugins that have since been uninstalled or disabled.
-            Why key: switching plugin tabs must remount the sandboxed iframe —
-            a reused frame could keep posting messages while the bridge is
-            rebound under the next plugin's identity. */}
+        {/* Remount on plugin changes so an old iframe cannot post through the next plugin's rebound bridge. */}
         {isPluginPanelTabKey(effectiveTab) && (
           <PluginPanel key={effectiveTab} tabKey={effectiveTab} />
         )}

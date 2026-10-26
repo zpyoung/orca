@@ -18,12 +18,7 @@ import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/proto
 import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
 import type { AgentTerminalLaunchCompletion } from './structured-agent-session-launch-admission'
 
-/**
- * Launch an agent terminal on the web runtime host instead of a local tab.
- *
- * Why: paired web tabs are host-owned, so this path never creates a local tab
- * (callers return tabId: null).
- */
+/** Paired web tabs are host-owned; never create a local tab, and return tabId:null. */
 export async function launchAgentInWebHostTab(args: {
   agent: TuiAgent
   worktreeId: string

@@ -206,8 +206,7 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
       handleConfirmedAgentExit(leafId)
       notifyTerminalDockConfirmedAgentExit(tabId, leafId)
     }
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Preserve the pre-split dependency contract.
-  }, [handleConfirmedAgentExit, tabId])
+  }, [handleConfirmedAgentExit, onAgentExitedRef, tabId])
   const canToggleChatForLeaf = useCallback(
     (leafId: string | null): boolean => {
       // Scope the "always allow toggling back" rule to the leaf showing chat; must not make an unsupported sibling look eligible.

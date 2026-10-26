@@ -89,7 +89,6 @@ docs/**
 !docs/
 !docs/architecture/
 !docs/architecture/**
-# The deployable docs app is source, not local engineering notes.
 !docs/site/
 !docs/site/**
 !docs/assets/
@@ -99,6 +98,8 @@ docs/**
 !docs/bug-reproductions/
 !docs/bug-reproductions/**
 !docs/STYLEGUIDE.md
+!docs/styleguide/
+!docs/styleguide/**
 !docs/fork-upstreaming.md
 !docs/reference/
 !docs/reference/cross-platform-support.md
@@ -122,7 +123,7 @@ validation-screenshots/
 test-results/
 playwright-report/
 
-# Agent skill installations (machine-local, populated by agent tooling).
+# Agent skills are installed per machine.
 # Exclude directory *contents* rather than the directory itself, so fork-owned
 # skills below can be re-included — git cannot re-include a path whose parent
 # directory is itself excluded.

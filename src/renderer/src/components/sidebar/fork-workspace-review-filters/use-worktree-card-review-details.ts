@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/use-worktree-card-review-details.ts
-// FORK-COPY-SHA: 86de8f90e22a15846a49912015278c1e440d00c7
+// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
 import { useState } from 'react'
 import { getDetachedWorkspaceReviewRequest } from '../workspace-detached-review-request'
 import {
@@ -88,7 +88,7 @@ export function useWorktreeCardReviewDetails({
       : ''
   // Saved workspace bindings keep equal Linear identifiers separate.
   const nextLinearSourceContext = getWorkspaceAttachmentSourceContext('linear', repo, worktree)
-  // Why: every workspace write rebuilds this object; holding it while equal keeps the card's Linear fetch effects from re-running.
+  // Preserve equal source-context identity so metadata writes do not retrigger Linear fetches.
   const [linearSourceContext, setLinearSourceContext] = useState(nextLinearSourceContext)
   if (!areTaskSourceContextsEqual(linearSourceContext, nextLinearSourceContext)) {
     setLinearSourceContext(nextLinearSourceContext)

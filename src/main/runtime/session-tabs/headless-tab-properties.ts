@@ -44,12 +44,7 @@ export abstract class RuntimeHeadlessTabProperties extends OrcaRuntimeWithCloseH
   // Remote tab color/pin need persistence and live publication or the next snapshot reverts them.
   async setMobileSessionTabProps(
     worktreeSelector: string,
-    args: {
-      tabId: string
-      color?: string | null
-      isPinned?: boolean
-      viewMode?: 'terminal' | 'chat'
-      customTitle?: string | null
+    args: SessionTabProps & {
       terminalDock?: TerminalDockPropsPatch
     }
   ): Promise<{ updated: true }> {

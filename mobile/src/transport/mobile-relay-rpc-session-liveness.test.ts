@@ -99,10 +99,21 @@ async function authenticateSession(onLog?: ConnectionLogSink) {
   return session
 }
 
-function sentRequests(): { id: string; method: string }[] {
-  return fakes.sendText.mock.calls.map(
-    ([value]) => JSON.parse(value as string) as { id: string; method: string }
-  )
+function sentRequests() {
+  return fakes.sendText.mock.calls.map(([value]) => {
+    const request: unknown = JSON.parse(value)
+    if (
+      !request ||
+      typeof request !== 'object' ||
+      !('id' in request) ||
+      typeof request.id !== 'string' ||
+      !('method' in request) ||
+      typeof request.method !== 'string'
+    ) {
+      throw new Error('Expected a serialized RPC request')
+    }
+    return request
+  })
 }
 
 describe('mobile relay RPC session liveness', () => {

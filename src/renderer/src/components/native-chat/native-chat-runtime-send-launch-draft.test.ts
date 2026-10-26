@@ -99,7 +99,7 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
       clearInput,
       confirmCleared: () => true
     })
-    // Body must NOT ride out with the clear — the confirm happens in between.
+    // Wait for clear confirmation before writing the body.
     await vi.advanceTimersByTimeAsync(MAX_CLEAR_PACING_MS)
     expect(writes().join('')).toBe(clearInput)
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS)

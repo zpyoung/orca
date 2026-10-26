@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-runtime-contract.ts
-// FORK-COPY-SHA: 86de8f90e22a15846a49912015278c1e440d00c7
+// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
 import type {
   NativeChatAppendedMessages,
   NativeChatReadSessionResult
@@ -36,8 +36,7 @@ export function parseRuntimeNativeChatTurnLifecycle(
   return {
     state: record.state,
     turnId: record.turnId.trim(),
-    // Why: an omitted timestamp is a valid payload; normalize it to null rather
-    // than dropping the whole lifecycle record.
+    // Missing timestamps are valid; normalize them without dropping the lifecycle record.
     timestamp: record.timestamp ?? null
   }
 }

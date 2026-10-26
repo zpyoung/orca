@@ -165,13 +165,8 @@ function mergeNativeChatSkills(
     byName.set(safeName, namedSkills)
   }
 
-  // Why: when the running session reports its own skills, that report is the
-  // authority on which ones exist — a disk scan cannot see what the session
-  // actually loaded (plugin roots, setting-source filters), and a scanned root
-  // the session ignored must not be offered. The scan stays the source of
-  // description and scope for the names both know about.
-  // A reported skill with its file is its own row: two skills may share a name, and the pick
-  // tells the agent which file it means.
+  // Session reports determine loaded skills (including plugin roots/setting-source filters); disk scans enrich matching descriptions/scope only.
+  // Each reported file gets its own row so same-named skills remain explicitly selectable.
   const nameCounts = new Map<string, number>()
   const firstReportedByName = new Map<string, NativeChatSessionSkill>()
   for (const skill of sessionSkills ?? []) {

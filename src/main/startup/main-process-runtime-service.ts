@@ -178,8 +178,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
     ipcMain,
     getWindows: () => [state.mainWindow, getDashboardPopoutWindow()]
   })
-  // Why before anything can attach: a client host that reattaches to a restarted runtime is only
-  // handed its pages back if the runtime found them first.
+  // Rehydrate before clients attach so restarted runtimes can return their owned pages.
   runtime.rehydrateClientHostedBrowserPages()
   browserManager.setBrowserGuestStateChangedListener((worktreeId) => {
     runtime.notifyMobileSessionTabsChanged(worktreeId)

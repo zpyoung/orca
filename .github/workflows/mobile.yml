@@ -104,9 +104,7 @@ jobs:
   verify:
     name: Mobile verify
     if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
-    # Why ARM: 209s of this job is Vitest and nothing here needs x86: no Android SDK, emulator, gradle,
-    # Hermes or Watchman, no docker, and no artifacts. The Gemfile.lock lists the generic `ruby`
-    # platform, so frozen bundler installs without an aarch64-linux entry.
+    # Use ARM for pure Vitest; no x86 native toolchain is needed and Gemfile.lock’s ruby platform supports frozen install.
     runs-on: ubuntu-24.04-arm
 
     env:
@@ -242,7 +240,7 @@ jobs:
   native-fingerprint:
     name: Mobile native fingerprint
     if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     continue-on-error: true
 

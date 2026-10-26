@@ -86,8 +86,7 @@ export function mergeHostWebUIState(
     showInactiveWorkspaces: incoming.showInactiveWorkspaces
   })
   const review = normalizeWebWorkspaceReviewFilters(local, {})
-  // Why `satisfies Record<...>` rather than a `Pick<...>` annotation: every member is optional in
-  // PersistedUIState, so Pick would accept a literal that silently skipped a newly added member.
+  // All PersistedUIState members are optional; satisfies Record catches newly omitted keys that Pick would accept.
   const pinned = {
     automationHostFilter: local.automationHostFilter,
     hideWorkspacesFromOtherDevices: local.hideWorkspacesFromOtherDevices === true,

@@ -1,18 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
-/**
- * The downgrade direction for persisted worktree identity.
- *
- * Upgrade is the easy direction. The risk PR #19955 records is the other one: a user runs a new
- * build, it writes durable state, then they roll back. State the new build wrote must stay
- * readable by the old one.
- *
- * The stack widens `migrateWorktreeIdentity` to repoint the `worktreeId` INSIDE session rows the
- * pre-stack build leaves pointing at the old id. A renamed worktree therefore leaves different
- * bytes on disk depending on which build did the rename, with no wire change anywhere — Rule 3's
- * shape applied to persistence, which is why it is measured here rather than reasoned about.
- */
+// Pin the pre-change reader: renamed session rows written by a new build must survive rollback and further renames.
 const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'
 const SUITE_TIMEOUT_MS = 180_000
 

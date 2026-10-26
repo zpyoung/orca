@@ -67,7 +67,7 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
       escalate: !isDeliberateTerminalExit(cause),
       describe: (task, outcome) => ({
         subject: `Agent exited unexpectedly (${errorContext})`,
-        body: `Worker ${handle} stopped while running task ${task}. ${errorContext}.${outcome}`
+        body: `Worker ${handle} stopped while running task ${task}. ${errorContext}.${outcome}${exitTailText ?? ''}`
       }),
       payload: { exitCode, exitCause: cause }
     })
@@ -146,10 +146,15 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
       {
         from: handle,
         mailbox: () => dispatchReportMailbox(db, dispatch),
-        describe: (task) => ({
-          subject: `Agent exited unexpectedly (${errorContext})`,
-          body: `Worker ${handle} stopped while running task ${task}. ${errorContext}.${settled?.status === 'circuit_broken' ? ' This task has now failed too many times, so it will not be retried automatically.' : settled?.status === 'failed' ? ' The task is ready to be dispatched again.' : ''}${exitTailText ?? ''}`
-        }),
+        describe: (task) =>
+          failure.describe(
+            task,
+            settled?.status === 'circuit_broken'
+              ? ' This task has now failed too many times, so it will not be retried automatically.'
+              : settled?.status === 'failed'
+                ? ' The task is ready to be dispatched again.'
+                : ''
+          ),
         payload: {
           taskId: dispatch.task_id,
           dispatchId: dispatch.id,

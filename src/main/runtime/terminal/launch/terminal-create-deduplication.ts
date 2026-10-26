@@ -156,6 +156,7 @@ export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRun
       prompt: string
       title?: string
       extraAgentArgs?: string
+      suppressStartupUpdatePrompt?: boolean
       launchOverrides?: AgentLaunchOverrides
     }
   ): Promise<RuntimeTerminalCreate> {
@@ -171,6 +172,7 @@ export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRun
     }
     const startup = this.buildStartupForAgent(repo, opts.agent, opts.prompt, undefined, {
       ...(opts.extraAgentArgs ? { extraAgentArgs: opts.extraAgentArgs } : {}),
+      ...(opts.suppressStartupUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {}),
       ...(opts.launchOverrides ? { launchOverrides: opts.launchOverrides } : {}),
       launchScope: await this.resolveTerminalWorkspaceLaunchScope(`id:${worktree.id}`)
     })

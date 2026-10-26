@@ -47,9 +47,10 @@ export function buildAgentStartupPlan(args: {
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
   includeSessionOptionCatalogDefaults?: boolean
-  /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
-   * `orca-ide` rename must be skipped for remote launches. */
+  /** Remote Linux deploys orca, so skip the local-only orca-ide rename. */
   isRemote?: boolean
+  /** Orca types into this launch after start, so a startup update prompt would take that input. */
+  suppressStartupUpdatePrompt?: boolean
   claudeSuppressionFlags?: string[] | null
 }): AgentStartupPlan | null {
   const { agent, prompt, cmdOverrides, platform, allowEmptyPromptLaunch = false } = args
@@ -67,6 +68,7 @@ export function buildAgentStartupPlan(args: {
     sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
     includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
     isRemote: args.isRemote,
+    suppressStartupUpdatePrompt: args.suppressStartupUpdatePrompt,
     claudeSuppressionFlags: args.claudeSuppressionFlags
   })
   if (!baseCommand.ok) {

@@ -135,8 +135,7 @@ export function useRightSidebarActivityItems({
         title: translate('auto.components.right.sidebar.index.ledger', 'Ledger'),
         shortcut: ''
       },
-      // Why: plugin panels append after the built-in tabs so core navigation
-      // keeps stable positions regardless of which plugins are installed.
+      // Append plugin tabs to preserve built-in navigation positions.
       ...getPluginPanelActivityItems(visiblePluginPanels, pluginPanelErrors),
       ...askActivityItems
     ],

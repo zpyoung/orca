@@ -298,8 +298,7 @@ function getPickerAnnotation(item: NativeChatPickerItem): string | null {
         { plugins: plugins.join(', ') }
       )
     }
-    // Why: name the interpolation `sourceCount`, not `count` — a `count` option
-    // makes i18next resolve plural-suffixed keys that these locales don't define.
+    // Use sourceCount because i18next treats count as pluralization input and these keys have no plural variants.
     return translate(
       'components.native-chat.composer.skillMultipleSources',
       '{{sourceCount}} sources - agent resolves',

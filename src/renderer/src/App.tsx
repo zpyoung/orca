@@ -120,7 +120,7 @@ function App(): React.JSX.Element {
       <RunningTerminalCloseDialog />
       <LoopSetupDialogHost />
       <LoopCloseDialogHost />
-      {/* Why: Electron's drag-region hit-test is DOM-order-based (ignores z-index); render last so WindowControls stay clickable. */}
+      {/* Electron drag hit-testing follows DOM order, ignoring z-index; render controls last to keep them clickable. */}
       {hasCustomTitleBar && <WindowControls />}
     </div>
   )

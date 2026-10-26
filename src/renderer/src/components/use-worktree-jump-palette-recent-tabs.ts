@@ -158,33 +158,6 @@ export function useWorktreeJumpPaletteRecentTabs({
     [openTabRecentRows]
   )
   const pendingAskTabIds = usePendingAskTabIds()
-  const recentTabRows = useMemo<RecentWorkspaceTabRow[]>(() => {
-    const now = Date.now()
-    const rows: RecentWorkspaceTabRow[] = []
-    for (const { item, worktree, row } of openTabRecentRows) {
-      if (
-        shouldIncludeOpenTabInRecentSection({
-          item,
-          worktree,
-          row,
-          paneSources: recentTabPaneSources,
-          unreadTerminalTabs,
-          unreadAgentCompletionPanes,
-          now,
-          hasPendingAsk: row.terminalTab != null && pendingAskTabIds.has(row.terminalTab.id)
-        })
-      ) {
-        rows.push(row)
-      }
-    }
-    return rows
-  }, [
-    openTabRecentRows,
-    pendingAskTabIds,
-    recentTabPaneSources,
-    unreadAgentCompletionPanes,
-    unreadTerminalTabs
-  ])
   const [recentTabSnapshot, setRecentTabSnapshot] = useState(EMPTY_RECENT_TAB_SNAPSHOT)
   // Filter changes must refresh frozen recent order or newly included rows stay hidden.
   const capturedFilterRef = useRef(filter)
@@ -234,7 +207,8 @@ export function useWorktreeJumpPaletteRecentTabs({
           paneSources: recentTabPaneSources,
           unreadTerminalTabs,
           unreadAgentCompletionPanes,
-          now
+          now,
+          hasPendingAsk: row.terminalTab != null && pendingAskTabIds.has(row.terminalTab.id)
         })
       ) {
         rows.push(row)
@@ -254,6 +228,7 @@ export function useWorktreeJumpPaletteRecentTabs({
     filter,
     hasQuery,
     openTabRecentRows,
+    pendingAskTabIds,
     query.length,
     recentOrderAttentionIncomplete,
     recentTabSnapshot,

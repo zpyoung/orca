@@ -79,7 +79,7 @@ export function convertLifecycleMessageToRejection(
     ...details,
     originalBody: message.body
   })
-  // Why: rejected lifecycle signals stay auditable but must not reach read paths as actionable completion/liveness events.
+  // Keep rejected lifecycle signals auditable but non-actionable on read paths.
   this.db
     .prepare(
       `UPDATE messages

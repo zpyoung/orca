@@ -236,7 +236,6 @@ them hot sidebar hooks — and rewriting ref patterns upstream has no reason to 
 
 - `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
 - `mobile/src/session/pending-terminal-handle-recovery.test.ts`
-- `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
 - `mobile/src/browser/mobile-browser-frame-state.ts`
 - `mobile/src/diagnostics/connection-diagnostics-submission.ts`
 - `src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx`
@@ -438,7 +437,7 @@ that do not supply a signal.
 - `src/renderer/src/web/preload-api/web-git-api.ts`
 - `src/preload/api/git-bridge.ts`
 - `src/preload/api/git-inspection-api.ts`
-- `src/main/ipc/filesystem.ts`
+- `src/main/ipc/filesystem/filesystem.ts`
 - `src/main/ipc/filesystem/filesystem-handler-context.ts`
 - `src/main/ipc/filesystem/filesystem-git-status-handlers.ts`
 - `src/main/providers/git-provider-contract.ts`
@@ -453,7 +452,7 @@ that do not supply a signal.
 
 **Regression coverage:**
 
-- `src/main/ipc/filesystem-git-status-staging.test.ts`
+- `src/main/ipc/filesystem/filesystem-git-status-staging.test.ts`
 - `src/main/runtime/rpc/methods/git.test.ts`
 - `src/main/runtime/orca-runtime-git-diff-budget.test.ts`
 - `src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts`

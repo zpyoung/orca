@@ -114,6 +114,7 @@ export abstract class OrcaRuntimeWithRecordPtyWorktree extends RuntimeWorkspaceR
         launchToken: null,
         launchIncarnationId: null,
         launchAgent: null,
+        launchCommandAgent: null,
         launchedAgent: null,
         agentSessionOwners: (state.agentSessionOwners ?? []).map(cloneAgentSessionOwnerBinding),
         foregroundAgent: null,

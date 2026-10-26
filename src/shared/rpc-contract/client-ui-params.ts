@@ -173,8 +173,7 @@ export const UiUpdateFields = z
     ...ClientUiWorkspaceFilterFields,
     ...WorkspaceActivityUIUpdateFields,
     ...WorkspaceReviewUIUpdateFields,
-    // Why: rides App.tsx's debounced writer, so omitting it rejected that entire
-    // payload (sidebar widths, filters, agent acks) for every paired client.
+    // Part of App.tsx’s debounced writer; missing fields reject the whole paired-client payload.
     explorerDisplayRootByWorktree: z.record(z.string(), z.string()).optional(),
     showDotfilesByWorktree: z.record(z.string(), z.boolean()).optional(),
     collapsedGroups: StringArray.optional(),

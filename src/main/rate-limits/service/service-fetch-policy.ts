@@ -108,7 +108,7 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
 
   /** Ingest live Claude plan windows and report whether the selected account accepted them. */
   ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): boolean {
-    // Why: attribution needs the selected account's config dir; until a fetch cycle captures it, drop posts rather than guess the account.
+    // Wait for a selected-account snapshot rather than guessing live-post attribution.
     const snapshot = this.lastClaudeAuthSnapshot
     if (!snapshot) {
       console.debug('[rate-limits] dropped live Claude usage: no auth snapshot yet', {

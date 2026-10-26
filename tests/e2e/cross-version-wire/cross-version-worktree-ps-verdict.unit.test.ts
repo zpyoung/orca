@@ -5,17 +5,7 @@ import {
   materializeReleaseCheckout
 } from './release-checkout'
 
-/**
- * The verdict on a `worktree ps` agent row, paired across two builds.
- *
- * The host now sends `mainAgent` (the main agent's own state, verdict and clock) on each row,
- * beside the `interrupted` flag every build reads. That is Rule 1 only if an old phone still reads
- * a new host's row by the flag, and a new phone reads an old host's row, which has no `mainAgent`,
- * by the same flag. Both halves run a real old build here rather than being reasoned about.
- *
- * The pre-change ref is pinned rather than derived: a newer baseline would carry the new reader,
- * and every "old reader" cell would then pair the change against itself.
- */
+// Pin pre-mainAgent readers: old phones must read new rows by interrupted; new phones must keep that fallback for old hosts.
 const PRE_CHANGE_REF = 'v1.4.216-rc.0.zy01'
 const SUITE_TIMEOUT_MS = 180_000
 // Both builds load a copy in the checkout cache, out of reach of `mobile/tsconfig.json`.

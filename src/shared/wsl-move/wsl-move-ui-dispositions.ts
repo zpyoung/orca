@@ -170,7 +170,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'workspaceActivityCustomDays',
   'hideCompletedReviewWorkspaces',
   'hidePassingCheckWorkspaces',
-  // One-shot migration flags.
   '_antigravityStatusBarDefaultAdded',
   '_cursorStatusBarDefaultAdded',
   '_expandedWorktreeCardPropertiesDefaulted',

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: 86de8f90e22a15846a49912015278c1e440d00c7
+// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
@@ -30,14 +30,14 @@ import { useNativeChatTranscriptCompanion } from '../fork-native-chat-session-op
 import { useNativeChatHookStatus } from '../use-native-chat-hook-status'
 
 export type UseNativeChatLiveSessionArgs = {
-  /** Composite `${tabId}:${leafId}` key — selects the live hook entry. */
+  /** Composite `${tabId}:${leafId}` hook-entry key. */
   paneKey: string
   agent: AgentType
-  /** The agent's own session id, or null before it reports one — nothing to read/tail, so the view shows live hook state. */
+  /** Null until reported; use live hook state before there is a session to read. */
   sessionId: string | null
-  /** Authoritative transcript path from the hook, preferred over reconstructing it from sessionId. Null when not reported. */
+  /** Prefer the hook’s authoritative path over reconstruction from sessionId. */
   transcriptPath?: string | null
-  /** Runtime owner (Model B): non-null routes read/subscribe to the remote host; null keeps the local IPC path. */
+  /** Non-null routes reads/subscriptions to the owning remote host; null uses local IPC. */
   runtimeEnvironmentId?: string | null
   /** False suspends transcript IO while retaining the last committed session. */
   enabled?: boolean
@@ -115,7 +115,6 @@ export function useNativeChatLiveSession(
   args: UseNativeChatLiveSessionArgs
 ): NativeChatLiveSession {
   const { paneKey, agent, sessionId, transcriptPath, runtimeEnvironmentId, enabled = true } = args
-  // Stable per owner id so a re-render without an owner flip keeps the same transport and doesn't re-subscribe.
   const transport = useMemo(
     () => getNativeChatSessionTransport(runtimeEnvironmentId ?? null),
     [runtimeEnvironmentId]
@@ -132,9 +131,9 @@ export function useNativeChatLiveSession(
   // to growing the limit.
   const oldestOffsetRef = useRef<number | null>(null)
 
-  // Appended messages accumulate separately from the snapshot so pagination doesn't lose in-flight appends; merged by id and capped to the read window (#6).
+  // Separate live appends from snapshots so pagination cannot lose in-flight content.
   const [appended, setAppended] = useState<NativeChatMessage[]>([])
-  // Id-dedup merger backing `appended`; caches the id→index map so each live frame costs O(incoming), not O(existing) (#18).
+  // Cache the id index so each frame costs O(incoming), not O(existing).
   const appendMergerRef = useRef<ReturnType<typeof createNativeChatMerger>>(undefined!)
   appendMergerRef.current ??= createNativeChatMerger(NATIVE_CHAT_SOURCE_PRIORITY)
 
@@ -165,7 +164,7 @@ export function useNativeChatLiveSession(
   }, [sessionId, transport])
 
   useEffect(() => {
-    // Why: agent/path/owner rebinds can keep the same session; every source generation must invalidate pagination captured before it.
+    // Agent/path/owner rebinds may retain sessionId; invalidate every prior pagination generation.
     transcriptEpochRef.current += 1
     setOlderHistoryGeneration(transcriptEpochRef.current)
     setLoadingEarlier(false)
@@ -185,7 +184,6 @@ export function useNativeChatLiveSession(
     }
     transcriptCompanionControl.reset()
     if (!sessionId) {
-      // No session id yet: surface live hook state on an empty transcript; backfills once the id arrives.
       setRead({ phase: 'ready', messages: [] })
       replaceList(appendMergerRef.current, [])
       setAppended([])
@@ -194,10 +192,9 @@ export function useNativeChatLiveSession(
     }
 
     let cancelled = false
-    // Set by the first authoritative frame so the readSession seed below can't clobber a live snapshot.
+    // Authoritative frames outrank the independent read seed.
     let frameArrived = false
-    // Set once the host reports no transcript on disk yet, which makes a notFound
-    // read known-good news rather than a failure worth surfacing.
+    // Host-confirmed missing transcripts are expected until flushed, not errors.
     let transcriptPending = false
     limitRef.current = NATIVE_CHAT_INITIAL_LIMIT
     oldestOffsetRef.current = null
@@ -299,7 +296,7 @@ export function useNativeChatLiveSession(
     // `transport` identity changes on an owner flip, re-running this effect to re-subscribe against the new host.
   }, [agent, enabled, sessionId, sourceKey, transcriptPath, transport, transcriptCompanionControl])
 
-  // The page in flight for the current transcript epoch; concurrent callers join it.
+  // Concurrent callers share the current epoch’s page.
   const olderPageRef = useRef<{
     epoch: number
     promise: Promise<NativeChatOlderPageResult>
@@ -329,7 +326,6 @@ export function useNativeChatLiveSession(
         ...(request.mode === 'before' ? { beforeOffset: request.beforeOffset } : {})
       })
       .then((result): NativeChatOlderPageResult => {
-        // Ignore a stale resolve from a swapped session or flipped owner — either would paint the wrong host's history.
         if (
           latestSessionId.current !== sessionId ||
           latestTransport.current !== transport ||
@@ -374,7 +370,7 @@ export function useNativeChatLiveSession(
         setHasMore(hasMoreOlder)
         return result.messages.length > 0 ? 'applied' : hasMoreOlder ? 'unchanged' : 'exhausted'
       })
-      // Swallow a rejected "load more" read: keep the already-loaded transcript intact rather than surface the rejection.
+      // Keep loaded history when pagination rejects.
       .catch((): NativeChatOlderPageResult => 'failed')
       .finally(() => {
         if (olderPageRef.current?.promise === promise) {
@@ -389,7 +385,7 @@ export function useNativeChatLiveSession(
     return promise
   }, [agent, sessionId, transcriptPath, transport, hasMore, read, transcriptCompanionControl])
 
-  // Computed outside the status memo so hookState churn (status-only) never re-runs the assembler.
+  // Keep status-only hook updates from rerunning the assembler.
   const baseMessages = read.phase === 'ready' ? read.messages : EMPTY_MESSAGES
   const surfacedMessages = useNativeChatAssembledTranscript(
     baseMessages,

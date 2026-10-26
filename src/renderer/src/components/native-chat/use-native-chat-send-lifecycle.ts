@@ -85,8 +85,7 @@ export function useNativeChatSendLifecycle(
     [cancelPendingSends, targetPtyId, terminalTabId]
   )
 
-  // Why: delayed Enter/image writes belong to the exact PTY target. A pane
-  // swap or unmount must cancel them before that PTY can close or be reused.
+  // Cancel delayed Enter/image writes during commit before a swapped PTY can close or be reused.
   useLayoutEffect(() => cancelPendingSends, [cancelPendingSends, targetPtyId, terminalTabId])
 
   // Why: the same pty can turn transport-unsafe mid-delay (recovery,

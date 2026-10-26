@@ -103,8 +103,7 @@ export type RightSidebarTab =
   | 'checks'
   | 'ports'
   | 'ledger'
-  // Plugin-contributed panels are keyed `plugin:<pluginId>/<panelId>` so the
-  // static union stays closed while plugin tabs remain type-representable.
+  // Plugin IDs encode their dynamic panel namespace without opening the static tab union.
   | `plugin:${string}`
 export type ActiveRightSidebarTab = Exclude<RightSidebarTab, 'search'>
 export type RightSidebarExplorerView = 'files' | 'search'

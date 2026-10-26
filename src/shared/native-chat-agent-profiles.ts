@@ -43,8 +43,7 @@ const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfi
     skillPrefix: '$',
     skillSourceOwner: 'codex',
     namespacesPluginSkills: false,
-    // The app-server has no slash parser, but the model owns goal tools and
-    // calls create_goal itself when `/goal <objective>` reaches it as prose.
+    // App-server has no slash parser; the model owns goal tools and receives /goal objectives as prose.
     textDrivenCommands: ['goal']
   },
   claude: {

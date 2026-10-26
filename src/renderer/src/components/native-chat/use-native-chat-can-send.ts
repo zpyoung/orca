@@ -6,10 +6,7 @@ import {
   subscribeTerminalInputQuarantine
 } from '../terminal-pane/terminal-input-quarantine'
 
-/**
- * Track both native-chat input guards for the live tab/pty pair: the tab-keyed
- * fresh-shell quarantine and the pty-keyed mobile presence lock.
- */
+/** Subscribe to the external driver map and tab quarantine so mobile-owned or freshly replaced PTYs guard composer sends just like xterm input. */
 export function useNativeChatCanSend(terminalTabId: string, ptyId: string | null): boolean {
   const [quarantineTick, setQuarantineTick] = useState(0)
   const [driverTick, setDriverTick] = useState(0)
@@ -21,8 +18,7 @@ export function useNativeChatCanSend(terminalTabId: string, ptyId: string | null
     [terminalTabId]
   )
 
-  // Why: the driver event fires for every pty; only re-derive when it targets
-  // this pane's pty. ptyId is a dep so the listener re-binds on a pty swap.
+  // Filter per-PTY driver events and rebind when pane ownership changes.
   useEffect(
     () =>
       onDriverChange((event) => {

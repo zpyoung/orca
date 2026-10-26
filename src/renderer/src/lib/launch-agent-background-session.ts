@@ -160,8 +160,7 @@ export async function launchAgentBackgroundSession(
   }
   try {
     if (runtimeTarget.kind === 'environment') {
-      // Why: runtime environments execute on the server; using local pty.spawn
-      // would silently run automation on the client for a remote workspace.
+      // Runtime workspaces execute on their server; local pty.spawn would run automation on this client.
       const created = await createRuntimeAgentBackgroundSession({
         environmentId: runtimeTarget.environmentId,
         worktreeId,

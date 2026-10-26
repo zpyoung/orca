@@ -2,14 +2,10 @@
 
 UI rules for Orca. Token values live in `src/renderer/src/assets/main.css` (canonical); this file documents _roles and rules_, not values.
 
-The identity is **monochrome and quiet**: neutral grays carry the chrome, color is reserved for state (selection ring, destructive, git decorations). Orca mostly hosts other tools (Monaco, xterm, Markdown previews), so its own UI should recede and frame. When in doubt:
+The chrome is **monochrome and quiet**: neutral grays carry it, color is reserved for state (selection ring, destructive, git decorations). The native chat transcript is a documented exception, where color is load-bearing rather than decorative: see [Tool activity colors](#tool-activity-colors). Orca mostly hosts other tools (Monaco, xterm, Markdown previews), so its own UI should recede and frame. When in doubt:
 
-Orca is an Electron desktop app for orchestrating coding agents across git worktrees. Orca's chrome is **monochrome and quiet** — neutral grays carry it, color is reserved for state (selection ring, destructive, git decorations). The native chat transcript is a documented exception, where color is load-bearing rather than decorative — see [Tool activity colors](#tool-activity-colors). The product spends most of its time hosting other people's tools (Monaco, xterm, Markdown previews), so Orca's own UI should recede and frame.
-
-When in doubt:
-
-- Reach for **muted/accent/border** before reaching for color.
-- Reach for **CSS variables** before hardcoding hex.
+- Reach for **muted/accent/border** before color.
+- Reach for **CSS variables** before hardcoded hex.
 - Match the nearest **shadcn primitive** before writing custom CSS.
 
 ## Deep dives
@@ -24,46 +20,25 @@ Read only when the task touches the topic:
 
 ## Tokens
 
-Role tokens come in pairs: a **surface** and a **foreground** that meets contrast on it. Always use them together — this governs the surface/foreground pairs below.
+- Colors, `@theme inline` bindings, typography, scrollbars, and titlebar chrome live in `main.css`; primitives in `src/renderer/src/components/ui/`.
+- Never hardcode a hex value in component code if a variable already covers it. A new token goes in `main.css` in both `:root` and `.dark`, is exposed in `@theme inline`, then used.
+- Need a tint? `color-mix(in srgb, var(--token) N%, var(--background))` against an existing token, never a new hex, so light/dark parity stays automatic.
 
-**Categorical tokens are the exception.** `--git-graph-lane-1` through `-5` and the `--tool-*` family (see [Tool activity colors](#tool-activity-colors)) are standalone hues, not surface/foreground pairs. A categorical token has no paired foreground, so it must clear a measured contrast floor against every surface it's drawn on instead.
-
-| Role                                                      | Use it for                                                  | Don't use it for                                    |
-| --------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
-| `background` / `foreground`                               | App canvas, default text                                    | Cards, popovers, sidebar (have their own)           |
-| `card` / `card-foreground`                                | Panels lifted off the canvas                                | The canvas itself                                   |
-| `popover` / `popover-foreground`                          | Floating menus, dropdowns, hovercards                       | Inline UI                                           |
-| `primary` / `primary-foreground`                          | The single affirmative action in a flow (Save, Confirm)     | Decorative accents; hover states; secondary actions |
-| `secondary` / `secondary-foreground`                      | Lower-emphasis actions next to a primary                    | The affirmative action                              |
-| `muted` / `muted-foreground`                              | De-emphasized text, captions, placeholders, disabled chrome | Body copy; primary actions                          |
-| `accent` / `accent-foreground`                            | Hover/active backgrounds for ghost buttons and list rows    | Solid filled buttons (use `secondary` instead)      |
-| `destructive` / `destructive-foreground`                  | Delete, discard, irreversible-action buttons; error states  | Cancel buttons (Cancel is not destructive)          |
-| `status-warning-background` / `status-warning-foreground` | Attention, parked work, unverifiable host contact           | Confirmed failures; proof that remote work exited   |
-| `border`                                                  | All hairlines: dividers, input outlines, card edges         | Heavy emphasis; that's `ring`                       |
-| `input`                                                   | Form field background only                                  | Anywhere outside form fields                        |
-| `ring`                                                    | Focus-visible outlines, active selection halos              | Persistent decoration                               |
-| `sidebar` (+ variants)                                    | The worktree sidebar and its children                       | Other panels                                        |
-| `editor-surface`                                          | Background of Monaco / markdown editor panes                | App chrome                                          |
+## Color
 
 Tokens pair a **surface** with a **foreground** that meets contrast on it; always use them together. Role summary (full table in [color.md](./styleguide/color.md)):
 
-The warning family also provides `--status-warning` for compact marks and `--status-warning-border` for outlines. Pair warning surfaces with their foreground token and explicit status text; lost contact never implies that remote work exited.
-
-### Git decoration colors
-
-For diff status, file-tree decorations, and the changes view, use the git decoration tokens (mirroring VS Code's palette so users transferring from VS Code aren't surprised):
-
-| Token                        | State          |
-| ---------------------------- | -------------- |
-| `--git-decoration-added`     | Added / new    |
-| `--git-decoration-modified`  | Modified       |
-| `--git-decoration-deleted`   | Deleted        |
-| `--git-decoration-renamed`   | Renamed        |
-| `--git-decoration-untracked` | Untracked      |
-| `--git-decoration-copied`    | Copied         |
-| `--git-decoration-ignored`   | Ignored by git |
-
-Use these _only_ for git status. Don't reuse them for unrelated state colors — that breaks the convention.
+- `background` = app canvas; `card` = panels lifted off it; `popover` = floating menus; `input` = form field background only.
+- `primary` = the single affirmative action in a flow, never decoration, hover, or secondary actions. `secondary` = lower-emphasis sibling.
+- `muted` = de-emphasized text, captions, placeholders, disabled chrome; not body copy.
+- `accent` = hover/active backgrounds for ghost buttons and list rows; not solid filled buttons (use `secondary`).
+- `destructive` = delete/discard/irreversible actions and error states; never Cancel.
+- `status-warning-background` / `status-warning-foreground` = attention, parked work, unverifiable host contact; not confirmed failures or proof that remote work exited. `--status-warning` is for compact marks and `--status-warning-border` for outlines. Pair warning surfaces with their foreground token and explicit status text; lost contact never implies that remote work exited.
+- `border` = all hairlines; `ring` = focus-visible outlines and selection halos, not persistent decoration.
+- `sidebar*` only inside the worktree sidebar; `editor-surface` for Monaco/markdown editor panes, not app chrome.
+- `--git-decoration-*` only for git status, never other state.
+- **Categorical tokens are the exception to pairing.** `--git-graph-lane-1` through `-5` and the `--tool-*` family (see [Tool activity colors](#tool-activity-colors)) are standalone hues, not surface/foreground pairs. A categorical token has no paired foreground, so it must clear a measured contrast floor against every surface it's drawn on instead.
+- **List rows:** idle transparent; hover `bg-accent` (`bg-sidebar-accent` in the sidebar); cmdk keyboard selection must not rely on flat `bg-accent` on light popovers/dialogs — use the `.jump-palette-item[data-selected='true']` recipe in `main.css`; the persistent current row is `bg-accent` plus `data-current="true"`. Never invent a "selected" color.
 
 ### Tool activity colors
 
@@ -88,26 +63,6 @@ Any tool hue must clear a contrast floor:
 Use these _only_ for tool activity. Don't reuse them for unrelated state colors, and don't reach for `--git-decoration-*` to color a tool category — that breaks the convention in either direction.
 
 The second axis is content type: `--code-accent` / `--code-accent-surface` mark inline code and file paths in prose, kept deliberately off the tool hues so a path in a sentence can't be misread as a tool category.
-
-### List rows: hover, selected, current
-
-A common point of drift. Use these conventions for any list-style row (worktrees, command palette items, settings nav):
-
-- **Idle:** transparent background.
-- **Hover:** `bg-accent` (in the worktree sidebar, `bg-sidebar-accent`).
-- **Keyboard-selected (cmdk highlight):** do **not** rely on flat `bg-accent` alone on light popover/dialog surfaces — `--accent` (#f5f5f5) is nearly identical to `--background` (#fff), so the cursor vanishes. Use the jump-palette recipe in `main.css` (`.jump-palette-item[data-selected='true']`): `color-mix` foreground into background (~12%) plus an inset ring. Expose the mix as `--jump-palette-selection-surface` when nested cutouts (status pips) must match. The `data-selected` attribute is set by `cmdk` automatically.
-- **Persistent "current" / "active" row** (e.g. the worktree the user is viewing): also `bg-accent`, _plus_ a `data-current="true"` attribute so CSS or future styling can distinguish it from the cmdk highlight.
-- **Don't:** hardcode `bg-[#ededed]` / `bg-[#333333]` or invent a "selected" color. Mix from existing tokens (`foreground`/`background`/`accent`) so light/dark stay aligned.
-
-### Color mixing
-
-When you need a tint (e.g. a 12% primary wash on hover), use `color-mix` against the existing token, not a new hex:
-
-```css
-background: color-mix(in srgb, var(--primary) 12%, var(--background));
-```
-
-This keeps light/dark parity automatic.
 
 ## Typography
 

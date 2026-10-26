@@ -37,8 +37,7 @@ export function AppBackgroundServices(): React.JSX.Element {
       <AgentHibernationGate />
       <StructuredAgentSessionStatusBridge />
       <AskEscalationGate />
-      {/* Why here and not in the chat pane: a backgrounded chat has no mounted pane, and that is
-          exactly the completion the user needs the dot for. */}
+      {/* Background chats have no mounted pane but still need completion attention. */}
       <StructuredAgentSessionAttentionBridge />
     </>
   )

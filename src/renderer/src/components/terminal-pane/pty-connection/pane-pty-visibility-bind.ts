@@ -170,8 +170,7 @@ export function installPanePtyVisibilityBind(session: ConnectPanePtySession): vo
       armTerminalInputQuarantine(session.deps.tabId)
     }
     session.remotePtyIncarnationId = nextIncarnationId
-    // Why: provider handle rotation keeps the existing pane/session generation;
-    // replace its stale store identity without fresh-spawn exit semantics.
+    // Handle rotation replaces store identity within the same pane/session generation, without fresh-spawn exit semantics.
     session.bindActivePanePty(ptyId, { replacePtyId: replacedPtyId })
   }
   // BEL raises attention and OS notification; replay resets stale focus-report modes so shell clicks cannot generate false bells (shared/terminal-mode-reset-profiles.ts).

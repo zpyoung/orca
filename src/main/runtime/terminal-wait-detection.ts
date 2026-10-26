@@ -204,8 +204,7 @@ export function tuiIdleNeedsVisibleScreenProbe(
   return lastAgentStatus === null && (waitText.length === 0 || agent === 'claude')
 }
 
-// Why: Muse titles its OSC with the bare cwd and never updates it, so only the body can
-// prove the TUI is up. The voice-input composer is present even without loaded skills.
+// Muse keeps its bare-cwd OSC title; only the body proves readiness, including the voice composer without skills.
 function findMuseReadyPromptIndex(normalized: string): number | null {
   const headerIndex = normalized.lastIndexOf('muse code')
   if (headerIndex === -1) {

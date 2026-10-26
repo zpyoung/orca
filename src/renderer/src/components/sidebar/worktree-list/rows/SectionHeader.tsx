@@ -249,8 +249,7 @@ export function renderWorktreeSectionHeaderRow(args: {
           data-workspace-status={headerWorkspaceStatus ?? undefined}
           data-workspace-pin-drop-target={isPinnedHeader ? '' : undefined}
           className={cn(
-            // Why: no row-level grab — only the title surface below shows the hand;
-            // actions use cursor-pointer so … / + never look reorderable.
+            // Keep grab on the title; action buttons use pointer cursors.
             'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',
             !(isDraggableRepoHeader || isDraggableProjectGroupHeader) && 'cursor-pointer',
             ctx.highlightedRevealRowKey === row.key &&

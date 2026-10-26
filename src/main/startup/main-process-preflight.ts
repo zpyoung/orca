@@ -70,7 +70,7 @@ import { setMainHttpClient } from '../network/http-client'
 import { electronSpeechServiceFactories } from '../host/electron-speech-services'
 import { setSpeechServiceFactories } from '../speech/speech-runtime-service'
 import { setWorktreeWatcherRemoval } from '../ipc/worktree-watcher-removal'
-import { desktopWorktreeWatcherRemoval } from '../ipc/filesystem-watcher'
+import { desktopWorktreeWatcherRemoval } from '../ipc/filesystem/watchers/filesystem-watcher'
 import { installRuntimeEnvironmentDiagnosticsHost } from '../host/fork-heimdall/runtime-environment-diagnostics-host'
 import { setDefaultProxySessionResolver } from '../network/proxy-settings'
 import { initDataPath, getCanonicalUserDataPath } from '../persistence'
@@ -274,9 +274,7 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Node hosts omit desktop surfaces and route notifications to paired clients instead.
   setRuntimeDesktopSurface(electronRuntimeDesktopSurface)
   installRuntimeEnvironmentDiagnosticsHost()
-  // Why here: constructing RuntimeBrowserCommands is what pulls the Chromium browser
-  // cluster into the graph. The desktop installs it; a Node host installs none and every
-  // browser RPC rejects, which capability filtering already tells clients about.
+  // Install Chromium browser commands only in Electron; Node hosts advertise no browser capability and reject those RPCs.
   installElectronBrowserCommands()
   // Electron consults default-session proxy config; Node hosts use environment only.
   setDefaultProxySessionResolver(() => session.defaultSession)

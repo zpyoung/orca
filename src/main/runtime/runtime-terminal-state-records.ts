@@ -82,6 +82,8 @@ export type RuntimePtyWorktreeRecord = RuntimeTerminalTailState & {
   launchToken: string | null
   launchIncarnationId: PtyIncarnationId | null
   launchAgent: TuiAgent | null
+  /** Identify flagged unmanaged --command panes before foreground reads; null for adopted/restored panes. */
+  launchCommandAgent: TuiAgent | null
   /** Which agent Orca launched here. Authority retires on the shell's first command-finished
    *  marker; the identity must outlive it, or a prompt write races that marker. */
   launchedAgent?: TuiAgent | null

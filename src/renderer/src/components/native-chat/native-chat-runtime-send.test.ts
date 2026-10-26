@@ -105,8 +105,7 @@ describe('sendNativeChatMessage', () => {
 
   it('does not fire Enter before the proven 500ms gap (busy-agent safety)', async () => {
     sendNativeChatMessage(TARGET, 'hi')
-    // A short gap would fire Enter while a busy Codex has not yet landed the
-    // paste, submitting an empty box — so nothing must happen before 500ms.
+    // Busy Codex can swallow Enter before paste lands; retain the full submit delay.
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS - 1)
     expect(mergedWriteBytes()).toHaveLength(2)
   })
@@ -127,7 +126,6 @@ describe('sendNativeChatMessage', () => {
     handle.cancel()
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
 
-    // Pre-send clear + body + cancel clear; Enter must not fire.
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       buildNativeChatPasteBytes('hi'),
@@ -167,7 +165,6 @@ describe('sendNativeChatMessage', () => {
     sendNativeChatMessage(TARGET, 'continue')
     await vi.advanceTimersByTimeAsync(0)
 
-    // First clear+body are immediate; second sequence waits for the first Enter.
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       buildNativeChatPasteBytes('tell me a joke')
@@ -525,8 +522,7 @@ describe('sendNativeChatMessageVerified', () => {
   })
 
   it('awaits body acceptance before the delayed Enter write (no pre-clear)', async () => {
-    // Why: model-switch confirmation watches the PTY while this send runs;
-    // verified option commands must not inject Ctrl+U noise.
+    // Model-confirmation observers must not see Ctrl+U from verified commands.
     const result = sendNativeChatMessageVerified(TARGET, '/model sonnet')
     await vi.waitFor(() => {
       expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
@@ -580,7 +576,6 @@ describe('sendNativeChatMessageVerified', () => {
     const submits = sendRuntimePtyInputAcceptance.mock.calls.filter(
       (call) => call[1] === NATIVE_CHAT_SUBMIT
     )
-    // Only the verified path's Enter — chat's delayed Enter was cancelled.
     expect(submits).toHaveLength(0)
     expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(PTY, NATIVE_CHAT_SUBMIT, 'driving', {
       isCancelled: expect.any(Function)
@@ -776,7 +771,6 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     handle.cancel()
     await vi.runAllTimersAsync()
 
-    // Pre-clear + image body + cancel clear; no Enter.
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png'),

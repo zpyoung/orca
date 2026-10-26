@@ -89,8 +89,7 @@ export function createNotificationDeliveryService(
           ? { title: request.title, body: request.body }
           : buildNotificationOptions(request, translateMain)
 
-      // Why: desktop focus only means this computer sees the worktree; the paired phone may still need the alert.
-      // The execution host pushed its own phones and retires them itself on acknowledgement.
+      // Desktop focus need not silence phones; execution hosts retire their own delivered alerts.
       // no mobile push for pending asks in v1
       if (
         !request.mobileDeliveredByHost &&

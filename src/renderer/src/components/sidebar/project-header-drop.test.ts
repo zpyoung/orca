@@ -200,11 +200,7 @@ describe('computeProjectHeaderDropPreview', () => {
   })
 
   describe('nearest-boundary choice across an interior gap', () => {
-    // The gap models estimate-vs-actual drift: sectionBottom is an estimated
-    // row offset (worktree-header-section-boundaries.ts, no virtualizer gap:2 or
-    // measured sizes) while the next header's top is actual vItem.start geometry,
-    // so they diverge in tall sections. Near the real boundary the pointer snaps
-    // to actual geometry (beforeNext); the estimate governs only deep-body drops.
+    // Estimated section ends can drift from actual header geometry; test snapping on both sides of the gap.
     const INDICATOR_GAP = 4
     const prevSectionBottom = 200
     const nextHeaderTop = 240

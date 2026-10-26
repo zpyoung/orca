@@ -231,8 +231,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
       submitPastedPrompt,
       agentArgs,
       useLaunchOverrides: includeSessionOptionCatalogDefaults === false,
-      // Why: omission means terminal locally, but would let a paired host apply
-      // its own default; send the client's resolved terminal choice explicitly.
+      // Send the resolved terminal choice explicitly or a paired host could substitute its own chat default.
       viewMode: 'terminal',
       ...(activate === false ? { activate } : {}),
       onPromptDelivered

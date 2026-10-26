@@ -167,7 +167,7 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
   }, [isOpen, repoId, repo, ledgerPreviewGeneration])
 
   const handleConfirm = useCallback(async () => {
-    // Why: without the opener's host a bare id could remove another host's row (#13071).
+    // Require the opener’s host so same-ID rows on other hosts cannot be removed.
     if (repoId && hostId) {
       try {
         await removeProject(repoId, {

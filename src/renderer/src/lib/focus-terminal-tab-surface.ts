@@ -3,10 +3,7 @@ import { refreshTerminalImeInputContext } from '@/components/terminal-pane/termi
 import { UNCOVERED_TERMINAL_LEAF_SELECTOR } from '@/components/terminal-pane/native-chat-covered-pane'
 import { requestNativeChatComposerFocus } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
 
-/**
- * Moves keyboard focus into the preferred input surface for a freshly mounted terminal tab.
- * The dock composer wins when enabled; otherwise focus falls back to xterm.
- */
+/** Wait two frames for a fresh tab’s xterm textarea to mount so focus cannot land on the menu/body/previous tab. */
 function cssAttributeString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }

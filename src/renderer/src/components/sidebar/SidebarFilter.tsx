@@ -178,8 +178,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
         data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
       >
         <WorkspaceActivityWindowControl />
-        {/* Why gated: the exemption only has an effect while sleeping workspaces
-            are being swept, so it stays hidden until its parent row is on. */}
+        {/* Show the exemption only while its parent sleeping-workspace filter can use it. */}
         {!showSleepingWorkspaces && (
           <FilterToggleRow
             indented

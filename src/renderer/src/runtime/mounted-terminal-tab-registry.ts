@@ -117,9 +117,7 @@ export function focusRuntimeTerminalSurface(
       activeDockComposer.focus()
       return true
     }
-    // Why: mirrors focus-terminal-tab-surface.ts's chat-view bail — the xterm is covered by the
-    // chat portal, so focusing it pulls the caret out of the composer. `true` = handled because
-    // `false` sends the caller to the DOM fallback.
+    // Chat portal covers xterm; return handled to preserve composer focus and prevent DOM fallback (focus-terminal-tab-surface.ts).
     if (activePaneIsCoveredByNativeChat(manager)) {
       return true
     }
@@ -137,8 +135,7 @@ export function focusRuntimeTerminalSurface(
   const requestedPane = manager
     .getPanes()
     .find((candidate) => candidate.id === resolution.numericPaneId)
-  // Activating a covered leaf lets its chat surface claim the composer without focusing the
-  // xterm underneath it. Explicit leaf requests must still change the manager's active pane.
+  // Covered-leaf activation lets chat claim its composer without xterm focus; explicit leaf requests still update active pane.
   // A dock composer takes focus here rather than through the manager, which would focus the
   // xterm underneath it instead.
   const dockComposer = findPaneDockComposer(requestedPane)

@@ -38,6 +38,8 @@ export function resolveAgentLaunchCommand(args: {
   sessionOptionsOverrideAgentArgs?: boolean
   includeSessionOptionCatalogDefaults?: boolean
   isRemote?: boolean
+  /** Launch-only, like session options: a resumed session must not inherit it. */
+  suppressStartupUpdatePrompt?: boolean
   claudeSuppressionFlags?: string[] | null
 }): ResolvedAgentLaunchCommand {
   const override = args.cmdOverrides[args.agent]

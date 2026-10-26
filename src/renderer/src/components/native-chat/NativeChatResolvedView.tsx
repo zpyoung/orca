@@ -107,10 +107,8 @@ export function NativeChatResolvedView({
   // A coalesced interrupt/restart can stay working; the newer epoch must still clear Stop suppression.
   const workingEpoch = useAppStore((s) => s.agentStatusByPaneKey[paneKey]?.stateStartedAt ?? null)
   const canSend = useNativeChatCanSend(terminalTabId, targetPtyId)
-  // Reuse the verified composer send path for interactive cards and composer
-  // stop (Stop sends ESC, the agent-TUI interrupt key).
+  // Share verified composer delivery with prompt answers and ESC-based Stop.
   const send = useNativeChatInteractiveSend(terminalTabId, paneKey, targetPtyId, agent)
-  // Every send this pane makes brings the latest into view, wherever the reader had scrolled.
   const { messageListRef, revealLatest } = useNativeChatRevealLatest()
   const interactiveSend = useNativeChatInteractiveSendReveal(send, targetPtyId, revealLatest)
   const [workingInterrupted, setWorkingInterrupted] = useState(false)
@@ -386,10 +384,7 @@ export function NativeChatResolvedView({
       {collapsedCard ? (
         <NativeChatPromptStrip card={collapsedCard} onExpand={promptCardPresentation.expand} />
       ) : null}
-      {/* canSend reflects both the tab's fresh-shell quarantine and the mobile
-          presence-lock, so native chat cannot race either input owner. Under a card it stays
-          mounted but hidden, so its state survives; detaching the ref keeps root typing, paste
-          and reveal focus off it. */}
+      {/* Honor mobile PTY ownership and fresh-shell quarantine; retain the hidden composer’s state but detach its ref from typing, paste and focus routes. */}
       <div hidden={shownPromptCard !== null} className="contents">
         <NativeChatComposer
           ref={shownPromptCard ? undefined : composerRef}

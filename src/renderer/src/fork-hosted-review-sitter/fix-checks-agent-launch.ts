@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
-// FORK-COPY-SHA: 86de8f90e22a15846a49912015278c1e440d00c7
+// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
 // Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
 import { acquireAgentLaunchChoices } from '@/lib/host-chat-program-acquisition'
@@ -96,8 +96,7 @@ async function resolveSavedAgentOverride(
     kind: 'git-worktree',
     ...(repo ? { repoId: repo.id, executionHostId: getRepoExecutionHostId(repo) } : {})
   }
-  // Why: a paired server answers per workspace, so only the enabled check can run before it exists;
-  // the direct launch checks installation on the new workspace.
+  // Before workspace creation, paired projects can check enabled only; installation is checked on the created workspace’s host.
   const detected = pendingAgents
     ? (await acquireAgentLaunchChoices(workspace, () => pendingAgents)).detected
     : null

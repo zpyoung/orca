@@ -110,9 +110,7 @@ export function createAutomation(
     agentId: input.agentId,
     ...(extraAgentArgs !== undefined ? { extraAgentArgs } : {}),
     ...(launchOverrides ? { launchOverrides } : {}),
-    // Why own contexts win: a wire context speaks the client's perspective —
-    // 'runtime:<id>' is a client-assigned name this store cannot interpret, and
-    // persisting it makes the projection orphan a record this authority owns.
+    // Prefer authority-local contexts; client-assigned runtime IDs cannot identify this store's host.
     runContext: contexts.runContext ?? input.runContext ?? null,
     sourceContext: contexts.sourceContext ?? input.sourceContext ?? null,
     projectId: input.projectId,

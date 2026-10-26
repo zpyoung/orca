@@ -147,9 +147,7 @@ const EMPTY_PANE_IDS: ReadonlySet<string> = new Set()
 
 type TerminalTabActivityInput = {
   hasPendingAsk?: boolean
-  // Why: launchAgent is read, not just carried — the status gate needs it to attribute a
-  // bare spinner title to an agent (#9040). Narrowing it away here compiles (it is optional)
-  // but silently drops the tab-bar dot back to the pre-#9040 behavior.
+  // Carry launchAgent to attribute providerless spinner titles; omitting this optional field compiles but loses the status signal.
   tab: Pick<TerminalTab, 'id' | 'title' | 'launchAgent'>
   agentStatusByPaneKey?: Record<string, AgentStatusEntry>
   // Freshness epochs invalidate cached flags even when pane-map identity is unchanged.

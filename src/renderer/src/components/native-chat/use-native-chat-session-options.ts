@@ -79,8 +79,7 @@ export function useNativeChatSessionOptions(args: {
    *  over the screen scrape: it is written per turn, so it outlives the scrollback
    *  and reflects a switch made outside the composer. */
   reportedSessionOptions?: NativeChatSessionOptionObservation | null
-  /** Pane whose live agent status names the provider model, for agents whose hook
-   *  reports one (OMP). Claude's model comes from its terminal frame instead. */
+  /** OMP model evidence comes from its hook; Claude uses its terminal frame. */
   paneKey?: string
 }): {
   surface: NativeChatPtySessionOptionsSurface | null
@@ -219,9 +218,7 @@ export function useNativeChatSessionOptions(args: {
         if (!reportedValues) {
           continue
         }
-        // Why: discovery can land after this read. Keeping the screen that
-        // parsed lets it re-resolve against the host's real ids later, when the
-        // frame itself may have already scrolled out of the buffer.
+        // Retain parsed screen text for late discovery after the model frame scrolls away.
         if (
           cancelled ||
           observedFromLogRef.current ||
@@ -296,7 +293,6 @@ export function useNativeChatSessionOptions(args: {
             surface.reportSessionOptions(reportedValues)
           }
         }
-        // A failed settings write must not surface as an unhandled rejection.
         void retireModelsMissingFromDiscovery(agent, discoveryContext.hostKey, models).catch(
           () => undefined
         )

@@ -3150,7 +3150,7 @@
       "kind": "registration",
       "lines": [
         "import { NativeChatToolCategoryDots } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'",
-        "          <NativeChatToolCategoryDots blocks={blocks} />"
+        "            <NativeChatToolCategoryDots blocks={blocks} />"
       ]
     },
     {
@@ -3513,7 +3513,7 @@
       "feature": "heimdall",
       "kind": "passthrough",
       "lines": [
-        "          body: `Worker ${handle} stopped while running task ${task}. ${errorContext}.${settled?.status === 'circuit_broken' ? ' This task has now failed too many times, so it will not be retried automatically.' : settled?.status === 'failed' ? ' The task is ready to be dispatched again.' : ''}${exitTailText ?? ''}`"
+        "        body: `Worker ${handle} stopped while running task ${task}. ${errorContext}.${outcome}${exitTailText ?? ''}`"
       ]
     },
     {
@@ -4110,7 +4110,7 @@
       ]
     },
     {
-      "path": "src/main/ipc/filesystem-download-lifetime.test.ts",
+      "path": "src/main/ipc/filesystem/filesystem-download-lifetime.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["    cancellations,", "    cancellations"]
@@ -5595,7 +5595,7 @@
       "path": ".github/workflows/mobile.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-24.04-arm"]
+      "lines": ["    runs-on: ubuntu-24.04-arm", "    runs-on: ubuntu-latest"]
     },
     {
       "path": ".github/workflows/node-next-compat.yml",
@@ -5699,12 +5699,6 @@
       "lines": ["    runs-on: ubuntu-latest"]
     },
     {
-      "path": ".github/workflows/terminal-ime-e2e.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-22.04"]
-    },
-    {
       "path": ".github/workflows/terminal-perf.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -5733,6 +5727,12 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["    runs-on: windows-2022"]
+    },
+    {
+      "path": ".github/workflows/wsl-orcad-e2e-frozen-runner-retry.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-22.04"]
     },
     {
       "path": ".github/workflows/wsl-orcad-e2e.yml",
@@ -5868,7 +5868,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "reason": "Fork-only agent hook wiring; upstream ships no project settings file.",
+      "reason": "Adds the fork's sandboxed-test hook to upstream's project agent settings.",
       "status": "permanent"
     },
     {
@@ -5980,11 +5980,6 @@
     {
       "path": "config/fork-ownership.json",
       "reason": "The manifest declares itself so a sync never resets or removes its own source of truth.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/reliability-gates.jsonc",
-      "reason": "Fork-specific reliability gate thresholds.",
       "status": "permanent"
     },
     {
@@ -6161,12 +6156,6 @@
     },
     {
       "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
-      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
-    },
-    {
-      "path": "mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts",
       "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
@@ -6543,7 +6532,7 @@
       "ledger": "bug-12"
     },
     {
-      "path": "src/main/ipc/filesystem-git-status-staging.test.ts",
+      "path": "src/main/ipc/filesystem/filesystem-git-status-staging.test.ts",
       "reason": "Regression coverage for sender-scoped cancellation of in-flight diff IPC requests.",
       "status": "pending-upstream",
       "ledger": "bug-12"
@@ -6585,7 +6574,7 @@
       "ledger": "bug-12"
     },
     {
-      "path": "src/main/ipc/filesystem.ts",
+      "path": "src/main/ipc/filesystem/filesystem.ts",
       "reason": "Owns sender-scoped cancellation state for Git diff IPC requests.",
       "status": "pending-upstream",
       "ledger": "bug-12"
@@ -7123,8 +7112,8 @@
       "removed": 0
     },
     ".gitignore": {
-      "added": 15,
-      "removed": 2
+      "added": 14,
+      "removed": 1
     },
     ".oxlintrc.json": {
       "added": 4,
@@ -7132,7 +7121,7 @@
     },
     "AGENTS.md": {
       "added": 146,
-      "removed": 2
+      "removed": 1
     },
     "config/localization-coverage-allowlist.json": {
       "added": 7,
@@ -7263,8 +7252,8 @@
       "removed": 0
     },
     "src/main/runtime/session-tabs/headless-tab-properties.ts": {
-      "added": 63,
-      "removed": 12
+      "added": 65,
+      "removed": 13
     },
     "src/main/runtime/session-tabs/mobile-session-reconciliation.ts": {
       "added": 18,
@@ -7392,7 +7381,7 @@
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
       "added": 14,
-      "removed": 37
+      "removed": 36
     },
     "src/renderer/src/components/native-chat/native-chat-pending.ts": {
       "added": 1,
@@ -7575,8 +7564,8 @@
       "removed": 1
     },
     "src/renderer/src/lib/focus-terminal-tab-surface.ts": {
-      "added": 8,
-      "removed": 5
+      "added": 6,
+      "removed": 0
     },
     "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts": {
       "added": 1,
@@ -7752,7 +7741,7 @@
     },
     "src/main/rate-limits/service/service-fetch-policy.ts": {
       "added": 8,
-      "removed": 7
+      "removed": 6
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
       "added": 9,
@@ -7848,7 +7837,7 @@
     },
     "src/shared/workspace-session-schema.test.ts": {
       "added": 103,
-      "removed": 3
+      "removed": 0
     },
     "src/shared/workspace-session-schema.ts": {
       "added": 3,
@@ -8148,7 +8137,7 @@
     },
     "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
       "added": 4,
-      "removed": 13
+      "removed": 12
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
       "added": 49,
@@ -8518,7 +8507,7 @@
       "added": 3,
       "removed": 1
     },
-    "src/main/ipc/filesystem-download-lifetime.test.ts": {
+    "src/main/ipc/filesystem/filesystem-download-lifetime.test.ts": {
       "added": 7,
       "removed": 1
     },
@@ -8535,8 +8524,8 @@
       "removed": 2
     },
     "src/renderer/src/components/use-worktree-jump-palette-recent-tabs.ts": {
-      "added": 11,
-      "removed": 2
+      "added": 5,
+      "removed": 1
     },
     "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
       "added": 1,
@@ -8747,8 +8736,8 @@
       "removed": 0
     },
     "src/renderer/src/components/settings/RepositorySourceControlAiSection.tsx": {
-      "added": 4,
-      "removed": 2
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/components/settings/SourceControlActionRecipeRow.tsx": {
       "added": 52,
@@ -8763,8 +8752,8 @@
       "removed": 9
     },
     "src/renderer/src/components/settings/repository-source-control-ai-global-ux.ts": {
-      "added": 20,
-      "removed": 2
+      "added": 19,
+      "removed": 1
     },
     "src/renderer/src/components/settings/repository-source-control-ai-labels.ts": {
       "added": 11,
@@ -8919,8 +8908,8 @@
       "removed": 2
     },
     "src/main/runtime/terminal/launch/terminal-create-deduplication.ts": {
-      "added": 9,
-      "removed": 1
+      "added": 3,
+      "removed": 0
     },
     "src/main/runtime/runtime-automation-controller.ts": {
       "added": 2,
@@ -8935,8 +8924,8 @@
       "removed": 1
     },
     "src/main/runtime/runtime-worktree-agent-startup.ts": {
-      "added": 26,
-      "removed": 11
+      "added": 27,
+      "removed": 12
     },
     "src/renderer/src/components/automations/AutomationRunDetailsPage.tsx": {
       "added": 21,
@@ -9163,8 +9152,8 @@
       "removed": 1
     },
     ".github/workflows/mobile.yml": {
-      "added": 2,
-      "removed": 2
+      "added": 3,
+      "removed": 3
     },
     ".github/workflows/node-next-compat.yml": {
       "added": 1,
@@ -9226,10 +9215,6 @@
       "added": 1,
       "removed": 1
     },
-    ".github/workflows/terminal-ime-e2e.yml": {
-      "added": 2,
-      "removed": 2
-    },
     ".github/workflows/terminal-perf.yml": {
       "added": 1,
       "removed": 1
@@ -9247,6 +9232,10 @@
       "removed": 2
     },
     ".github/workflows/windows-typecheck-parity.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/wsl-orcad-e2e-frozen-runner-retry.yml": {
       "added": 1,
       "removed": 1
     },

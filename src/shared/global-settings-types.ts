@@ -213,8 +213,7 @@ export type GlobalSettings = GlobalSettingsBase & {
   experimentalTerminalDock?: boolean
   /** Open the terminal composer automatically for new agent sessions; mounted panes are unchanged. */
   dockTerminalComposerByDefault?: boolean
-  /** Opt-in: resume working structured chats automatically on the next launch. Off still offers
-   *  the list, so the user sees exactly what would run before anything spends tokens. */
+  /** Opt-in resume of working structured chats after restart; off still lists them for review before token spending. */
   nativeChatResumeWorkOnRestart?: boolean
   /** Queue editable mid-turn follow-ups until turn end on capable hosts. Absent means on; off sends immediately. */
   nativeChatQueueFollowUps?: boolean
@@ -229,8 +228,6 @@ export type GlobalSettings = GlobalSettingsBase & {
   /** Legacy client permission control and host-support marker; kept valid for old peers. */
   nativeChatPermissionMode?: AgentChatPermissionMode
   forkSessionHandoff?: ForkSessionHandoffSettings
-  /** Per-agent new-chat defaults chosen alongside that agent's terminal permission mode. */
-  agentNativeChatPermissionModes?: Partial<Record<TuiAgent, AgentChatPermissionMode>>
   /** Extra launcher rows for the worktree "Open in" submenu. VS Code is always shown first. */
   openInApplications?: OpenInApplication[]
   /** Deprecated: migration/backward-compat only. Use PersistedUIState.rightSidebarOpen. */

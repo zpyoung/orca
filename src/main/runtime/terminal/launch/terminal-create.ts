@@ -243,13 +243,14 @@ export abstract class OrcaRuntimeWithCreateTerminal extends OrcaRuntimeWithTermi
             seedPtyLaunchTitle(pty, launch.effectiveTitle, launchTitleAt, (title, at) =>
               this.setPtyManagementTitleFromObservedTitle(pty, title, at)
             )
-            pty.launchConfig = effectiveLaunchConfig
-              ? dependencies.copySleepingAgentLaunchConfig(effectiveLaunchConfig)
-              : null
-            pty.launchToken = launchToken ?? null
-            pty.launchIncarnationId = launchToken ? pty.incarnationId : null
-            pty.launchAgent = launchOpts.launchAgent ?? null
-            pty.launchedAgent = launchOpts.launchAgent ?? null
+          }
+          recordTerminalLaunchMetadata(pty, result, launch)
+          if (!launch.adoptedStablePane) {
+            pty.launchCommandAgent = result.agentResumeRefused
+              ? null
+              : resolveLaunchCommandPaneAgent(launchOpts.command)
+            pty.launchedAgent = pty.launchAgent
+            this.rememberSavedTerminalLaunchResult(result.id, result)
           }
           recordPtySurface(pty, tabId, paneKey, spawnSurfaceClaimSequence(this.graphSequence))
         }

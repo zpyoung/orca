@@ -484,9 +484,7 @@
   flex-direction: column;
 }
 
-/* Baseline xterm-container layout — padding is driven by CSS custom properties
-   so Ghostty-imported window-padding-x/y can be applied without inline styles.
-   The fallback 4px preserves the legacy default. */
+/* Use CSS variables for Ghostty-imported window padding, retaining the legacy 4px fallback. */
 .xterm-container {
   box-sizing: border-box;
   position: relative;

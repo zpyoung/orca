@@ -13,8 +13,7 @@ export function fitPanes(manager: PaneManager): void {
 }
 
 export function focusActivePane(manager: PaneManager, ownership?: PaneFocusOwnership): void {
-  // Why: tab rename focuses the input on the next frame. A queued terminal
-  // layout focus can land in between mount and focus, blurring rename closed.
+  // Tab rename focuses next frame; queued layout focus must not blur it closed first.
   if (typeof document !== 'undefined' && document.querySelector('[data-tab-rename-input="true"]')) {
     return
   }

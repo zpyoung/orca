@@ -87,8 +87,7 @@ export type NativeChatOptimisticSendOutcome = {
 export type NativeChatComposerProps = AgentComposerCoreProps & {
   /** Prompts recovered by a host from the pane transcript or live status. */
   historyPrompts?: readonly string[]
-  /** Owner of the unsent draft; defaults to `paneKey`. A structured chat's is its conversation,
-   *  shared by every composer showing it. */
+  /** Unsent-draft owner; defaults to paneKey, while structured chats share conversation scope. */
   draftScopeKey?: string
   /** This client's Stop request is in flight: the Stop control is disabled and says so. */
   isStopping?: boolean

@@ -1,29 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
-/**
- * The session-tabs retirement-proof surface, paired across two builds.
- *
- * `cross-version-terminal-wire` covers the terminal binary stream and
- * `cross-version-agent-session-wire` covers `agentSession.*`; neither reaches the
- * session-tabs frame, which is where a paired client learns that a mirrored terminal
- * is gone. This pairs the two halves of that surface across versions:
- *
- *  - the HOST half changed — a host now ships a retirement proof on its own frame when
- *    no surface removal carries one (`attachRetirementProofsToSnapshot`);
- *  - the CLIENT half did not change, which this asserts by running both builds' ledger
- *    over the same frames rather than by reading the diff.
- *
- * The claim under test is the one written into the change: that this is Rule 1, because
- * `retiredTerminalSurfaces` is an existing optional field on an existing path. Rule 3's
- * fourth bullet says "a frame the host ... starts sending, on an existing path" is a wire
- * change even with no codec movement, so the claim is checked against an actual old
- * build rather than accepted.
- *
- * The pre-stack ref is pinned rather than derived: this contract needs a release from
- * before the proof-only frame existed, which is the fallback
- * docs/reference/remote-wire-compatibility.md sanctions for exactly this case.
- */
+// Pin the pre-proof host and run both client ledgers over real retirement frames; optional fields alone cannot prove behavioral compatibility.
+// Cover renderer-first removal where the later PTY exit finds no persisted surface to retire.
 const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'
 
 const SUITE_TIMEOUT_MS = 180_000

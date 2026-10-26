@@ -184,10 +184,7 @@ export abstract class OrcaRuntimeWithSyncMobileSessionTabs extends OrcaRuntimeWi
         dockMergedSnapshot,
         existing
       )
-      // Why: clients drop same-epoch frames whose version isn't strictly newer,
-      // and main-local touches may already have emitted a higher version than
-      // the renderer's counter — keep the stored version strictly monotonic so
-      // the accepted content is never discarded as stale downstream.
+      // Keep stored versions strictly increasing past main-local bumps or clients discard accepted renderer content as stale.
       const storedVersion = existing
         ? Math.max(nextSnapshot.snapshotVersion, existing.snapshotVersion + 1)
         : nextSnapshot.snapshotVersion

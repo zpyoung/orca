@@ -21,11 +21,7 @@ type RepositorySourceControlAiSectionProps = {
   updateRepo: (repoId: string, updates: SourceControlAiRepoUpdate) => void | Promise<boolean>
 }
 
-/**
- * Per-repo Source Control AI settings — save UX matches global Git / Source Control AI:
- * selects and simple controls persist immediately; each action recipe drafts launch options,
- * CLI args, and its command template until that row's Save.
- */
+/** Persist simple controls immediately; draft CLI args/templates until per-action Save, matching global recipes. */
 export function RepositorySourceControlAiSection({
   repo,
   updateRepo

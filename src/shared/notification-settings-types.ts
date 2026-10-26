@@ -65,10 +65,7 @@ export type NotificationDispatchRequest = {
    *  title/body in buildNotificationOptions, which does not read these fields at all. */
   title?: string
   body?: string
-  /**
-   * Which lane raised this, so the click handler knows how to reveal the subject. Absent means the
-   * terminal lane, which is every sender that predates structured chat.
-   */
+  /** Click-routing lane; absence means terminal, preserving pre-structured-chat senders. */
   surface?: 'terminal' | 'agent-session'
   /** Producer-owned once-only news identity bypasses workspace burst dedupe so distinct events survive. */
   attentionKey?: string

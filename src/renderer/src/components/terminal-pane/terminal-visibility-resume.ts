@@ -98,8 +98,7 @@ export function resumeTerminalVisibility({
         focusActivePane(manager, ...paneFocusOwnershipArgs(tabId))
       }
     } else {
-      // fitAllRevealedPanes flushes after WebGL reattaches, avoiding a redundant
-      // full refresh in the suspended DOM renderer while preserving first paint.
+      // Flush after WebGL attachment to avoid a redundant suspended-DOM refresh while preserving first paint.
       repairedDpr = resumeTerminalVisibilityHeavy(
         manager,
         isActive && !isChatViewMode,
@@ -209,10 +208,7 @@ function resumeTerminalVisibilityHeavy(
   shouldFocus: boolean,
   ownershipArgs: [] | [PaneFocusOwnership] = []
 ): boolean {
-  // Why: hidden panes can accumulate large PTY bursts while Chromium is
-  // occluded. Drain a bounded slice before fitting; the scheduler keeps
-  // ordering and continues the rest asynchronously so return-to-app does
-  // not beachball behind an entire backlog.
+  // Drain only a bounded pre-fit backlog slice; keep ordering and continue asynchronously to avoid freezing app return.
   for (const pane of manager.getPanes()) {
     requestTerminalBacklogRecovery(pane.terminal)
     flushTerminalOutput(pane.terminal, { maxChars: VISIBLE_RESUME_FLUSH_CHARS })

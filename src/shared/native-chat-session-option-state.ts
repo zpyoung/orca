@@ -88,8 +88,7 @@ export function setTrackedSessionOption(
   optionId: string,
   value: SessionOptionValue,
   source: TrackedNativeChatSessionOption['source'],
-  /** The model the picker drew this option under when none is tracked — without it a
-   *  value set against a CLI default would be dispatched and then silently forgotten. */
+  /** Picker model when none is tracked; retain options dispatched under the CLI default. */
   fallbackModelId: string | null = null,
   at?: number
 ): string | null {
@@ -153,8 +152,7 @@ export function applyNativeChatReportedSessionOptions(
   record: NativeChatSessionOptionRecord,
   values: Record<string, SessionOptionValue>,
   observedAt?: number | null,
-  /** Ids the provider reported back. Omitted means every value is a report, which
-   *  is what a surface that only ever learns values by reading them sends. */
+  /** Provider-confirmed ids; omitted means all values are read-back reports. */
   confirmed?: readonly string[]
 ): boolean {
   const sourceFor = (id: string): TrackedNativeChatSessionOption['source'] =>

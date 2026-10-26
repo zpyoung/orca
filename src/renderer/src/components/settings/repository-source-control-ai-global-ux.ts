@@ -47,11 +47,7 @@ type UseRepositorySourceControlAiGlobalUxArgs = {
   updateRepo: (repoId: string, updates: SourceControlAiRepoUpdate) => void | Promise<boolean>
 }
 
-/**
- * Match global Source Control AI save UX for per-repo overrides:
- * - Selects / simple controls persist immediately (optimistic UI)
- * - Action launch options, CLI args, and command template draft until the per-action Save
- */
+/** Persist simple controls optimistically; draft action CLI args/templates until per-action Save, matching global UX. */
 export function useRepositorySourceControlAiGlobalUx({
   repoId,
   persistedRepoAi,

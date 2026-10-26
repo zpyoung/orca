@@ -62,8 +62,7 @@ export function useNativeChatInteractiveSend(
     inFlightRef.current?.cancel()
     inFlightRef.current = null
   }, [])
-  // Why: a split can be rebound without unmounting this view. Cancel during
-  // commit so no delayed answer write can race the replacement PTY.
+  // A split can rebind without unmounting; cancel during commit before delayed writes can target the replacement PTY.
   useLayoutEffect(
     () => cancelInFlight,
     [agent, cancelInFlight, paneKey, targetPtyId, terminalTabId]

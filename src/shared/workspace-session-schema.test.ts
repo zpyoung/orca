@@ -822,6 +822,7 @@ describe('parseWorkspaceSession', () => {
     }
   })
 
+  // Reclaiming client-hosted pages after relaunch requires both persisted identity fields; z.object drops unlisted fields.
   it('preserves the remote page identity of a client-hosted browser page', () => {
     const result = parseWorkspaceSession({
       activeRepoId: null,

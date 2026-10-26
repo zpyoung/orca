@@ -167,9 +167,7 @@ export function useVisibleSidebarWorktrees(args: {
     pairedDeviceIdsByEnvironment,
     worktreeIdsWithStructuredChat
   ])
-  // Why: agentStatusEpoch bumps recompute this memo even when membership and
-  // order are unchanged; keeping the previous identity stops the whole
-  // rows/sectionRows/renderedWorktrees chain from churning per epoch.
+  // Reuse equal visibility results across epochs to avoid churning the entire row-model chain.
   const visibleWorktrees = useReusedArrayIdentity(recomputedVisibleWorktrees.worktrees)
 
   return {

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-view-state.ts
-// FORK-COPY-SHA: 86de8f90e22a15846a49912015278c1e440d00c7
+// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
 // Pure mapping from an assembled NativeChatSession to the discrete view state the
 // UI renders. Keeping it a single function (not branching inside the .tsx) makes
 // the empty/loading/error/working/ready dispatch testable and keeps the render
@@ -7,9 +7,7 @@
 
 import type { NativeChatSession } from '../../../../../shared/native-chat-types'
 
-/** The mutually-exclusive surfaces the chat view can show. `ready` and
- *  `working` both render the message list; `working` additionally shows the
- *  live in-flight indicator. The rest are full-pane states. */
+/** Ready renders the transcript; isWorking adds live activity. Other variants replace the pane. */
 export type NativeChatViewState =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
@@ -42,14 +40,10 @@ export function selectNativeChatViewState(session: NativeChatSession): NativeCha
   if (session.status === 'loading') {
     return { kind: 'loading' }
   }
-  // A KNOWN session working with nothing to show is a transcript that has not
-  // flushed yet, so hold the loading surface rather than flashing empty (#11032).
-  // The status stays 'working', so the composer keeps Stop the moment a bubble
-  // lands — forcing 'loading' upstream instead rendered an idle pane mid-turn.
+  // Unflushed known sessions stay visually loading, retaining working status for Stop (#11032).
   if (session.status === 'working' && session.sessionId !== null) {
     return { kind: 'loading' }
   }
-  // Empty wins over a transient 'working' hook so a just-toggled, pre-session
-  // pane shows a clear empty state instead of a spinner over nothing.
+  // Before session discovery, transient working hooks must not replace the empty state with a spinner.
   return { kind: 'empty' }
 }

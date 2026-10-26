@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 86de8f90e22a15846a49912015278c1e440d00c7
+// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
@@ -53,8 +53,7 @@ export type AgentComposerFieldProps = {
   isWorking: boolean
   /** This client's Stop request is in flight: the Stop control is disabled and says so. */
   isStopping?: boolean
-  /** The chat reads Stopping: the placeholder says a message runs after the stop, queued as a
-   *  card where the host holds sends as cards (`queue`), else sent and held by the host (`send`). */
+  /** After Stop, describe whether the host queues the next message as a card or holds the send. */
   afterStop?: NativeChatAfterStopSend
   attachDisabled: boolean
   dictationDisabled: boolean
@@ -90,8 +89,7 @@ export type AgentComposerImageAttachment = {
   /** Empty while `pending`: the clipboard image has no agent-readable path yet. */
   path: string
   connectionId?: string
-  /** Clipboard thumbnail (blob/data URL) rendered before — and after — the file
-   *  lands, so the chip never waits on a disk round-trip to show something. */
+  /** Show clipboard thumbnails immediately, without waiting for disk/upload completion. */
   previewUrl?: string
   /** True while the pasted image is still being written to disk or uploaded. */
   pending?: boolean
@@ -204,9 +202,7 @@ export function AgentComposerField({
       return
     }
     if (imeEnterGesture.isComposing()) {
-      // Why: a clear (an async structured send confirming) would otherwise be lost outright and
-      // the sent text would ride along into the next message. Only clears are carved out of
-      // browser ownership; every other programmatic draft still loses to the live composition.
+      // Remember async send clears during composition so sent text cannot leak into the next message; other drafts still yield to IME.
       droppedDraftClearRef.current ||= draft === '' && textarea.value !== ''
       return
     }

@@ -43,12 +43,7 @@ export type {
 function noop(): void {}
 
 /**
- * Rich native input for the chat view. Sends prompts into the running agent
- * through the same verified runtime path as typed input (KTD4), so the agent
- * cannot distinguish native input from keystrokes. Enter sends; Shift+Enter
- * inserts a newline; multi-line is bracketed-paste wrapped; Esc interrupts.
- * Slash-command and `@file` autocomplete are agent-aware; image paste persists a
- * temp file and injects the agent-appropriate path (or reports unsupported).
+ * Send through the chat’s structured transport or verified PTY route, with agent-aware autocomplete and image handling.
  *
  * A thin host wrapper over the shared {@link useAgentComposerCoreState} /
  * {@link useAgentComposerCompose} composer core: it owns only what's specific
