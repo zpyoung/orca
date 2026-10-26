@@ -8,7 +8,7 @@ import type {
 import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
 import type { AgentType } from '../../shared/native-chat-types'
 import { AI_VAULT_AGENT_SOURCES } from '../ai-vault/session-scanner-agent-sources'
-import { isENOENT } from '../ipc/filesystem-path-containment'
+import { isENOENT } from '../ipc/filesystem/filesystem-path-containment'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import {
   getForkPaneTranscriptPaths,
