@@ -11,13 +11,7 @@ import type { VisibleWorktreeOptions } from './compute-visible-worktrees'
 import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter-context'
 import { getWorkspaceReviewFilterContext } from './fork-workspace-review-filters/workspace-review-filter-context'
 
-/**
- * Read the store into the filter inputs `computeVisibleWorktrees` decides from.
- *
- * Why separate from the filter itself: this is the only part of the pipeline that touches the
- * store, so keeping it here leaves the filter a pure function of its options — which is what lets
- * the sidebar, Cmd+J and the Cmd+1–9 handler all reuse it without a React render.
- */
+/** Isolate store reads so sidebar, palette and keyboard shortcuts can share the pure visibility filter. */
 export function buildVisibleWorktreeOptionsFromState(
   state: ReturnType<typeof useAppStore.getState>,
   repoMap: Map<string, Repo>

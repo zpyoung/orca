@@ -1,7 +1,4 @@
-import {
-  isAgentChatPermissionMode,
-  normalizeAgentNativeChatPermissionModes
-} from '../../../../shared/agent-chat-permission-mode'
+import { isAgentChatPermissionMode } from '../../../../shared/agent-chat-permission-mode'
 import { normalizeNativeChatAppearanceSettings } from '../../../../shared/native-chat-appearance-settings'
 import { normalizeAutoRenameBranchFromWorkDefaultOn } from '../../../../shared/auto-rename-branch-from-work-settings'
 import {
@@ -185,8 +182,7 @@ export function migrateStoredWebSettings(stored: Partial<GlobalSettings>): Parti
   }
 }
 
-/** Browser-saved Arguments from before the stored permission carry their flags; moved so the
- *  stored default can't add a second one. A missing key launched with the shipped default. */
+/** Move legacy browser-saved permission flags so stored defaults cannot duplicate them; missing keys used the shipped default. */
 function migrateBrowserSavedAgentPermission(stored: Partial<GlobalSettings>) {
   if (hasTypedAgentPermission(stored) || (!stored.agentDefaultArgs && !stored.agentDefaultEnv)) {
     return {}
@@ -255,18 +251,9 @@ export function mergeSettings(
 /** The host's new-chat permission default (the host seeds from it), kept only when a known mode. */
 export function runtimeChatPermissionSetting(
   settings: Partial<GlobalSettings>,
-  includeAgentOverrides = true
-): Pick<GlobalSettings, 'nativeChatPermissionMode' | 'agentNativeChatPermissionModes'> {
-  return {
-    ...(isAgentChatPermissionMode(settings.nativeChatPermissionMode)
-      ? { nativeChatPermissionMode: settings.nativeChatPermissionMode }
-      : {}),
-    ...(includeAgentOverrides
-      ? {
-          agentNativeChatPermissionModes: normalizeAgentNativeChatPermissionModes(
-            settings.agentNativeChatPermissionModes
-          )
-        }
-      : {})
-  }
+  _includeAgentOverrides = true
+): Pick<GlobalSettings, 'nativeChatPermissionMode'> {
+  return isAgentChatPermissionMode(settings.nativeChatPermissionMode)
+    ? { nativeChatPermissionMode: settings.nativeChatPermissionMode }
+    : {}
 }

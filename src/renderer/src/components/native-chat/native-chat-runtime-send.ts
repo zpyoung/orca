@@ -54,8 +54,7 @@ export type NativeChatSendOptions = NativeChatDeliveryOptions & {
   onOutcome?: (outcome: SendOutcome) => void
 }
 
-/** Cancels an in-flight send's pending pty writes (the delayed Enter, and any
- *  later question bodies/Enters). Safe to call after the send completes. */
+/** Cancellation suppresses remaining scheduled writes and is safe after completion. */
 export type NativeChatSendHandle = {
   /** `keepInput` skips the unsubmitted-input clear, e.g. while a dialog owns the agent's input. */
   cancel: (keepInput?: boolean) => void

@@ -263,8 +263,7 @@ function PickerOptionButton({
       aria-selected={selected}
       type="button"
       onPointerDown={(event) => {
-        // Why: the textarea owns query and caret state, so pointer acceptance
-        // must run before the browser transfers focus to this row.
+        // Accept before focus transfer because the textarea owns query and caret state.
         event.preventDefault()
         if (event.button === 0) {
           onChoose()

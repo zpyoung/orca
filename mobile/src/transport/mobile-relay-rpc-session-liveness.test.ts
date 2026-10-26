@@ -6,7 +6,7 @@ const fakes = vi.hoisted(() => ({
     onText(value: string): void
     onBinary(value: Uint8Array): void
   },
-  sendText: vi.fn(() => true),
+  sendText: vi.fn((_frame: string) => true),
   close: vi.fn()
 }))
 
@@ -55,6 +55,11 @@ async function authenticateSession(onLog?: ConnectionLogSink) {
   fakes.linkOptions!.onAuthenticated()
   await vi.waitFor(() => expect(fakes.sendText).toHaveBeenCalledOnce())
   const confirmation = sentRequests()[0]!
+  expect(confirmation).toMatchObject({
+    method: 'pairing.getEndpoints',
+    params: { resumeConfirmReqId: 'confirm-1' },
+    deviceToken: 'device-token'
+  })
   fakes.linkOptions!.onText(
     JSON.stringify({
       id: confirmation.id,
@@ -76,6 +81,11 @@ async function authenticateSession(onLog?: ConnectionLogSink) {
   )
   await vi.waitFor(() => expect(fakes.sendText).toHaveBeenCalledTimes(2))
   const capabilities = sentRequests()[1]!
+  expect(capabilities).toMatchObject({
+    method: 'runtime.clientCapabilities.update',
+    params: { clientCapabilities: expect.arrayContaining(['agent-session.structured.v1']) },
+    deviceToken: 'device-token'
+  })
   fakes.linkOptions!.onText(
     JSON.stringify({
       id: capabilities.id,

@@ -94,8 +94,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
   )
 
   const canFilterRepos = repos.length > 1
-  // Why: derive from current repos so stale ids (e.g. lingering after a repo
-  // is removed) don't inflate counts or falsely signal an applied filter.
+  // Ignore removed repo IDs so they cannot inflate counts or imply an active filter.
   const selectedRepoIdSet = useMemo(() => {
     const set = new Set<string>()
     for (const r of repos) {
@@ -107,7 +106,6 @@ const SidebarFilter = React.memo(function SidebarFilter({
   }, [repos, filterRepoIds])
   const selectedCount = selectedRepoIdSet.size
   const hasRepoFilter = selectedCount > 0
-  // The sidebar's own badge, so this menu counts every filter the Workspace options do.
   const { hasAnyFilter, activeFilterCount } = useWorkspaceOptionsFilterBadge()
 
   const filteredRepos = useMemo(() => searchRepos(repos, query), [repos, query])
@@ -122,8 +120,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
     clearSidebarFilters(selectSidebarFilterState(store), store)
   }, [])
 
-  // Why: derive ids from the live repos list at click time so a repo added
-  // while the popover is open is included immediately.
+  // Use current repos so Select All includes projects added while the popover stays open.
   const selectAllRepos = useCallback(() => {
     setFilterRepoIds(repos.map((r) => r.id))
   }, [repos, setFilterRepoIds])
@@ -156,8 +153,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
             >
               <ListFilter className="size-3.5" strokeWidth={2.25} />
               {hasAnyFilter && (
-                // Why: the only at-a-glance affordance that filters are
-                // applied — without it the list can silently hide workspaces.
+                // Expose active filters so silently hidden workspaces have an at-a-glance explanation.
                 <span
                   aria-hidden
                   className="absolute -top-0.5 -right-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-medium leading-none text-primary-foreground"
@@ -281,8 +277,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
                 )}
                 value={query}
                 onValueChange={(nextQuery) => {
-                  // Why: typing creates a new filtered list, so keyboard
-                  // selection should return to the derived first match.
+                  // Reset keyboard selection when typing produces a new result list.
                   setCommandValueOverride(null)
                   setQuery(nextQuery)
                 }}
@@ -332,9 +327,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
         )}
 
         <DropdownMenuSeparator />
-        {/* Why: "Add project" stays visible regardless of project count so users
-            can recover from the 0/1-project state where the project section is
-            hidden. Reset sits beside it only when a filter is active. */}
+        {/* Keep Add project visible even when the project-filter section disappears at zero/one projects. */}
         <div className="flex items-center justify-between gap-1 px-1 py-1">
           {hasAnyFilter ? (
             <button

@@ -141,8 +141,7 @@ export class RuntimeRepositorySettingsController {
     }
     const repo = typeof target === 'string' ? await this.deps.resolveRepo(target) : target
     assertWslMoveRepoWritable(store, repo)
-    // Why here: the host owns these shells; a client only stops the workspaces it has loaded,
-    // and older clients stop none. Bounded so repo.rm still answers inside the client's timeout.
+    // Host owns all shells; clients may stop only loaded workspaces or none. Bound teardown inside repo.rm timeout.
     const deadline = Date.now() + PROJECT_TERMINAL_STOP_BUDGET_MS
     const stopProjectTerminals = async (closeStructuredSessions: boolean): Promise<void> => {
       await this.deps
@@ -152,7 +151,7 @@ export class RuntimeRepositorySettingsController {
         })
     }
     await stopProjectTerminals(false)
-    // Why again: a WSL move may have fenced the project while the stop was awaited.
+    // Recheck WSL fence after stop awaits.
     assertWslMoveRepoWritable(store, repo)
     const removeFromCatalog = (): true => {
       if (!store.removeProjectForHost) {

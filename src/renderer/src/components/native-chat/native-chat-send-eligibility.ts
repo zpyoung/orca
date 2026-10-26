@@ -14,15 +14,7 @@ export function deriveNativeChatCanSend(
   return !quarantined && driver?.kind !== 'mobile'
 }
 
-/**
- * Pure predicate for whether the native chat surface should take over the mobile
- * driver surface for a pane. When a tab is in chat view, the chat view is the
- * visible/active layer above the still-mounted terminal, so the terminal's own
- * mobile-driver overlay (presence-lock banner / phone-fit hold) must not render
- * on top of it — the composer's guarded `canSend` state communicates the lock
- * inside the chat surface instead. Keeps the terminal mounted underneath either
- * way (R2).
- */
+/** Chat communicates the mobile lock in its composer; suppress the still-mounted terminal overlay above it. */
 export function shouldChatTakeOverMobileSurface(viewMode: 'terminal' | 'chat'): boolean {
   return viewMode === 'chat'
 }

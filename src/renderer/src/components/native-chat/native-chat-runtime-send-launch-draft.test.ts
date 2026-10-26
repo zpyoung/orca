@@ -1,6 +1,3 @@
-// Send-path behaviour when a launch-context draft is still parked on the agent's
-// TUI input line: the multi-line clear and its confirmation step.
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sendRuntimePtyInput = vi.fn()

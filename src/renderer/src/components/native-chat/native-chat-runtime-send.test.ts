@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock the IO seam so the test stays pure: we only assert the write order and
-// the inter-write delay, not the local-vs-remote pty branching.
+// Mock PTY I/O to isolate write ordering and delays from local/remote routing.
 const sendRuntimePtyInput = vi.fn()
 const sendRuntimePtyInputAcceptance = vi.fn()
 const sendRuntimePtyInputVerified = vi.fn()
@@ -148,8 +147,8 @@ describe('sendNativeChatMessage', () => {
     expect(mergedWriteBytes()).toEqual([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       buildNativeChatPasteBytes('tell me a joke'),
-      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, // cancel cleanup
-      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, // next send pre-clear
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       buildNativeChatPasteBytes('continue')
     ])
   })

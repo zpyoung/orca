@@ -284,8 +284,7 @@ describe('SourceControlAgentActionDialog', () => {
       launchOptions: {}
     })
   })
-  // Why (#21429): a paired server's workspace has no SSH connection on this client; its agents
-  // are on the server, and this client's own list says nothing about them.
+  // Paired-server agents belong to the workspace owner; the client list cannot detect them (#21429).
   it('detects agents on the paired server that owns the workspace', async () => {
     mocks.ensureDetectedAgents.mockResolvedValue([])
     resetStore(settingsWithGlobalRecipe(), [repoWithSavedRecipe('', null, 'runtime:env-1')])

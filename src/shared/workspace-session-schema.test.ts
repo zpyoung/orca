@@ -104,9 +104,7 @@ describe('parseWorkspaceSession', () => {
   })
 
   it('preserves an isolated browser tab session partition across hydration', () => {
-    // Regression for #6923: the resolved partition must survive persist→load,
-    // otherwise a restored isolated tab falls back to the shared default
-    // partition when the renderer profile mirror is stale at startup.
+    // Preserve isolated storage despite a stale renderer profile mirror after restart (#6923).
     const result = parseWorkspaceSession({
       activeRepoId: null,
       activeWorktreeId: null,
@@ -436,7 +434,6 @@ describe('parseWorkspaceSession', () => {
   it('rejects a session with missing required top-level fields', () => {
     const result = parseWorkspaceSession({
       activeRepoId: null
-      // missing activeWorktreeId, tabsByWorktree, etc.
     })
     expect(result.ok).toBe(false)
   })

@@ -214,6 +214,8 @@ export function prepareWebSessionTabsSnapshotUnified(
     (snapshot.activeTabType === 'terminal'
       ? (activeMirroredTerminalId ?? mirroredTerminalTabEntries[0]?.id)
       : mirroredTerminalTabEntries[0]?.id) ??
+    // Another runtime's terminals can outlive this frame's own (#31983).
+    nextTerminalTabs?.[0]?.id ??
     null
   const currentActiveBrowserStillExists =
     state.activeBrowserTabIdByWorktree[worktreeId] &&
@@ -259,9 +261,7 @@ export function prepareWebSessionTabsSnapshotUnified(
       ? currentVisibleUnifiedTabId
       : null
   const activeGroupId = state.activeGroupIdByWorktree[worktreeId]
-  // Why: Open Preview to the Side can activate an empty reserved group before the host
-  // browser lands. A snapshot that still has the host terminal active must not treat
-  // that emptiness as a terminal focus change.
+  // Reserved preview splits can be active before browser arrival; emptiness must not become terminal focus intent.
   const reservedEmptyPreviewFallbackTabId =
     currentVisibleUnifiedTabId == null &&
     activeGroupId != null &&

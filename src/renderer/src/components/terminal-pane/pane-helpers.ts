@@ -73,8 +73,7 @@ export function shouldPreserveEditableFocus(element: Element | null): boolean {
   if (element.closest('[hidden], [inert]')) {
     return false
   }
-  // Why: deferred fit/focus work can run after inline rename or settings
-  // fields take focus. Layout maintenance must not blur user edits closed.
+  // Deferred layout maintenance must not steal focus from rename or settings edits.
   return (
     element.isContentEditable ||
     element.tagName === 'INPUT' ||

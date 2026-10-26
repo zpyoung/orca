@@ -102,8 +102,7 @@ export function useNativeChatSendLifecycle(
 
   const inputOwnedByCard = cardOwnership?.inputOwnedByCard === true
   const onPendingSendRetired = cardOwnership?.onPendingSendRetired ?? onPendingSendCanceled
-  // Why: once a card owns the agent's input, an unsubmitted Enter would answer it. No line clear
-  // either: it would type under the dialog, and the next send clears the line first.
+  // Card ownership makes a pending Enter an answer; retire it without typing a line-clear under the dialog.
   useLayoutEffect(() => {
     if (inputOwnedByCard) {
       settlePendingSends(onPendingSendRetired, true)

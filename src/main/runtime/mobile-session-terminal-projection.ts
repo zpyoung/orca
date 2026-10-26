@@ -14,10 +14,7 @@ import {
 } from './mobile-session-layout-projection'
 import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
-/**
- * Drops a legacy row with no tab-bar entry whose every terminal a tab-bar tab of this workspace
- * holds (the shared Loader's rule; the window hides it too), and moves a selection on it to that tab.
- */
+/** Match the window Loader: remove legacy rows wholly absorbed by tab-bar tabs and move their selection. */
 function withoutAbsorbedLegacyRows(
   worktreeId: string,
   persistedTabs: readonly TerminalTab[],

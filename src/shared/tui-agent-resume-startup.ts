@@ -29,6 +29,8 @@ export function buildAgentResumeStartupPlan(args: {
   isRemote?: boolean
   /** The caller chose the terminal folder on purpose, so Codex must not ask for the recorded one. */
   resumeInLaunchCwd?: boolean
+  /** Folder the resume shell starts in; an agent recorded elsewhere is resumed from its own folder (#16960). */
+  launchCwd?: string | null
   /** Open a copy of the conversation instead of re-entering it; null for agents that cannot. */
   fork?: boolean
   claudeSuppressionFlags?: string[] | null
@@ -39,8 +41,7 @@ export function buildAgentResumeStartupPlan(args: {
   if (!resumeArgv) {
     return null
   }
-  // Why: Codex otherwise prompts for the folder, defaulting to the recorded one even once it was
-  // deleted (#17745). Kept before `resume` so dropAgentResumeArgvFromCommand strips only that.
+  // Codex otherwise asks for its old folder, even if deleted (#17745). Keep before resume so argv removal preserves the folder choice.
   const argv =
     args.agent === 'codex' && args.resumeInLaunchCwd
       ? [resumeArgv[0], '-c', 'tui.resume_cwd=current', ...resumeArgv.slice(1)]
@@ -78,7 +79,17 @@ export function buildAgentResumeStartupPlan(args: {
     ...args,
     agentCommand: baseCommand.commandWithoutSessionOptions
   })
-  const launchCommand = buildAgentResumeLaunchCommand(args.agent, baseCommand.command, argv, shell)
+  const resumeCommand = buildAgentResumeLaunchCommand(args.agent, baseCommand.command, argv, shell)
+  const agentCwd = args.providerSession.cwd
+  const launchCommand =
+    agentCwd && args.launchCwd && !args.resumeInLaunchCwd && !isSameFolder(agentCwd, args.launchCwd)
+      ? buildAiVaultResumeShellCommand({
+          resumeCommand,
+          cwd: agentCwd,
+          platform: args.platform,
+          shell
+        })
+      : resumeCommand
   const applied = baseCommand.appliedSessionOptions
   return {
     agent: args.agent,
@@ -90,4 +101,12 @@ export function buildAgentResumeStartupPlan(args: {
     ...(Object.keys(applied).length > 0 ? { sessionOptions: { ...applied } } : {}),
     ...(args.agentEnv ? { env: { ...args.agentEnv } } : {})
   }
+}
+
+/** WSL panes start at a UNC path while the agent reports its Linux path. */
+function isSameFolder(agentCwd: string, launchCwd: string): boolean {
+  const launchPath = parseWslUncPath(launchCwd)?.linuxPath ?? launchCwd
+  return (
+    normalizeRuntimePathForComparison(agentCwd) === normalizeRuntimePathForComparison(launchPath)
+  )
 }

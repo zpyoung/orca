@@ -18,12 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  # Why: a README/docs-only PR used to start the full matrix (test shards,
-  # two package jobs, typecheck, git compat, xterm, shell contracts). Path
-  # filters on `on.pull_request` would drop the `verify` check entirely; this
-  # detector keeps verify as the required aggregate and skips the expensive jobs.
-  # Per-job outputs also skip git-compat/xterm/packaging/shell when those
-  # inputs are unchanged; empty diffs fail closed and run everything.
+  # Keep required verify present for docs-only PRs while routing expensive jobs by inputs; empty diffs fail closed to full checks.
   code_paths:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     name: detect changes and check repository guards
@@ -47,11 +42,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # Why depth 50 and not 0: every diff below resolves to HEAD^1, so only the merge commit
-          # and a little slack are needed. Fetching all 8127 refs' commit graph cost ~20s here and
-          # is charged to the start of all 22 jobs, since they all need this one.
-          # Why blob:none stays: the sparse tree below is ~7 files, so there are no blobs to
-          # materialize and no promisor refetch. Measured 9.5s -> 1.6s against 20.7s today.
+          # Fetch 50 commits for merge HEAD^1 diffs instead of all 8127 refs (~20s); sparse ~7-file blob:none checkout avoids materialization/refetch (9.5s→1.6s).
           fetch-depth: 50
           filter: blob:none
           sparse-checkout: |
@@ -108,9 +99,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          # Why HEAD^1 and not --merge-base: HEAD is the pull request merge commit, so its first
-          # parent is the base side already. Computing a merge base instead would require the
-          # payload base SHA to be in the graph, which is what forced a full-history checkout.
+          # PR merge HEAD’s first parent is the base; --merge-base would require the payload SHA/full history.
           DIFF_BASE="$(node config/scripts/git-pull-request-diff-base.mjs "$BASE_SHA")"
           # Why --no-renames: name-only rename detection can report only the destination.
           # A code file moved under docs/ must still expose its code-side deletion.
@@ -143,11 +132,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # Why depth 50: the gates below diff against HEAD^1, so no merge base is computed and
-          # the payload base SHA need not be in the graph.
-          # Why no blob:none here, unlike code_paths: this job checks out all 30,226 files, and
-          # the filter then forces a second promisor fetch of nearly every blob. Measured 23s
-          # blobless against ~11s without it.
+          # Fetch 50 for merge HEAD^1, no merge-base graph needed. Full-tree checkout omits blob:none to avoid refetching ~30k blobs (23s versus ~11s).
           fetch-depth: 50
           persist-credentials: false
 
@@ -303,9 +288,7 @@ jobs:
       shards: ${{ needs.preflight.outputs.shards }}
       run_shards: ${{ needs.code_paths.outputs.mobile_ci_tools != 'true' }}
 
-  # Why a sibling and not part of the test workflow: it is advisory, so it must not delay the
-  # gate. Inside unit-tests.yml a caller's `needs: test` waited for it, holding verify ~36s
-  # after the last shard. Deliberately absent from verify's needs for the same reason.
+  # Keep advisory evidence sibling to tests and outside verify.needs; reusable-workflow dependency otherwise added ~36s after last shard.
   unit_selection_evidence:
     needs: [test]
     if: ${{ !cancelled() && (needs.test.result == 'success' || needs.test.result == 'failure') }}
@@ -323,15 +306,11 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      # Why fetch-depth 0: the harness extracts the newest release tag to skew
-      # current code against it. The default shallow clone has no tags, which is
-      # why this cannot ride along in the sharded `test` job.
+      # Fetch tags/full history for newest-release skew; shallow unit shards cannot supply it.
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # Why blob:none: full history is needed for the merge-base diff, but historical
-          # file contents are not. Blobs are ~89% of this repo's pack, and Git fetches the
-          # few this job actually reads on demand.
+          # Use blob:none for merge-base history because blobs are ~89% of pack; fetch rare historical contents on demand.
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
@@ -362,8 +341,7 @@ jobs:
           DIFF_BASE="$(node config/scripts/git-pull-request-diff-base.mjs "$BASE_SHA")"
           pnpm run check:runtime-launcher-protocol-ratchet -- --base "$DIFF_BASE"
 
-      # Runs the whole directory so a new file there cannot be left out; an empty match
-      # exits 1 ("No test files found"), so this lane cannot pass while running zero tests.
+      # Run the entire directory; zero matches fail so new contracts cannot be omitted silently.
       - name: Old/new client and server compatibility journeys
         run: pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/
 

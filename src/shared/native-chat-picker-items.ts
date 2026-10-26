@@ -38,12 +38,8 @@ export type NativeChatSkillDiscoverySnapshot = {
   errorKind?: 'unavailable' | 'timeout' | 'host' | 'unknown'
 }
 
-/**
- * Which commands a scanned skill of the same name may stand in for, by marking them unclassified.
- * Never one the chat's own send handles (`/compact`), which runs that whatever the row says. Where
- * the agent's report lists skills among its commands (OpenCode 1.x), only a name reported under
- * that skill's own description; any other is the agent's command, which OpenCode runs first.
- */
+/** Only unclassify namesake commands a scanned skill can replace. Never override host-owned dispatch (/compact).
+ * OpenCode 1.x mixes skills into commands: require matching skill descriptions; otherwise its real command takes precedence. */
 export function classifyPickerCommands(
   commands: readonly SlashCommandSuggestion[],
   skills: readonly DiscoveredSkill[],
@@ -90,8 +86,7 @@ export function buildNativeChatPickerItems(
   trigger: '/' | '$' = '/',
   namespacePluginSkills = false
 ): NativeChatPickerItem[] {
-  // A name can only collide when both kinds invoke through the same sigil;
-  // where skills carry their own, `/review` and `$review` are distinct entries.
+  // Only shared sigils collide: /review and $review remain separate.
   const sharedSigil = skillSigil === '/'
   const unclassifiedNames = new Set(
     commands.filter((command) => command.kindUnspecified).map((command) => command.name)
@@ -121,8 +116,7 @@ export function buildNativeChatPickerItems(
     resolvedCommands.map((command, index) => ({
       item: {
         kind: 'command' as const,
-        // Why: the name is the dispatch token and the catalog is curated, so
-        // it is inserted verbatim; only untrusted skill text gets sanitized.
+        // Curated command names are dispatch tokens; sanitize untrusted skill text only.
         id: `command:${command.name}`,
         name: command.name,
         token: `/${command.name}`,
@@ -326,8 +320,7 @@ function isSubsequence(query: string, value: string): boolean {
   return false
 }
 
-// Why: the row's visual truncation is CSS; the name IS the inserted PTY token,
-// so it must never be sliced. Token safety instead rejects absurd lengths.
+// Names are inserted PTY tokens, never visual prefixes. CSS truncates display; reject unsafe lengths without slicing tokens.
 const MAX_TOKEN_SAFE_NAME_LENGTH = 200
 
 function getSafeSkillName(skill: DiscoveredSkill): string | null {
@@ -376,8 +369,7 @@ function compareDiscoveredSkills(a: DiscoveredSkill, b: DiscoveredSkill): number
   )
 }
 
-// A session-reported skill this host could not locate on disk sorts last: it is
-// real and invocable, but carries no scope or description to rank on.
+// Unlocated reported skills remain invocable but lack description/scope for ranking; sort last.
 const UNLOCATED_SCOPE_PRIORITY = Object.keys(SCOPE_PRIORITY).length
 
 function skillScopePriority(item: Extract<NativeChatPickerItem, { kind: 'skill' }>): number {

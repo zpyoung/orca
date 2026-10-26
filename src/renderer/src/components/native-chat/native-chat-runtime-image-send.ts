@@ -13,8 +13,7 @@ import {
 
 export { NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS }
 
-/** The path text an agent detects as an image. One with spaces or shell characters is escaped as a
- *  terminal image drop is, which agent TUIs undo before checking the file exists. */
+/** Escape image paths as terminal drops do; agent TUIs unescape before checking file existence. */
 export function agentImagePastePath(agent: AgentType, path: string): string {
   const formatted = formatAgentImagePath(agent, path)
   if (formatted !== path) {

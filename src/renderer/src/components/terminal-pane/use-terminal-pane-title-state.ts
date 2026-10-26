@@ -73,8 +73,7 @@ export function useTerminalPaneTitleState(controller: TerminalPaneFoundation) {
       }
       closeRenameSession()
     },
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Preserve the pre-split dependency contract.
-    [closeRenameSession]
+    [closeRenameSession, containerRef]
   )
 
   const handleStartRename = useCallback(
@@ -119,8 +118,7 @@ export function useTerminalPaneTitleState(controller: TerminalPaneFoundation) {
       setTerminalErrorsByPaneId((current) => clearPaneTerminalError(current, paneId))
       paneTransportsRef.current.get(paneId)?.notifyErrorSurfaceDismissed?.()
     }
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Preserve the pre-split dependency contract.
-  }, [])
+  }, [managerRef, paneTransportsRef, setTerminalError, setTerminalErrorsByPaneId])
   const onPtyRecoveryStateRef = useRef(
     (paneId: number, state: PtyTransportRecoveryState | null) => {
       setPtyRecoveryStatesByPaneId((previous) =>

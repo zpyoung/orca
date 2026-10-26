@@ -141,8 +141,7 @@ describe('useNativeChatInteractiveSend', () => {
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
 
-    // Codex's request_user_input card ignores typed labels (STA-1860 shape):
-    // the 2nd option is delivered as its digit '2', which selects AND commits.
+    // Codex request_user_input commits option digits and ignores typed labels (STA-1860).
     expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
       {
         terminalTabId: 'tab-1',
@@ -191,7 +190,6 @@ describe('useNativeChatInteractiveSend', () => {
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
 
-    // The 2nd option is delivered as its number '2', not the label 'B' (STA-1860).
     expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
       {
         terminalTabId: 'tab-1',
@@ -372,10 +370,9 @@ describe('useNativeChatInteractiveSend', () => {
       useNativeChatInteractiveSend('tab-1', PANE_KEY, 'pty-1', 'claude')
     )
 
-    // Answer question A while it is the current waiting question.
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
 
-    // A different AskUserQuestion becomes current before the paced send settles.
+    // Replace question A before its paced delivery settles.
     mocks.storeState = {
       agentStatusByPaneKey: {
         [PANE_KEY]: {
@@ -390,8 +387,7 @@ describe('useNativeChatInteractiveSend', () => {
     const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[2]
     onSettled?.(true)
 
-    // The baseline is question A's (captured before delivery), so the server can
-    // reject it against the now-current question B instead of clearing B's wait.
+    // The captured A baseline lets the server reject settlement against B without clearing B’s wait.
     expect(mocks.inferQuestionAnswered).toHaveBeenCalledExactlyOnceWith({
       paneKey: PANE_KEY,
       baselineUpdatedAt: waitingQuestion.updatedAt,

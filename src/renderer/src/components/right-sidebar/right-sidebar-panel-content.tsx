@@ -30,9 +30,7 @@ export function RightSidebarPanelContent({
         {effectiveTab === 'explorer' && <FileExplorer />}
         {effectiveTab === 'source-control' && <SourceControl />}
         {effectiveTab === 'checks' && <ChecksPanel />}
-        {/* Why: SSH port forwarding still depends on the raw ports.detect data,
-            which the workspace-scoped status bar popover intentionally does not
-            expose. Keep this panel reachable only for SSH worktrees. */}
+        {/* SSH forwarding needs raw ports.detect data absent from the workspace-scoped status popover. */}
         {effectiveTab === 'ports' && (
           <PortsPanel isVisible={rightSidebarOpen && effectiveTab === 'ports'} />
         )}

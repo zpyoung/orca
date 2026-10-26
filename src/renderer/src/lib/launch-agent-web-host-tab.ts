@@ -145,8 +145,7 @@ export async function launchAgentInWebHostTab(args: {
     }).then(handleCreation)
   }
   if (hasPrompt && promptDelivery === 'draft') {
-    // Why: the draft rode in on the launch command, so no paste runs and
-    // nothing else seeds the chat-composer copy for this host class.
+    // Native launch-command prefill skips paste, so explicitly seed this host class’s chat composer.
     return createWebRuntimeAgentSessionTerminalWithLaunchDraft({
       ...launch,
       agent,

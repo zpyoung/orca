@@ -168,8 +168,7 @@ export function updateAutomation(
   if (options?.destination) {
     assertAutomationDestination(options.destination, projectionContext)
   }
-  // Why: the renderer forwards a Partial verbatim, so `{ enabled: undefined }` survives structuredClone
-  // and would blank the stored value in the spread below. Explicit clears go through the `null` branches.
+  // Ignore undefined values preserved by structuredClone; explicit clears use null.
   const definedUpdates = Object.fromEntries(
     Object.entries(updates).filter(([, value]) => value !== undefined)
   ) as AutomationUpdateInput
@@ -207,9 +206,7 @@ export function updateAutomation(
       : normalizeAutomationPrecheck(current.precheck),
     ...(normalizedLaunchOverrides ? { launchOverrides: normalizedLaunchOverrides } : {}),
     projectId: repoId,
-    // Why the wire object is ignored: contexts are the storing authority's own
-    // registry speaking. A move restates them from that registry, anything else
-    // keeps the stored value; an explicit null still clears.
+    // Rebuild moved contexts from this authority's registry; otherwise preserve stored values or explicit null.
     runContext:
       definedUpdates.runContext === null
         ? null
@@ -284,7 +281,7 @@ export function updateAutomation(
     executionTarget,
     workspaceSshPinMoved ? undefined : workspaceSshPin
   )
-  // Replaced, not patched in place: the list projection caches on array identity.
+  // Replace the array to invalidate identity-keyed list projections.
   operations.state.automations = operations.state.automations.map((entry) =>
     entry.id === id ? updated : entry
   )
@@ -292,10 +289,7 @@ export function updateAutomation(
   return updated
 }
 
-/**
- * Writes the run target a legacy record resolved to, once: a record that already has one keeps it,
- * so a stamp can never retarget an automation the user or a migration placed.
- */
+/** Stamp legacy targets once without retargeting user- or migration-owned contexts. */
 export function stampLegacyAutomationRunContext(
   operations: AutomationDefinitionOperations,
   id: string,
@@ -305,7 +299,7 @@ export function stampLegacyAutomationRunContext(
   if (!current || current.runContext) {
     return false
   }
-  // Replaced, not patched in place: the list projection caches on array identity.
+  // Replace the array to invalidate identity-keyed list projections.
   operations.state.automations = operations.state.automations.map((entry) =>
     entry.id === id ? { ...entry, runContext } : entry
   )
@@ -334,7 +328,7 @@ export function deleteAutomation(
     (entry) => entry.automationId !== id
   )
   operations.recordAutomationRunsMutation?.(operations.state.automationRuns)
-  // Why: the automation and its unfinished runs were pinning their workspace; both are gone (#17775).
+  // Removing definitions and unfinished runs releases their workspace claims (#17775).
   invalidateLocalWorktreeMetadataPruneInputs()
   operations.flush()
 }

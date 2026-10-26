@@ -1,10 +1,4 @@
-// Per-PTY serialization for native-chat clear+body+Enter sequences.
-// Why: Enter is delayed (busy-agent safety). Without a queue, a second send's
-// clear/body can interleave with the first Enter window and still glue or race
-// the agent composer. Each sequence owns the line until its Enter fires.
-//
-// Option commands (model switch) cancel/await this queue first so a delayed chat
-// Enter cannot land on Claude's model confirmation dialog.
+// Serialize clear/body/delayed Enter per PTY; option commands cancel and await sends before opening dialogs.
 
 import { subscribeTerminalInputQuarantine } from '../terminal-pane/terminal-input-quarantine'
 
@@ -61,7 +55,6 @@ export function resetNativeChatPtySendQueuesForTests(): void {
   ptyQueues.clear()
 }
 
-/** Abort every in-flight/queued chat send on this PTY (clears delayed Enter). */
 export function cancelNativeChatPtySends(ptyId: string): void {
   const state = ptyQueues.get(ptyId)
   if (!state) {
@@ -96,10 +89,7 @@ export async function waitForNativeChatPtyIdle(ptyId: string): Promise<void> {
   await state.tail
 }
 
-/**
- * Run `start` only after prior sequences for `ptyId` finish. When the queue is
- * idle, `start` runs synchronously so the body write is not deferred a tick.
- */
+/** Wait for earlier sends; start synchronously when idle to avoid deferring the body write. */
 export function enqueueNativeChatPtySend(
   ptyId: string,
   durationMs: number,
@@ -190,8 +180,7 @@ export function enqueueNativeChatPtySend(
     state.depth = Math.max(0, state.depth - 1)
     finished = true
     dropHandle()
-    // Why: drop the per-pty record once nothing is in flight so the map does not
-    // accumulate one permanent entry per pty over a long, multi-pane session.
+    // Release idle PTY keys so closed panes cannot accumulate permanent queue entries.
     if (state.depth === 0 && state.handles.size === 0 && ptyQueues.get(ptyId) === state) {
       ptyQueues.delete(ptyId)
     }

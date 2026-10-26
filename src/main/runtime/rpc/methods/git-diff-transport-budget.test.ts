@@ -152,7 +152,7 @@ describe('remote git diff transport budget', () => {
     )
   })
 
-  // Why: the in-process/Unix-socket context sets no clientKind, so desktop-local diffs keep full fidelity.
+  // In-process/Unix-socket callers have no clientKind and retain full diff fidelity.
   it.each(CASES)(
     'leaves $method uncapped for a local caller',
     async ({ method, runtimeMethod, params }) => {

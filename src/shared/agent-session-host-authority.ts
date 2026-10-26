@@ -107,6 +107,7 @@ export type RuntimeEnsureAgentSessionRequest =
     }
   | {
       kind: 'explicit'
+      resumeOrigin?: 'saved'
       worktree: string
       agent: ResumableTuiAgent
       providerSession: AgentProviderSessionMetadata

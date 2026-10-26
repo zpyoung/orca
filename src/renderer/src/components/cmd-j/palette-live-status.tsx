@@ -97,8 +97,7 @@ export function PaletteLiveStatusProvider({
   const statusEpoch = useAppStore((s) => (active ? s.agentStatusEpoch : 0))
 
   const value = useMemo<PaletteLiveStatus>(() => {
-    // Why: `now` decides freshness, so both derivations must read it on the same tick — otherwise a
-    // "done" dot can outlive its window while the worktree row beside it has already decayed.
+    // Share one freshness tick so worktree state and its done dot cannot expire at different times.
     const entriesByTabId = buildExplicitEntriesByTabId(
       agentStatusByPaneKey,
       migrationUnsupportedByPtyId
@@ -197,10 +196,7 @@ function useLiveStatus(): PaletteLiveStatus | null {
   return useContext(PaletteLiveStatusContext)
 }
 
-/**
- * Live dot for a worktree row. Rendering it instead of resolving the status in the palette body is
- * what keeps an agent transition from re-rendering every row in the list.
- */
+/** Own the live status subscription here so agent transitions do not re-render the palette list. */
 export function PaletteWorktreeStatusDot({
   worktree
 }: {
@@ -232,10 +228,7 @@ export function PaletteWorktreeStatusDot({
   )
 }
 
-/**
- * Leading slot for a recent chat/terminal row: content icon + shared attention badge
- * (resolveTerminalTabAttentionBadge — same ladder as the tab strip).
- */
+/** Share the tab strip’s attention ladder for recent chat/terminal rows. */
 export function PaletteRecentTabStatusDot({
   row,
   fallback
@@ -268,8 +261,7 @@ export function PaletteRecentTabStatusDot({
   }
   const statusLabel =
     badge === 'unread'
-      ? // Why the tab-bar key: same bell, same sentence — a fresh key here would ship untranslated
-        // in every non-English locale for the sake of a namespace.
+      ? // Reuse the translated tab-bar label for the same unread signal.
         translate(
           'auto.components.tab.bar.TerminalTabLeadingIcon.7ab2964bea',
           'Unread agent completion'
@@ -293,7 +285,6 @@ export function PaletteRecentTabStatusDot({
   )
 }
 
-/** Renders the shared attention glyph — AgentStateDot for agent states, bell for unread. */
 function RecentTabAttentionBadgeGlyph({
   badge
 }: {
@@ -302,6 +293,5 @@ function RecentTabAttentionBadgeGlyph({
   if (badge === 'unread') {
     return <FilledBellIcon className="size-2.5 text-amber-500 drop-shadow-sm" />
   }
-  // Why: AgentStateDot owns working/permission/done glyphs app-wide (spinner / ? / check).
   return <AgentStateDot state={badge} size="sm" title={null} />
 }

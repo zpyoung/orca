@@ -13,14 +13,6 @@ import {
   type ForkFilterSetters
 } from './fork-workspace-activity-window/workspace-filter-chrome'
 
-/**
- * Whether the sidebar is currently filtered, and what "clear filters" should undo.
- *
- * Split out of visible-worktrees to keep that file under the line cap; this is
- * about the filter CHROME, not about which rows survive filtering.
- */
-
-/** Inputs describing sidebar filter settings that the Clear Filters path owns. */
 export type SidebarFilterState = {
   showSleepingWorkspaces: boolean
   filterRepoIds: readonly string[]
@@ -35,7 +27,6 @@ export type SidebarFilterState = {
   workspaceHostScope?: ExecutionHostScope
 }
 
-/** The sidebar's store fields as the shared Workspace options filters. */
 export function sidebarWorkspaceRowFilters(state: SidebarFilterState): WorkspaceRowFilters {
   return {
     hideSleepingWorkspaces: !state.showSleepingWorkspaces,
@@ -134,14 +125,3 @@ export function clearSidebarFilters(
     RESET_SIDEBAR_FILTER[key](store)
   }
 }
-
-/**
- * Shared pure utility that computes the ordered list of visible (non-archived,
- * non-filtered) worktree IDs. Both the App-level Cmd+1–9 handler and
- * WorktreeList's render pipeline consume this function so the numbering and
- * card order can never diverge.
- *
- * Why a shared function: if the filter/sort pipeline lived in two places, a
- * new filter added in one but not the other would silently break the mapping
- * between badge numbers and the Cmd+N shortcut target.
- */

@@ -70,8 +70,7 @@ export type NotificationDispatchRequest = {
    * terminal lane, which is every sender that predates structured chat.
    */
   surface?: 'terminal' | 'agent-session'
-  /** The news's own identity, set only by a producer that announces each one once. Delivery dedupes
-   *  on it instead of the per-workspace burst window, which would drop distinct news. */
+  /** Producer-owned once-only news identity bypasses workspace burst dedupe so distinct events survive. */
   attentionKey?: string
   structuredOrigin?: StructuredAttentionOrigin
   /** The execution host already pushed this to its paired phones, so main must not fan it out again. */
@@ -131,8 +130,7 @@ export type NotificationPermissionStatusResult = {
   requested: boolean
 }
 
-/** macOS notification permission outcome: authoritative native UNUserNotificationCenter readout, else a weaker
- *  delivery-probe fallback; 'awaiting-decision' = permission dialog unanswered. */
+/** macOS permission from authoritative native UNUserNotificationCenter, otherwise weaker delivery probing; awaiting-decision means unanswered dialog. */
 export type NotificationDeliveryProbeResult = {
   state: 'delivered' | 'blocked' | 'awaiting-decision' | 'unsupported'
   /** True when the state comes from the native authorization readout (vs. the delivery-probe fallback). */

@@ -151,7 +151,7 @@ export function useRepositorySourceControlAiGlobalUx({
       if (!endWrite(repoIdForWrite)) {
         return
       }
-      // Only snap when no sibling write is in flight — a failed field must not wipe another.
+      // Roll back only without sibling writes so one failed field cannot erase another.
       if (!ok && pendingWritesRef.current === 0) {
         commitImmediate(persistedRef.current)
       }
@@ -169,7 +169,7 @@ export function useRepositorySourceControlAiGlobalUx({
 
   const commitCustomCommand = (value: string | undefined): void => {
     setCustomCommandDraft(value ?? '')
-    // Blur fires even when unchanged — skip the queue for true no-ops.
+    // Unchanged blur must not enter the persistence queue.
     const next = withRepoAiCustomCommand(persistedRef.current, value)
     if (JSON.stringify(next) === JSON.stringify(persistedRef.current)) {
       setCustomCommandDraft((latest) => (latest === (value ?? '') ? null : latest))

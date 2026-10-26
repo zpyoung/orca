@@ -56,8 +56,7 @@ function snapshot(
   }
 }
 
-// The three verdicts the change separates: a failure the old flag cannot express, the same
-// failure while subagents keep the row working, and a stop the old flag already carries.
+// Separate main-agent failure, failure with working children, and an explicit user stop.
 const SNAPSHOTS: HookSnapshot[] = [
   snapshot('failed-done', {
     state: 'done',
@@ -72,8 +71,7 @@ const SNAPSHOTS: HookSnapshot[] = [
     interrupted: true,
     mainAgent: { state: 'done', outcome: 'cancellation', stateStartedAt: NOW - 600_000 }
   }),
-  // The host-observed ends: a crash that cut the turn off, and an end the host cannot prove. Neither
-  // sets the flag, so a reader without the arm reads the done it always did.
+  // Host-observed crash/unknown endings set no interrupted flag, so old readers still see done.
   snapshot('crash-cut', {
     state: 'done',
     mainAgent: { state: 'done', outcome: 'interruption', stateStartedAt: NOW - 600_000 }
@@ -170,7 +168,7 @@ beforeAll(async () => {
 
 describe('cross-version worktree ps verdict', () => {
   it('pairs two real builds that disagree on the row shape', () => {
-    // Anti-vacuous-pass oracle: one module resolved twice would make every cell same-version.
+    // Require distinct implementations so every skew cannot silently run the same build.
     expect(oldBuild.agentDotState).not.toBe(newBuild.agentDotState)
     expect(Object.values(publishRows(oldBuild.host)).some((row) => 'mainAgent' in row)).toBe(false)
     expect(Object.values(publishRows(newBuild.host)).every((row) => 'mainAgent' in row)).toBe(true)
