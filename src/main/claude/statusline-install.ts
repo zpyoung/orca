@@ -1,13 +1,16 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { writeManagedScript, type HooksConfig } from '../agent-hooks/installer-utils'
-import { getManagedStatusLineCommand, getManagedStatusLineScript } from './statusline-script'
+import { getManagedStatusLineCommand } from './statusline-script'
+import {
+  getManagedStatusLineScript,
+  removeManagedStatusLine
+} from '../fork-session-info/session-info-statusline-chaining'
 import {
   applyManagedStatusLine,
   getStatusLineInstallMarkerPath,
   getStatusLineScriptFileName,
   getStatusLineScriptPath,
   getStatusLineSlotState,
-  removeManagedStatusLine,
   type ClaudeCompatibleHookSettings
 } from './hook-settings'
 

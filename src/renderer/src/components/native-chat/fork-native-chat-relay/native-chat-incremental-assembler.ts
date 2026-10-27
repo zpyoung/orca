@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-incremental-assembler.ts
-// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
+// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
 // Share full-rebuild merge rules; append new sorted tails cheaply, reset on base changes, and preserve full-rebuild equality at every prefix.
 
 import {

@@ -2616,6 +2616,16 @@
       ]
     },
     {
+      "path": "src/main/claude/statusline-install.ts",
+      "feature": "session-info",
+      "kind": "import-swap",
+      "lines": [
+        "  getManagedStatusLineScript,",
+        "  removeManagedStatusLine",
+        "} from '../fork-session-info/session-info-statusline-chaining'"
+      ]
+    },
+    {
       "path": "src/main/claude/hook-service.ts",
       "feature": "session-info",
       "kind": "import-swap",
@@ -3462,18 +3472,6 @@
       ]
     },
     {
-      "path": "src/shared/pairing-local-ui-fields.test.ts",
-      "feature": "workspace-activity-window",
-      "kind": "passthrough",
-      "lines": ["      'workspaceActivityWindow',", "      'workspaceActivityCustomDays',"]
-    },
-    {
-      "path": "src/shared/pairing-local-ui-fields.test.ts",
-      "feature": "workspace-review-filters",
-      "kind": "passthrough",
-      "lines": ["      'hideCompletedReviewWorkspaces',", "      'hidePassingCheckWorkspaces'"]
-    },
-    {
       "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts",
       "feature": "workspace-activity-window",
       "kind": "registration",
@@ -4210,8 +4208,6 @@
       "feature": "release-routing",
       "kind": "passthrough",
       "lines": [
-        "    expect(getReleaseRepoForChannel('stable')).toBe('zpyoung/orca')",
-        "    expect(getReleaseRepoForChannel('rc')).toBe('zpyoung/orca')",
         "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160'",
         "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
         "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
@@ -5586,12 +5582,6 @@
       "lines": ["    runs-on: ubuntu-latest"]
     },
     {
-      "path": ".github/workflows/macos-updater-tests.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: macos-15"]
-    },
-    {
       "path": ".github/workflows/mobile.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -6147,12 +6137,6 @@
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
       "reason": "React Doctor gate: clears editingAnnotationId during render instead of in an effect when the annotation leaves the browserAnnotations prop, so the tray never paints a frame still editing an annotation that is gone."
-    },
-    {
-      "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
-      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it \u2014 a correctness fix to upstream's own hook, not fork behavior."
     },
     {
       "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
@@ -7991,8 +7975,12 @@
       "added": 2,
       "removed": 1
     },
+    "src/main/claude/statusline-install.ts": {
+      "added": 5,
+      "removed": 2
+    },
     "src/main/claude/hook-service.ts": {
-      "added": 7,
+      "added": 6,
       "removed": 2
     },
     "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
@@ -8222,10 +8210,6 @@
     "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
       "added": 4,
       "removed": 0
-    },
-    "src/shared/pairing-local-ui-fields.test.ts": {
-      "added": 5,
-      "removed": 1
     },
     "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
       "added": 4,
@@ -8552,8 +8536,8 @@
       "removed": 5
     },
     "src/shared/release-channel.test.ts": {
-      "added": 5,
-      "removed": 5
+      "added": 3,
+      "removed": 3
     },
     "src/cli/runtime/websocket-transport.test.ts": {
       "added": 2,
@@ -9146,10 +9130,6 @@
     ".github/workflows/docs.yml": {
       "added": 3,
       "removed": 3
-    },
-    ".github/workflows/macos-updater-tests.yml": {
-      "added": 1,
-      "removed": 1
     },
     ".github/workflows/mobile.yml": {
       "added": 3,

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx
-// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
+// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
 // @vitest-environment happy-dom
 
 import { cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'

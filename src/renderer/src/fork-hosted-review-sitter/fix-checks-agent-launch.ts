@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
-// FORK-COPY-SHA: 041baf356b368d773f333e76375ce860fba2481b
+// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
 // Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
 import { acquireAgentLaunchChoices } from '@/lib/host-chat-program-acquisition'

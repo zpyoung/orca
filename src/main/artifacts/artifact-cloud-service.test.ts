@@ -20,7 +20,6 @@ import {
   ARTIFACT_SHARING_DISABLED_CODE,
   ARTIFACT_SHARING_DISABLED_MESSAGE
 } from '../../shared/artifact-sharing-gate'
-import { getDefaultSettings } from '../../shared/constants'
 import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'
 
 const createdPaths: string[] = []

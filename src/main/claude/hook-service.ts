@@ -34,7 +34,7 @@ import {
 } from './windows-hook-files'
 
 export { getManagedScript }
-import { getManagedStatusLineCommand } from './statusline-script'
+import { installClaudeManagedStatusLine, retireClaudeManagedStatusLine } from './statusline-install'
 import {
   finalizeManagedStatusLineRemoval,
   getManagedStatusLineScript,

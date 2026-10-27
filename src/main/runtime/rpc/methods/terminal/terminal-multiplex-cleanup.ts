@@ -1,4 +1,5 @@
 import type { TerminalMultiplexConnection } from './terminal-multiplex-connection'
+import { answerUndeliveredYieldedQueries } from './terminal-multiplex-yielded-queries'
 import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export function installMultiplexCleanup(state: TerminalMultiplexConnection): void {

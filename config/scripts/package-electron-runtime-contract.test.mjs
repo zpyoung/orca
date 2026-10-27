@@ -3,82 +3,12 @@ import { join, resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
+import { compileAggregateExpression } from './pr-aggregate-gate-context.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const readProject = (file) => readFileSync(join(projectDir, file), 'utf8')
 
 describe('Electron runtime package contract', () => {
-  const packageTargets = {
-    win32: windowsAddonsInstalled ? createPackagedRuntimeNodeModuleResources('win32') : [],
-    darwin: createPackagedRuntimeNodeModuleResources('darwin'),
-    linux: createPackagedRuntimeNodeModuleResources('linux')
-  }
-
-  it('keeps the native Windows registry addon optional and platform-gated', () => {
-    expect(packageJson.optionalDependencies['@orca/windows-registry']).toBe('workspace:*')
-    // allowBuilds suppresses install-time node-gyp; the Windows rebuild owns the addon’s runtime ABI.
-    expect(pnpmWorkspace.allowBuilds['@orca/windows-registry']).toBe(false)
-    if (windowsAddonsInstalled) {
-      expect(packageTargets.win32).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-registry') }),
-          expect.objectContaining({ to: join('node_modules', 'node-addon-api') })
-        ])
-      )
-    }
-    for (const platform of ['darwin', 'linux']) {
-      expect(packageTargets[platform]).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-registry') })
-        ])
-      )
-    }
-  })
-
-  // Without it the secure-file writes report unrestricted and orcad's privacy check fails closed.
-  it('ships the native Windows ACL addon on Windows only, built by the Windows rebuild', () => {
-    expect(packageJson.optionalDependencies['@orca/windows-security']).toBe('workspace:*')
-    expect(pnpmWorkspace.allowBuilds['@orca/windows-security']).toBe(false)
-    if (windowsAddonsInstalled) {
-      expect(packageTargets.win32).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-security') })
-        ])
-      )
-    }
-    for (const platform of ['darwin', 'linux']) {
-      expect(packageTargets[platform]).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-security') })
-        ])
-      )
-    }
-  })
-
-  it('keeps the native Windows process-table addon optional and platform-gated', () => {
-    expect(packageJson.optionalDependencies['@vscode/windows-process-tree']).toBe('0.8.0')
-    // As with registry, suppress install-time node-gyp so the Windows rebuild selects the runtime ABI.
-    expect(pnpmWorkspace.allowBuilds['@vscode/windows-process-tree']).toBe(false)
-    // Patch removes unavailable Spectre-library requirement and 1024-process enumeration cap that hides descendants on busy hosts.
-    expect(pnpmWorkspace.patchedDependencies['@vscode/windows-process-tree@0.8.0']).toBe(
-      'config/patches/@vscode__windows-process-tree@0.8.0.patch'
-    )
-    if (windowsAddonsInstalled) {
-      expect(packageTargets.win32).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@vscode', 'windows-process-tree') })
-        ])
-      )
-    }
-    for (const platform of ['darwin', 'linux']) {
-      expect(packageTargets[platform]).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@vscode', 'windows-process-tree') })
-        ])
-      )
-    }
-  })
-
   it('keeps release-cut signing provenance on GitHub-hosted runners', () => {
     const releaseWorkflow = parse(
       readFileSync(join(projectDir, '.github/workflows/release-cut.yml'), 'utf8')

@@ -8,6 +8,7 @@ import type {
   ArtifactPublishResult,
   ArtifactWriteRequest
 } from '../../shared/artifacts'
+import { SharingUnavailableOnHostError } from '../../shared/sharing-unavailable-on-host'
 import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
 
 export class RuntimeArtifactController {

@@ -81,16 +81,15 @@ export function useChecksListState({
       }
       return next
     })
-    const autoExpandKey =
-      autoExpandedContextRef.current === checkDetailsContextKey
-        ? null
-        : (rows.find((row) => isFailedCheck(row.check))?.key ?? null)
+    // Close the one-shot latch outside the updater; React may run an updater twice.
+    let autoExpandKey: string | undefined
     if (autoExpandedContextRef.current !== checkDetailsContextKey) {
+      autoExpandKey = rows.find((row) => isFailedCheck(row.check))?.key
       autoExpandedContextRef.current = checkDetailsContextKey
     }
     setExpandedCheckKeys((current) => {
       const next = new Set([...current].filter((key) => validKeys.has(key)))
-      if (autoExpandKey !== null) {
+      if (autoExpandKey !== undefined) {
         next.add(autoExpandKey)
       }
       return next

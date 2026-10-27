@@ -16,6 +16,7 @@ import { buildAiVaultResumeShellCommand } from './ai-vault-resume-command'
 import { normalizeRuntimePathForComparison } from './cross-platform-path'
 import { parseWslUncPath } from './wsl-paths'
 import { applyClaudeSuppressionFlagsToResumeCommand } from './fork-ask-question-tool/claude-suppression-flag-composition'
+import { dropRecordedAgentPermissionArgs } from './tui-agent-permission-lift'
 
 export function buildAgentResumeStartupPlan(args: {
   agent: ResumableTuiAgent

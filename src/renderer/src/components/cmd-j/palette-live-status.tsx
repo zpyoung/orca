@@ -205,6 +205,9 @@ export function PaletteWorktreeStatusDot({
 }): React.JSX.Element | null {
   const live = useLiveStatus()
   const hasPendingAsk = useAppStore((s) => selectWorktreeHasPendingAsk(s, worktree.id))
+  const hasStructuredChat = useAppStore((s) =>
+    hasAwakeStructuredChat(s.unifiedTabsByWorktree[worktree.id], s.structuredChatSleptAtByPaneKey)
+  )
   if (!live) {
     return null
   }

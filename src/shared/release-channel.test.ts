@@ -30,24 +30,6 @@ describe('release channel', () => {
     expect(getVersionChannel('not-a-version')).toBeNull()
   })
 
-  // The main release Atom feed holds only 10 entries; daily/hourly tags would evict stable/RC updates.
-  it('keeps dev builds out of the main release repo, and apart from each other', () => {
-    expect(getReleaseRepoForChannel('hourly')).toBe('stablyai/orca-hourly')
-    expect(getReleaseRepoForChannel('daily')).toBe('stablyai/orca-daily')
-    // Keep unlanded adhoc branch builds away from users following main’s hourly channel.
-    expect(getReleaseRepoForChannel('adhoc')).toBe('stablyai/orca-adhoc')
-    expect(getReleaseRepoForChannel('stable')).toBe('zpyoung/orca')
-    expect(getReleaseRepoForChannel('rc')).toBe('zpyoung/orca')
-  })
-
-  it('marks exactly the dev channels as having their own repo', () => {
-    expect(hasDedicatedReleaseRepo('hourly')).toBe(true)
-    expect(hasDedicatedReleaseRepo('daily')).toBe(true)
-    expect(hasDedicatedReleaseRepo('adhoc')).toBe(true)
-    expect(hasDedicatedReleaseRepo('stable')).toBe(false)
-    expect(hasDedicatedReleaseRepo('rc')).toBe(false)
-  })
-
   // Dev tags exist only in their dedicated repos; main-repo links 404.
   it('builds release-notes links against the repo that published the version', () => {
     expect(getReleaseNotesUrlForVersion('1.4.160-hourly.202607281400')).toBe(

@@ -238,7 +238,6 @@ them hot sidebar hooks — and rewriting ref patterns upstream has no reason to 
 - `mobile/src/session/pending-terminal-handle-recovery.test.ts`
 - `mobile/src/browser/mobile-browser-frame-state.ts`
 - `mobile/src/diagnostics/connection-diagnostics-submission.ts`
-- `src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx`
 - `src/renderer/src/components/browser-pane/annotate/browser-page-annotation-tray.tsx`
 
 The `package.json` severities need no `exceptions` row of their own; the file is already declared
