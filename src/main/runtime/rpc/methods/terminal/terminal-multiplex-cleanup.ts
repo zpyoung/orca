@@ -19,6 +19,7 @@ export function installMultiplexCleanup(state: TerminalMultiplexConnection): voi
     stream.ackRecoverySnapshotInFlight = false
     stream.ackRecoveryHistoryOwed = false
     stream.unsubscribeData()
+    answerUndeliveredYieldedQueries(runtime, stream)
     stream.unsubscribeResize()
     stream.unsubscribeFit()
     stream.unsubscribeDriver()

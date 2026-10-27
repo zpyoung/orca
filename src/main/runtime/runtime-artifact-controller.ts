@@ -17,6 +17,10 @@ export class RuntimeArtifactController {
     this.service = service
   }
 
+  hasService(): boolean {
+    return this.service !== null
+  }
+
   list(options: ArtifactListOptions): Promise<ArtifactCloudOperation<ArtifactListPage>> {
     return this.requireService().list(options)
   }
@@ -51,7 +55,7 @@ export class RuntimeArtifactController {
 
   private requireService(): ArtifactCloudService {
     if (!this.service) {
-      throw new Error("Artifact sharing isn't available on this Orca server.")
+      throw new SharingUnavailableOnHostError()
     }
     return this.service
   }

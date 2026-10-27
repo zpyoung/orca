@@ -1,21 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { compileAggregateExpression } from './pr-aggregate-gate-context.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
-const require = createRequire(import.meta.url)
-const { createPackagedRuntimeNodeModuleResources } = require('../packaged-runtime-node-modules.cjs')
 const readProject = (file) => readFileSync(join(projectDir, file), 'utf8')
-const packageJson = JSON.parse(readProject('package.json'))
-const pnpmWorkspace = parse(readProject('pnpm-workspace.yaml'))
-// Resolve the win32 plan wherever its OS-gated addon is installed; windows-registry is a workspace link on every platform.
-const windowsAddonsInstalled = existsSync(
-  join(projectDir, 'node_modules', '@vscode', 'windows-process-tree', 'package.json')
-)
 
 describe('Electron runtime package contract', () => {
   const packageTargets = {

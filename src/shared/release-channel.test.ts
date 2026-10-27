@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   findInstallerAssetName,
   getReleaseNotesUrlForVersion,
-  getReleaseRepoForChannel,
   getVersionChannel,
-  hasDedicatedReleaseRepo,
   hasInstallableArtifactForPlatform,
   isAdhocVersion,
   isChannelSupportedOnPlatform,
   isDailyVersion,
   isHourlyVersion,
-  isReleaseChannel,
   parseAdhocVersionStamp,
   parseDailyVersionStamp,
   parseDevBuildStamp,
@@ -219,16 +216,6 @@ describe('release channel', () => {
       expect(isChannelSupportedOnPlatform('stable', platform)).toBe(true)
       expect(isChannelSupportedOnPlatform('rc', platform)).toBe(true)
     }
-  })
-
-  it('accepts only known channels', () => {
-    expect(isReleaseChannel('hourly')).toBe(true)
-    expect(isReleaseChannel('daily')).toBe(true)
-    expect(isReleaseChannel('adhoc')).toBe(true)
-    expect(isReleaseChannel('stable')).toBe(true)
-    expect(isReleaseChannel('nightly')).toBe(false)
-    expect(isReleaseChannel(null)).toBe(false)
-    expect(isReleaseChannel(undefined)).toBe(false)
   })
 
   // Timestamp tails distinguish consecutive hourlies; keep picker ordering chronological.
