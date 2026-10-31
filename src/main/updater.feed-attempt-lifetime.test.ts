@@ -2,8 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 import { updaterMainWindow } from './updater-test-main-window'
 
-const { autoUpdaterMock, fetchNewerReleaseTagsMock, moduleFactories, resetUpdaterMocks } =
-  await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
+const {
+  autoUpdaterMock,
+  fetchNewerReleaseTagsMock,
+  fetchLatestStableReleaseTagMock,
+  moduleFactories,
+  resetUpdaterMocks
+} = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -99,6 +104,29 @@ describe('updater feed preflight ownership', () => {
       expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
     }
   )
+
+  it('does not let an expired stable fallback replace a newer feed', async () => {
+    let finish = (_tag: string | null): void => {}
+    fetchLatestStableReleaseTagMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const updater = await setup()
+    updater.checkForUpdatesFromMenu()
+    await vi.advanceTimersByTimeAsync(45_000)
+    fetchNewerReleaseTagsMock.mockResolvedValueOnce({ tags: ['v3.0.0'], state: 'ready' })
+    updater.checkForUpdatesFromMenu()
+    await vi.advanceTimersByTimeAsync(0)
+    autoUpdaterMock.setFeedURL.mockClear()
+
+    finish('v2.0.0')
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(autoUpdaterMock.setFeedURL).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+  })
 
   it.each([
     {

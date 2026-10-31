@@ -15,7 +15,7 @@ import {
   NATIVE_CHAT_ADVANCE_BUFFER_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS
-} from '../../../../shared/native-chat-answer-stepping'
+} from '../../../../shared/native-chat/input/native-chat-answer-stepping'
 import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,

@@ -1,18 +1,25 @@
+import { projectSelectedSourceControlActionLaunch } from '../../../../shared/source-control-action-launch-preferences'
+import type { SelectedSourceControlActionRecipe } from '../../../../shared/source-control-action-selection'
+import type { AgentLaunchPreferences } from '@/components/settings/use-host-agent-launch-preferences'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RuntimeGitContext } from '@/runtime/runtime-git-client-context'
 import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import type {
-  SourceControlActionRecipe,
-  SourceControlLaunchActionId
+  SourceControlLaunchActionId,
+  SourceControlActionRecipe
 } from '../../../../shared/source-control-ai-actions'
 import type { SourceControlAiWriteTarget } from '../../../../shared/source-control-ai-recipe-save'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentLaunchChoice } from '@/lib/agent-menu-selection'
 import { buildSourceControlAgentDeliveryPlan } from './buildSourceControlAgentDeliveryPlan'
 import type { SourceControlAgentActionDeliveryPlanState } from './SourceControlAgentActionDialogForm'
-import { runSourceControlAgentActionStart } from './runSourceControlAgentActionStart'
+import {
+  runSourceControlAgentActionStart,
+  type RunSourceControlAgentActionStartArgs
+} from './runSourceControlAgentActionStart'
 import { buildSourceControlAgentConnectionErrorPlan } from './source-control-agent-action-dialog-support'
 
 type UseSourceControlAgentActionStartArgs = {
@@ -21,7 +28,6 @@ type UseSourceControlAgentActionStartArgs = {
   selectedAgent: TuiAgent | null
   commandInput: string
   trimmedCommandInput: string
-  agentArgs: string
   /** False when the launch would be structured native chat, which reads no CLI arguments. */
   agentArgsApply: boolean
   launchOptions?: AgentLaunchOptionSelection
@@ -30,6 +36,7 @@ type UseSourceControlAgentActionStartArgs = {
   saveTargetValue: string
   actionId: SourceControlLaunchActionId
   repoId?: string | null
+  agentLaunchPreferences: AgentLaunchPreferences
   settings: GlobalSettings | null
   repo: Pick<Repo, 'id' | 'sourceControlAi'> | null
   worktreeId?: string | null
@@ -61,8 +68,7 @@ type UseSourceControlAgentActionStartArgs = {
 }
 
 type SourceControlAgentActionStartWithDetectedAgentsArgs = {
-  detectedAgents?: TuiAgent[]
-  saveTargetValueOverride?: string
+  detectedAgents: TuiAgent[]
 }
 
 type UseSourceControlAgentActionStartResult = {
@@ -82,7 +88,6 @@ export function useSourceControlAgentActionStart({
   selectedAgent,
   commandInput,
   trimmedCommandInput,
-  agentArgs,
   agentArgsApply,
   launchOptions = {},
   commandTemplate,
@@ -91,6 +96,7 @@ export function useSourceControlAgentActionStart({
   actionId,
   repoId,
   settings,
+  agentLaunchPreferences,
   repo,
   worktreeId,
   groupId,
@@ -100,7 +106,8 @@ export function useSourceControlAgentActionStart({
   launchSource,
   recoveryContext,
   connectionUnavailable,
-  refreshDetectedAgents,
+  detectedAgents,
+  launchChoice,
   onStart,
   onSaveAgentDefault,
   onLaunchAccepted,
@@ -121,10 +128,44 @@ export function useSourceControlAgentActionStart({
   }, [])
   useEffect(() => cancelStart, [open, worktreeId, connectionId, actionId, cancelStart])
 
+  const buildPlan = useCallback(
+    (
+      currentDetectedAgents: TuiAgent[],
+      submitted: SelectedSourceControlActionRecipe
+    ): SourceControlAgentActionDeliveryPlanState =>
+      buildSourceControlAgentDeliveryPlan({
+        settings,
+        agentLaunchPreferences,
+        selectedAgent,
+        commandInput,
+        // Why: the check must judge the arguments the launch will really apply.
+        agentArgs:
+          agentArgsApply && selectedAgent
+            ? projectSelectedSourceControlActionLaunch(submitted, selectedAgent, {
+                renderedPrompt: commandInput,
+                settings
+              }).agentArgs
+            : undefined,
+        detectedAgents: currentDetectedAgents,
+        connectionUnavailable,
+        launchPlatform,
+        isRemote
+      }),
+    [
+      settings,
+      agentLaunchPreferences,
+      agentArgsApply,
+      commandInput,
+      connectionUnavailable,
+      selectedAgent,
+      launchPlatform,
+      isRemote
+    ]
+  )
+
   const startWithDetectedAgents = useCallback(
     async ({
-      detectedAgents: nextAgents,
-      saveTargetValueOverride
+      detectedAgents: nextAgents
     }: SourceControlAgentActionStartWithDetectedAgentsArgs): Promise<boolean> => {
       if (!open || !selectedAgent || attemptRef.current) {
         return false
@@ -137,19 +178,8 @@ export function useSourceControlAgentActionStart({
       attemptRef.current = attempt
       setIsStarting(true)
       try {
-        const detectedAgents = nextAgents ?? (await refreshDetectedAgents())
-        if (attempt.signal.aborted) {
-          return false
-        }
-        const nextPlan = buildSourceControlAgentDeliveryPlan({
-          selectedAgent,
-          commandInput,
-          agentArgs: agentArgsApply ? agentArgs : undefined,
-          detectedAgents,
-          connectionUnavailable,
-          launchPlatform,
-          isRemote
-        })
+        const submitted = prepareRecipe ? prepareRecipe(selectedAgent) : recipe
+        const nextPlan = buildPlan(nextAgents, submitted)
         if (nextPlan.status === 'error') {
           setDeliveryPlan(nextPlan)
           return false
@@ -166,6 +196,7 @@ export function useSourceControlAgentActionStart({
           actionId,
           repoId,
           settings,
+          agentLaunchPreferences,
           repo,
           worktreeId,
           groupId,
@@ -200,7 +231,6 @@ export function useSourceControlAgentActionStart({
       commandTemplate,
       connectionUnavailable,
       groupId,
-      isRemote,
       launchSource,
       recoveryContext,
       launchPlatform,
@@ -213,7 +243,6 @@ export function useSourceControlAgentActionStart({
       open,
       promptDelivery,
       resetDeliveryPlan,
-      refreshDetectedAgents,
       repo,
       repoId,
       saveLaunchRecipe,
@@ -226,8 +255,8 @@ export function useSourceControlAgentActionStart({
   )
 
   const handleStart = useCallback(async () => {
-    await startWithDetectedAgents({})
-  }, [startWithDetectedAgents])
+    await startWithDetectedAgents({ detectedAgents })
+  }, [detectedAgents, startWithDetectedAgents])
 
   return {
     deliveryPlan,

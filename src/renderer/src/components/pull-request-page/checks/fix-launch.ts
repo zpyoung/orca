@@ -2,11 +2,9 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { startFixChecksAgent } from '@/fork-hosted-review-sitter/fix-checks-agent-launch'
 import { launchWorkItemDirect } from '@/lib/launch-work-item-direct'
-import { buildFixBrokenChecksPrompt } from '@/components/pr-checks-fix-prompt'
-import {
-  saveSourceControlActionRecipe,
-  type SourceControlAiWriteTarget
-} from '../../../../../shared/source-control-ai-recipe-save'
+import { buildFixBrokenChecksPrompt } from '../../../../../shared/pr-checks-fix-prompt'
+import type { SourceControlAiWriteTarget } from '../../../../../shared/source-control-ai-recipe-save'
+import { saveSourceControlAiActionRecipeForTarget } from '../../right-sidebar/source-control/ai/recipe-persistence'
 import type {
   SourceControlActionRecipe,
   SourceControlLaunchActionId
@@ -21,30 +19,17 @@ export async function saveFixChecksActionDefault(
   target: SourceControlAiWriteTarget,
   actionId: SourceControlLaunchActionId,
   recipe: SourceControlActionRecipe,
-  updateSettings: StoreState['updateSettings'],
+  updateSettings: StoreState['updateSettingsOrThrow'],
   updateRepo: StoreState['updateRepo']
 ): Promise<void> {
-  const state = useAppStore.getState()
-  const latestSettings = state.settings
-  if (!latestSettings) {
-    throw new Error('Settings are not loaded.')
-  }
-  const latestRepo =
-    target.type === 'repo'
-      ? (state.repos.find((candidate) => candidate.id === target.repoId) ?? null)
-      : null
-  const result = saveSourceControlActionRecipe({
+  await saveSourceControlAiActionRecipeForTarget({
+    getStoreState: useAppStore.getState,
+    updateSettings,
+    updateRepo,
     target,
-    settings: latestSettings,
-    repo: latestRepo,
     actionId,
     recipe
   })
-  if ('sourceControlAi' in result) {
-    await updateSettings({ sourceControlAi: result.sourceControlAi })
-    return
-  }
-  await updateRepo(result.target.repoId, result.update)
 }
 
 export async function startFixChecksFromDialog(args: {
@@ -66,6 +51,7 @@ export async function startFixChecksFromDialog(args: {
     telemetrySource: 'sidebar',
     promptDelivery: 'submit-after-ready',
     agentOverride: args.agent,
+    agentLaunchPreferences: args.agentLaunchPreferences,
     agentArgs: args.agentArgs,
     launchOptions: args.launchOptions,
     openModalFallback: () => {

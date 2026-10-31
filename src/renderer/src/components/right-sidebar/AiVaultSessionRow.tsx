@@ -66,7 +66,7 @@ export function VaultSessionRow({
   onPick
 }: {
   session: AiVaultSession
-  liveState: AgentStatusState | null
+  liveState: AgentDotState | null
   resumeStartup: AiVaultResumeStartup
   realHomeResumeStartup: AiVaultResumeStartup
   worktreeInfo: AiVaultSessionWorktreeInfo | null

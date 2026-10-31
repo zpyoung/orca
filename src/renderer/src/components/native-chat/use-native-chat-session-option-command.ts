@@ -51,7 +51,12 @@ export function useNativeChatSessionOptionCommand(args: {
     async (command, options) => {
       const target = resolveTarget()
       if (!target || disabled) {
-        throw new Error('No live terminal is available.')
+        throw new Error(
+          translate(
+            'components.native-chat.sessionOption.noLiveTerminal',
+            'No live terminal is available.'
+          )
+        )
       }
       onSubmitted?.()
       const sendController = new AbortController()
@@ -75,7 +80,12 @@ export function useNativeChatSessionOptionCommand(args: {
         cancelNativeChatPtySends(target.ptyId)
         await waitForNativeChatPtyIdle(target.ptyId)
         if (!mountedRef.current || sendController.signal.aborted) {
-          throw new Error('Chat UI command was canceled because the composer closed.')
+          throw new Error(
+            translate(
+              'components.native-chat.sessionOption.commandCanceled',
+              'Chat UI command was canceled because the composer closed.'
+            )
+          )
         }
         const detectClaudeConfirmation =
           options?.detectAgentInteraction === 'claude-model-switch-confirmation'
@@ -87,7 +97,12 @@ export function useNativeChatSessionOptionCommand(args: {
           activeObserversRef.current.add(observer)
           await observer.ready
           if (!mountedRef.current || sendController.signal.aborted) {
-            throw new Error('Chat UI command was canceled because the composer closed.')
+            throw new Error(
+              translate(
+                'components.native-chat.sessionOption.commandCanceled',
+                'Chat UI command was canceled because the composer closed.'
+              )
+            )
           }
           // Arm at the live tail immediately before submitting so historical output cannot confirm the switch.
           observer.arm()
@@ -97,7 +112,12 @@ export function useNativeChatSessionOptionCommand(args: {
             ? await typeNativeChatCommand(target, command, sendController.signal)
             : await sendNativeChatMessageVerified(target, command, sendController.signal)
         if (!accepted) {
-          throw new Error('The terminal did not accept the command.')
+          throw new Error(
+            translate(
+              'components.native-chat.sessionOption.commandRejected',
+              'The terminal did not accept the command.'
+            )
+          )
         }
         // Start detection after acceptance so remote send latency cannot consume the response window.
         observer?.startDetection()

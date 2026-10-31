@@ -1,3 +1,4 @@
+import { nativeChatComposerDestination } from './native-chat-composer-destination'
 import { useCallback, useEffect } from 'react'
 import type { RefObject } from 'react'
 import { toast } from 'sonner'
@@ -129,7 +130,7 @@ export function useNativeChatPasteBridge({
         // Other text fields (search, answer) keep their native paste.
         return
       }
-      const composer = composerRef.current
+      const composer = nativeChatComposerDestination(rootRef.current, composerRef.current)
       if (composer) {
         composer.handlePasteEvent(event)
         event.preventDefault()
@@ -162,7 +163,10 @@ export function useNativeChatPasteBridge({
     }
     // Named-pane paste requests carry no clipboard event data.
     const onPasteRequest = (event: Event): void => {
-      if (composerRef.current || questionAnswerInputRef?.current) {
+      if (
+        nativeChatComposerDestination(rootRef.current, composerRef.current) ||
+        questionAnswerInputRef?.current
+      ) {
         event.preventDefault()
         pasteClipboardIntoComposer()
       }

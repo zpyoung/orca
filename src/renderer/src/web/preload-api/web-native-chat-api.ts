@@ -60,7 +60,7 @@ export function createWebNativeChatApi(): NativeChatApi {
             subscriptionId: args.subscriptionId,
             transcriptPath: args.transcriptPath,
             limit: args.limit,
-            capabilities: { transcriptPending: 1 }
+            capabilities: { transcriptPending: 1, transcriptSourceOrder: 1 }
           },
           {
             onResponse: (response) => {

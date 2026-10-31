@@ -33,6 +33,7 @@ import { searchRepos } from '@/lib/repo-search'
 import { clearSidebarFilters, selectSidebarFilterState } from './sidebar-filter-actions'
 import { useWorkspaceOptionsFilterBadge } from './workspace-options-menu-items'
 import { translate } from '@/i18n/i18n'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 
 type SidebarFilterProps = {
   preserveWorkspaceBoardOpen?: boolean
@@ -47,6 +48,7 @@ const SidebarFilter = React.memo(function SidebarFilter({
   contentSide = 'right',
   onMenuOpenChange
 }: SidebarFilterProps) {
+  useUiLanguageRevision()
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
   const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
   const setHideDefaultBranchWorkspace = useAppStore((s) => s.setHideDefaultBranchWorkspace)

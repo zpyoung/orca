@@ -80,7 +80,7 @@ export abstract class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntime
     sleepingAgentWake: 'requested' | 'unsupported-headless' | 'not-applicable'
   }> {
     this.assertGraphReady()
-    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
+    const worktree = await this.resolveGitWorktreeSelector(worktreeSelector)
     const repo = this.store?.getRepo(worktree.repoId)
     if (!repo) {
       throw new Error('repo_not_found')
@@ -349,6 +349,8 @@ export abstract class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntime
       wrappedSetupCommand?: string
       // Background provisioning must not move the user's sidebar selection.
       surfaceOwner?: false
+      /** The create was the user's act: its terminals may start a stopped WSL distro. */
+      wslUserAct?: true
     },
     createdWorktree?: Worktree
   ): Promise<{ setupSpawned: boolean; setupTerminalHandle: string | null }> {

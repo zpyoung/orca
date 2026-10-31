@@ -80,7 +80,10 @@ export function initializeMainProcessObservers(): void {
     uninstallHookStatusRepublish()
   }
   // Initialize before IPC/renderers can track; the telemetry client gates dev/disabled cases itself.
-  initTelemetry(store)
+  // Load the SDK after first paint (#35752); headless serve and GPU failures never show a window.
+  initTelemetry(store, (start) =>
+    runAfterFirstWindowShown(start, TELEMETRY_CLIENT_START_FALLBACK_MS)
+  )
   const profileStateStartup = state.profileStateStartup
   if (profileStateStartup) {
     track('profile_state_authority_selected', {

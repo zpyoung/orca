@@ -37,6 +37,11 @@ export function registerRepoCatalogHandlers(
     return visibleRepos(store)
   })
 
+  // The local rows `repos:list` hides once their WSL host owns them; read-only, for their chats.
+  ipcMain.handle('repos:listWslMoved', () =>
+    listWslMovedProjects(store.getRepos(), store.getFolderWorkspaces())
+  )
+
   ipcMain.handle('projects:list', () => {
     enrichMissingRepoGitRemoteIdentities(store, { onChanged: broadcastReposChanged })
     return store.getProjects()

@@ -3,6 +3,7 @@ export const CLI_GLOBAL_FLAGS: readonly string[] = ['help', 'json', ...CLI_GLOBA
 
 export const CLI_BOOLEAN_FLAGS = new Set([
   'accept-changed-state',
+  'agent-wait',
   'all',
   'allow-failed-archive-hook',
   'attachments',
@@ -45,6 +46,7 @@ export const CLI_BOOLEAN_FLAGS = new Set([
   'reclaim-stale-lock',
   'references',
   'relations',
+  'removed',
   'reinstall',
   'restore-window',
   'return-preamble',

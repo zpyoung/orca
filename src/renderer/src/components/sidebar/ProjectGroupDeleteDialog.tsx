@@ -59,17 +59,11 @@ export function ProjectGroupDeleteDialog({
   const mountedRef = useRef(true)
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
   const removeProjectsId = useId()
-  const removeContainedProjectCopy =
-    projectCount === 1
-      ? translate(
-          'auto.components.sidebar.ProjectGroupDeleteDialog.removeContainedProjectSingular',
-          'Remove 1 contained project'
-        )
-      : translate(
-          'auto.components.sidebar.ProjectGroupDeleteDialog.removeContainedProjectPlural',
-          'Remove {{value0}} contained projects',
-          { value0: projectCount }
-        )
+  const removeContainedProjectCopy = translate(
+    'auto.components.sidebar.ProjectGroupDeleteDialog.removeContainedProjects',
+    'Remove {{count}} contained projects',
+    { count: projectCount, defaultValue_one: 'Remove {{count}} contained project' }
+  )
 
   const handleDialogContentRef = useCallback((node: HTMLDivElement | null): void => {
     // Track content attachment so late deletions cannot update closed dialog state.
@@ -134,8 +128,15 @@ export function ProjectGroupDeleteDialog({
             )}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {translate('auto.components.sidebar.ProjectGroupDeleteDialog.69f5cb97d0', 'Delete')}{' '}
-            <span className="break-all font-medium text-foreground">{groupName}</span>.
+            <Trans
+              i18n={i18n}
+              defaults={translate(
+                'auto.components.sidebar.ProjectGroupDeleteDialog.deleteGroupDescription',
+                'Delete <name>{{name}}</name>.'
+              )}
+              values={{ name: groupName }}
+              components={{ name: <span className="break-all font-medium text-foreground" /> }}
+            />
           </DialogDescription>
         </DialogHeader>
         {projectCount > 0 && (
@@ -162,10 +163,10 @@ export function ProjectGroupDeleteDialog({
                   ))}
                   {projectNames.length > 4 ? (
                     <li className="text-muted-foreground">
-                      +{projectNames.length - 4}{' '}
                       {translate(
-                        'auto.components.sidebar.ProjectGroupDeleteDialog.ad407c2d55',
-                        'more'
+                        'auto.components.sidebar.ProjectGroupDeleteDialog.moreProjects',
+                        '+{{count}} more',
+                        { count: projectNames.length - 4, defaultValue_one: '+{{count}} more' }
                       )}
                     </li>
                   ) : null}

@@ -5,6 +5,7 @@ import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-verified
 import type { AgentType } from '../../../../shared/native-chat-types'
 import {
   nativeChatAskRequiresTerminal,
+  nativeChatStopSendsSecondEscape,
   resolveNativeChatTranscriptAgent,
   shouldStepNativeChatAskAnswer
 } from '../../../../shared/native-chat-agent-support'
@@ -13,9 +14,9 @@ import {
   buildCodexAskAnswerKeys,
   formatAskAnswer,
   hasAskAnswer,
-  type AskAnswerSelection,
-  type AskPrompt
-} from './native-chat-interactive-prompt'
+  type AskAnswerSelection
+} from '../../../../shared/native-chat-ask-answer'
+import type { AskPrompt } from '../../../../shared/native-chat/input/native-chat-ask-types'
 import {
   invalidateNativeChatPtySends,
   sendNativeChatAskAnswer,

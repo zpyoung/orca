@@ -1,3 +1,5 @@
+import { seedPendingRuntimeRepoRemovals } from '@/store/repos/pending-runtime-repo-removals'
+import { replayPendingRuntimeRepoRemovalsForReadyServers } from '@/store/repos/pending-runtime-repo-removal-replay'
 import {
   DEFAULT_HIDE_SLEEPING_WORKSPACES,
   DEFAULT_STATUS_BAR_ITEMS,
@@ -20,6 +22,9 @@ export function hydratePersistedUIAfterStartupRead({
     return false
   }
 
+  // Before any catalog merge, so a server that still lists a removed project cannot re-add it.
+  seedPendingRuntimeRepoRemovals(persistedUI.pendingRuntimeRepoRemovals)
+  replayPendingRuntimeRepoRemovalsForReadyServers()
   hydratePersistedUI(persistedUI, 'startup')
   return true
 }

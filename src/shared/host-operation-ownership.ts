@@ -42,6 +42,7 @@ export const HOST_OPERATION_OWNERSHIP = {
   layout: 'host',
   ledger: 'host',
   linear: 'scope-picked',
+  linkPreview: 'host',
   managedRuntime: 'host',
   managedServer: 'host',
   markdown: 'host',

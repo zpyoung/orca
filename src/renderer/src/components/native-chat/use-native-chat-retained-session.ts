@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   createNativeChatTranscriptRetention,
   encodeNativeChatTranscriptIdentity
-} from '../../../../shared/native-chat-transcript-retention'
+} from '../../../../shared/native-chat/transcript/native-chat-transcript-retention'
 import {
   isNativeChatTranscriptUnsettled,
   useNativeChatLiveSession,

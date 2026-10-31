@@ -80,6 +80,7 @@ export async function launchAgentInWebHostTab(args: {
       : {}),
     // Why: with or without a prompt, the desktop's launch settings decide args (#31986).
     launchAgent: agent,
+    preparedAgentCommand: agentLaunchNeedsPreparedCommand(agent, startupPlan.sessionOptions),
     command: startupPlan.launchCommand,
     ...(startupPlan.env ? { env: startupPlan.env } : {}),
     launchConfig: startupPlan.launchConfig,
@@ -90,7 +91,11 @@ export async function launchAgentInWebHostTab(args: {
     ...(hasPrompt && pastePromptAfterReady === null
       ? { promptDelivery: structuredPromptDelivery }
       : {}),
-    ...(agentArgs !== undefined ? { agentArgs } : {}),
+    ...(launchPreferences?.mode
+      ? { agentArgs: startupPlan.launchConfig.agentArgs }
+      : agentArgs !== undefined
+        ? { agentArgs }
+        : {}),
     ...(launchPreferences ? { launchPreferences } : {})
   } as const
 

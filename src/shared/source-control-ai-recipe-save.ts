@@ -1,10 +1,12 @@
+import { sourceControlActionRecipeEntry } from './source-control-action-selection'
+import { trimActionArgumentDocument } from './source-control-action-argument-choices'
+import { demoteDisplacedActionArgumentChoices } from './source-control-action-launch-preferences'
 import {
   normalizeRepoSourceControlAiOverrides,
   normalizeSourceControlAiSettings
 } from './source-control-ai'
 import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
-  SOURCE_CONTROL_ACTION_IDS,
   SOURCE_CONTROL_TEXT_ACTION_IDS,
   normalizeSourceControlActionRecipe,
   type SourceControlActionId,
@@ -93,6 +95,8 @@ function normalizeCompleteRecipe(
     launchOptions: recipe.launchOptions
   })?.launchOptions
   return {
+    ...trimActionArgumentDocument({ agentArgs, argumentChoices: recipe.argumentChoices }),
+    ...(rawAgentArgs === null ? { agentArgs: null } : {}),
     agentId: recipe.agentId ?? null,
     commandInputTemplate,
     ...(agentArgs !== undefined ? { agentArgs } : {}),
@@ -107,14 +111,7 @@ function normalizeCompleteRecipe(
 function normalizeActionOverrides(
   overrides: RepoSourceControlAiOverrides['actionOverrides']
 ): WritableRepoSourceControlAiOverrides['actionOverrides'] {
-  const normalized: WritableRepoSourceControlAiOverrides['actionOverrides'] = {}
-  for (const actionId of SOURCE_CONTROL_ACTION_IDS) {
-    const recipe = normalizeCompleteRecipe(actionId, overrides?.[actionId])
-    if (recipe) {
-      normalized[actionId] = recipe
-    }
-  }
-  return hasEntries(normalized) ? normalized : undefined
+  return normalizeRepoSourceControlAiOverrides({ actionOverrides: overrides })?.actionOverrides
 }
 
 export function normalizeWritableRepoSourceControlAiOverrides(
@@ -191,7 +188,29 @@ function normalizeRecipeForSave(
 export function saveSourceControlActionRecipe(
   input: SaveSourceControlActionRecipeInput
 ): SourceControlActionRecipeSaveResult {
-  const savedRecipe = normalizeRecipeForSave(input.actionId, input.recipe)
+  const selected = sourceControlActionRecipeEntry(input.recipe)
+  const recipe = demoteDisplacedActionArgumentChoices(selected)
+  const sources = selected.resolvedChoiceSources
+  const savedRecipe = normalizeRecipeForSave(
+    input.actionId,
+    sources
+      ? {
+          ...recipe,
+          launchPreferences:
+            sources.canonicalAgentId && (sources.model || sources.permission)
+              ? {
+                  agentId: sources.canonicalAgentId,
+                  ...(sources.model
+                    ? { modelSelection: { ...sources.model, base: 'default' } }
+                    : {}),
+                  ...(sources.permission?.permissionMode
+                    ? { permissionMode: sources.permission.permissionMode }
+                    : {})
+                }
+              : undefined
+        }
+      : recipe
+  )
   if (input.target.type === 'global') {
     const current = normalizeSourceControlAiSettings(
       input.settings.sourceControlAi,

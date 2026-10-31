@@ -83,7 +83,8 @@ export const NATIVE_CHAT_METHODS = [
             params.transcriptPath
           ),
           limit,
-          beforeOffset: params.beforeOffset
+          beforeOffset: params.beforeOffset,
+          sourceOrder: params.capabilities?.transcriptSourceOrder === 1
         },
         signal
       )

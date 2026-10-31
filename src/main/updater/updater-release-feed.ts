@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import {
+  fetchLatestStableReleaseTag,
   fetchNewerReleaseTagsWithReadiness,
   getReleaseDownloadUrl
 } from '../updater-prerelease-feed'

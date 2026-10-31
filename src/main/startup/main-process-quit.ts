@@ -1,3 +1,5 @@
+import { killWslChannelsInCloseGrace } from '../wsl/wsl-command-channel'
+import { markHostShuttingDown } from '../host-shutdown-state'
 import { app, type Event } from 'electron'
 import { closeAllWatchers } from '../ipc/filesystem/watchers/filesystem-watcher-shutdown'
 import { disposeWorktreeBaseDirectoryWatchers } from '../ipc/worktree-base-directory-watcher'
@@ -32,6 +34,7 @@ import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
 import { stopTccPromptNotice } from '../macos-tcc-prompt-notice'
 import { cancelHistoryGc } from '../terminal-history-gc'
 import { shouldQuitWhenAllWindowsClosed } from './window-all-closed-quit-policy'
+import { desktopConnectorCloud } from './main-process-connector-startup'
 import { mainProcessState as state } from './main-process-state'
 import { isDevParentShutdownRequested } from './configure-process'
 import { getCanonicalUserDataPath } from '../persistence'
@@ -83,6 +86,7 @@ function installBeforeQuitHandler(): void {
     state.isQuitting = true
     flushUnsavedCloudSessions()
     state.desktopRelayService?.fenceAndCloseNow()
+    desktopConnectorCloud()?.fence()
     state.runtimeRpc?.setMobileRelayPairingProvider(null)
     state.unsubscribeAgentAwakeStatusChanges?.()
     state.unsubscribeAgentAwakeStatusChanges = null
@@ -110,6 +114,7 @@ function installWillQuitHandler(): void {
     // Include pane grids still inside their write burst in final save.
     const paneGridFlush = state.runtime?.flushPaneGrids() ?? null
     // A renderer can veto before-quit; push must survive until quit is committed.
+    markHostShuttingDown()
     state.desktopPushService?.stop()
     state.unsubscribeSystemResumeBroadcast?.()
     state.unsubscribeSystemResumeBroadcast = null
@@ -135,6 +140,8 @@ function installWillQuitHandler(): void {
     state.pluginKillListService = null
     state.pluginMarketplaceService = null
     state.pluginMarketplaceInstaller = null
+    state.pluginAutoUpdater?.dispose()
+    state.pluginAutoUpdater = null
     const pluginHostShutdown = state.pluginService?.dispose() ?? Promise.resolve()
     const codexBackfillRecoveryShutdown = stopCodexStateDbBackfillRecoveries()
     stopCodexAccountSessionBridges()
@@ -178,6 +185,8 @@ function installWillQuitHandler(): void {
         : Promise.resolve()
     // Dispose relay timers and wsl.exe children explicitly rather than rely on pipe teardown.
     wslHookRelayManager.disposeAll()
+    // A closed WSL-host channel still in its EOF grace must not outlive the app.
+    killWslChannelsInCloseGrace()
     const statsFlush = state.stats?.flushAsync() ?? Promise.resolve()
     // Await per-session close children so browser daemons cannot retain ports/state after quit (#16367); retire headless owners first to avoid duplicate fanout.
     const browserShutdown = (async (): Promise<void> => {
@@ -298,7 +307,8 @@ function installWindowAllClosedHandler(): void {
       shouldQuitWhenAllWindowsClosed({
         platform: process.platform,
         isQuitting: state.isQuitting,
-        isServeMode: state.isServeMode
+        isServeMode: state.isServeMode,
+        hasOpenedMainWindow: state.hasOpenedMainWindow
       })
     ) {
       app.quit()

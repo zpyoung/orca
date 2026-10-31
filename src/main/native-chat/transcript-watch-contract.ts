@@ -25,6 +25,7 @@ export type SubscribeNativeChatTranscriptArgs = ResolveSessionFileOptions & {
     companion?: NativeChatTranscriptCompanion
   ) => void
   initialLimit?: number
+  sourceOrder?: boolean
   filePath?: string
   debounceMs?: number
   resolvePollIntervalMs?: number

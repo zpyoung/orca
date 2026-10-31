@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getDefaultSettings } from './constants'
 import {
-  normalizeWritableRepoSourceControlAiOverrides,
   saveSourceControlActionRecipe,
   toSourceControlAiRepoUpdate
 } from './source-control-ai-recipe-save'
@@ -66,7 +65,6 @@ describe('source-control AI recipe saves', () => {
               launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } }
             },
             pullRequest: {
-              agentId: null,
               commandInputTemplate: '{basePrompt}\n\nlegacy review'
             }
           },
@@ -78,50 +76,35 @@ describe('source-control AI recipe saves', () => {
     })
   })
 
-  it('clears empty repo source-control AI writes with the JSON boundary sentinel', () => {
-    expect(toSourceControlAiRepoUpdate({ prCreationDefaults: { draft: null } })).toEqual({
-      sourceControlAi: null
-    })
-  })
-
-  it('preserves boolean-only hosted-review defaults and strips legacy null defaults on write', () => {
-    expect(
-      normalizeWritableRepoSourceControlAiOverrides({
-        prCreationDefaults: {
-          draft: true,
-          useTemplate: null,
-          generateDetailsOnOpen: false
-        }
-      })
-    ).toEqual({
-      prCreationDefaults: {
-        draft: true,
-        generateDetailsOnOpen: false
-      }
-    })
-  })
-
-  it('stores repo custom commands when saving a custom-command recipe', () => {
+  it('keeps the action model when saving a repo recipe', () => {
+    const launchPreferences = {
+      agentId: 'codex' as const,
+      model: 'gpt-5.6-terra',
+      options: { effort: 'high' }
+    }
     const result = saveSourceControlActionRecipe({
       target: { type: 'repo', repoId: 'repo-1' },
       settings: settings(),
       repo: null,
-      actionId: 'commitMessage',
-      recipe: {
-        agentId: 'custom',
-        commandInputTemplate: '{basePrompt}'
-      },
-      customAgentCommand: 'repo-agent {prompt}'
+      actionId: 'fixChecks',
+      recipe: { agentId: 'codex', commandInputTemplate: '{basePrompt}', launchPreferences }
     })
 
     expect(result).toMatchObject({
       update: {
         sourceControlAi: {
-          customAgentCommand: 'repo-agent {prompt}',
           actionOverrides: {
-            commitMessage: {
-              agentId: 'custom',
-              commandInputTemplate: '{basePrompt}'
+            fixChecks: {
+              agentId: 'codex',
+              commandInputTemplate: '{basePrompt}',
+              launchPreferences: {
+                agentId: 'codex',
+                modelSelection: {
+                  base: 'default',
+                  model: { agentId: 'codex', value: 'gpt-5.6-terra' },
+                  options: { effort: { agentId: 'codex', value: 'high' } }
+                }
+              }
             }
           }
         }

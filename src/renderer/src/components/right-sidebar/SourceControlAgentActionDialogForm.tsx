@@ -1,3 +1,4 @@
+import type { SelectedSourceControlActionRecipe } from '../../../../shared/source-control-action-selection'
 import React from 'react'
 import { Info, RefreshCw, RotateCcw, Settings, Sparkles, TriangleAlert } from 'lucide-react'
 import AgentCombobox from '@/components/agent/AgentCombobox'
@@ -24,9 +25,11 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
-import { sourceControlActionRecipeMatchesTarget } from './source-control-action-recipe-match'
+import { describeSourceControlActionModel } from '../settings/source-control-action-model-copy'
+import { sourceControlActionRecipeSaveMatchesTarget } from './source-control-action-recipe-match'
 import type { SourceControlAgentScopeNote } from './source-control-agent-action-dialog-result'
 import { translate } from '@/i18n/i18n'
+import { selectedSourceControlActionPreferences } from '../../../../shared/source-control-action-launch-preferences'
 
 /** Expose only delivery errors the user can fix before launch. */
 export type SourceControlAgentActionDeliveryPlanState =
@@ -41,6 +44,7 @@ type SourceControlAgentActionDialogFormProps = {
   selectedAgent: TuiAgent | null
   hasEnabledAgents: boolean
   detecting: boolean
+  surfaceRows: AgentComboboxSurfaceRows
   statusCopy: string | null
   agentArgs: string
   /** False when the launch would be structured native chat; the field is then absent, not disabled. */
@@ -91,6 +95,7 @@ export function SourceControlAgentActionDialogForm({
   selectedAgent,
   hasEnabledAgents,
   detecting,
+  surfaceRows,
   statusCopy,
   agentArgs,
   agentArgsApply,
@@ -131,7 +136,7 @@ export function SourceControlAgentActionDialogForm({
   const selectedLaunchRecipeAlreadySaved = Boolean(
     selectedRecipe &&
     selectedSaveTarget &&
-    sourceControlActionRecipeMatchesTarget({
+    sourceControlActionRecipeSaveMatchesTarget({
       actionId,
       target: selectedSaveTarget,
       recipe: selectedRecipe,
@@ -163,7 +168,9 @@ export function SourceControlAgentActionDialogForm({
             <AgentCombobox
               agents={agentOptions}
               value={selectedAgent}
-              onValueChange={onSelectedAgentChange}
+              onValueChange={onAgentPick}
+              surfaceRows={surfaceRows}
+              disabled={!surfaceRows.selection.ready}
               allowNarrowTrigger
               triggerClassName="w-full"
             />
@@ -195,6 +202,10 @@ export function SourceControlAgentActionDialogForm({
             <p className="flex items-start gap-1.5 text-[11px] text-destructive">
               <TriangleAlert className="mt-px size-3 shrink-0" />
               <span>{statusCopy}</span>
+            </p>
+          ) : selectedAgent && selectedPreferences ? (
+            <p className="text-[11px] text-muted-foreground">
+              {describeSourceControlActionModel(selectedAgent, selectedPreferences)}
             </p>
           ) : null}
         </div>

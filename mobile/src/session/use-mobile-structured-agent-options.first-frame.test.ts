@@ -5,7 +5,7 @@ import type {
   AgentSessionModelCatalogResult,
   AgentSessionOptionsResult
 } from '../../../src/shared/agent-session-wire'
-import type { SessionOptionDescriptor } from '../../../src/shared/native-chat-session-options'
+import type { SessionOptionDescriptor } from '../../../src/shared/native-chat/input/native-chat-session-options'
 import type { RpcClient } from '../transport/rpc-client'
 import { useMobileStructuredAgentOptions } from './use-mobile-structured-agent-options'
 
@@ -58,7 +58,13 @@ async function mount(initial: Props) {
       enabled: true,
       fence: props.fence,
       mutate,
-      hostSupport: { permissionModes: true, coherentModelCatalog: true, statusFeed: false }
+      turnId: null,
+      hostSupport: {
+        sendOptions: false,
+        permissionModes: true,
+        coherentModelCatalog: true,
+        statusFeed: false
+      }
     })
     latest = options
     frames.push(modelChoices(options.optionSnapshot))

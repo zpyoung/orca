@@ -66,7 +66,7 @@ jobs:
   warm:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     concurrency:
-      group: ci-cache-warmup-linux-x64-${{ github.event.pull_request.number || github.ref }}
+      group: ci-cache-warmup-linux-x64-${{ matrix.runner }}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -83,6 +83,8 @@ jobs:
           native-runtime: node
           node-version: '24'
           cache-electron-package: 'true'
+          # No hosted job restores the root store, so keep it out of GitHub's cache quota.
+          cache-pnpm-store: ${{ startsWith(matrix.runner, 'blacksmith-') }}
           cache-pnpm-store-lookup-only: 'true'
 
       - uses: ./.github/actions/prepare-headless-compiler

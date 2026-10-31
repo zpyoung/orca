@@ -4,9 +4,9 @@ import {
   type AgentProviderSessionMetadata,
   type ResumableTuiAgent
 } from './agent-session-resume'
-import type { SessionOptionValue } from './native-chat-session-options'
+import type { SessionOptionValue } from './native-chat/input/native-chat-session-options'
 import { buildSleepingAgentLaunchConfig } from './sleeping-agent-launch-config'
-import { resolveAgentLaunchCommand } from './tui-agent-launch-command'
+import { resolveAgentLaunchCommand, withAgentTerminalInputArgs } from './tui-agent-launch-command'
 import type { AgentStartupPlan } from './tui-agent-startup'
 import { resolveStartupShell, type AgentStartupShell } from './tui-agent-startup-shell'
 import { TUI_AGENT_CONFIG } from './tui-agent-config'
@@ -88,7 +88,7 @@ export function buildAgentResumeStartupPlan(args: {
   const launchConfig = buildSleepingAgentLaunchConfig({
     ...args,
     agentArgs: recorded.agentArgs,
-    agentCommand: baseCommand.commandWithoutSessionOptions
+    ...baseCommand.resumeLaunch
   })
   const resumeCommand = buildAgentResumeLaunchCommand(args.agent, baseCommand.command, argv, shell)
   const agentCwd = args.providerSession.cwd

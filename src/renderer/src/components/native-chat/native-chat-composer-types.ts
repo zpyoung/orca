@@ -11,7 +11,7 @@ import type {
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
-} from '../../../../shared/native-chat-session-options'
+} from '../../../../shared/native-chat/input/native-chat-session-options'
 import type { NativeChatLaunchDraft } from '@/lib/native-chat-launch-prompt'
 import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
 import type {
@@ -57,6 +57,7 @@ export type NativeChatStructuredComposerTransport = {
   sessionCommands?: readonly AgentSessionSlashCommand[]
   /** Request command refresh; updated choices arrive through sessionCommands. */
   refreshCommands?: () => void
+  setCommandsMenuOpen?: (open: boolean) => void
   /** False when the agent takes no image input, as its host registered it. */
   acceptsImages?: boolean
   /** The session's context usage; null until the journal can state it. */

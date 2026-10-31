@@ -1,11 +1,16 @@
+import { trimActionArgumentDocument } from './source-control-action-argument-choices'
+import {
+  selectSourceControlActionRecipe,
+  type CurrentActionSelection,
+  type SelectedSourceControlActionRecipe
+} from './source-control-action-selection'
 import type { GlobalSettings } from './global-settings-types'
 import type { Repo } from './repo-types'
 import {
   readSourceControlActionDefault,
   resolveSourceControlActionCommandTemplate,
   type AiActionId,
-  type SourceControlTextActionId,
-  type SourceControlActionRecipe
+  type SourceControlTextActionId
 } from './source-control-ai-actions'
 import { commandTemplateFromOperationInstruction } from './source-control-ai-command-template'
 import { normalizeRepoSourceControlAiOverrides } from './source-control-ai-repo-settings'
@@ -187,11 +192,11 @@ export function resolveSourceControlAiEnabled(input: {
   )
 }
 
-export function resolveSourceControlActionRecipe(input: {
+export function captureSourceControlActionSelection(input: {
   settings: Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'> | null | undefined
   repo?: Pick<Repo, 'sourceControlAi'> | null
   actionId: AiActionId
-}): SourceControlActionRecipe {
+}): CurrentActionSelection {
   const source = normalizeSourceControlAiSettings(
     input.settings?.sourceControlAi,
     input.settings?.commitMessageAi

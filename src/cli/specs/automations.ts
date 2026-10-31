@@ -117,6 +117,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     positionalArgs: ['id'],
     notes: [
       'Use the full automation UUID from orca automations list; shortened prefixes are not accepted.',
+      'Like Run now in Orca, this manually starts a run without executing the precheck; prechecks gate scheduled runs only.',
       'A queued or dispatching run has been accepted but may not have a workspace or terminal yet. Use orca automations runs --id <automation-id> to follow its progress.'
     ],
     examples: [

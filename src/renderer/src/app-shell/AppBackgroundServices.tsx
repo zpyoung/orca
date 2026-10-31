@@ -7,6 +7,7 @@ import { WorkspacePortScanner } from '../components/ports/WorkspacePortScanner'
 import { SavedHostScopeWidenGate } from '../components/sidebar/SavedHostScopeWidenGate'
 import { MacosTccPromptNoticeHost } from '../hooks/MacosTccPromptNoticeHost'
 import { useAppStore } from '../store'
+import { ActiveWorkspaceSyncGate } from './ActiveWorkspaceSyncGate'
 import { StructuredAgentSessionAttentionBridge } from '../components/native-chat/StructuredAgentSessionAttentionBridge'
 import { StructuredAgentSessionStatusBridge } from '../components/native-chat/StructuredAgentSessionStatusBridge'
 import { AskEscalationGate } from '../components/fork-ask-question-tool/AskEscalationGate'
@@ -23,6 +24,7 @@ export function AppBackgroundServices(): React.JSX.Element {
   return (
     <>
       <WorkspacePortScanner enabled={workspaceSessionReady} />
+      <ActiveWorkspaceSyncGate />
       {/* Keep permission notices available across app surfaces. */}
       <MacosTccPromptNoticeHost />
       {/* Keep agent-status retention subscriptions out of the App render tree. */}

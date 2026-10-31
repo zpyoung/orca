@@ -56,10 +56,13 @@ jobs:
             /config/.bun-version
             /config/scripts/check-readme-local-links.mjs
             /config/scripts/pr-code-change-scope.mjs
+            /config/scripts/pr-shell-contract-prefixes.mjs
             /.oxfmtrc.json
             /config/scripts/pr-package-test-paths.mjs
             /config/scripts/pr-layout-oracle-route.mjs
             /config/scripts/pr-e2e-source-routing.mjs
+            /config/scripts/pr-browser-e2e-source-routes.mjs
+            /config/scripts/pr-editor-preview-e2e-source-routes.mjs
             /config/scripts/ci-e2e-job-selection.mjs
             /config/scripts/pr-ready-check-reuse.mjs
           sparse-checkout-cone-mode: false
@@ -80,6 +83,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: config/.bun-version
+          no-cache: true
 
       - name: Check required PR context ownership
         run: bun .github/scripts/check-required-pr-context.mjs
@@ -271,21 +275,29 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/scripts/check-fork-ownership.mjs "$BASE_SHA" "$HEAD_SHA"
 
-  # Preflight saves the Node cache and publishes the plan before tests fan out.
+  # Shards wait only for the plan, not preflight, which moves them about two minutes earlier.
+  unit_plan:
+    needs: [code_paths]
+    if: needs.code_paths.outputs.test == 'true'
+    uses: ./.github/workflows/unit-plan.yml
+    with:
+      selection_mode: ${{ vars.ORCA_UNIT_SELECTION_MODE || 'shadow' }}
+
   test:
-    needs: [code_paths, preflight]
-    # Cancellation and failed prerequisites stop the expensive matrix.
+    needs: [code_paths, unit_plan]
     if: >-
       !cancelled() &&
       needs.code_paths.result == 'success' &&
       needs.code_paths.outputs.test == 'true' &&
-      needs.preflight.result == 'success'
+      needs.unit_plan.result == 'success'
     uses: ./.github/workflows/unit-tests.yml
     with:
       node_versions: '["24"]'
       runner: ubuntu-latest
       phase_diagnostics: true
-      shards: ${{ needs.preflight.outputs.shards }}
+      # Restore main's transform cache; the `ci:cold-unit-cache` label or ORCA_UNIT_MODULE_CACHE=off forces cold.
+      module_cache: ${{ (vars.ORCA_UNIT_MODULE_CACHE == 'off' || contains(github.event.pull_request.labels.*.name, 'ci:cold-unit-cache')) && 'off' || 'warm' }}
+      shards: ${{ needs.unit_plan.outputs.shards }}
       run_shards: ${{ needs.code_paths.outputs.mobile_ci_tools != 'true' }}
 
   # Keep advisory evidence sibling to tests and outside verify.needs; reusable-workflow dependency otherwise added ~36s after last shard.

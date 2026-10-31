@@ -7,7 +7,7 @@ import { useAiVaultPanelSessions } from './ai-vault-session-filters'
 import {
   deriveAiVaultScopeSessionPaths,
   deriveAiVaultWorkspaceScopePaths
-} from './ai-vault-scope-paths'
+} from '../../../../shared/ai-vault-scope-paths'
 import { countAiVaultViewAdjustments } from './ai-vault-view-defaults'
 import {
   buildAiVaultProjectContext,
@@ -51,6 +51,7 @@ import {
 import { useAiVaultPanelHandle, type AiVaultPanelProps } from './ai-vault-panel-handle'
 import { aiVaultSearchHitHostLabels } from './ai-vault-search-hit-hosts'
 import { selectFolderWorkspaces, selectWorktreesByRepo } from '@/store/workspace-record-selectors'
+import { formatClipboardFilePath } from '@/lib/clipboard-file-path'
 
 export default function AiVaultPanel({
   ref,
@@ -364,7 +365,7 @@ export default function AiVaultPanel({
             }
             onCopyPath={(session) =>
               void copyText(
-                session.filePath,
+                formatClipboardFilePath(session.filePath, session.executionHostId),
                 translate('auto.components.right.sidebar.AiVaultPanel.logPath', 'Log path')
               )
             }

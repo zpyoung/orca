@@ -211,7 +211,7 @@ function findMuseReadyPromptIndex(normalized: string): number | null {
     return null
   }
   const segment = normalized.slice(headerIndex)
-  return segment.includes('voice') && segment.includes('input') && segment.includes('❯')
-    ? headerIndex
-    : null
+  const voiceComposer =
+    segment.includes('voice') && segment.includes('input') && segment.includes('❯')
+  return voiceComposer || MUSE_COMPOSER_RE.test(segment) ? headerIndex : null
 }

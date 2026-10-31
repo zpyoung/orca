@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => {
       sessionId: 'session-1'
     }
   }
-  return { state, prepare: vi.fn(), save: vi.fn() }
+  return { state, prepare: vi.fn(), save: vi.fn(), goal: vi.fn(async () => true) }
 })
 
 vi.mock('../../store', () => {
@@ -54,7 +54,7 @@ vi.mock('../../store', () => {
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
   sendRuntimePtyInput: vi.fn()
 }))
-vi.mock('../../../../shared/remote-runtime-pty-id', async (importOriginal) => ({
+vi.mock('../../../../shared/remote-runtime/remote-runtime-pty-id', async (importOriginal) => ({
   ...(await importOriginal<typeof RemoteRuntimePtyIdModule>()),
   isRemoteRuntimePtyId: () => false
 }))
@@ -106,32 +106,42 @@ const STORED = '/srv/agent-session-attachments/0b6f8a52-4a3e-4c4e-9a59-1d5d1f2b8
 
 function composer(
   acceptsImages = true,
-  composerRef?: RefObject<NativeChatComposerHandle | null>
+  composerRef?: RefObject<NativeChatComposerHandle | null>,
+  mode: 'structured' | 'terminal' | 'goal' = 'structured'
 ): React.JSX.Element {
   return (
     <NativeChatComposer
       ref={composerRef}
       terminalTabId="tab-1"
       paneKey={PANE}
-      targetPtyId={null}
+      targetPtyId={mode === 'terminal' ? 'pty' : null}
       agent="claude"
-      structuredTransport={{
-        capturePresentation: () => () => true,
-        send: vi.fn(() => true),
-        dispatchCommand: vi.fn(async () => ({ handled: false, accepted: false, error: null })),
-        optionsSurface: {
-          getSnapshot: () => [],
-          setOption: vi.fn(),
-          invokeAction: vi.fn(),
-          subscribe: () => () => {}
-        },
-        optionSnapshot: [],
-        onError: vi.fn(),
-        runtime: 'remote',
-        acceptsImages,
-        sessionId: 'session-1',
-        runtimeEnvironmentId: 'env-1'
-      }}
+      structuredTransport={
+        mode === 'terminal'
+          ? undefined
+          : {
+              capturePresentation: () => () => true,
+              send: vi.fn(() => true),
+              dispatchCommand: vi.fn(async () => ({
+                handled: false,
+                accepted: false,
+                error: null
+              })),
+              optionsSurface: {
+                getSnapshot: () => [],
+                setOption: vi.fn(),
+                invokeAction: vi.fn(),
+                subscribe: () => () => {}
+              },
+              optionSnapshot: [],
+              onError: vi.fn(),
+              runtime: 'remote',
+              acceptsImages,
+              ...(mode === 'goal' ? { threadGoal: { setObjective: mocks.goal } } : {}),
+              sessionId: 'session-1',
+              runtimeEnvironmentId: 'env-1'
+            }
+      }
     />
   )
 }
@@ -175,6 +185,7 @@ beforeEach(() => {
   clearNativeChatAttachmentCacheForTests()
   clearNativeChatDraftCacheForTests()
   mocks.state.fieldProps = null
+  mocks.goal.mockClear()
   mocks.state.owner = {
     kind: 'runtime-session',
     environmentId: 'env-1',

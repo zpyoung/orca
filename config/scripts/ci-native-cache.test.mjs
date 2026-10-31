@@ -28,7 +28,8 @@ function resolveIdentity({
   arch = 'X64',
   image = 'win22',
   libc = null,
-  sourceDigest = 'a'.repeat(64)
+  sourceDigest = 'a'.repeat(64),
+  lockDigest = 'c'.repeat(64)
 } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'orca-native-identity-'))
   try {
@@ -38,7 +39,7 @@ function resolveIdentity({
       writeFileSync(osRelease, `ID=${libc.id}\nVERSION_ID=${libc.version}\n`)
     }
     // Isolate the container file lookup while running the production identity commands.
-    const script = `pnpm() { printf "%s\\n" "$TEST_PNPM_VERSION"; }\n${identity.run.replaceAll('/etc/os-release', '"$TEST_OS_RELEASE"')}`
+    const script = `pnpm() { printf "%s\\n" "$TEST_PNPM_VERSION"; }\nnode() { printf "%s\\n" "$TEST_LOCK_DIGEST"; }\n${identity.run.replaceAll('/etc/os-release', '"$TEST_OS_RELEASE"')}`
     const execution = runProcessSync({
       program: 'bash',
       args: ['-e', '-o', 'pipefail', '-c', script],
@@ -51,6 +52,7 @@ function resolveIdentity({
         ImageOS: image,
         NATIVE_SOURCE_HASH: sourceDigest,
         TEST_PNPM_VERSION: pnpm,
+        TEST_LOCK_DIGEST: lockDigest,
         TEST_OS_RELEASE: osRelease,
         GITHUB_OUTPUT: output
       }
@@ -84,6 +86,7 @@ describe('CI native cache ownership', () => {
       expect(baseline.path.split('\n')).toEqual(paths)
       const variants = [
         { sourceDigest: 'b'.repeat(64) },
+        { lockDigest: 'd'.repeat(64) },
         { runtime: 'electron' },
         { node: 'v24.22.0' },
         { pnpm: '12.1.0' },
@@ -134,7 +137,7 @@ describe('CI native cache ownership', () => {
     }
   )
 
-  it('uses requested identity on both restores and saves the Node ABI before Windows switches to Electron', () => {
+  it('uses requested identity on every restore and leaves Windows PR saves to the main warmers', () => {
     for (const step of native.runs.steps.filter((step) => step.uses?.startsWith('actions/cache'))) {
       expect(step.with.key).toBe('${{ steps.native-cache-scope.outputs.key }}')
       expect(step.with.path.trim().split('\n')).toEqual(paths)

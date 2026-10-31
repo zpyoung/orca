@@ -21,6 +21,7 @@ export type RpcDispatchStreamingOptions = Pick<
   | 'pairing'
   | 'deviceSelf'
   | 'mobileRelayHosts'
+  | 'peerDesktops'
   | 'delegatedMobileDevices'
   | 'sendBinary'
   | 'registerBinaryStreamHandler'
@@ -28,6 +29,8 @@ export type RpcDispatchStreamingOptions = Pick<
 > & {
   /** What the transport proved the caller may do; absent means this host's owner. */
   callerScope?: RpcCallerScope
+  /** Aborts when the caller's connection closes; only for the dispatcher's own waits, never handlers. */
+  connectionSignal?: AbortSignal
 }
 
 export function rpcContextFromTransport(
@@ -62,6 +65,7 @@ export function rpcContextFromTransport(
     pairing: options?.pairing,
     deviceSelf: options?.deviceSelf,
     mobileRelayHosts: options?.mobileRelayHosts,
+    peerDesktops: options?.peerDesktops,
     delegatedMobileDevices: options?.delegatedMobileDevices,
     sendBinary: options?.sendBinary,
     registerBinaryStreamHandler: options?.registerBinaryStreamHandler,

@@ -210,5 +210,6 @@ for (const [program, args] of ${JSON.stringify(steps)}) {
   console.log(JSON.stringify(report.summary))
 } finally {
   rmSync(baselineFile, { force: true })
+  rmSync(baselineCollectorFile, { force: true })
   rmSync(runnerFile, { force: true })
 }

@@ -94,7 +94,16 @@ export function commandMarkersAsMessages(
     id: `command:${marker.id}`,
     role: 'system' as const,
     // Why: a host answer is one sentence, so it reads as the aside it replaces, not a grid.
-    blocks: [{ type: 'text' as const, text: marker.output ?? `Ran ${marker.command}` }],
+    blocks: [
+      {
+        type: 'text' as const,
+        text:
+          marker.output ??
+          translate('components.native-chat.commandMarker.ran', 'Ran {{command}}', {
+            command: marker.command
+          })
+      }
+    ],
     timestamp: marker.sentAt,
     source: 'scrape' as const
   }))

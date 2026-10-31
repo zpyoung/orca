@@ -31,7 +31,7 @@ export async function launchHeadlessAutomationAgent(
   runtime: OrcaRuntimeService,
   request: {
     automation: Automation
-    run: Pick<AutomationRun, 'id' | 'title' | 'scheduledFor'>
+    run: Pick<AutomationRun, 'id' | 'title' | 'scheduledFor' | 'trigger'>
     target: Extract<AutomationRunTargetResult, { ok: true }>
     runs: readonly AutomationRun[]
   }
@@ -189,7 +189,10 @@ async function sendToReusableSession(
 }
 
 /** Reject reused pane handles whose PTY no longer belongs to this run. */
-export function runOwnHandle(runtime: OrcaRuntimeService, run: AutomationRun): string | null {
+export function runOwnHandle(
+  runtime: Pick<OrcaRuntimeService, 'getTerminalHandleForPaneKey' | 'getTerminalPtyIdForHandle'>,
+  run: AutomationRun
+): string | null {
   const handle = run.terminalPaneKey
     ? runtime.getTerminalHandleForPaneKey(run.terminalPaneKey)
     : null

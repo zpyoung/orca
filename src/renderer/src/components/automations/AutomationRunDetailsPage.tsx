@@ -12,6 +12,7 @@ import { formatAutomationRunLaunchSettings } from './fork-automation-launch-sett
 import type { AutomationRunViewState } from './automation-run-view-state'
 import type { AutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
 import {
+  AutomationRunErrorNotice,
   formatAutomationDateTimeWithRelative,
   getAutomationRunStatusLabel,
   getAutomationRunStatusVariant
@@ -97,9 +98,17 @@ export function AutomationRunDetailsPage({
         }
         onBack={onBack}
       >
+        {/* Why: saved terminal output otherwise hides why the run failed. */}
+        {run.status === 'dispatch_failed' && errorText && content !== errorText ? (
+          <AutomationRunErrorNotice
+            className="mb-4"
+            label={translate('auto.components.automations.AutomationsPage.runError', 'Error:')}
+            error={errorText}
+          />
+        ) : null}
         <CommentMarkdown
           variant="document"
-          content={getAutomationRunContent(run)}
+          content={content}
           className="text-sm leading-relaxed text-foreground"
         />
       </AutomationRunPageFrame>

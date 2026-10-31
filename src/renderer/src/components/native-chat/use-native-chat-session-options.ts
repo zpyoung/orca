@@ -13,11 +13,12 @@ import {
   useClaudeStartupFrameRevision
 } from './fork-native-chat-session-options/use-claude-startup-frame-revision'
 import { useAppStore } from '../../store'
+import { sayNativeChatSessionOptionTranslated } from './native-chat-session-option-labels-text'
 import {
   createNativeChatPtySessionOptions,
   type NativeChatPtySessionOptionsSurface
-} from './native-chat-pty-session-options'
-import type { NativeChatSessionOptionDispatchCommand } from './native-chat-session-option-command-dispatch'
+} from '../../../../shared/native-chat-pty-session-options'
+import type { NativeChatSessionOptionDispatchCommand } from '../../../../shared/native-chat-session-option-dispatch'
 import {
   ensureNativeChatModelEnrichment,
   readNativeChatEnrichedModels,
@@ -143,6 +144,7 @@ export function useNativeChatSessionOptions(args: {
       // Version-neutral family seeds keep the picker available while host discovery runs or fails.
       ...(discoveryContext ? { initialModels: discoveredModels ?? undefined } : {}),
       mode: targetPtyId ? 'live' : 'draft',
+      modelLabel: sayNativeChatSessionOptionTranslated('model'),
       reportedValues,
       dispatchCommand,
       canSwitchOmpModel,

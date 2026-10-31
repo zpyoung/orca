@@ -19,6 +19,7 @@ import {
 } from '@/store/plugin-panels'
 import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { AgentSessionHistoryIcon } from './agent-session-history-icon'
 import { useSourceControlDirtyItemOverride } from './fork-dirty-branch-indicator/use-source-control-dirty-item-override'
 import { getSessionInfoActivityItem } from './fork-session-info/session-info-activity-item'
@@ -38,6 +39,7 @@ export function useRightSidebarActivityItems({
 }: {
   rightSidebarOpen: boolean
 }): RightSidebarActivityItems {
+  const languageRevision = useUiLanguageRevision()
   const explorerShortcut = useShortcutLabel('sidebar.explorer.toggle')
   const sourceControlShortcut = useShortcutLabel('sidebar.sourceControl.toggle')
   const checksShortcut = useShortcutLabel('sidebar.checks.toggle')
@@ -139,6 +141,7 @@ export function useRightSidebarActivityItems({
       ...getPluginPanelActivityItems(visiblePluginPanels, pluginPanelErrors),
       ...askActivityItems
     ],
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
     [
       askActivityItems,
       checksShortcut,

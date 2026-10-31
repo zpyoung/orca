@@ -81,7 +81,8 @@ export async function installTranscriptWatcher(
       (next) => {
         companion = mergeNativeChatTranscriptCompanion(companion, next)
       },
-      gateAbort.signal
+      gateAbort.signal,
+      args.sourceOrder
     )
     if (!closed && (remaining.length > 0 || companion)) {
       onAppend(remaining, companion)
@@ -99,7 +100,8 @@ export async function installTranscriptWatcher(
       gateAbort.signal,
       (boundary) => {
         state.boundary = boundary
-      }
+      },
+      args.sourceOrder
     )
   }
 
@@ -203,7 +205,8 @@ export async function installTranscriptWatcher(
           (next) => {
             companion = mergeNativeChatTranscriptCompanion(companion, next)
           },
-          gateAbort.signal
+          gateAbort.signal,
+          args.sourceOrder
         )
         if (closed) {
           return

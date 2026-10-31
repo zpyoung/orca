@@ -1,3 +1,4 @@
+import type { CurrentActionSelection } from '../../../../shared/source-control-action-selection'
 import React from 'react'
 import type { RuntimeGitContext } from '@/runtime/runtime-git-client-context'
 import {
@@ -13,13 +14,17 @@ import type {
   SourceControlLaunchActionId
 } from '../../../../shared/source-control-ai-actions'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { RunSourceControlAgentActionStartArgs } from './runSourceControlAgentActionStart'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import type { SourceControlAiWriteTarget } from '../../../../shared/source-control-ai-recipe-save'
 import { SourceControlAgentActionDialogForm } from './SourceControlAgentActionDialogForm'
 import { useSourceControlAgentActionDialog } from './useSourceControlAgentActionDialog'
+import { translate } from '@/i18n/i18n'
 
 export type SourceControlAgentActionDialogProps = {
   open: boolean
+  initialRecipe?: SourceControlActionRecipe
+  initialSelection?: CurrentActionSelection
   onOpenChange: (open: boolean) => void
   actionId: SourceControlLaunchActionId
   title: string
@@ -61,6 +66,12 @@ export type SourceControlAgentActionDialogProps = {
 
 export function SourceControlAgentActionDialog(
   props: SourceControlAgentActionDialogProps
+): React.JSX.Element | null {
+  return props.open ? <SourceControlAgentActionEditor {...props} /> : null
+}
+
+function SourceControlAgentActionEditor(
+  props: SourceControlAgentActionDialogProps
 ): React.JSX.Element {
   const {
     open,
@@ -70,17 +81,20 @@ export function SourceControlAgentActionDialog(
     baseCommandInput,
     savedCommandInputTemplate,
     onOpenSettings,
-    startLabel = 'Start agent',
+    startLabel = translate(
+      'auto.components.right.sidebar.SourceControlAgentActionDialog.startAgent',
+      'Start agent'
+    ),
     onSaveAgentDefault
   } = props
   const {
     handleOpenChange,
-    shouldRenderDialog,
     agentScopeNote,
     agentOptions,
     selectedAgent,
     hasEnabledAgents,
     detecting,
+    surfaceRows,
     statusCopy,
     agentArgs,
     agentArgsApply,

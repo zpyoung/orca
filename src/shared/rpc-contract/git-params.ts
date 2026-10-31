@@ -1,3 +1,4 @@
+import { normalizeSourceControlAiActionDefaults } from '../source-control-ai-actions'
 import { z } from 'zod'
 import { OptionalGitAdmissionTier } from './git-admission-tier-params'
 import { OptionalTuiAgent } from './worktree-params'
@@ -279,7 +280,8 @@ export const GitRemoteFileUrl = WorktreeSelector.extend({
     .unknown()
     .transform((v) => (typeof v === 'string' ? v : ''))
     .pipe(z.string().min(1, 'Missing relative path')),
-  line: z.number().int().min(1)
+  line: z.number().int().min(1),
+  endLine: z.number().int().min(1).optional()
 })
 
 export const GitRemoteCommitUrl = WorktreeSelector.extend({
