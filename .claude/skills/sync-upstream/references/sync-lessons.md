@@ -22,7 +22,7 @@ Each entry carries:
 **What happened.** v1.4.190 (`eb1792985f`, #15172) replaced `src/main/ipc/pty.ts` — 8,030 lines —
 with a 39-line barrel re-exporting 73 new modules under `src/main/ipc/pty/`. The fork carried a
 96-line `terminal-dock` seam inside that file. `-X ours` kept the fork's whole 8,112-line monolith
-_and_ the merge added all 73 new modules, so two complete implementations were live at once, each
+*and* the merge added all 73 new modules, so two complete implementations were live at once, each
 with its own module state. Nothing complained: the merge was conflict-free after `-X ours`,
 `--verify-seams` passed 388/388 because the stale monolith still contained every declared line, and
 `pnpm typecheck` was clean. This is the third such release (v1.4.186 and v1.4.187 were the others),
@@ -65,9 +65,9 @@ and `TerminalContextMenu.tsx` (355 / 383 / 473). Both are repaired the same way 
 Two adjacent tells worth knowing. A seam path that no longer exists in the tag at all is the same
 situation one step further along; compare the manifest's seam paths against
 `git ls-tree -r --name-only "$UPSTREAM_TARGET"` as sets — in Python, or with `LC_ALL=C` on both the
-`sort`s _and_ the `comm`. Under the default macOS locale `comm` reports paths as missing that the
+`sort`s *and* the `comm`. Under the default macOS locale `comm` reports paths as missing that the
 tag plainly contains; v1.4.195 got 120 false positives that way, against a true answer of zero. And
-a residual that drifts by exactly one or two lines is _not_ this — that is ordinary `-X ours` hunk
+a residual that drifts by exactly one or two lines is *not* this — that is ordinary `-X ours` hunk
 damage, where upstream added a parameter or an import the fork's side discarded, and it is repaired
 in place.
 
@@ -85,7 +85,7 @@ supposedly owns:
 
 v1.4.197 did all three at once, so a release splitting several exception files in one go is normal
 rather than exceptional. Confirm the same way as for a seam — `git show "${UPSTREAM_TARGET}:<path>"
-| wc -l` against the worktree copy — and note that the fork's _own_ delta stays small: those three
+| wc -l` against the worktree copy — and note that the fork's *own* delta stays small: those three
 were 2/2, 7/6 and 134/14 lines. A small fork delta against a huge upstream removal is the whole
 shape.
 
@@ -119,7 +119,7 @@ and `terminal-pane-store-subscription-budget.test.tsx`. Each pins the refactor w
 equality: 204 flattened render hooks and a SHA-256 of their order, 24 DOM listeners and a SHA-256 of
 theirs, and `expect(perPane).toBe(17)` for store subscriptions. The fork's `terminal-dock` feature
 had lived inside that monolith as 134 added lines, and its integration adds four `useAppStore`
-subscriptions and roughly thirty hooks _inside the pinned file set_. No re-home satisfies the pins.
+subscriptions and roughly thirty hooks *inside the pinned file set*. No re-home satisfies the pins.
 
 **The tell.** The split's new files include tests whose constants are exact rather than upper
 bounds. Grep the new siblings before planning any of the work:
@@ -130,7 +130,7 @@ comm -13 <(git ls-tree -r --name-only "$PREV_TAG" -- <dir>/ | LC_ALL=C sort) \
   | xargs git grep -lE '_SHA256|_BUDGET|toHaveLength\([0-9]' --
 ```
 
-The escape hatch worth checking, because it sometimes works: read each pin's _file pattern_. The
+The escape hatch worth checking, because it sometimes works: read each pin's *file pattern*. The
 hook-order pattern here covers `TerminalPane.tsx` and `use-terminal-pane-*.ts` only, so
 `TerminalPaneSurface.tsx` and the runtime portals are outside it, and a fork mount rendered from the
 surface costs nothing. It did not rescue this one, because the budget test mounts
@@ -156,7 +156,7 @@ v1.4.198's import graph. v1.4.200 then added four brand-new upstream files —
 (`native-chat-draft-cache`, `native-chat-composer-scope-cache`, `NativeChatImageAttachmentPreview`,
 `use-native-chat-composer-keydown`). Ownership resolution is silent about it: `remove.txt` honours
 the deletion, `--verify-seams` and `--verify-residuals` both pass, and the fork ownership guard
-passes. It surfaces only as `TS2307: Cannot find module` — reported against _upstream's_ files, in a
+passes. It surfaces only as `TS2307: Cannot find module` — reported against *upstream's* files, in a
 directory the fork never edited, which reads at first like merge damage somewhere else entirely.
 
 **The tell.** A typecheck error naming a path the fork does not own, pointing at a relative import
@@ -207,7 +207,7 @@ Two adjacent moves are wrong, and both look tempting:
   re-extend every release, and it throws away upstream tests — `use-native-chat-composer-catalog.test.tsx`
   covers a hook the fork's own composer now calls.
 - **Do not repoint upstream's import at the fork's replacement** unless the fork module genuinely
-  provides the same surface. The fork's `agent-composer-draft-cache` exports a _string_ cache;
+  provides the same surface. The fork's `agent-composer-draft-cache` exports a *string* cache;
   v1.4.200's editor needs `readNativeChatDraftDocument`/`writeNativeChatDraftDocument`, which persist
   a ProseMirror document the fork's cache has no notion of. A type-only import is the exception —
   `NativeChatImageAttachmentPreview` takes the fork's attachment type through an ordinary
@@ -289,7 +289,7 @@ schema moves shared-side. Say so in the PR rather than leaving it implicit.
 ## Re-measuring residuals reads the worktree, not `HEAD`
 
 **What happened.** After a fix that changed a seam, re-measuring every budget with
-`git diff --numstat "$UPSTREAM_TARGET" HEAD -- <paths>` reported _zero_ changes, and
+`git diff --numstat "$UPSTREAM_TARGET" HEAD -- <paths>` reported *zero* changes, and
 `--verify-residuals` then failed on the one file that had actually moved. The uncommitted fix was
 invisible to a `HEAD`-to-`HEAD` diff.
 
@@ -306,7 +306,7 @@ measurement taken over uncommitted work.
 **What happened.** The 2026-09-17 run merged `v1.4.206` (`c464b10149`, "release: v1.4.206",
 2026-09-18) and the fork shipped `v1.4.207-rc.0.zy01` on it. By 2026-09-19 upstream had **deleted**
 `refs/tags/v1.4.206` — no `v1.4.206`, no `v1.4.206-rc.*`, nothing — leaving `v1.4.205` (a day
-_older_ than what `main` carries) as the newest strict `vX.Y.Z` tag on the remote. Upstream had
+*older* than what `main` carries) as the newest strict `vX.Y.Z` tag on the remote. Upstream had
 re-cut `release/v1.4.206-adhoc` at `b10226a7ed`, a commit that does **not** descend from the
 retracted release commit.
 
@@ -318,7 +318,7 @@ does for a newer one. The run would then merge and, at Step 6, `git checkout v1.
 upstream-owned path: a whole-release rollback, silently breaking the fork commits written against
 the newer release (here `58a42923cb`, "adapt three fork surfaces to v1.4.206 API shapes").
 
-**The tell.** `$STABLE_TAG` sorts _below_ `upstream_synced` in `CHANGELOG.md`'s
+**The tell.** `$STABLE_TAG` sorts *below* `upstream_synced` in `CHANGELOG.md`'s
 frontmatter. Step 2 now checks this first. Confirm the retraction rather than assuming a truncated
 listing — an exact query is unambiguous where a glob plus `tail -1` is not:
 
@@ -342,7 +342,7 @@ Two consequences a human needs to hear about, neither of which the run can settl
 - **The fork may be shipping a release upstream pulled.** `v1.4.207-rc.0.zy01` is built on a commit
   upstream has since untagged. Why it was retracted is upstream's information, not the run's.
 - **The local tag is now load-bearing for the release skill.** `release` resolves its anchor with
-  `git describe --tags ... HEAD`, which reads _local_ tags. With `v1.4.206` present the anchor is
+  `git describe --tags ... HEAD`, which reads *local* tags. With `v1.4.206` present the anchor is
   correct; prune it (a fresh clone, or `git fetch --prune-tags`) and the anchor silently falls back
   to `v1.4.203`, which would compute `1.4.204-rc.0.zyNN` — **below** the already-published
   `1.4.207-rc.0.zy01`, regressing the series and breaking auto-update ordering. That is the

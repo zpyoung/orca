@@ -169,7 +169,7 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
 `main` already contains upstream trunk commits absorbed by previous syncs; a plain
 `$UPSTREAM_TARGET..origin/main` range reports those as fork work and inflates N by dozens.
 
-- **Before the ancestry test, check that the target is not _older_ than what `main` carries.**
+- **Before the ancestry test, check that the target is not *older* than what `main` carries.**
   Read `upstream_synced` from `CHANGELOG.md`'s YAML frontmatter and compare by version order:
 
   ```sh
@@ -188,8 +188,7 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
   Step 6 resets every upstream-owned file to `$UPSTREAM_TARGET`, so merging an older tag rolls the
   whole fork back a release and breaks any fork commit written against the newer release's API
   shapes. `merge-base --is-ancestor` cannot catch this on its own — stable tags live on their own
-  release branches, so it fails for an _older_ tag exactly as it does for a genuinely new one.
-
+  release branches, so it fails for an *older* tag exactly as it does for a genuinely new one.
 - If `git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main` succeeds, `main` already contains
   this release. Skip to Step 12 and note "no new stable release (already at $STABLE_TAG)". This is
   the expected outcome on most days and is a success, not a warning.
@@ -206,7 +205,7 @@ Then check that the **previous** stable tag is still an ancestor:
 git merge-base --is-ancestor "$PREV_TAG" origin/main
 ```
 
-If it fails, the last sync PR was squash-merged. `main` still carries that release's _content_, so
+If it fails, the last sync PR was squash-merged. `main` still carries that release's *content*, so
 nothing looks wrong, but the tag commit is gone from the lineage and `git merge` resolves its base a
 release further back — v1.4.205 merged against a v1.4.203-era base and produced 2,536 differing
 paths and 287 conflicted files instead of a one-release step. Proceed with the normal procedure:
@@ -297,7 +296,7 @@ This merge is fork-against-fork, so `-X ours` is wrong here — it would discard
   afterwards (`npx oxfmt --write config/fork-ownership.json`), never `pnpm format`.
 - **Never merge residual numbers.** The two sides measured against different tags, so the merged
   value is meaningless either way. Re-measure with `--verify-residuals "$UPSTREAM_TARGET"` and
-  re-baseline what it flags. A budget that _shrank_ is the normal case here and means the new
+  re-baseline what it flags. A budget that *shrank* is the normal case here and means the new
   release absorbed a line the fork was carrying — on 2026-09-10 upstream's own fixture fix
   superseded a workaround `main` had landed for the same bug, and taking upstream's side dropped
   three budgets from `+5/-2`, `+5/-2`, `+13/-4` to `+1/-1`, `+1/-1`, `+9/-3`.
@@ -358,7 +357,7 @@ handed and stop rather than adapting to a workspace that fails any of these:
 - No rebase/merge/cherry-pick is in progress. Resolve each path with `git rev-parse --git-path`
   (`MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`) and test what it prints. A
   literal `.git/MERGE_HEAD` test can never fire here: the run always happens in a worktree, where
-  `.git` is a _file_ pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
+  `.git` is a *file* pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
   reads as absent no matter what is in progress.
 - `git merge-base --is-ancestor HEAD origin/main` succeeds. The branch carries no commits of its
   own, so the reset below destroys nothing. If it fails, the workspace holds someone's work.
@@ -523,7 +522,7 @@ fix policy forbids. That is a confirmed feature collision: stop and raise it, ra
 the hour first.
 
 A `reason` that reads like whole-file ownership ("the fork's release-tooling delta", "fork-specific
-thresholds") is exactly where this goes wrong: it is describing a _delta_, and the exception is
+thresholds") is exactly where this goes wrong: it is describing a *delta*, and the exception is
 keeping the whole file. v1.4.194 lost four that way — the Electron installer's staging-transaction
 rework, the packaged-runtime contract's move off `package.json`'s `pnpm` block, release-cut's new
 permission row, and `pr.yml`'s new real-IME lane. Every one passed both manifest checks, the local
@@ -589,7 +588,7 @@ done < <out-dir>/ours.txt
 
 Run this before the numstat loop; it removes paths from the decision list rather than adding them.
 
-The same staleness also hides _inside_ a path that does diverge, where it reads as deliberate fork
+The same staleness also hides *inside* a path that does diverge, where it reads as deliberate fork
 intent. Before defending a hunk the fork appears to have deleted, check whether a fork commit ever
 touched it — `git log -S'<symbol>' -- <path>` returning only upstream commits means the exception
 discarded upstream's addition at some earlier sync and no one chose anything.
@@ -599,7 +598,7 @@ and resolves to the tag, so a dependency the exception dropped makes `pnpm insta
 fail in Step 8 with a lockfile error that names nothing about ownership.
 
 **A `deleted: true` exception can be invalidated by the release you are merging.** The fork's
-deletions were decided against the _previous_ tag's import graph; a new release can add files that
+deletions were decided against the *previous* tag's import graph; a new release can add files that
 import a module the fork deletes. Nothing reports it — `remove.txt` honours the deletion, both
 manifest checks pass, and the ownership guard passes — so it surfaces as `TS2307` against upstream's
 own new files. Sweep right after `remove.txt` is applied.
@@ -708,7 +707,7 @@ A fix may:
 - apply lint and format fixes, committed one commit per rule. A stable tag can enable whole rule
   families that `--fix` cannot rewrite, and adopting those in fork-owned files **is the run's job** —
   it is never an escalation on its own. The fix is names and types only, taken from upstream's own
-  adoption commit for that rule; `references/file-ownership.md` § _When upstream tightens the linter_
+  adoption commit for that rule; `references/file-ownership.md` § *When upstream tightens the linter*
   has the method and its limits
 - remove a job from the fork's `pr.yml` that the release cannot route: its `verify` selection has
   no producer in the tag's `pr-code-change-scope.mjs`, or a script it runs does not exist in the
@@ -814,8 +813,8 @@ node config/scripts/fork-sync-gate/replay-pr-preflight.mjs
   replay takes about three minutes.
 
 Every step is absolute: stop at the first failure and treat it as a hard fail. The reference's
-rule-tightening carve-out is the one exception, and it is an exception about _how the tree is
-fixed_, not about tolerating a failure — lint must still pass before the push, and the mechanical
+rule-tightening carve-out is the one exception, and it is an exception about *how the tree is
+fixed*, not about tolerating a failure — lint must still pass before the push, and the mechanical
 `oxlint --fix` it permits is committed separately from the merge and the ownership commit.
 
 **Why no tests here.** Vitest cannot run on the machine this skill runs on; `AGENTS.md` routes every
@@ -960,7 +959,7 @@ patched-source guard then rejects it. v1.4.198 added exactly such a guard
 
 **The poison is self-perpetuating, and a green job is what writes it.** Do not look for a cancelled
 run: on 2026-09-10 the entry that failed the job had been written the previous afternoon by the
-_successful_ WSL job that the previous run's cache deletion had just produced. `rebuild-native-deps.mjs`
+*successful* WSL job that the previous run's cache deletion had just produced. `rebuild-native-deps.mjs`
 decides to skip from `probeElectronNativeModules`, which tests only whether the addon loads, while
 the patched-source check runs later in `ensure-native-runtime.mjs` — so a restored prebuild loads,
 the rebuild is skipped, and the guard rejects it. That file is byte-identical to upstream, so this is
@@ -968,7 +967,7 @@ an upstream defect: deleting the entry unblocks the run but does not stop the ne
 fresh bad entry. Expect to do this every sync until upstream's skip decision consults the guard.
 
 The tell is a failure whose whole path is byte-identical to the tag. Prove that before anything else,
-and diff the _real_ paths — the patches live in `config/patches/`, not `patches/`, and a diff of a
+and diff the *real* paths — the patches live in `config/patches/`, not `patches/`, and a diff of a
 directory that does not exist reports no changes and looks like proof:
 
 ```sh
@@ -1002,7 +1001,7 @@ re-run behind a wait on run status rather than retrying the command. If you are 
 anyway, do that instead: the new run re-runs the job for free. Re-running a job also re-runs its
 dependents, which is why `verify` cannot be re-run on its own and does not need to be.
 
-Whether clearing a cache belongs on the fix policy's list of what a fix _may_ do is a question for
+Whether clearing a cache belongs on the fix policy's list of what a fix *may* do is a question for
 the skill's owner, not for a run to settle — raise it, do not assume it.
 
 **A reproduced CI failure is the fork's to fix, even if the merge did not cause it.** There is no
@@ -1057,14 +1056,14 @@ git rev-list --parents -n1 "$MAIN_NEW" | wc -w                # must be 3: the c
 ```
 
 **Both checks are load-bearing — run them and act on the result.** A squash puts the tag's
-_content_ on `main` while leaving its _commit_ out of the lineage, so the ancestor check fails and
+*content* on `main` while leaving its *commit* out of the lineage, so the ancestor check fails and
 the parent count reads 2 instead of 3. Verified on PR #82: after it was squashed,
 `git merge-base --is-ancestor v1.4.204 origin/main` exits 1 while `main`'s tree verifies clean
 against v1.4.204. The parent count is the more direct signal, because it also catches a rebase
 merge, whose single parent still carries the content forward.
 
 Nothing else notices for a long time, and what eventually does is confusing. The fork ownership
-guard picks the newest stable tag _reachable from HEAD_, so it silently falls back a release and
+guard picks the newest stable tag *reachable from HEAD*, so it silently falls back a release and
 reports every seam re-baselined since as drift — on **every** PR, including ones that touch nothing.
 #82 left #83 red that way, with ~25 false residual failures and no fault of its own. The next sync
 then merges against a base a release further back: v1.4.205 resolved against a v1.4.203-era base and
