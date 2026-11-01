@@ -1,11 +1,11 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-incremental-assembler.ts
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 // Share full-rebuild merge rules; append new sorted tails cheaply, reset on base changes, and preserve full-rebuild equality at every prefix.
 
 import {
   hasImagePromptMarker,
   isImageSourceUserTurn
-} from '../../../../../shared/native-chat-image-transcript-markers'
+} from '../../../../../shared/native-chat/transcript/native-chat-image-transcript-markers'
 import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
 import {
   compareMessages,
@@ -65,7 +65,7 @@ export function applyAppends(
   return assembler.messages
 }
 
-/** Require every message at/after the tail; null timestamps force a full sort because they belong first. */
+/** Compare canonical appends by source position, including null and backward provider clocks. */
 function isTailAppend(
   current: readonly NativeChatMessage[],
   incoming: readonly NativeChatMessage[]
@@ -75,18 +75,26 @@ function isTailAppend(
     return true
   }
   if (
-    hasImagePromptMarker(last) &&
     incoming[0]?.source === last.source &&
-    incoming[0]?.timestamp === last.timestamp &&
-    isImageSourceUserTurn(incoming[0]!)
+    ((hasImagePromptMarker(last) &&
+      incoming[0]?.timestamp === last.timestamp &&
+      isImageSourceUserTurn(incoming[0]!)) ||
+      (isImageSourceUserTurn(last) && hasImagePromptMarker(incoming[0]!)))
   ) {
     return false
   }
+  // Prompt-first image folding displays companions before the prompt; retain their source high-water mark.
+  const previous = current.at(-2)
+  const boundary = previous && compareMessages(previous, last) > 0 ? previous : last
   for (const message of incoming) {
-    if (message.timestamp === null) {
+    // Supplemental insertion depends on the canonical sequence, not its last clock.
+    if (boundary.transcriptOrder !== undefined && message.source !== 'transcript') {
       return false
     }
-    if (compareMessages(message, last) < 0) {
+    if (message.timestamp === null && message.transcriptOrder === undefined) {
+      return false
+    }
+    if (compareMessages(message, boundary) < 0) {
       return false
     }
   }

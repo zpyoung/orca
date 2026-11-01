@@ -134,6 +134,7 @@ export function buildDefaultSettings(args: {
     terminalLinkClickBehavior: 'actions',
     terminalUrlMiddleClickBehavior: 'open',
     experimentalNativeChat: false,
+    experimentalBrowserExtensions: false,
     experimentalTerminalDock: false,
     dockTerminalComposerByDefault: true,
     nativeChatResumeWorkOnRestart: false,

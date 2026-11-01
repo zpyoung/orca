@@ -230,18 +230,24 @@ export function installPaneHostCapabilityFlags(session: ConnectPanePtySession): 
     useAppStore.getState().recordTerminalInput(session.cacheKey)
   }
   // Record real input from xterm’s core signal; onData also carries query replies that falsely prevent hibernation. Fall back only if that signal is absent.
-  session.recordRealUserTerminalInput = (): void => {
+  session.recordRealUserTerminalInput = (fromKeyboard: boolean): void => {
     session.recordTerminalInputForHibernation()
     // Takeover must never fire from the onData fallback below: it mixes in auto-replies.
-    if (isTerminalUserInputFromKeyboard(session.pane.terminal)) {
+    if (fromKeyboard) {
       reportWorkerTerminalUserInput(session.cacheKey, session.runtimeEnvironmentId)
     }
   }
   primeTerminalUserInputKeyboardGate(session.pane.terminal)
-  session.userInputActivityDisposable = subscribeToTerminalUserInput(
-    session.pane.terminal,
-    session.recordRealUserTerminalInput
-  )
+  // Why: xterm fires onUserInput before onData, so publishing here made the key wait on every store subscriber before reaching the PTY.
+  session.userInputActivityDisposable = subscribeToTerminalUserInput(session.pane.terminal, () => {
+    // keyboard provenance is only readable while the originating event is still dispatching
+    const fromKeyboard = isTerminalUserInputFromKeyboard(session.pane.terminal)
+    queueMicrotask(() => {
+      if (!session.disposed) {
+        session.recordRealUserTerminalInput(fromKeyboard)
+      }
+    })
+  })
   session.recordTerminalInputForHibernationFallback = (): void => {
     if (session.userInputActivityDisposable === null) {
       session.recordTerminalInputForHibernation()

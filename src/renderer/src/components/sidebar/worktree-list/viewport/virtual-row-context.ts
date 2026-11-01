@@ -88,22 +88,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       projectHeaderHostContexts: args.projectHeaderHostContexts,
       getCachedFolderWorkspacePathStatus: args.getCachedFolderWorkspacePathStatus,
       toggleGroupWithScrollAnchor: args.toggleGroupWithScrollAnchor,
-      projectActions: {
-        getWorktreeVisibilityDefaults: (repo) =>
-          getRepoOwnerWorktreeVisibilityDefaults(
-            repo,
-            args.settings,
-            args.worktreeVisibilityDefaultsByHost
-          ),
-        onOpenRepoSettings: props.handleOpenRepoSettings,
-        onOpenProjectLedger: props.handleOpenProjectLedger,
-        onOpenWorktreeVisibility: props.handleOpenWorktreeVisibility,
-        onCreateGroupFromRepo: props.handleCreateGroupFromRepo,
-        onMoveProjectToGroup: props.handleMoveProjectToGroup,
-        onRemoveProjectFromGroup: props.handleRemoveProjectFromGroup,
-        onRemoveProject: props.handleRemoveProject,
-        onCreateForRepo: props.handleCreateForRepo
-      },
+      projectActions: args.projectActions,
       onRenameProjectGroup: props.handleRenameProjectGroup,
       onDeleteProjectGroup: props.handleDeleteProjectGroup,
       onOpenGroupLedger: props.handleOpenGroupLedger,

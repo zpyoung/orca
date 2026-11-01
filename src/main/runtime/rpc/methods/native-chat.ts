@@ -149,6 +149,7 @@ export const NATIVE_CHAT_METHODS = [
           params.transcriptPath
         ),
         initialLimit: limit,
+        sourceOrder: params.capabilities?.transcriptSourceOrder === 1,
         onInitialSnapshot: (messages, hasMore, beforeOffset, error, companion) => {
           if (closed) {
             return

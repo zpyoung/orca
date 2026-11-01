@@ -28,7 +28,12 @@ export type UseSourceControlAgentActionDialogResult = {
   agentArgs: string
   /** False when this launch would be a structured native chat session, which reads no CLI arguments. */
   agentArgsApply: boolean
+<<<<<<< fork
   launchOptions: AgentLaunchOptionSelection
+||||||| base
+=======
+  recipe: SelectedSourceControlActionRecipe
+>>>>>>> upstream
   commandTemplate: string
   saveLaunchRecipe: boolean
   saveTargetValue: string
@@ -38,10 +43,18 @@ export type UseSourceControlAgentActionDialogResult = {
   deliveryPlan: SourceControlAgentActionDeliveryPlanState
   canStart: boolean
   isStarting: boolean
+<<<<<<< fork
   onSelectedAgentChange: (agent: TuiAgent | null) => void
   onLaunchOverridesChange: (
     updater: (current: AgentLaunchOverrides) => AgentLaunchOverrides
   ) => void
+||||||| base
+  onSelectedAgentChange: (agent: TuiAgent | null) => void
+  onAgentArgsChange: (value: string) => void
+=======
+  onAgentPick: (agent: TuiAgent, surface?: AgentLaunchSurface) => void
+  onAgentArgsChange: (value: string) => void
+>>>>>>> upstream
   onCommandTemplateChange: (value: string) => void
   onSaveLaunchRecipeChange: (value: boolean) => void
   onSaveAgentDefaultChange: (value: string) => void

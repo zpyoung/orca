@@ -136,7 +136,11 @@ function installWillQuitHandler(): void {
     state.starNag?.stop()
     state.automations?.stop()
     const heimdallShutdown = beginHeimdallShutdown(state.heimdall)
-    // Await plugin shutdown/SIGKILL escalation or forked hosts can outlive Electron.
+    // Why: plugin hosts are forked children; dispose sends shutdown and
+    // escalates to SIGKILL so they cannot outlive the app. The promise joins
+    // the teardown barrier below — quitting before it resolves would let
+    // Electron exit first and orphan the hosts.
+    state.pluginKillListService?.dispose()
     state.pluginKillListService = null
     state.pluginMarketplaceService = null
     state.pluginMarketplaceInstaller = null

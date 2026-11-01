@@ -122,10 +122,20 @@ export function SourceControlAiActionRecipeDefaults({
     savingActionRecipeIds,
     onActionTemplateChange,
     onActionAgentArgsChange,
+<<<<<<< fork
     onActionLaunchOptionsChange,
     resetActionLaunchOptions,
     saveActionRecipeDraft,
     discardActionRecipeDraft,
+||||||| base
+    saveActionTemplateDraft,
+    discardActionTemplateDraft,
+=======
+    onActionLaunchPreferencesChange,
+    retireActionAgentDocument,
+    saveActionTemplateDraft,
+    discardActionTemplateDraft,
+>>>>>>> upstream
     appendVariable
   } = useSourceControlActionRecipeDraftState({
     config,
@@ -139,9 +149,29 @@ export function SourceControlAiActionRecipeDefaults({
   ): Promise<boolean> => {
     try {
       await writeConfig((current) => {
+<<<<<<< fork
+        previousActions = current.actions
+        return {
+          actions: setSourceControlActionDefault(current.actions, actionId, {
+            agentId,
+            launchOptions: undefined
+          })
+        }
+||||||| base
+        previousActions = current.actions
+        return {
+          actions: setSourceControlActionDefault(current.actions, actionId, { agentId })
+        }
+=======
         return { actions: update(current.actions) }
+>>>>>>> upstream
       })
+<<<<<<< fork
+      resetActionLaunchOptions(actionId)
+||||||| base
+=======
       return true
+>>>>>>> upstream
     } catch (error) {
       console.error('Failed to save Source Control AI action agent default', error)
       toast.error(
@@ -166,24 +196,13 @@ export function SourceControlAiActionRecipeDefaults({
         : value === CUSTOM_AGENT_ID
           ? CUSTOM_AGENT_ID
           : (value as TuiAgent)
-    let previousActions = config.actions
-    try {
-      await writeConfig((current) => {
-        previousActions = current.actions
-        return {
-          actions: setSourceControlActionDefault(current.actions, actionId, {
-            agentId,
-            launchOptions: undefined
-          })
-        }
-      })
-      resetActionLaunchOptions(actionId)
-    } catch (error) {
-      console.error('Failed to save Source Control AI action agent default', error)
-      try {
-        await writeConfig({ actions: previousActions })
-      } catch (rollbackError) {
-        console.error('Failed to roll back Source Control AI action agent default', rollbackError)
+    const changed = config.actions?.[actionId]?.agentId !== agentId
+    const captured = actionRecipeDraftState.values[actionId].launchPreferences
+    const saved = await writeActionDefault((actions) => {
+      const next = setSourceControlActionAgentDefault(actions, actionId, agentId)
+      if (choice) {
+        const { surface: _previous, ...recipe } = next[actionId] ?? {}
+        next[actionId] = { ...recipe, ...(choice.surface ? { surface: choice.surface } : {}) }
       }
       return next
     })
@@ -259,8 +278,16 @@ export function SourceControlAiActionRecipeDefaults({
               onAgentArgsChange={onActionAgentArgsChange}
               onLaunchOptionsChange={onActionLaunchOptionsChange}
               onAppendVariable={appendVariable}
+<<<<<<< fork
               onDiscard={discardActionRecipeDraft}
               onSave={(id) => void saveActionRecipeDraft(id)}
+||||||| base
+              onDiscard={discardActionTemplateDraft}
+              onSave={(id) => void saveActionTemplateDraft(id)}
+=======
+              onDiscard={discardActionTemplateDraft}
+              onSave={(id) => void saveActionTemplateDraft(id).catch(console.error)}
+>>>>>>> upstream
             />
           )
         })}

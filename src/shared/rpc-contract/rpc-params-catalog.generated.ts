@@ -28,13 +28,6 @@ import {
   DesktopBrowserBridgeResultParams
 } from '../desktop-browser-bridge-protocol'
 import { RegisterDeviceKeyParamsSchema } from '../device-key-registration-contract'
-import {
-  EmptyHeimdallRequestSchema,
-  HeimdallUnsubscribeRequestSchema,
-  WatcherCommandRequestSchema,
-  WatcherTargetSchema
-} from '../fork-heimdall/api'
-import { LoopCreateInputSchema } from '../fork-loops/loop-types'
 import { HostAccountLaunchEnvParams } from '../host-account-launch-env'
 import {
   PairingGetEndpointsParamsSchema,
@@ -526,6 +519,7 @@ import {
   ProjectGroupImportNested,
   ProjectGroupMoveProject,
   ProjectGroupScanNested,
+  ProjectGroupSelector,
   ProjectGroupUpdate,
   RepoClone,
   RepoCreate,
@@ -817,7 +811,6 @@ export const RPC_PARAMS_BY_METHOD = {
   'artifacts.getPublishedLink': SourceRequest,
   'artifacts.list': ListOptions,
   'artifacts.publish': WriteRequest,
-  'artifacts.revealPassphrase': SourceRequest,
   'artifacts.share': WriteRequest,
   'artifacts.unshare': SourceRequest,
   'artifacts.update': WriteRequest,
@@ -1122,12 +1115,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'gitlab.updateMRState': UpdateMrState,
   'gitlab.workItemByPath': WorkItemByPath,
   'gitlab.workItemDetails': WorkItemDetails,
-  'heimdall:command': WatcherCommandRequestSchema,
-  'heimdall:detail': WatcherTargetSchema,
-  'heimdall:fleet': EmptyHeimdallRequestSchema,
-  'heimdall:objectiveDetail': WatcherTargetSchema,
-  'heimdall:subscribe': EmptyHeimdallRequestSchema,
-  'heimdall:unsubscribe': HeimdallUnsubscribeRequestSchema,
+  'host.declareClient': OrcadDeclareClientParamsSchema,
   'host.gitBash.isAvailable': null,
   'host.peerDesktops': OrcadPeerDesktopsParamsSchema,
   'host.platform': null,
@@ -1216,7 +1204,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'linear.teamStates': TeamId,
   'linear.testConnection': WorkspaceSelection,
   'linear.updateIssue': IssueUpdateOfLinearParams,
-  'loops:create': LoopCreateInputSchema,
+  'linkPreview.get': LinkPreviewGetParams,
   'managedRuntime.cancel': ManagedRuntimeCancelParams,
   'managedRuntime.install': ManagedRuntimeAgentParams,
   'managedRuntime.remove': ManagedRuntimeAgentParams,
@@ -1316,6 +1304,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'project.list': null,
   'project.update': ProjectUpdate,
   'projectGroup.create': ProjectGroupCreate,
+  'projectGroup.delete': ProjectGroupSelector,
   'projectGroup.importNested': ProjectGroupImportNested,
   'projectGroup.list': null,
   'projectGroup.moveProject': ProjectGroupMoveProject,
@@ -1341,6 +1330,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'repo.issueCommandWrite': RepoIssueCommandWrite,
   'repo.list': null,
   'repo.reorder': RepoReorder,
+  'repo.rm': RepoSelector,
   'repo.saveSparsePreset': RepoSparsePresetSave,
   'repo.searchRefs': RepoSearchRefs,
   'repo.setBaseRef': RepoSetBaseRef,
@@ -1514,43 +1504,9 @@ export const RPC_PARAMS_BY_METHOD = {
 // Why: these methods bind a schema the shared contract cannot hold because its value
 // graph reaches into src/main. Listing them keeps the gap visible instead of absent.
 export const RPC_METHODS_WITHOUT_SHARED_PARAMS: readonly string[] = [
-  'artifacts.publishProtected',
-  'artifacts.removeProtection',
-  'artifacts.rotateProtection',
-  'artifacts.shareProtected',
-  'ask.answer',
-  'ask.cancel',
-  'ask.register',
-  'ask.snapshot',
-  'ask.subscribe',
-  'ask.updatePartial',
-  'ask.wait',
   'emulator.install',
-  'heimdall:approve',
-  'heimdall:debugReport',
-  'heimdall:disarm',
-  'heimdall:disarmAll',
-  'heimdall:enroll',
-  'heimdall:ledger',
-  'heimdall:list',
-  'ledger.request',
-  'ledger.ui',
-  'loops:bindTab',
-  'loops:detach',
-  'loops:edit',
-  'loops:get',
-  'loops:iterations',
-  'loops:list',
-  'loops:openTab',
-  'loops:pause',
-  'loops:queue',
-  'loops:resume',
-  'loops:steer',
-  'loops:stop',
   'orchestration.send',
-  'orchestration.taskUpdate',
-  'projectGroup.delete',
-  'repo.rm'
+  'orchestration.taskUpdate'
 ]
 
 export type RpcMethodName = keyof typeof RPC_PARAMS_BY_METHOD

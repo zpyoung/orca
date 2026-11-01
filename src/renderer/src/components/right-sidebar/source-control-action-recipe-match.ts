@@ -1,7 +1,12 @@
+<<<<<<< fork
 import {
   normalizeAgentLaunchOverrides,
   type AgentLaunchOptionSelection
 } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+||||||| base
+=======
+import { sourceControlActionRecipeEntry } from '../../../../shared/source-control-action-selection'
+>>>>>>> upstream
 import { isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
 import { trimActionArgumentDocument } from '../../../../shared/source-control-action-argument-choices'
 import {
@@ -24,15 +29,32 @@ import type { Repo } from '../../../../shared/repo-types'
 type NormalizedSourceControlActionRecipe = {
   agentId: SourceControlActionRecipe['agentId'] | null
   commandInputTemplate: string
+<<<<<<< fork
   agentArgs: string
   launchOptions: AgentLaunchOptionSelection
+||||||| base
+  agentArgs: string
+=======
+  agentArgs: string | undefined
+  launchPreferences: string
+  argumentChoices: string
+  surface: string
+>>>>>>> upstream
 }
 
 type PersistedSourceControlActionRecipe = {
   agentId?: SourceControlActionRecipe['agentId']
   commandInputTemplate?: string | null
   agentArgs?: string | null
+<<<<<<< fork
   launchOptions?: AgentLaunchOptionSelection | null
+||||||| base
+=======
+  argumentChoices?: SourceControlActionRecipe['argumentChoices']
+  launchPreferences?: SourceControlActionRecipe['launchPreferences']
+  surface?: SourceControlActionRecipe['surface']
+  resolvedChoiceSources?: SourceControlActionRecipe['resolvedChoiceSources']
+>>>>>>> upstream
 }
 
 function normalizeSourceControlActionRecipeForComparison(
@@ -55,6 +77,7 @@ function normalizeSourceControlActionRecipeForComparison(
       typeof recipe?.commandInputTemplate === 'string'
         ? recipe.commandInputTemplate.trim()
         : DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId],
+<<<<<<< fork
     agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs.trim() : '',
     launchOptions: normalizeAgentLaunchOverrides(recipe?.launchOptions) ?? {}
   }
@@ -66,6 +89,25 @@ function launchOptionsMatch(
 ): boolean {
   if (left.model !== right.model) {
     return false
+||||||| base
+    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs.trim() : ''
+=======
+    agentArgs: document.agentArgs,
+    argumentChoices: JSON.stringify(document.argumentChoices ?? null),
+    launchPreferences:
+      permission || selection
+        ? JSON.stringify([
+            permission?.agentId ?? null,
+            selection?.base ?? null,
+            selection?.model ? [selection.model.agentId, selection.model.value] : null,
+            Object.entries(selection?.options ?? {})
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([key, entry]) => [key, entry.agentId, entry.value]),
+            permission?.permissionMode ?? null
+          ])
+        : '',
+    surface: recipe?.surface ?? ''
+>>>>>>> upstream
   }
   const leftOptions = left.optionValues ?? {}
   const rightOptions = right.optionValues ?? {}
@@ -80,8 +122,17 @@ function sourceControlActionRecipesMatch(
   return (
     left.agentId === right.agentId &&
     left.commandInputTemplate === right.commandInputTemplate &&
+<<<<<<< fork
     left.agentArgs === right.agentArgs &&
     launchOptionsMatch(left.launchOptions, right.launchOptions)
+||||||| base
+    left.agentArgs === right.agentArgs
+=======
+    left.agentArgs === right.agentArgs &&
+    left.launchPreferences === right.launchPreferences &&
+    left.argumentChoices === right.argumentChoices &&
+    left.surface === right.surface
+>>>>>>> upstream
   )
 }
 

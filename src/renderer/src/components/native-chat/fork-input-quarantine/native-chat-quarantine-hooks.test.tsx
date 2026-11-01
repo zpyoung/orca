@@ -36,7 +36,7 @@ vi.mock('../native-chat-runtime-send', () => ({
 import { useNativeChatCanSend } from '../use-native-chat-can-send'
 import { useNativeChatInteractiveSend } from '../use-native-chat-interactive-send'
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
-import type { AskPrompt } from '../native-chat-interactive-prompt'
+import type { AskPrompt } from '../../../../../shared/native-chat/input/native-chat-ask-types'
 import {
   _resetTerminalInputQuarantineForTests,
   armTerminalInputQuarantine,

@@ -25,7 +25,10 @@ export function createWebNativeChatApi(): NativeChatApi {
         ? { agent: argsOrAgent, sessionId: sessionId ?? '', limit, transcriptPath }
         : argsOrAgent
     return parseRuntimeNativeChatReadSessionResult(
-      await callRuntimeResult<unknown>('nativeChat.readSession', args)
+      await callRuntimeResult<unknown>('nativeChat.readSession', {
+        ...args,
+        capabilities: { transcriptSourceOrder: 1 }
+      })
     )
   }
 

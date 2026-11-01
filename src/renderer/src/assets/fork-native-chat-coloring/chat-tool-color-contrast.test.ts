@@ -1,6 +1,10 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { contrastRatio, parseCssRgbColor, type RgbaColor } from '../../lib/terminal-title-contrast'
+import {
+  contrastRatio,
+  parseCssRgbColor,
+  type RgbaColor
+} from '../../../../shared/terminal-title-contrast'
 
 const mainCss = fs.readFileSync(new URL('../main.css', import.meta.url), 'utf8')
 const coloringCss = fs.readFileSync(

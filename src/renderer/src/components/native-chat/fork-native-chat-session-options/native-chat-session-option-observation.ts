@@ -13,8 +13,8 @@ import type {
   AgentType,
   NativeChatSessionOptionObservation
 } from '../../../../../shared/native-chat-types'
-import type { SessionOptionValue } from '../../../../../shared/native-chat-session-options'
-import { matchNativeChatCatalogModelId } from '../../../../../shared/native-chat-session-option-state'
+import type { SessionOptionValue } from '../../../../../shared/native-chat/input/native-chat-session-options'
+import { matchNativeChatCatalogModelId } from '../../../../../shared/native-chat/input/native-chat-session-option-state'
 
 /**
  * Resolve the catalog id for a model the provider named, most specific first: an

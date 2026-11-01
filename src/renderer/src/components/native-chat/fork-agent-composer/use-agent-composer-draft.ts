@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { appendReturnedDraftText } from '../../../../../shared/returned-draft-text'
+import { withNativeChatComposerDraftAddition } from '../native-chat-composer-draft-addition'
+import type { NativeChatDraftAppend } from '../native-chat-composer-draft-memory'
 import {
-  readNativeChatDraftCache,
-  subscribeToNativeChatDraftAppend
-} from '../native-chat-draft-cache'
-import { subscribeToNativeChatComposerDraft } from '../native-chat-composer-draft-store'
+  subscribeToNativeChatComposerDraft,
+  subscribeToNativeChatComposerDraftAppend
+} from '../native-chat-composer-draft-store'
+import type { NativeChatComposerDraft } from '../native-chat-composer-draft-storage'
+import { readNativeChatDraftCache } from '../native-chat-draft-cache'
 import {
   adoptNativeChatDraftAppends,
   adoptNativeChatDraftStoreText,
@@ -14,6 +16,19 @@ import {
 } from './agent-composer-draft-cache'
 
 const NEVER_COMPOSING = (): boolean => false
+
+function withHeldAppends(text: string, additions: readonly NativeChatDraftAppend[]): string {
+  const base: NativeChatComposerDraft = { text, images: [] }
+  return additions.reduce<NativeChatComposerDraft>(
+    (draft, addition) => ({
+      ...draft,
+      ...(typeof addition === 'function'
+        ? addition(draft)
+        : withNativeChatComposerDraftAddition(draft, addition))
+    }),
+    base
+  ).text
+}
 
 /**
  * Composer draft state backed by the scope cache so a typed-but-unsent message
@@ -37,7 +52,10 @@ export function useAgentComposerDraft(
 } {
   const [draft, setDraftState] = useState(() => readAgentComposerDraftCache(scopeKey))
   // Held out of the cache while composing: the composition's own writes would erase it.
-  const pendingAppendRef = useRef<{ scopeKey: string; text: string } | null>(null)
+  const pendingAppendRef = useRef<{
+    scopeKey: string
+    additions: readonly NativeChatDraftAppend[]
+  } | null>(null)
 
   // Reload the cached draft when reused for a different pane (scope change),
   // adjusting state during render rather than in an effect so the restored draft
@@ -55,7 +73,7 @@ export function useAgentComposerDraft(
 
   useEffect(
     () =>
-      subscribeToNativeChatDraftAppend(scopeKey, (text) => {
+      subscribeToNativeChatComposerDraftAppend(scopeKey, (addition) => {
         if (!isComposing()) {
           // the native cache already holds draft + text, and adopting it is idempotent across mounts
           writeAgentComposerDraftCache(scopeKey, readNativeChatDraftCache(scopeKey))
@@ -64,7 +82,7 @@ export function useAgentComposerDraft(
         const pending = pendingAppendRef.current
         pendingAppendRef.current = {
           scopeKey,
-          text: pending?.scopeKey === scopeKey ? appendReturnedDraftText(pending.text, text) : text
+          additions: [...(pending?.scopeKey === scopeKey ? pending.additions : []), addition]
         }
       }),
     [isComposing, scopeKey]
@@ -97,7 +115,7 @@ export function useAgentComposerDraft(
     const pending = pendingAppendRef.current
     pendingAppendRef.current = null
     if (pending?.scopeKey === scopeKey) {
-      setDraft((previous) => appendReturnedDraftText(previous, pending.text))
+      setDraft((previous) => withHeldAppends(previous, pending.additions))
     }
   }, [scopeKey, setDraft])
 
@@ -109,7 +127,7 @@ export function useAgentComposerDraft(
         pendingAppendRef.current = null
         writeAgentComposerDraftCache(
           scopeKey,
-          appendReturnedDraftText(readAgentComposerDraftCache(scopeKey), pending.text)
+          withHeldAppends(readAgentComposerDraftCache(scopeKey), pending.additions)
         )
       }
     },

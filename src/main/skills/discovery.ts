@@ -255,7 +255,23 @@ export async function discoverSkills(args: {
     args.cwd &&
     args.includeCwd !== false &&
     (!args.sourceKinds?.length || args.sourceKinds.includes('plugin'))
-      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })
+      ? args.cwd
+      : undefined
+  const gateStopped = args.readStoppedWslRootsFor !== 'all'
+  const mayReadStopped = stoppedRootReader(args.readStoppedWslRootsFor)
+  const pluginCwdStopped =
+    gateStopped &&
+    pluginCwd !== undefined &&
+    !mayReadStopped(pluginCwd) &&
+    wslDistroForPath(pluginCwd) !== null &&
+    (await isOnStoppedWslDistro(pluginCwd))
+  const candidateRoots = [
+    ...buildSkillDiscoverySources({ ...args, homeDir }),
+    ...(pluginCwd && !pluginCwdStopped
+      ? await waitForPromiseWithSignal(
+          discoverLiveClaudePluginSkillSources({ homeDir, cwd: pluginCwd, signal: args.signal }),
+          args.signal
+        )
       : [])
   ]
   // Host-only root sets never await the WSL gate.

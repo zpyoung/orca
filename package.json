@@ -435,6 +435,8 @@
     },
     "rules": {
       "react-doctor/js-combine-iterations": "off",
+      "react-doctor/no-initialize-state": "off",
+      "react-doctor/no-unstable-nested-components": "off",
       "react-doctor/effect-needs-cleanup": "warn",
       "react-doctor/no-effect-with-fresh-deps": "warn",
       "react-doctor/no-prop-callback-in-render": "warn",

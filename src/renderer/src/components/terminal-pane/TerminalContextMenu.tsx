@@ -194,7 +194,7 @@ function TerminalContextMenuItems({
       setTitle: formatPrimaryShortcutLabel('terminal.setTitle', keybindings),
       clearPaneTitle: formatPrimaryShortcutLabel('terminal.clearPaneTitle', keybindings),
       close: formatPrimaryShortcutLabel('terminal.closePane', keybindings),
-      nativeChat: nativeChatToggleShortcutLabel(isMacPlatform()),
+      nativeChat: formatOptionalPrimaryShortcutLabel('terminal.toggleNativeChat', keybindings),
       terminalDock: formatPrimaryShortcutLabel('terminal.dock.toggle', keybindings)
     }),
     [keybindings]

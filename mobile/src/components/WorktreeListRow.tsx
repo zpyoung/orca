@@ -219,7 +219,7 @@ function WorktreeListRowComponent({
           />
         ) : null}
         <LoopWorktreeLabel loop={item.loop} />
-        {lineageChildCount > 0 && onToggleLineage ? (
+        {count > 0 && onToggleLineage ? (
           <Pressable
             style={styles.lineageToggle}
             onPress={(event) => {

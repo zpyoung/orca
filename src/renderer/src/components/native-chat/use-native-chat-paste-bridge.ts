@@ -71,8 +71,9 @@ export function useNativeChatPasteBridge({
       // up beside an active card instead of unmounting it — so route by focus
       // rather than by whichever one happens to exist.
       const answerInputFocused = answerInput != null && document.activeElement === answerInput
-      if (composerRef.current && !answerInputFocused) {
-        composerRef.current.pasteFromClipboard()
+      const composer = nativeChatComposerDestination(rootRef.current, composerRef.current)
+      if (composer && !answerInputFocused) {
+        composer.pasteFromClipboard()
         return
       }
       if (!answerInput) {
@@ -95,7 +96,7 @@ export function useNativeChatPasteBridge({
           }
           return
         }
-        composerRef.current?.pasteFromClipboard()
+        nativeChatComposerDestination(rootRef.current, composerRef.current)?.pasteFromClipboard()
       })()
     },
     [composerRef, questionAnswerInputRef, rootRef]
@@ -112,7 +113,7 @@ export function useNativeChatPasteBridge({
         return
       }
       if (isEditableTarget(event.target)) {
-        const composer = composerRef.current
+        const composer = nativeChatComposerDestination(rootRef.current, composerRef.current)
         if (event.target instanceof Node && composer?.contains?.(event.target)) {
           composer.handlePasteEvent(event)
           return
@@ -190,7 +191,9 @@ export function useNativeChatPasteBridge({
       }
       if (
         isEditableTarget(activeElement) &&
-        !composerRef.current?.contains?.(activeElement) &&
+        !nativeChatComposerDestination(rootRef.current, composerRef.current)?.contains?.(
+          activeElement
+        ) &&
         activeElement !== questionAnswerInputRef?.current
       ) {
         return

@@ -107,8 +107,8 @@ export abstract class OrcaRuntimeWithPublishPtyBackedMobileSessionTerminal exten
           candidate.parentTabId === args.tabId &&
           candidate.terminalDockByPaneKey !== undefined
       )?.terminalDockByPaneKey
-    // Republished tabs retain manual names; new split leaves inherit them.
-    const customTitle = (
+    // Republished tabs retain manual names, null included; new split leaves inherit them.
+    const rowCustomTitle = (
       existingTab ??
       existing?.tabs.find(
         (candidate): candidate is RuntimeMobileSessionTerminalTab =>

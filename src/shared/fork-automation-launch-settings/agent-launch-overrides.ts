@@ -6,7 +6,7 @@ import {
 } from '../agent-session-option-catalog'
 import type { CatalogOptionApply } from '../agent-session-option-catalog-types'
 import { resolveAgentSessionOptionLaunch } from '../agent-session-option-launch'
-import type { SessionOptionValue } from '../native-chat-session-options'
+import type { SessionOptionValue } from '../native-chat/input/native-chat-session-options'
 import { tokenizeStartupCommand, type AgentStartupShell } from '../tui-agent-startup-shell'
 
 /** Structured launch values persisted by surfaces whose raw arguments live elsewhere. */

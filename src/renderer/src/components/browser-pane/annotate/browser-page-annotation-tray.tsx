@@ -1,6 +1,15 @@
 import { ImeTextarea } from '@/lib/ime-text-field'
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, CircleCheck, Copy, Pencil, Send, Trash2 } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  Copy,
+  Image as ImageIcon,
+  Pencil,
+  Send,
+  Trash2
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
@@ -62,6 +71,7 @@ export function BrowserPageAnnotationTray({
     !browserAnnotations.some((annotation) => annotation.id === editingAnnotationId)
   ) {
     setEditingAnnotationId(null)
+    resetEditImages()
   }
 
   const handleStartEdit = (annotation: BrowserPageAnnotation): void => {

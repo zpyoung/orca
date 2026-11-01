@@ -2,10 +2,11 @@ import { buildDefaultTerminalOptions } from '@/lib/pane-manager/pane-terminal-op
 import { createAgentSessionKeyboardOptions } from '@/runtime/agent-session-keyboard-capability'
 import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-resume'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
-import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
+import type { SessionOptionValue } from '../../../shared/native-chat/input/native-chat-session-options'
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import type { RuntimeTerminalCreate } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import { agentLaunchNeedsPreparedCommand } from '../../../shared/agent-launch-preferences'
 import { toAgentLaunchPreferencesWithOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'
 import {
   createAgentSessionCreateOperation,
@@ -38,34 +39,37 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
   const keyboardOptions = createAgentSessionKeyboardOptions(keyboardProtocol)
   const operation = createAgentSessionCreateOperation()
   const launchPreferences = toAgentLaunchPreferencesWithOptionValues(args.sessionOptions, {
+    agent: args.agent,
     includeOptionValues: args.useLaunchOverrides
   })
   return await runRemoteAgentSessionLaunch({
     environmentId: args.environmentId,
-    hostAuthority: () =>
-      operation.run(async (clientOperationId) =>
-        callRuntimeRpc<{ terminal: RuntimeTerminalCreate }>(
-          { kind: 'environment', environmentId: args.environmentId },
-          'terminal.createAgentSession',
-          withAgentSessionCreateOperationId(
-            {
-              ...(await keyboardOptions(args.environmentId)),
-              worktree: toRuntimeWorktreeSelector(args.worktreeId),
-              agent: args.agent,
-              ...(args.prompt
-                ? { prompt: args.prompt, promptDelivery: 'auto-submit' as const }
-                : {}),
-              ...(args.useLaunchOverrides ? { agentArgs: args.agentArgs ?? '' } : {}),
-              ...(launchPreferences ? { launchPreferences } : {}),
-              placement: { tabId: args.tabId, leafId: args.leafId },
-              // Why: local renderer owns the hidden tab; remote runtime should not reveal UI.
-              presentation: 'background'
-            },
-            clientOperationId
+    hostAuthority: agentLaunchNeedsPreparedCommand(args.agent, args.sessionOptions)
+      ? undefined
+      : () =>
+          operation.run(async (clientOperationId) =>
+            callRuntimeRpc<{ terminal: RuntimeTerminalCreate }>(
+              { kind: 'environment', environmentId: args.environmentId },
+              'terminal.createAgentSession',
+              withAgentSessionCreateOperationId(
+                {
+                  ...(await keyboardOptions(args.environmentId)),
+                  worktree: toRuntimeWorktreeSelector(args.worktreeId),
+                  agent: args.agent,
+                  ...(args.prompt ? { prompt: args.prompt } : {}),
+                  // Follow-up prompts arrive after startup but still need an unattended launch.
+                  promptDelivery: 'auto-submit',
+                  ...(args.useLaunchOverrides ? { agentArgs: args.agentArgs ?? '' } : {}),
+                  ...(launchPreferences ? { launchPreferences } : {}),
+                  placement: { tabId: args.tabId, leafId: args.leafId },
+                  // Why: local renderer owns the hidden tab; remote runtime should not reveal UI.
+                  presentation: 'background'
+                },
+                clientOperationId
+              ),
+              { timeoutMs: 15_000 }
+            )
           ),
-          { timeoutMs: 15_000 }
-        )
-      ),
     ...(args.useLaunchOverrides
       ? { hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY }
       : {}),

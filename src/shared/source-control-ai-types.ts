@@ -63,7 +63,14 @@ export type RepoSourceControlAiOverrides = {
         agentId?: TuiAgent | CustomAgentId | null
         commandInputTemplate?: string | null
         agentArgs?: string | null
+<<<<<<< fork
         launchOptions?: AgentLaunchOptionSelection | null
+||||||| base
+=======
+        argumentChoices?: SourceControlActionRecipe['argumentChoices']
+        launchPreferences?: SourceControlActionLaunchPreferences
+        surface?: SourceControlActionSurface
+>>>>>>> upstream
       }
     >
   >
@@ -78,8 +85,17 @@ export type RepoSourceControlAiOverrides = {
 export type CompleteSourceControlActionRecipe = {
   agentId: TuiAgent | CustomAgentId | null
   commandInputTemplate: string
+<<<<<<< fork
   agentArgs?: string
   launchOptions?: AgentLaunchOptionSelection | null
+||||||| base
+  agentArgs?: string
+=======
+  agentArgs?: string | null
+  argumentChoices?: SourceControlActionRecipe['argumentChoices']
+  launchPreferences?: SourceControlActionLaunchPreferences
+  surface?: SourceControlActionSurface
+>>>>>>> upstream
 }
 
 export type WritableRepoSourceControlAiOverrides = {

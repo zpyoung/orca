@@ -29,7 +29,8 @@ import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send
 import { shouldClearNativeChatWorkingSuppression } from '../../../../shared/native-chat/native-chat-working-suppression'
 import { resolveNativeChatTerminalTurn } from '../../../../shared/native-chat/native-chat-terminal-turn'
 import { useNativeChatTerminalTurnTiming } from './use-native-chat-terminal-turn-timing'
-import { pendingSendsAsMessages, shouldPruneLaunchPrompt } from './native-chat-pending'
+import { shouldPruneLaunchPrompt } from './native-chat-pending'
+import { pendingSendsAsMessages } from '../../../../shared/native-chat-pending-sends'
 import { useNativeChatPendingDelivery } from './use-native-chat-pending-delivery'
 import {
   appendCommandMarkerCache,
@@ -364,6 +365,7 @@ export function NativeChatResolvedView({
             allowFileUriLinks={fileLinkContext !== null}
             deliveryNotices={deliveryNotices}
             readError={viewState.error}
+            runtimeContext={imageRuntimeContext}
           />
         )}
       </div>

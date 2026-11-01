@@ -772,23 +772,6 @@
         }
       }
     },
-    "repository": {
-      "ledger": {
-        "staleTitle": "Ledger Staleness",
-        "staleDescription": "How many days without activity before a ledger entry is flagged stale for review.",
-        "loading": "Reading this project’s ledger…",
-        "save": "Save",
-        "saved": "Saved",
-        "noLedger": "This project has no ledger yet. File an entry to create one.",
-        "keyword": {
-          "ledger": "ledger",
-          "stale": "stale",
-          "triage": "triage",
-          "bug": "bug",
-          "deferred": "deferred"
-        }
-      }
-    },
     "agents": {
       "permissionsTitle": "Permissions",
       "permissionsChoiceExplanation": "What every agent may do without asking. You can set one agent differently below.",
@@ -1006,6 +989,21 @@
       "iconPickErrors": {
         "notPng": "Repo icons must be PNG files.",
         "tooLarge": "Repo icon image must be 256KB or smaller."
+      },
+      "ledger": {
+        "staleTitle": "Ledger Staleness",
+        "staleDescription": "How many days without activity before a ledger entry is flagged stale for review.",
+        "loading": "Reading this project’s ledger…",
+        "save": "Save",
+        "saved": "Saved",
+        "noLedger": "This project has no ledger yet. File an entry to create one.",
+        "keyword": {
+          "ledger": "ledger",
+          "stale": "stale",
+          "triage": "triage",
+          "bug": "bug",
+          "deferred": "deferred"
+        }
       }
     }
   },
@@ -6581,7 +6579,15 @@
           "sidebarRowMissing": "Target no longer exists",
           "failedUnnestWorkspace": "Failed to unnest workspace",
           "hostRepairRequired": "Re-pair required",
-          "openLedger": "Open ledger"
+          "openLedger": "Open ledger",
+          "showChildWorkspaces_one": "Show {{count}} child workspace",
+          "hideChildWorkspaces_one": "Hide {{count}} child workspace",
+          "showChildWorkspaces_other": "Show {{count}} child workspaces",
+          "hideChildWorkspaces_other": "Hide {{count}} child workspaces",
+          "childCount_one": "{{count}} child",
+          "childCount_other": "{{count}} children",
+          "groupProjectsRemained_one": "{{remaining}} of {{count}} contained project remained after deleting the group.",
+          "groupProjectsRemained_other": "{{remaining}} of {{count}} contained projects remained after deleting the group."
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "Cancel",

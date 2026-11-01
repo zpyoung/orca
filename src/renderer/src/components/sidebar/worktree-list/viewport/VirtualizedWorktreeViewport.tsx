@@ -75,6 +75,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   const newCardStyle = settings?.experimentalNewWorktreeCardStyle === true
   const {
     handleOpenRepoSettings,
+    handleOpenProjectLedger,
     handleOpenWorktreeVisibility,
     handleCreateGroupFromRepo,
     handleMoveProjectToGroup,
@@ -88,6 +89,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
       getWorktreeVisibilityDefaults: (repo) =>
         getRepoOwnerWorktreeVisibilityDefaults(repo, settings, worktreeVisibilityDefaultsByHost),
       onOpenRepoSettings: handleOpenRepoSettings,
+      onOpenProjectLedger: handleOpenProjectLedger,
       onOpenWorktreeVisibility: handleOpenWorktreeVisibility,
       onCreateGroupFromRepo: handleCreateGroupFromRepo,
       onMoveProjectToGroup: handleMoveProjectToGroup,
@@ -99,6 +101,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
       settings,
       worktreeVisibilityDefaultsByHost,
       handleOpenRepoSettings,
+      handleOpenProjectLedger,
       handleOpenWorktreeVisibility,
       handleCreateGroupFromRepo,
       handleMoveProjectToGroup,

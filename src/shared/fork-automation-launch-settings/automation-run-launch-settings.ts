@@ -4,7 +4,7 @@ import {
   describeOverriddenOptionIds,
   resolveAgentLaunchOverrides
 } from './agent-launch-overrides'
-import type { SessionOptionValue } from '../native-chat-session-options'
+import type { SessionOptionValue } from '../native-chat/input/native-chat-session-options'
 import type { AgentStartupShell } from '../tui-agent-startup-shell'
 import type { TuiAgent } from '../tui-agent'
 

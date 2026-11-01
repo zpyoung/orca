@@ -291,6 +291,7 @@ export function ChecksPanelActiveContent({
         promptDelivery="submit-after-ready"
         launchPlatform={activeSourceControlLaunchPlatform}
         launchSource={agentComposerState?.launchSource ?? 'task_page'}
+<<<<<<< fork
         savedAgentId={
           agentComposerState
             ? readSourceControlLaunchRecipeAgentId(
@@ -329,6 +330,38 @@ export function ChecksPanelActiveContent({
               }).launchOptions ?? null)
             : null
         }
+||||||| base
+        savedAgentId={
+          agentComposerState
+            ? readSourceControlLaunchRecipeAgentId(
+                resolveSourceControlActionRecipe({
+                  settings,
+                  repo,
+                  actionId: agentComposerState.actionId
+                })
+              )
+            : null
+        }
+        savedCommandInputTemplate={
+          agentComposerState
+            ? (resolveSourceControlActionRecipe({
+                settings,
+                repo,
+                actionId: agentComposerState.actionId
+              }).commandInputTemplate ?? null)
+            : null
+        }
+        savedAgentArgs={
+          agentComposerState
+            ? (resolveSourceControlActionRecipe({
+                settings,
+                repo,
+                actionId: agentComposerState.actionId
+              }).agentArgs ?? null)
+            : null
+        }
+=======
+>>>>>>> upstream
         onSaveAgentDefault={saveLaunchActionDefault}
         {...agentComposerState?.launchContext}
       />

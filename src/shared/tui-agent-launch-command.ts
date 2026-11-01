@@ -3,7 +3,7 @@ import {
   resolveAgentSessionOptionLaunch
 } from './agent-session-option-launch'
 import { appendClaudeSuppressionFlags } from './fork-ask-question-tool/claude-suppression-flag-composition'
-import type { SessionOptionValue } from './native-chat-session-options'
+import type { SessionOptionValue } from './native-chat/input/native-chat-session-options'
 import { agentArgTerminatorIndex } from './agent-session-option-agent-args'
 import { getTuiAgentLaunchCommand, TUI_AGENT_CONFIG } from './tui-agent-config'
 import {
@@ -94,6 +94,8 @@ export function resolveAgentLaunchCommand(args: {
   /** Launch-only, like session options: a resumed session must not inherit it. */
   suppressStartupUpdatePrompt?: boolean
   claudeSuppressionFlags?: string[] | null
+  /** OS that runs the agent when `platform` only picks quoting; null when unreported. */
+  agentHostPlatform?: NodeJS.Platform | null
 }): ResolvedAgentLaunchCommand {
   const override = args.cmdOverrides[args.agent]
   const command =
@@ -123,7 +125,8 @@ export function resolveAgentLaunchCommand(args: {
     args.agent,
     args.sessionOptions,
     args.sessionOptionsOverrideAgentArgs ? [] : trailingTokens.tokens,
-    args.includeSessionOptionCatalogDefaults ?? !args.sessionOptionsOverrideAgentArgs
+    args.includeSessionOptionCatalogDefaults ?? !args.sessionOptionsOverrideAgentArgs,
+    trailingTokens.tokens
   )
   if (override && args.sessionOptionsOverrideAgentArgs) {
     const overrideTokens = tokenizeStartupCommand(override, args.shell)
@@ -167,22 +170,28 @@ export function resolveAgentLaunchCommand(args: {
   const resumeArgs = render(
     insertBeforeTerminator(args.agent, keptTokens, resolvedOptions.permissionArgs ?? [])
   )
+  const suppressed = appendClaudeSuppressionFlags({
+    agent: args.agent,
+    shell: args.shell,
+    override,
+    command: withArgs(render(launchTokens), launchHead),
+    commandWithoutSessionOptions: withArgs(resumeArgs),
+    claudeSuppressionFlags: args.claudeSuppressionFlags,
+    isRemote: args.isRemote
+  })
   return {
     ok: true,
-    ...appendClaudeSuppressionFlags({
-      agent: args.agent,
-      shell: args.shell,
-      override,
-      command: args.sessionOptionsOverrideAgentArgs
-        ? commandWithOverrides
-        : suffix.suffix
-          ? `${commandWithOptions} ${suffix.suffix}`
-          : commandWithOptions,
-      commandWithoutSessionOptions,
-      claudeSuppressionFlags: args.claudeSuppressionFlags,
-      isRemote: args.isRemote
-    }),
-    appliedSessionOptions: resolvedOptions.appliedValues
+    command: suppressed.command,
+    resumeLaunch: {
+      agentCommand: suppressed.commandWithoutSessionOptions,
+      ...(keptTokens.length !== rawTokens.length || resolvedOptions.permissionArgs
+        ? { agentArgs: resumeArgs }
+        : {})
+    },
+    appliedSessionOptions: resolvedOptions.appliedValues,
+    ...(args.suppressStartupUpdatePrompt && STARTUP_UPDATE_PROMPT_SUPPRESSION_ENV[args.agent]
+      ? { startupEnv: STARTUP_UPDATE_PROMPT_SUPPRESSION_ENV[args.agent] }
+      : {})
   }
 }
 

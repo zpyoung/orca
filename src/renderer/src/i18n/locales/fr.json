@@ -23247,5 +23247,403 @@
       "needsPermission": "L’agent a besoin d’une autorisation",
       "statusStale": "Le statut de l’agent est obsolète"
     }
+  },
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "Observateur d’objectif"
+      },
+      "status": {
+        "watching": "Surveillance",
+        "held": "En attente",
+        "acting": "Action en cours",
+        "escalated": "Escaladé",
+        "parked": "En pause",
+        "terminal": "Terminé",
+        "disabled": "Arrêté",
+        "unreachable": "Hôte injoignable",
+        "tickError": "Erreur · nouvelle tentative",
+        "lostContact": "Hôte injoignable · dernière confirmation {{age}}",
+        "phase": "Phase actuelle"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "Hôte injoignable · dernière confirmation {{age}}"
+      },
+      "host": {
+        "remote": "Distant · {{host}}",
+        "local": "Cet appareil"
+      },
+      "time": {
+        "never": "Jamais",
+        "now": "à l’instant",
+        "ago": "Il y a {{age}}"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "{{count}} observateurs nécessitent votre attention",
+        "bucket": {
+          "attention": "Votre attention requise",
+          "lostContact": "Contact perdu",
+          "active": "Actif"
+        }
+      },
+      "page": {
+        "back": "Retour",
+        "title": "Flotte Heimdall",
+        "summary": "{{active}} actifs · {{attention}} nécessitent votre attention",
+        "refresh": "Actualiser la flotte",
+        "staleError": "Échec de l’actualisation de la flotte ; affichage du dernier instantané confirmé : {{error}}"
+      },
+      "fleet": {
+        "title": "Flotte d’observateurs",
+        "emptyTitle": "Aucun observateur dans la flotte",
+        "emptyDescription": "Activez un observateur depuis un espace de travail pris en charge pour le voir ici.",
+        "name": "Observateur",
+        "status": "État",
+        "phase": "Phase",
+        "activeBurn": "Temps actif",
+        "turns": "Tours",
+        "elapsed": "Temps écoulé",
+        "lastTick": "Dernier cycle"
+      },
+      "detail": {
+        "back": "Retour à la flotte",
+        "refreshing": "Actualisation des détails",
+        "observed": "État du runtime propriétaire observé {{age}}",
+        "remote": "Cache distant",
+        "lostContact": "Dernière confirmation {{age}} ; le runtime propriétaire est actuellement inaccessible. L’observateur peut néanmoins être toujours en cours d’exécution.",
+        "readOnly": "Lecture seule.",
+        "staleError": "Échec de l’actualisation des détails ; affichage des dernières données confirmées : {{error}}",
+        "loading": "Chargement des détails du runtime propriétaire…",
+        "unavailable": "Les détails du runtime propriétaire sont indisponibles.",
+        "selectPrompt": "Sélectionnez un observateur pour examiner ses décisions, ses agents et les contrôles du runtime propriétaire."
+      },
+      "controls": {
+        "title": "Contrôles du runtime propriétaire",
+        "resume": "Reprendre",
+        "pause": "Mettre en pause",
+        "disarm": "Désarmer",
+        "delete": "Supprimer l’observateur",
+        "deleteTitle": "Supprimer l’observateur ?",
+        "deleteDescription": "L’observateur « {{name}} » et son historique enregistré seront définitivement supprimés. Les terminaux des agents ne seront pas arrêtés.",
+        "approve": "Approuver",
+        "budgetResumeWarning": "Le budget de cet observateur est épuisé. Augmentez la limite avant de le reprendre, sinon il sera de nouveau mis en pause."
+      },
+      "command": {
+        "applied": "Appliquée par le runtime propriétaire à {{time}}.",
+        "refused": "Commande refusée par le runtime propriétaire ({{reason}}) : {{detail}}",
+        "indeterminate": "La commande a peut-être été appliquée ou non. Nouvelle lecture de l’état du runtime propriétaire… {{detail}}",
+        "stopAllIndeterminate": "{{count}} commandes d’arrêt ont peut-être été appliquées ou non. Nouvelle lecture de l’état du runtime propriétaire en cours.",
+        "stopAllRefused": "{{count}} runtimes propriétaires ont refusé la commande d’arrêt."
+      },
+      "budget": {
+        "title": "Budget",
+        "activeTime": "Temps actif",
+        "unlimited": "Illimité",
+        "unlimitedShort": "illimité",
+        "turns": "Tours de l’agent",
+        "exhausted": "Épuisé : {{kind}}",
+        "minutesLimit": "Limite de minutes actives",
+        "turnLimit": "Limite de tours de l’agent",
+        "apply": "Appliquer le budget"
+      },
+      "escalations": {
+        "title": "Escalades ouvertes"
+      },
+      "workers": {
+        "title": "Agents actifs",
+        "empty": "Aucun agent actif.",
+        "live": "Actif",
+        "unverifiable": "Injoignable",
+        "exited": "Terminé",
+        "noContact": "Aucun contact confirmé",
+        "lastContact": "Dernier contact {{age}}",
+        "stop": "Arrêter",
+        "answerPlaceholder": "Répondre à l’agent",
+        "answerLabel": "Répondre à la question de l’agent",
+        "sendAnswer": "Envoyer la réponse"
+      },
+      "trace": {
+        "title": "Trace de décision",
+        "noDecision": "Aucune décision enregistrée",
+        "decidedAction": "Action : {{action}}",
+        "empty": "Aucune trace de décision pour le moment.",
+        "tick": "Cycle {{seq}}",
+        "running": "En cours",
+        "saw": "Observé",
+        "noSnapshot": "Aucun instantané enregistré",
+        "decided": "Décision",
+        "gate": "Barrière",
+        "declined": "Refusées",
+        "noneDeclined": "Aucune phase refusée"
+      },
+      "activity": {
+        "title": "Historique des actions de la flotte",
+        "asOf": "Dernière actualisation : {{age}}",
+        "partial": "{{count}} historiques d’observateurs n’ont pas pu être actualisés ; les enregistrements visibles sont conservés.",
+        "empty": "Aucune action autonome enregistrée pour le moment."
+      },
+      "ledger": {
+        "title": "Activité de l’observateur",
+        "attemptResolved": "Tentative résolue",
+        "attemptAbandoned": "Tentative abandonnée",
+        "evidence": "Preuve",
+        "activeTimeStarted": "Temps actif démarré",
+        "activeTimeChecked": "Point de contrôle du temps actif",
+        "activeTimeStopped": "Temps actif arrêté",
+        "workerTurn": "Tour de l’agent",
+        "finished": "Terminé",
+        "empty": "Aucune activité enregistrée pour le moment."
+      },
+      "error": {
+        "unavailable": "Le plan de contrôle Heimdall est indisponible.",
+        "ownerUnavailable": "Le runtime propriétaire est indisponible ; aucune inscription n’a été envoyée."
+      }
+    },
+    "loops": {
+      "setup": {
+        "presetInterval": "À intervalle régulier",
+        "presetQueue": "File d'attente",
+        "presetUntilDone": "Jusqu'à la fin",
+        "errorWholeNumber": "Saisissez un nombre entier supérieur ou égal à 1.",
+        "createFailed": "Impossible de démarrer la boucle.",
+        "runningLoopWarning": "Cet espace de travail a déjà une boucle en cours. Une deuxième boucle modifie les mêmes fichiers en même temps.",
+        "name": "Nom",
+        "namePlaceholder": "Par défaut, le prompt",
+        "agent": "Agent",
+        "noAgents": "Aucun agent détecté",
+        "preset": "Exécution",
+        "queueItems": "File d'attente",
+        "queueItem": "Élément {{n}} de la file",
+        "queueMoveUp": "Monter l'élément {{n}} de la file",
+        "queueMoveDown": "Descendre l'élément {{n}} de la file",
+        "queueRemove": "Retirer l'élément {{n}} de la file",
+        "queueNew": "Nouvel élément de la file",
+        "queueNewPlaceholder": "Un prompt pour une itération",
+        "queueAdd": "Ajouter à la file",
+        "errorQueueEmpty": "Ajoutez au moins un prompt à la file.",
+        "errorQueueBlankItem": "Les prompts de la file ne peuvent pas être vides.",
+        "repeatQueue": "Recommencer quand la file est vide",
+        "prompt": "Prompt",
+        "promptPlaceholder": "Que doit faire l'agent à chaque itération ?",
+        "intervalMinutes": "Exécuter toutes les (minutes)",
+        "session": "Session",
+        "sessionFresh": "Nouvelle session à chaque itération",
+        "sessionContinue": "Continuer la même session",
+        "maxIterations": "Nombre maximal d'itérations",
+        "maxIterationsHint": "Laissez vide pour ne pas limiter.",
+        "advanced": "Avancé",
+        "checkCommand": "Commande de vérification",
+        "checkHint": "S'exécute dans l'espace de travail. Le code de sortie 0 signifie que le travail est terminé.",
+        "evaluator": "Condition d'achèvement",
+        "evaluatorHint": "Un second agent lit les changements et juge si cette condition est remplie.",
+        "maxCost": "Coût maximal (USD)",
+        "errorCost": "Saisissez un montant supérieur à 0.",
+        "protectedPaths": "Chemins protégés",
+        "protectedPathsHint": "Un chemin ou motif par ligne. La boucle se met en pause si l'agent en modifie un.",
+        "noProgress": "Mettre en pause après 3 itérations sans changement",
+        "checkpointCommits": "Faire un commit de point de contrôle après chaque itération",
+        "askBeforeNext": "Demander avant chaque nouvelle itération",
+        "resumeAtLimitReset": "Reprendre à la réinitialisation de la limite d'usage",
+        "cancel": "Annuler",
+        "start": "Démarrer la boucle",
+        "title": "Nouvelle boucle",
+        "description": "Exécute un agent dans cet espace de travail, encore et encore, jusqu'à ce que le travail soit terminé.",
+        "menuItem": "Boucle…",
+        "intervalAnchor": "Compté depuis",
+        "anchorFromEnd": "La fin de la dernière itération",
+        "anchorWallClock": "L'horloge",
+        "checkTimeout": "Délai de la vérification (secondes)",
+        "errorCheckTimeout": "Saisissez de 1 à 600 secondes.",
+        "checkRunWhen": "Lancer la vérification",
+        "runEveryIteration": "Après chaque itération",
+        "runOnClaim": "Quand l'agent dit avoir terminé",
+        "maxActiveMinutes": "Minutes actives maximales",
+        "errorPrompt": "Saisissez un prompt pour démarrer la boucle."
+      },
+      "rail": {
+        "action": {
+          "cancel": "Annuler",
+          "edit": "Modifier",
+          "pause": "Mettre en pause",
+          "resume": "Reprendre",
+          "steer": "Orienter…",
+          "stop": "Arrêter"
+        },
+        "actionFailed": "L’action n’a pas abouti. Réessayez.",
+        "badge": {
+          "fail": "Échec",
+          "none": "Sans vérification",
+          "pass": "Réussi"
+        },
+        "check": {
+          "failed": "Vérification échouée",
+          "none": "Sans vérification",
+          "passed": "Vérification réussie"
+        },
+        "detail": {
+          "added": "{{value}} ajoutées",
+          "back": "Retour",
+          "changes": "Modifications",
+          "check": "Vérification de fin",
+          "checkStderr": "Erreurs de la vérification",
+          "checkStdout": "Sortie de la vérification",
+          "cost": "Coût",
+          "duration": "Durée",
+          "evaluator": "Évaluateur",
+          "evaluatorMet": "Condition remplie",
+          "evaluatorNotMet": "Condition non remplie",
+          "evaluatorReason": "Motif de l’évaluateur",
+          "loadFailed": "Impossible de charger la sortie de cette itération.",
+          "loading": "Chargement de la sortie…",
+          "noChanges": "Non mesuré",
+          "noOutput": "Aucune sortie de l’agent n’a été capturée.",
+          "noRecord": "Aucune sortie enregistrée pour cette itération.",
+          "outcome": "Résultat",
+          "outputTail": "Sortie de l’agent",
+          "removed": "{{value}} supprimées",
+          "title": "Itération {{n}}"
+        },
+        "edit": {
+          "errorName": "Saisissez un nom.",
+          "errorPrompt": "Saisissez un prompt.",
+          "name": "Nom",
+          "pacing": "Cadence",
+          "pacingInterval": "À intervalle régulier",
+          "pacingOnIdle": "Dès que l’agent est inactif",
+          "save": "Enregistrer"
+        },
+        "endReason": {
+          "crashed": "L’agent a planté",
+          "interrupted": "Interrompue",
+          "running": "En cours",
+          "settled": "Terminée",
+          "stopped": "Arrêtée"
+        },
+        "iteration": {
+          "current": "Itération {{n}}",
+          "currentOfMax": "Itération {{n}} sur {{max}}",
+          "done": "{{n}} itérations terminées",
+          "doneOfMax": "{{n}} itérations sur {{max}} terminées"
+        },
+        "iterations": {
+          "empty": "Aucune itération terminée pour l’instant",
+          "title": "Itérations"
+        },
+        "label": "Boucle",
+        "lastCheck": {
+          "failed": "Échec à l’itération {{n}}",
+          "passed": "Réussi à l’itération {{n}}",
+          "title": "Dernière vérification"
+        },
+        "meter": {
+          "cost": "Coût",
+          "costUnavailable": "Coût indisponible",
+          "ofCap": "{{spent}} sur {{cap}}",
+          "time": "Temps"
+        },
+        "pause": {
+          "agentBlocked": "L’agent est bloqué",
+          "agentDecide": "L’agent attend une décision",
+          "askBeforeNext": "En attente de votre feu vert",
+          "capCost": "Plafond de coût atteint",
+          "capIterations": "Plafond d’itérations atteint",
+          "capTime": "Plafond de temps atteint",
+          "crashed": "L’agent n’a cessé de planter",
+          "interruptedByRestart": "Interrompu par un redémarrage de l’app",
+          "noProgress": "Aucun progrès sur les dernières itérations",
+          "protectedPath": "A touché un chemin protégé",
+          "queueExhausted": "La file d’attente est vide",
+          "unverifiable": "Contact perdu avec l’hôte de l’agent",
+          "usageLimit": "Limite d’utilisation de l’agent atteinte",
+          "user": "Mis en pause par vous"
+        },
+        "phase": {
+          "checking": "Exécution de la vérification de fin",
+          "evaluating": "Évaluation du résultat",
+          "needsYou": "En attente de votre action",
+          "relaunching": "Redémarrage de l’agent",
+          "sending": "Envoi du prompt",
+          "waiting": "En attente de la prochaine itération",
+          "working": "L’agent travaille"
+        },
+        "preset": {
+          "interval": "Toutes les {{minutes}} min",
+          "queue": "Parcourir une file",
+          "untilDone": "Jusqu’à la fin"
+        },
+        "question": {
+          "blocked": "Bloqué",
+          "decide": "Décision requise"
+        },
+        "queue": {
+          "add": "Ajouter",
+          "done": "Terminé",
+          "editLabel": "Modifier l'élément de la file",
+          "empty": "La file d'attente est vide",
+          "inFlight": "En cours",
+          "moveDown": "Descendre",
+          "moveUp": "Monter",
+          "newLabel": "Nouvel élément de la file",
+          "placeholder": "Décrivez la tâche suivante",
+          "remove": "Retirer",
+          "title": "File d'attente"
+        },
+        "resume": {
+          "addLabel": "Itérations à ajouter",
+          "iterations": "itérations"
+        },
+        "state": {
+          "completed": "Terminé",
+          "needsYou": "Votre action est requise",
+          "paused": "En pause",
+          "running": "En cours",
+          "stopped": "Arrêté",
+          "unverifiable": "Non vérifiable"
+        },
+        "steer": {
+          "label": "Note d’orientation",
+          "placeholder": "Consignes pour la prochaine itération",
+          "send": "Envoyer"
+        },
+        "stop": {
+          "afterIteration": "Après cette itération",
+          "now": "Maintenant",
+          "prompt": "Arrêter la boucle"
+        },
+        "strip": {
+          "label": "État de la boucle",
+          "sessionFresh": "nouvelle session",
+          "sessionContinued": "session poursuivie"
+        },
+        "unverifiableHint": "L'hôte de l'agent est injoignable, donc la boucle n'avance pas.",
+        "skippedTicks_one": "{{count}} tick ignoré",
+        "skippedTicks_other": "{{count}} ticks ignorés",
+        "skippedTicks_many": "{{count}} ticks ignorés"
+      },
+      "status": {
+        "glyph": {
+          "tooltip": "Boucle {{n}} · {{state}}",
+          "tooltipWithCap": "Boucle {{n}}/{{max}} · {{state}}",
+          "open": "Ouvrir la boucle",
+          "state": {
+            "running": "En cours",
+            "needsYou": "Votre action requise",
+            "paused": "En pause",
+            "detached": "Détachée",
+            "unverifiable": "Non vérifiable"
+          }
+        },
+        "close": {
+          "title": "Fermer une boucle en cours ?",
+          "description": "Cet onglet exécute la boucle « {{name}} ». Laissez-la tourner en arrière-plan ou arrêtez-la maintenant.",
+          "cancel": "Annuler",
+          "stop": "Arrêter la boucle",
+          "keepRunning": "Continuer en arrière-plan",
+          "failed": "Impossible de mettre à jour la boucle, l'onglet reste donc ouvert."
+        }
+      }
+    }
   }
 }

@@ -143,10 +143,15 @@ describe('CI native cache ownership', () => {
       expect(step.with.path.trim().split('\n')).toEqual(paths)
       expect(step.with['restore-keys']).toBeUndefined()
     }
-    // This fork removed the Windows PR packaging lane whose Node-ABI save ordering upstream pins.
+    // This fork removed the Windows PR packaging lane, so there is no PR job whose saves to pin.
     expect(
       parse(readFileSync('.github/workflows/pr.yml', 'utf8')).jobs.package_windows
     ).toBeUndefined()
+    const saving = native.runs.steps.find((step) => step.id === 'native-cache-restore')
+    expect(saving.if).toContain(
+      "!(github.event_name == 'pull_request' && (runner.os == 'Windows' || " +
+        "runner.os == 'Linux' && inputs.native-runtime == 'electron' && runner.environment == 'github-hosted'))"
+    )
     expect(native.outputs['cache-key'].value).toBe('${{ steps.native-cache-scope.outputs.key }}')
   })
 

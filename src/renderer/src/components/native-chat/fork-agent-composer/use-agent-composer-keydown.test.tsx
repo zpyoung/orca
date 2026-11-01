@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 // @vitest-environment happy-dom
 
 import { cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
@@ -10,7 +10,7 @@ import {
   applyPickerSuggestion,
   deriveComposerAutocomplete,
   type ComposerAutocomplete
-} from '../native-chat-composer-state'
+} from '../../../../../shared/native-chat-composer-autocomplete'
 import { getNativeChatAgentProfile } from '../../../../../shared/native-chat-agent-profiles'
 import { useAgentComposerKeyDown } from './use-agent-composer-keydown'
 

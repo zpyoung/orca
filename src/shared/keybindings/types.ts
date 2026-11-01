@@ -40,6 +40,7 @@ export type KeybindingActionId =
   | 'workspace.selectByIndex'
   | 'voice.dictation'
   | 'view.tasks'
+  | 'view.plugins'
   | 'view.ledger'
   | 'dashboard.toggle'
   | 'sidebar.left.toggle'
@@ -122,6 +123,7 @@ export type KeybindingActionId =
   | 'terminal.splitRight'
   | 'terminal.splitDown'
   | 'terminal.switchInputSource'
+  | 'terminal.toggleNativeChat'
   | 'terminal.dock.toggle'
   | 'terminal.dock.passthrough'
   | PluginKeybindingActionId

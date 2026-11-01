@@ -24,7 +24,8 @@ export async function getRuntimeGitDiff(
     staged: boolean
     compareAgainstHead?: boolean
     signal?: AbortSignal
-  }
+  },
+  options?: GitDiffWakeOptions
 ): Promise<GitDiffResult> {
   const { signal, ...diffArgs } = args
   if (signal?.aborted) {
@@ -36,7 +37,8 @@ export async function getRuntimeGitDiff(
       {
         worktreePath: resolveLocalWorktreePath(context),
         ...diffArgs,
-        connectionId: context.connectionId
+        connectionId: context.connectionId,
+        ...localWakeArgs(context, options)
       },
       signal
     )

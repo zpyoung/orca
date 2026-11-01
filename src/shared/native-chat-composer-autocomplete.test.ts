@@ -610,6 +610,7 @@ describe('native skill and command picker', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       true
     )
     expect(items.map((item) => item.name)).toEqual(['quirk:render', 'warp:render'])
@@ -660,6 +661,7 @@ describe('native skill and command picker', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       true
     )
     expect(items.map((item) => item.name)).toEqual(['clear', 'quirk:clear'])
@@ -679,6 +681,7 @@ describe('native skill and command picker', () => {
       ],
       '',
       '/',
+      undefined,
       undefined,
       undefined,
       undefined,

@@ -6,7 +6,7 @@ describe('negotiated agent launch preference values', () => {
     expect(
       toAgentLaunchPreferencesWithOptionValues(
         { model: 'gpt-5', effort: 'high', thinking: true, fastMode: false },
-        { includeOptionValues: true }
+        { agent: 'codex', includeOptionValues: true }
       )
     ).toEqual({
       model: 'gpt-5',
@@ -14,13 +14,19 @@ describe('negotiated agent launch preference values', () => {
       optionValues: { thinking: true, fastMode: false }
     })
     expect(
-      toAgentLaunchPreferencesWithOptionValues({ model: 'gpt-5' }, { includeOptionValues: true })
+      toAgentLaunchPreferencesWithOptionValues(
+        { model: 'gpt-5' },
+        { agent: 'codex', includeOptionValues: true }
+      )
     ).toEqual({
       model: 'gpt-5',
       optionValues: {}
     })
     expect(
-      toAgentLaunchPreferencesWithOptionValues(undefined, { includeOptionValues: true })
+      toAgentLaunchPreferencesWithOptionValues(undefined, {
+        agent: 'codex',
+        includeOptionValues: true
+      })
     ).toEqual({
       optionValues: {}
     })

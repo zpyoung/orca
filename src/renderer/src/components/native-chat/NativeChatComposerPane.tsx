@@ -137,8 +137,8 @@ export const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, Nativ
       if (!targetPtyId) {
         return null
       }
-      return { ptyId: targetPtyId }
-    }, [targetPtyId])
+      return { terminalTabId, ptyId: targetPtyId }
+    }, [targetPtyId, terminalTabId])
 
     const attachments = useNativeChatComposerAttachments({
       attachmentScopeKey: draftScopeKey,

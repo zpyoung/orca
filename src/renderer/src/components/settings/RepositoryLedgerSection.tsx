@@ -7,7 +7,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { SearchableSetting } from './SearchableSetting'
-import { getRepositoryLedgerSectionId } from './repository-settings-targets'
+import { getRepositoryLedgerSectionId } from './repository/repository-settings-targets'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 

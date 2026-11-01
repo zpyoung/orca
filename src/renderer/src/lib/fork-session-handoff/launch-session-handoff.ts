@@ -1,9 +1,6 @@
 import { submitPromptToAgentPty } from '@/lib/agent-paste-draft'
-import {
-  launchAgentInNewTab,
-  type LaunchAgentInNewTabArgs,
-  type LaunchAgentInNewTabResult
-} from '@/lib/launch-agent-in-new-tab'
+import { launchAgentInNewTab, type LaunchAgentInNewTabArgs } from '@/lib/launch-agent-in-new-tab'
+import type { LaunchAgentInNewTabResult } from '@/lib/launch-agent-in-new-tab-host-agents'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import type { LaunchSource } from '../../../../shared/telemetry-events'

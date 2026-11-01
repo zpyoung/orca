@@ -8,6 +8,7 @@ import { translate } from '@/i18n/i18n'
 import type { Automation, AutomationRun } from '../../../../shared/automations-types'
 import { AutomationRunPageFrame } from './AutomationRunPageFrame'
 import { getAutomationRunContent } from './automation-run-content'
+import { automationRunErrorText } from './automation-run-error-copy'
 import { formatAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-display'
 import type { AutomationRunViewState } from './automation-run-view-state'
 import type { AutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
@@ -41,6 +42,8 @@ export function AutomationRunDetailsPage({
   onOpenWorkspace: () => void
   onBack: () => void
 }): React.JSX.Element {
+  const content = getAutomationRunContent(run)
+  const errorText = automationRunErrorText(run)
   const runLaunchAgentId = run.launchSettings?.agentId
   const runLaunchAgentLabel =
     getAgentCatalog().find((agent) => agent.id === runLaunchAgentId)?.label ?? runLaunchAgentId

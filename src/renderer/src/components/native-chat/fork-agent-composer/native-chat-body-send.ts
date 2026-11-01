@@ -2,7 +2,7 @@ import {
   enqueueNativeChatPtySend,
   type NativeChatPtySendQueueHandle
 } from '../native-chat-pty-send-queue'
-import { NATIVE_CHAT_SUBMIT_DELAY_MS } from '../../../../../shared/native-chat-answer-stepping'
+import { NATIVE_CHAT_SUBMIT_DELAY_MS } from '../../../../../shared/native-chat/input/native-chat-answer-stepping'
 import { runBodyAcceptedThen } from './native-chat-runtime-send-acceptance'
 import {
   createDeliveryObserver,

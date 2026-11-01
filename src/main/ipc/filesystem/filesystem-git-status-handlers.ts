@@ -285,23 +285,30 @@ export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerCo
         compareAgainstHead?: boolean
         connectionId?: string
         requestToken?: string
+        /** Showing the diff tab or its Retry: a user act that may start a stopped WSL distro. */
+        wakeWslDistro?: boolean
       }
     ): Promise<GitDiffResult> => {
       const controller = gitDiffCancellations.begin(event, args.requestToken)
       try {
         requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
-        const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-        const filePath = validateGitRelativeFilePath(worktreePath, args.filePath)
-        const gitOptions = getLocalGitOptionsForRegisteredWorktree(
+        return await readWorktreeGitUnlessWslStopped(
           store,
           args.worktreePath,
-          worktreePath
+          args.wakeWslDistro,
+          (worktreePath, gitOptions) =>
+            getDiff(
+              worktreePath,
+              validateGitRelativeFilePath(worktreePath, args.filePath),
+              args.staged,
+              args.compareAgainstHead,
+              {
+                ...gitOptions,
+                admissionTier: 'interactive',
+                ...(controller ? { signal: controller.signal } : {})
+              }
+            )
         )
-        return await getDiff(worktreePath, filePath, args.staged, args.compareAgainstHead, {
-          ...gitOptions,
-          admissionTier: 'interactive',
-          ...(controller ? { signal: controller.signal } : {})
-        })
       } finally {
         gitDiffCancellations.finish(event, args.requestToken, controller)
       }

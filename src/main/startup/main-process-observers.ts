@@ -28,6 +28,9 @@ import { MuseUsageStore } from '../muse-usage/store'
 import { installRepoMaintenanceIdleGate } from '../repo-maintenance-idle-gate'
 import { mainProcessState as state } from './main-process-state'
 import { recordForkPaneTranscriptObservation } from '../fork-session-handoff/pane-transcript-history'
+import { runAfterFirstWindowShown } from './first-window-deferral'
+
+const TELEMETRY_CLIENT_START_FALLBACK_MS = 15_000
 
 export function initializeMainProcessObservers(): void {
   const store = state.store

@@ -39,7 +39,15 @@ export async function startFixChecksFromDialog(args: {
   commandInput: string
   /** Omitted when CLI arguments do not apply, so the launch resolves the global Agents setting. */
   agentArgs?: string
+<<<<<<< fork
   launchOptions: Parameters<typeof launchWorkItemDirect>[0]['launchOptions']
+||||||| base
+=======
+  sessionOptions?: Readonly<Record<string, string>>
+  launchChoice?: Parameters<typeof launchWorkItemDirect>[0]['launchChoice']
+  agentLaunchPreferences?: Parameters<typeof launchWorkItemDirect>[0]['agentLaunchPreferences']
+  sessionOptionsYieldToAgentArgs?: true
+>>>>>>> upstream
 }): Promise<boolean> {
   if (!args.targetRepoId) {
     return false
@@ -53,7 +61,14 @@ export async function startFixChecksFromDialog(args: {
     agentOverride: args.agent,
     agentLaunchPreferences: args.agentLaunchPreferences,
     agentArgs: args.agentArgs,
+<<<<<<< fork
     launchOptions: args.launchOptions,
+||||||| base
+=======
+    ...(args.sessionOptions ? { sessionOptions: args.sessionOptions } : {}),
+    ...(args.launchChoice ? { launchChoice: args.launchChoice } : {}),
+    sessionOptionsYieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
+>>>>>>> upstream
     openModalFallback: () => {
       toast.error(
         translate(

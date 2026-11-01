@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearNativeChatSessionOptionCacheForTests } from '../native-chat-session-option-cache'
-import { createNativeChatPtySessionOptions } from '../native-chat-pty-session-options'
+import { createNativeChatPtySessionOptions } from '../../../../../shared/native-chat-pty-session-options'
 
 describe('native chat session option report replay', () => {
   beforeEach(() => clearNativeChatSessionOptionCacheForTests())
@@ -14,6 +14,7 @@ describe('native chat session option report replay', () => {
       agent: 'claude',
       scopeKey: 'pty-report',
       mode: 'live',
+      modelLabel: 'Model',
       reportedValues,
       dispatchCommand: dispatch
     })!
@@ -23,6 +24,7 @@ describe('native chat session option report replay', () => {
       agent: 'claude',
       scopeKey: 'pty-report',
       mode: 'live',
+      modelLabel: 'Model',
       reportedValues: { ...reportedValues },
       dispatchCommand: dispatch
     })!

@@ -25,7 +25,7 @@ import {
   getSessionDetailsId,
   SessionMetadata
 } from './ai-vault-session-row-display'
-import type { AgentStatusState } from '../../../../shared/agent-status-types'
+import type { AgentDotState } from '@/components/AgentStateDot'
 import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'
 import type { AiVaultSearchHit } from '../../../../shared/ai-vault-search-types'
 import { AiVaultSearchEvidence } from './AiVaultSearchEvidence'

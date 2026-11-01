@@ -72,7 +72,7 @@ function getWorktreeVisibilityMenuLabel(
 export type RepoHeaderProjectActions = {
   getWorktreeVisibilityDefaults: (repo: Repo) => WorktreeVisibilityDefaults | undefined
   onOpenRepoSettings: (projectId: string, sectionId?: string) => void
-  onOpenProjectLedger: (repo: Repo) => void
+  onOpenProjectLedger?: (repo: Repo) => void
   onOpenWorktreeVisibility: (repo: Repo) => void
   onCreateGroupFromRepo: (repo: Repo) => void
   onMoveProjectToGroup: (repo: Repo, groupId: string) => void
@@ -136,10 +136,12 @@ export const RepoHeaderProjectActionsMenu = React.memo(function RepoHeaderProjec
         onClick={stopRepoHeaderMenuEvent}
         onKeyDown={stopRepoHeaderMenuEvent}
       >
-        <DropdownMenuItem onSelect={() => actions.onOpenProjectLedger(repo)}>
-          <BookOpen className="size-3.5" />
-          {translate('auto.components.sidebar.WorktreeList.openLedger', 'Open ledger')}
-        </DropdownMenuItem>
+        {actions.onOpenProjectLedger ? (
+          <DropdownMenuItem onSelect={() => actions.onOpenProjectLedger?.(repo)}>
+            <BookOpen className="size-3.5" />
+            {translate('auto.components.sidebar.WorktreeList.openLedger', 'Open ledger')}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onSelect={() => actions.onOpenRepoSettings(repo.id)}>
           <SlidersHorizontal className="size-3.5" />
           {translate('auto.components.sidebar.WorktreeList.2cdffbc728', 'Project Settings')}

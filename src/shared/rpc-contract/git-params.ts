@@ -134,6 +134,7 @@ export const SourceControlLaunchOptions = z.object({
 })
 
 export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customPrompt: true }).extend({
+<<<<<<< fork
   actions: z
     .record(
       z.string(),
@@ -145,6 +146,20 @@ export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customProm
       })
     )
     .optional(),
+||||||| base
+  actions: z
+    .record(
+      z.string(),
+      z.object({
+        agentId: z.string().nullable().optional(),
+        commandInputTemplate: z.string().optional(),
+        agentArgs: z.string().optional()
+      })
+    )
+    .optional(),
+=======
+  actions: z.unknown().optional().transform(normalizeSourceControlAiActionDefaults),
+>>>>>>> upstream
   instructionsByOperation: z.record(z.string(), z.string()).optional(),
   modelOverridesByOperation: z
     .record(
@@ -166,6 +181,7 @@ export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customProm
       openAfterCreate: z.boolean().optional()
     })
     .optional(),
+<<<<<<< fork
   launchActionDefaults: z
     .record(
       z.string(),
@@ -177,6 +193,20 @@ export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customProm
       })
     )
     .optional()
+||||||| base
+  launchActionDefaults: z
+    .record(
+      z.string(),
+      z.object({
+        agentId: z.string().nullable().optional(),
+        commandInputTemplate: z.string().optional(),
+        agentArgs: z.string().optional()
+      })
+    )
+    .optional()
+=======
+  launchActionDefaults: z.unknown().optional().transform(normalizeSourceControlAiActionDefaults)
+>>>>>>> upstream
 })
 
 export const ResolvedSourceControlAiGenerationParams = z.object({

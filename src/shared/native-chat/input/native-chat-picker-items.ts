@@ -84,6 +84,7 @@ export function buildNativeChatPickerItems(
   limit = PICKER_RESULT_LIMIT,
   /** `$` matches skill names only, so a shell word like `$CODEX_HOME` never hits a description. */
   trigger: '/' | '$' = '/',
+  commandAvailable?: (name: string) => boolean,
   namespacePluginSkills = false
 ): NativeChatPickerItem[] {
   // Only shared sigils collide: /review and $review remain separate.
@@ -318,17 +319,6 @@ function isSubsequence(query: string, value: string): boolean {
   return false
 }
 
-// Names are inserted PTY tokens, never visual prefixes. CSS truncates display; reject unsafe lengths without slicing tokens.
-const MAX_TOKEN_SAFE_NAME_LENGTH = 200
-
-function getSafeSkillName(skill: DiscoveredSkill): string | null {
-  if (isTokenSafe(skill.name)) {
-    return skill.name
-  }
-  const directoryName = skill.directoryPath.split(/[\\/]/).findLast(Boolean) ?? ''
-  return isTokenSafe(directoryName) ? directoryName : null
-}
-
 const MAX_PLUGIN_NAME_DISPLAY_LENGTH = 80
 
 function getDisplayPluginName(skill: DiscoveredSkill): string | undefined {
@@ -344,15 +334,6 @@ function getNamespaceSafePluginName(skill: DiscoveredSkill): string | null {
   // longer matches the one the agent resolves. A `:` would nest separators.
   const name = skill.pluginName
   return name && isTokenSafe(name) && !name.includes(':') ? name : null
-}
-
-function isTokenSafe(value: string): boolean {
-  return (
-    value.length > 0 &&
-    value.length <= MAX_TOKEN_SAFE_NAME_LENGTH &&
-    !/\s/u.test(value) &&
-    [...value].every(isSafeDisplayCharacter)
-  )
 }
 
 function sanitizePickerText(value: string, maxLength: number): string {

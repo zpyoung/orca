@@ -19,6 +19,7 @@ import { applyRuntimeWorktreePsUnverifiableTerminals } from '../runtime-worktree
 import { attachRuntimeWorktreeAgentRows } from '../runtime-worktree-agent-rows'
 import { requireLoopService } from '../rpc/methods/fork-loops/service-binding'
 import { attachWorktreeLoopSummaries } from '../../fork-loops/worktree-ps-loop-summary'
+import { attachRuntimeWorktreeAgentRowWaits } from '../runtime-worktree-agent-row-waits'
 import { compareWorktreePs } from '../runtime-worktree-status-projection'
 import type { Repo } from '../../../shared/repo-types'
 import { enrichMissingRepoGitRemoteIdentities } from '../../repo-git-remote-identity-enrichment'

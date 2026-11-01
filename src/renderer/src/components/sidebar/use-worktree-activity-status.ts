@@ -11,6 +11,40 @@ import {
 } from './worktree-card-status-inputs'
 import { selectWorktreeAgentActivitySummary } from './worktree-agent-activity-summary'
 import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
+import { selectStoppedWslDistro } from '@/lib/wsl-host-stopped-status'
+import { selectWorkspaceRuntimeEnvironmentId } from '../terminal-pane/remote-server-outage'
+import { parseRemoteRuntimePtyId } from '../../../../shared/remote-runtime/remote-runtime-pty-id'
+
+/** The Start card's rule: a pane with no server yet, or on the stopped one, ended with its distro. */
+function withoutStoppedHostPtys(
+  ptyIdsByTabId: Record<string, string[]>,
+  stoppedEnvironmentId: string
+): Record<string, string[]> {
+  const live: Record<string, string[]> = {}
+  for (const [tabId, ptyIds] of Object.entries(ptyIdsByTabId)) {
+    const kept = ptyIds.filter((ptyId) => {
+      const environmentId = parseRemoteRuntimePtyId(ptyId)?.environmentId
+      return environmentId != null && environmentId !== stoppedEnvironmentId
+    })
+    // Same array when nothing dropped, so useShallow keeps the card from re-rendering.
+    if (kept.length > 0) {
+      live[tabId] = kept.length === ptyIds.length ? ptyIds : kept
+    }
+  }
+  return live
+}
+
+// Why the cheap check first: every card's selector runs on each store update, and few hosts stop.
+function hasStoppedWslHost(state: {
+  wslHostStatuses?: Record<string, { state: string }>
+}): boolean {
+  for (const id in state.wslHostStatuses) {
+    if (state.wslHostStatuses[id]?.state === 'distro-stopped') {
+      return true
+    }
+  }
+  return false
+}
 
 export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
   const hasPendingAsk = useAppStore((s) => selectWorktreeHasPendingAsk(s, worktreeId))

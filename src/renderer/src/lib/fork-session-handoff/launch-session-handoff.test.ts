@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { useAppStore } from '@/store'
-import type { LaunchAgentInNewTabResult } from '@/lib/launch-agent-in-new-tab'
+import type { LaunchAgentInNewTabResult } from '@/lib/launch-agent-in-new-tab-host-agents'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { ForkSessionHandoffLineageRecord } from '../../../../shared/fork-session-handoff/session-lineage-types'
 import {

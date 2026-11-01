@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
@@ -14,9 +14,9 @@ import {
   applyAppend,
   createNativeChatMerger,
   replaceList
-} from '../../../../../shared/native-chat-merge'
+} from '../../../../../shared/native-chat/native-chat-merge'
 import { startNativeChatSeedRead } from './native-chat-read-retry'
-import { mergeNativeChatLiveSession, nativeChatHookAwaitsInput } from './native-chat-live-status'
+import { mergeNativeChatLiveSession } from './native-chat-live-status'
 import { useNativeChatAssembledTranscript } from './use-native-chat-assembled-transcript'
 import {
   hasMoreBeforeNativeChatPage,
@@ -412,11 +412,6 @@ export function useNativeChatLiveSession(
     })
     return {
       ...session,
-      hookAwaitingInput: nativeChatHookAwaitsInput(
-        hookState,
-        hookStateStartedAt,
-        transcriptCompanion?.lifecycle
-      ),
       hasMore,
       loadingEarlier,
       olderHistoryGeneration,

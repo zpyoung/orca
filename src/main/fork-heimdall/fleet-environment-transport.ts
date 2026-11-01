@@ -6,8 +6,8 @@ import { getPreferredPairedRuntimeConnection } from '../../shared/runtime-enviro
 import {
   sendRemoteRuntimeRequestWithStatusPreflight,
   type RemoteRuntimeSubscription
-} from '../../shared/remote-runtime-client'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
+} from '../../shared/remote-runtime/remote-runtime-client'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
 import {
   HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
   HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,

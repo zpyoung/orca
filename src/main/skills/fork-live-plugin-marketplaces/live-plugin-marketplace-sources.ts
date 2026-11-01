@@ -42,6 +42,7 @@ async function readMarketplaceFile(pathValue: string): Promise<string | null> {
 export async function discoverLiveClaudePluginSkillSources(args: {
   homeDir: string
   cwd: string
+  signal?: AbortSignal
 }): Promise<SkillScanRoot[]> {
   const roots = await discoverClaudePluginSkillSources(args)
   if (roots.length === 0) {

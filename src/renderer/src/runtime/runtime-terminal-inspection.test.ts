@@ -44,8 +44,6 @@ describe('runtime terminal owner routing', () => {
   const localWrite = vi.fn()
   const localWriteAccepted = vi.fn()
   const localWriteInputAccepted = vi.fn()
-  const localForeground = vi.fn()
-  const localHasChildren = vi.fn()
   const localInspect = vi.fn()
 
   beforeEach(() => {
@@ -72,8 +70,6 @@ describe('runtime terminal owner routing', () => {
           write: localWrite,
           writeAccepted: localWriteAccepted,
           writeInputAccepted: localWriteInputAccepted,
-          getForegroundProcess: localForeground,
-          hasChildProcesses: localHasChildren,
           inspectProcess: localInspect
         }
       }

@@ -22,6 +22,7 @@ export type LaunchAgentInNewTabArgs = LaunchAgentInNewTabRequest & {
   sessionOptions?: Readonly<Record<string, string>>
   /** On terminals, a flag `agentArgs` sets itself wins over the inherited saved choice. */
   sessionOptionsYieldToAgentArgs?: true
+  includeSessionOptionCatalogDefaults?: boolean
   initialCwd?: string | null
   /** How to deliver the prompt: `draft` leaves it editable, `submit-after-ready` sends it once the TUI is ready. */
   promptDelivery?: 'auto-submit' | 'draft' | 'submit-after-ready'

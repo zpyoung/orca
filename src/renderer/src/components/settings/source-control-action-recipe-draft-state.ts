@@ -1,5 +1,17 @@
+<<<<<<< fork
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+||||||| base
+import { useEffect, useMemo, useRef, useState } from 'react'
+=======
+import {
+  transportActionArgumentChoices,
+  demoteActionArgumentChoices,
+  type ActionArgumentChoices
+} from '../../../../shared/source-control-action-argument-choices'
+import { liftActionPermissionArgs } from '../../../../shared/source-control-action-permission-lift'
+import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
+>>>>>>> upstream
 import type {
   SourceControlAiSettings,
   SourceControlAiSettingsPatch
@@ -175,6 +187,7 @@ export function useSourceControlActionRecipeDraftState({
     })
   }
 
+<<<<<<< fork
   const onActionLaunchOptionsChange = (
     actionId: SourceControlActionId,
     launchOptions: AgentLaunchOptionSelection
@@ -203,6 +216,18 @@ export function useSourceControlActionRecipeDraftState({
 
   const saveActionRecipeDraft = async (actionId: SourceControlActionId): Promise<void> => {
     const nextValue = actionRecipeDraftState.values[actionId]
+||||||| base
+  const saveActionTemplateDraft = async (actionId: SourceControlActionId): Promise<void> => {
+    const nextValue = actionRecipeDraftState.values[actionId]
+=======
+  const saveActionTemplateDraft = async (actionId: SourceControlActionId): Promise<void> => {
+    const submitted = actionRecipeDraftState.values[actionId]
+    const { agentId: _binding, ...nextValue } = liftActionPermissionArgs(
+      { ...actionRecipeDraftState.values[actionId], agentId: config.actions?.[actionId]?.agentId },
+      true,
+      actionId
+    )
+>>>>>>> upstream
     if (
       JSON.stringify(nextValue) === JSON.stringify(actionRecipeDraftState.baseValues[actionId]) ||
       savingActionRecipeIds[actionId]
@@ -215,8 +240,16 @@ export function useSourceControlActionRecipeDraftState({
         return {
           actions: setSourceControlActionDefault(current.actions, actionId, {
             commandInputTemplate: nextValue.commandInputTemplate,
+<<<<<<< fork
             agentArgs: nextValue.agentArgs,
             launchOptions: nextValue.launchOptions
+||||||| base
+            agentArgs: nextValue.agentArgs
+=======
+            agentArgs: nextValue.agentArgs,
+            launchPreferences: nextValue.launchPreferences,
+            argumentChoices: nextValue.argumentChoices
+>>>>>>> upstream
           })
         }
       })
@@ -264,10 +297,20 @@ export function useSourceControlActionRecipeDraftState({
     savingActionRecipeIds,
     onActionTemplateChange,
     onActionAgentArgsChange,
+<<<<<<< fork
     onActionLaunchOptionsChange,
     resetActionLaunchOptions,
     saveActionRecipeDraft,
     discardActionRecipeDraft,
+||||||| base
+    saveActionTemplateDraft,
+    discardActionTemplateDraft,
+=======
+    onActionLaunchPreferencesChange,
+    retireActionAgentDocument,
+    saveActionTemplateDraft,
+    discardActionTemplateDraft,
+>>>>>>> upstream
     appendVariable
   }
 }

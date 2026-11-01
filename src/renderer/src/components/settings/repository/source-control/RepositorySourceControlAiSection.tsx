@@ -47,7 +47,6 @@ export function RepositorySourceControlAiSection({
     updateActionLaunchPreferences,
     updateActionTemplate,
     updateActionAgentArgs,
-    updateActionLaunchOptions,
     appendVariable,
     saveActionRecipeText,
     discardActionRecipeText,
@@ -100,7 +99,6 @@ export function RepositorySourceControlAiSection({
         onActionLaunchPreferencesChange={updateActionLaunchPreferences}
         onActionTemplateChange={updateActionTemplate}
         onActionAgentArgsChange={updateActionAgentArgs}
-        onActionLaunchOptionsChange={updateActionLaunchOptions}
         onAppendVariable={appendVariable}
         onActionDiscard={discardActionRecipeText}
         onActionSave={(actionId) => void saveActionRecipeText(actionId)}

@@ -106,6 +106,8 @@ export async function launchHeadlessAutomationAgent(
           title: run.title,
           suppressStartupUpdatePrompt: true,
           ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
+          // Run now is the user's act and may start a stopped WSL distro; a scheduled run never does.
+          ...(run.trigger === 'scheduled' ? {} : { wslUserAct: true as const }),
           launchOverrides: automation.launchOverrides ?? undefined
         })
         terminal = launched

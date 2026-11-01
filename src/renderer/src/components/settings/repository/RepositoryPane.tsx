@@ -26,14 +26,13 @@ import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
 import { RepositoryForkSyncSection } from './identity/RepositoryForkSyncSection'
 import { RepositoryGitHubAccountSection } from './RepositoryGitHubAccountSection'
 import { translate } from '@/i18n/i18n'
-import { RepositoryWindowsRuntimeSection } from './repository/execution/RepositoryWindowsRuntimeSection'
-import { matchesRepositoryIdentitySearch } from './repository/identity/repository-identity-search'
-import { RepositoryWorktreeDefaultsSection } from './repository/execution/RepositoryWorktreeDefaultsSection'
-import { RepositoryJiraProjectSection } from './repository/RepositoryJiraProjectSection'
-import { RepositoryLedgerSection } from './RepositoryLedgerSection'
-import { getProjectRuntimeSessionSummary } from './repository/execution/repository-runtime-session-summary'
-import { getRepoOwnerWorktreeVisibilityDefaults } from '../../store/worktree-visibility-defaults-by-host'
-export { getRepositoryPaneSearchEntries }
+import { RepositoryWindowsRuntimeSection } from './execution/RepositoryWindowsRuntimeSection'
+import { matchesRepositoryIdentitySearch } from './identity/repository-identity-search'
+import { RepositoryWorktreeDefaultsSection } from './execution/RepositoryWorktreeDefaultsSection'
+import { RepositoryJiraProjectSection } from './RepositoryJiraProjectSection'
+import { RepositoryLedgerSection } from '../RepositoryLedgerSection'
+import { getProjectRuntimeSessionSummary } from './execution/repository-runtime-session-summary'
+import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../store/worktree-visibility-defaults-by-host'
 
 type RepositoryPaneRepoUpdate = Omit<
   Partial<Repo>,

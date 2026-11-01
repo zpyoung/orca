@@ -21,6 +21,7 @@ import {
   isWslMoveSourceHost
 } from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 import { withLedgerErrorCode } from './ledger-removal-guard'
+import { listWslMovedProjects } from '../../persistence/moving-wsl-projects/wsl-moved-projects'
 
 export function registerRepoCatalogHandlers(
   mainWindow: BrowserWindow,

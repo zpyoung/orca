@@ -3,10 +3,9 @@ import { resolveSourceControlActionRecipe } from '../../../../../../shared/sourc
 import {
   SOURCE_CONTROL_ACTION_IDS,
   type SourceControlActionId
-} from '../../../../shared/source-control-ai-actions'
-import type { RepoSourceControlAiOverrides } from '../../../../shared/source-control-ai-types'
-import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
+} from '../../../../../../shared/source-control-ai-actions'
+import type { RepoSourceControlAiOverrides } from '../../../../../../shared/source-control-ai-types'
+import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import { completeRepoActionRecipe } from './repository-source-control-ai-labels'
 import { SOURCE_CONTROL_TEXT_ACTION_ID_SET } from '../../source-control-action-recipe-options'
 
@@ -157,23 +156,6 @@ export function withRepoAiActionMode(
   )
 }
 
-export function withRepoAiActionAgent(
-  base: RepoSourceControlAiOverrides,
-  settings: GlobalSettings | null,
-  actionId: SourceControlActionId,
-  agentId: RepoActionRecipe['agentId']
-): RepoSourceControlAiOverrides {
-  const currentRecipe =
-    base.actionOverrides?.[actionId] ?? readCompleteRecipeForDraft(base, settings, actionId)
-  return normalizeRepoAiDraft(
-    setActionOverride(base, actionId, {
-      ...currentRecipe,
-      agentId,
-      launchOptions: null
-    })
-  )
-}
-
 export function withRepoAiActionRecipeText(
   base: RepoSourceControlAiOverrides,
   _settings: GlobalSettings | null,
@@ -189,17 +171,38 @@ export function withRepoAiActionRecipeText(
   return normalizeRepoAiDraft(
     setActionOverride(base, actionId, {
       ...currentRecipe,
-      commandInputTemplate: text.commandInputTemplate,
-      agentArgs: text.agentArgs,
-      ...(Object.hasOwn(text, 'launchOptions') ? { launchOptions: text.launchOptions } : {})
+      ...(typeof text.commandInputTemplate === 'string'
+        ? { commandInputTemplate: text.commandInputTemplate }
+        : {}),
+      ...(text.agentArgs !== undefined ? { agentArgs: text.agentArgs } : {}),
+      argumentChoices: text.argumentChoices,
+      ...(preferencesEdited ? { launchPreferences: text.launchPreferences } : {})
     })
   )
 }
 
-export type ActionRecipeTextDraft = {
-  commandInputTemplate: string
-  agentArgs: string
-  launchOptions?: AgentLaunchOptionSelection | null
+/** The action's text as stored: an unset or cleared value stays so until the user types; inputs
+ *  show it as empty. */
+export type ActionRecipeTextDraft = Pick<
+  RepoActionRecipe,
+  'commandInputTemplate' | 'agentArgs' | 'launchPreferences' | 'argumentChoices'
+>
+
+// An own undefined is a deliberate clear; an absent preference leaves inheritance untouched.
+function sameDraftLaunchPreferences(a: ActionRecipeTextDraft, b: ActionRecipeTextDraft): boolean {
+  return (
+    Object.hasOwn(a, 'launchPreferences') === Object.hasOwn(b, 'launchPreferences') &&
+    JSON.stringify(a.launchPreferences) === JSON.stringify(b.launchPreferences)
+  )
+}
+
+function sameActionRecipeText(a: ActionRecipeTextDraft, b: ActionRecipeTextDraft): boolean {
+  return (
+    a.commandInputTemplate === b.commandInputTemplate &&
+    a.agentArgs === b.agentArgs &&
+    JSON.stringify(a.argumentChoices) === JSON.stringify(b.argumentChoices) &&
+    sameDraftLaunchPreferences(a, b)
+  )
 }
 
 export function readActionRecipeTextDraft(
@@ -208,12 +211,10 @@ export function readActionRecipeTextDraft(
 ): ActionRecipeTextDraft {
   const recipe = value.actionOverrides?.[actionId]
   return {
-    commandInputTemplate:
-      typeof recipe?.commandInputTemplate === 'string' ? recipe.commandInputTemplate : '',
-    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs : '',
-    ...(recipe?.launchOptions !== undefined
-      ? { launchOptions: structuredClone(recipe.launchOptions) }
-      : {})
+    commandInputTemplate: recipe?.commandInputTemplate,
+    agentArgs: recipe?.agentArgs,
+    argumentChoices: recipe?.argumentChoices,
+    ...(recipe?.launchPreferences ? { launchPreferences: recipe.launchPreferences } : {})
   }
 }
 
@@ -239,7 +240,8 @@ export function composeDisplayRepoAi(
           ...currentRecipe,
           commandInputTemplate: draft.commandInputTemplate,
           agentArgs: draft.agentArgs,
-          ...(Object.hasOwn(draft, 'launchOptions') ? { launchOptions: draft.launchOptions } : {})
+          argumentChoices: draft.argumentChoices,
+          launchPreferences: draft.launchPreferences
         }
       }
     }
@@ -252,27 +254,27 @@ export function computeActionDirtyById(
   persisted: RepoSourceControlAiOverrides,
   actionTextDrafts: Partial<Record<SourceControlActionId, ActionRecipeTextDraft>>
 ): Record<SourceControlActionId, boolean> {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the entries map every SOURCE_CONTROL_ACTION_IDS member exactly once.
-  return Object.fromEntries(
-    SOURCE_CONTROL_ACTION_IDS.map((actionId) => {
-      if (!hasOwnActionOverride(immediate.actionOverrides, actionId)) {
-        return [actionId, false]
-      }
-      const actionDraft = actionTextDrafts[actionId]
-      const draft = actionDraft ?? readActionRecipeTextDraft(immediate, actionId)
-      // Prefer persisted text as the base; if the override is only optimistic, compare against immediate.
-      const compareBase = hasOwnActionOverride(persisted.actionOverrides, actionId)
-        ? readActionRecipeTextDraft(persisted, actionId)
-        : readActionRecipeTextDraft(immediate, actionId)
-      return [
-        actionId,
-        draft.commandInputTemplate !== compareBase.commandInputTemplate ||
-          draft.agentArgs !== compareBase.agentArgs ||
-          (actionDraft !== undefined &&
-            JSON.stringify(draft.launchOptions) !== JSON.stringify(compareBase.launchOptions))
-      ]
-    })
-  ) as Record<SourceControlActionId, boolean>
+  const isDirty = (actionId: SourceControlActionId): boolean => {
+    if (!hasOwnActionOverride(immediate.actionOverrides, actionId)) {
+      return false
+    }
+    const draft = actionTextDrafts[actionId] ?? readActionRecipeTextDraft(immediate, actionId)
+    // Prefer persisted text as the base; if the override is only optimistic, compare against immediate.
+    const compareBase = hasOwnActionOverride(persisted.actionOverrides, actionId)
+      ? readActionRecipeTextDraft(persisted, actionId)
+      : readActionRecipeTextDraft(immediate, actionId)
+    return !sameActionRecipeText(draft, compareBase)
+  }
+  return {
+    commitMessage: isDirty('commitMessage'),
+    pullRequest: isDirty('pullRequest'),
+    branchName: isDirty('branchName'),
+    fixCommitFailure: isDirty('fixCommitFailure'),
+    fixPushFailure: isDirty('fixPushFailure'),
+    fixChecks: isDirty('fixChecks'),
+    resolveConflicts: isDirty('resolveConflicts'),
+    resolveComments: isDirty('resolveComments')
+  }
 }
 
 export function retainDivergentActionTextDrafts(
@@ -286,11 +288,7 @@ export function retainDivergentActionTextDrafts(
       continue
     }
     const persistedText = readActionRecipeTextDraft(persisted, actionId)
-    if (
-      draft.commandInputTemplate !== persistedText.commandInputTemplate ||
-      draft.agentArgs !== persistedText.agentArgs ||
-      JSON.stringify(draft.launchOptions) !== JSON.stringify(persistedText.launchOptions)
-    ) {
+    if (!sameActionRecipeText(draft, persistedText)) {
       next[actionId] = draft
     }
   }
@@ -311,12 +309,7 @@ export function clearActionTextDraftIfUnchanged(
   saved: ActionRecipeTextDraft
 ): Partial<Record<SourceControlActionId, ActionRecipeTextDraft>> {
   const latest = current[actionId]
-  if (
-    latest &&
-    (latest.commandInputTemplate !== saved.commandInputTemplate ||
-      latest.agentArgs !== saved.agentArgs ||
-      JSON.stringify(latest.launchOptions) !== JSON.stringify(saved.launchOptions))
-  ) {
+  if (latest && !sameActionRecipeText(latest, saved)) {
     return current
   }
   const { [actionId]: _removed, ...rest } = current

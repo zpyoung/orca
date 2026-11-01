@@ -232,10 +232,18 @@ async function launchFixChecksAgent(args: StartFixChecksAgentArgs): Promise<bool
       agent,
       worktreeId: targetWorktreeId,
       groupId: args.groupId ?? targetWorktreeId,
+<<<<<<< fork
       prompt,
       agentArgs: recipe().agentArgs,
       ...(recipeSessionOptions ? { sessionOptions: recipeSessionOptions } : {}),
       includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
+||||||| base
+      prompt,
+      agentArgs: recipe().agentArgs,
+=======
+      prompt: projectedPrompt,
+      ...projection,
+>>>>>>> upstream
       promptDelivery: 'submit-after-ready',
       launchPlatform,
       launchSource: args.launchSource,
@@ -298,8 +306,27 @@ async function launchFixChecksAgent(args: StartFixChecksAgentArgs): Promise<bool
     telemetrySource: args.telemetrySource,
     promptDelivery: 'submit-after-ready',
     agentArgs: recipe().agentArgs,
+<<<<<<< fork
     launchOptions: recipe().launchOptions,
     ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
+||||||| base
+    ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
+=======
+    resolveAgentArgs: (agent) =>
+      sourceControlActionAgentArgs(recipe(), agent, useAppStore.getState().settings),
+    resolveSessionOptions: (agent) => resolveSourceControlActionSessionOptions(recipe(), agent),
+    ...(agentOverride.kind === 'agent'
+      ? {
+          agentOverride: agentOverride.agent,
+          launchChoice: {
+            requestedSurface: resolveSourceControlActionRequestedSurface(
+              recipe(),
+              agentOverride.agent
+            )
+          }
+        }
+      : {}),
+>>>>>>> upstream
     openModalFallback: args.openModalFallback
   })
 }

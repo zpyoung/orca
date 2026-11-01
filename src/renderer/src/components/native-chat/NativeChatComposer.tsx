@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo } from 'react'
 import { useAppStore } from '../../store'
 import { sendNativeChatTypedCommand } from './native-chat-runtime-send'
-import { isSlashCommandDraft } from '../../../../shared/native-chat-slash-commands'
+import { isSlashCommandDraft } from '../../../../shared/native-chat/input/native-chat-slash-commands'
 import { emitNativeChatMessageSent } from '@/lib/native-chat-telemetry'
 import {
   useAgentComposerCoreState,
@@ -30,6 +30,7 @@ import { useNativeChatComposerSubmit } from './use-native-chat-composer-submit'
 import { answerNativeChatCommandInComposer } from './use-native-chat-local-command-answer'
 import { seedHistory } from './fork-agent-composer/agent-composer-history'
 import { useAgentComposerStructuredHistory } from './fork-agent-composer/use-agent-composer-structured-history'
+import { NativeChatComposerPane } from './NativeChatComposerPane'
 import type {
   NativeChatComposerHandle,
   NativeChatComposerProps
@@ -51,8 +52,8 @@ function noop(): void {}
  * session-option wiring) and builds its bridges from the exact same core
  * state it renders, so draft and caret never desync from another host.
  */
-const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
-  function NativeChatComposerPane(
+const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
+  function AgentChatComposerPane(
     {
       terminalTabId,
       paneKey,
@@ -187,20 +188,25 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       [draftScopeKey]
     )
 
-    const { pickAttachments, attachExternalPaths, captureCopiedFiles, resolveAttachmentOwner } =
-      useNativeChatFileDrops({
-        paneKey,
-        draftScopeKey,
-        targetPtyId,
-        structuredTransport,
-        terminalTabId,
-        structuredWorktreeId: structuredTransport?.worktreeId,
-        structuredSession: structuredTransport,
-        disabled: core.disabled,
-        attachResolvedPaths,
-        pendingChips: attachments.pendingChips,
-        setNotice: core.setNotice
-      })
+    const {
+      pickAttachments,
+      attachExternalPaths,
+      captureExternalPaths,
+      captureCopiedFiles,
+      resolveAttachmentOwner
+    } = useNativeChatFileDrops({
+      paneKey,
+      draftScopeKey,
+      targetPtyId,
+      structuredTransport,
+      terminalTabId,
+      structuredWorktreeId: structuredTransport?.worktreeId,
+      structuredSession: structuredTransport,
+      disabled: core.disabled,
+      attachResolvedPaths,
+      pendingChips: attachments.pendingChips,
+      setNotice: core.setNotice
+    })
 
     const { handlePaste, pasteFromClipboard } = useNativeChatComposerPaste({
       targetKey: JSON.stringify([
@@ -218,6 +224,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       attachResolvedPaths,
       attachCopiedFiles: attachExternalPaths,
       captureCopiedFiles,
+      captureExternalPaths,
       beginPendingImageAttachment: attachments.beginPendingImageAttachment,
       // Settles into the scope cache, which outlives a composer a prompt card unmounted.
       resolvePendingImageAttachment: attachments.pendingChips.resolve,
@@ -396,6 +403,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     useImperativeHandle(
       ref,
       () => ({
+        isComposing: core.imeEnterGesture.isComposing,
         focus: core.focus,
         insertTypedText: core.insertTypedText,
         acceptsText: core.acceptsText,
@@ -405,6 +413,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
         contains: core.contains
       }),
       [
+        core.imeEnterGesture.isComposing,
         core.focus,
         core.insertTypedText,
         core.acceptsText,
@@ -431,6 +440,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
 
 export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
   function NativeChatComposer(props, ref): React.JSX.Element {
-    return <NativeChatComposerPane key={props.paneKey} {...props} ref={ref} />
+    const Pane = props.editSession ? NativeChatComposerPane : AgentChatComposerPane
+    return <Pane key={props.paneKey} {...props} ref={ref} />
   }
 )

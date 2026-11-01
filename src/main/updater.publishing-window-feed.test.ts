@@ -103,7 +103,7 @@ describe('updater', () => {
     })
     expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
       provider: 'generic',
-      url: 'https://github.com/zpyoung/orca/releases/latest/download'
+      url: 'https://github.com/stablyai/orca/releases/download/v1.3.19'
     })
   })
 
@@ -160,7 +160,7 @@ describe('updater', () => {
     })
     expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
       provider: 'generic',
-      url: 'https://github.com/zpyoung/orca/releases/latest/download'
+      url: 'https://github.com/stablyai/orca/releases/download/v1.4.142'
     })
     expect(sendMock).not.toHaveBeenCalledWith(
       'updater:status',

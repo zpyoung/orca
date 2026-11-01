@@ -152,7 +152,8 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
     removeHandler: vi.fn()
-  }
+  },
+  webContents: { fromId: () => undefined }
 }))
 
 vi.mock('../../shared/runtime-environment-store', () => ({

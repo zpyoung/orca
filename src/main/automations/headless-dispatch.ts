@@ -16,11 +16,13 @@ export type HeadlessAutomationDispatchLaunch = {
   terminalPaneKey?: string | null
   terminalPtyId?: string | null
   launchSettings?: AutomationRunLaunchSettings | null
-  completion?: Promise<{
-    status: 'completed' | 'dispatch_failed'
-    outputSnapshot?: AutomationRunOutputSnapshot | null
-    error?: string | null
-  }>
+  completion?: Promise<
+    {
+      status: 'completed' | 'dispatch_failed'
+      outputSnapshot?: AutomationRunOutputSnapshot | null
+      error?: string | null
+    } & AutomationRunFailureCodeFields
+  >
 }
 
 export type HeadlessAutomationDispatcher = (request: {

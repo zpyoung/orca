@@ -17,6 +17,7 @@ import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-clie
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
 import type { AgentTerminalLaunchCompletion } from './structured-agent-session-launch-admission'
+import { agentLaunchNeedsPreparedCommand } from '../../../shared/agent-launch-preferences'
 
 /** Paired web tabs are host-owned; never create a local tab, and return tabId:null. */
 export async function launchAgentInWebHostTab(args: {
@@ -62,6 +63,7 @@ export async function launchAgentInWebHostTab(args: {
       ).catch(() => false))
     : false
   const launchPreferences = toAgentLaunchPreferencesWithOptionValues(startupPlan.sessionOptions, {
+    agent,
     includeOptionValues
   })
   const structuredPromptDelivery: AgentPromptDelivery =

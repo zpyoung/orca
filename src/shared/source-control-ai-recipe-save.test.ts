@@ -112,6 +112,7 @@ describe('source-control AI recipe saves', () => {
     })
   })
 
+<<<<<<< fork
   it('writes global recipes through a complete normalized source-control AI value', () => {
     const result = saveSourceControlActionRecipe({
       target: { type: 'global' },
@@ -136,9 +137,35 @@ describe('source-control AI recipe saves', () => {
       commandInputTemplate: '{basePrompt}\n\nreview',
       agentArgs: '--verbose',
       launchOptions: { model: 'sonnet' }
+||||||| base
+  it('writes global recipes through a complete normalized source-control AI value', () => {
+    const result = saveSourceControlActionRecipe({
+      target: { type: 'global' },
+      settings: settings(),
+      actionId: 'pullRequest',
+      recipe: {
+        agentId: 'custom',
+        commandInputTemplate: '{basePrompt}\n\nreview',
+        agentArgs: '--verbose'
+      },
+      customAgentCommand: 'review-agent {prompt}'
     })
-    expect(result.sourceControlAi.customAgentCommand).toBe('review-agent {prompt}')
-    expect(result.sourceControlAi.enabled).toBe(true)
+
+    expect(result.target).toEqual({ type: 'global' })
+    expect('sourceControlAi' in result).toBe(true)
+    if (!('sourceControlAi' in result)) {
+      throw new Error('Expected a global save result')
+    }
+    expect(result.sourceControlAi.actions?.pullRequest).toEqual({
+      agentId: 'custom',
+      commandInputTemplate: '{basePrompt}\n\nreview',
+      agentArgs: '--verbose'
+=======
+  it('clears empty repo source-control AI writes with the JSON boundary sentinel', () => {
+    expect(toSourceControlAiRepoUpdate({ prCreationDefaults: { draft: null } })).toEqual({
+      sourceControlAi: null
+>>>>>>> upstream
+    })
   })
 
   it('replaces global recipes so cleared CLI args do not survive', () => {

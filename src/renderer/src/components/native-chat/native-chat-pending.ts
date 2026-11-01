@@ -1,5 +1,9 @@
 import type { NativeChatMessage } from '../../../../shared/native-chat-types'
 import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'
+import {
+  NATIVE_CHAT_PENDING_SEND_LIMIT,
+  type NativeChatPendingSend
+} from '../../../../shared/native-chat-pending-sends'
 import type { NativeChatLaunchPrompt } from '@/lib/native-chat-launch-prompt'
 import {
   advancedNativeChatUserContentCounts,

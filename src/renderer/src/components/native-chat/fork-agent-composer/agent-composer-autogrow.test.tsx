@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 // @vitest-environment happy-dom
 
 /** happy-dom verifies the CSS sizing contract; app validation covers actual growth up to eight lines. */

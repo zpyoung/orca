@@ -8,7 +8,12 @@ import {
 import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
   SOURCE_CONTROL_TEXT_ACTION_IDS,
+<<<<<<< fork
   normalizeSourceControlActionRecipe,
+||||||| base
+=======
+  canonicalActionLaunchPreferences,
+>>>>>>> upstream
   type SourceControlActionId,
   type SourceControlActionRecipe
 } from './source-control-ai-actions'
@@ -45,7 +50,14 @@ type ReadCompatibleActionRecipe = {
   agentId?: SourceControlActionRecipe['agentId']
   commandInputTemplate?: string | null
   agentArgs?: string | null
+<<<<<<< fork
   launchOptions?: SourceControlActionRecipe['launchOptions'] | null
+||||||| base
+=======
+  argumentChoices?: SourceControlActionRecipe['argumentChoices']
+  launchPreferences?: SourceControlActionRecipe['launchPreferences']
+  surface?: SourceControlActionRecipe['surface']
+>>>>>>> upstream
 }
 
 const TEXT_ACTION_ID_SET = new Set<SourceControlActionId>(SOURCE_CONTROL_TEXT_ACTION_IDS)
@@ -90,21 +102,41 @@ function normalizeCompleteRecipe(
       ? recipe.commandInputTemplate
       : DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId]
   const rawAgentArgs = recipe.agentArgs
+<<<<<<< fork
   const agentArgs = typeof rawAgentArgs === 'string' ? rawAgentArgs.trim() : undefined
   const launchOptions = normalizeSourceControlActionRecipe({
     launchOptions: recipe.launchOptions
   })?.launchOptions
+||||||| base
+  const agentArgs = typeof rawAgentArgs === 'string' ? rawAgentArgs.trim() : undefined
+=======
+  const agentArgs = typeof rawAgentArgs === 'string' ? rawAgentArgs : undefined
+>>>>>>> upstream
   return {
     ...trimActionArgumentDocument({ agentArgs, argumentChoices: recipe.argumentChoices }),
     ...(rawAgentArgs === null ? { agentArgs: null } : {}),
     agentId: recipe.agentId ?? null,
     commandInputTemplate,
+<<<<<<< fork
     ...(agentArgs !== undefined ? { agentArgs } : {}),
     ...(recipe.launchOptions === null
       ? { launchOptions: null }
       : launchOptions
         ? { launchOptions }
         : {})
+||||||| base
+    ...(agentArgs !== undefined ? { agentArgs } : {})
+=======
+
+    ...(recipe.launchPreferences
+      ? {
+          launchPreferences: TEXT_ACTION_ID_SET.has(actionId)
+            ? recipe.launchPreferences
+            : canonicalActionLaunchPreferences(recipe.launchPreferences)
+        }
+      : {}),
+    ...(recipe.surface ? { surface: recipe.surface } : {})
+>>>>>>> upstream
   }
 }
 

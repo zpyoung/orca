@@ -28,6 +28,7 @@ import type {
 } from './ui-chrome-types'
 import type { WorkspaceStatusDefinition } from './worktree/types'
 import type { PersistedAutomationHostFilter } from './automation-host-filter'
+import type { PendingRuntimeRepoRemoval } from './pending-runtime-repo-removal'
 import type { PersistedWorkspaceActivityWindowState } from './fork-workspace-activity-window/workspace-activity-window'
 import type { PersistedWorkspaceReviewFilterState } from './fork-workspace-review-filters/workspace-review-filters'
 

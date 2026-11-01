@@ -9,10 +9,10 @@ const { netFetchMock, netRequestMock } = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({ net: { fetch: netFetchMock, request: netRequestMock } }))
 
-const latestUrl = 'https://github.com/stablyai/orca/releases/latest'
-const releaseUrl = 'https://github.com/stablyai/orca/releases/download/v1.4.241'
+const latestUrl = 'https://github.com/zpyoung/orca/releases/latest'
+const releaseUrl = 'https://github.com/zpyoung/orca/releases/download/v1.4.241'
 
-function serveLatestRelease(location = '/stablyai/orca/releases/tag/v1.4.241'): void {
+function serveLatestRelease(location = '/zpyoung/orca/releases/tag/v1.4.241'): void {
   netFetchMock.mockImplementation(async (url: string) => {
     if (url === latestUrl) {
       return new Response(null, { status: 302, headers: { location } })
@@ -65,12 +65,12 @@ describe('latest stable release fallback', () => {
   )
 
   it.each([
-    'https://other.example/stablyai/orca/releases/tag/v1.4.241',
+    'https://other.example/zpyoung/orca/releases/tag/v1.4.241',
     '/other/repo/releases/tag/v1.4.241',
-    '/stablyai/orca/releases/tag/v1.4.242-rc.1',
-    '/stablyai/orca/releases/tag/mobile-android-v0.0.59',
-    '/stablyai/orca/releases/tag/%',
-    '/stablyai/orca/releases/latest'
+    '/zpyoung/orca/releases/tag/v1.4.242-rc.1',
+    '/zpyoung/orca/releases/tag/mobile-android-v0.0.59',
+    '/zpyoung/orca/releases/tag/%',
+    '/zpyoung/orca/releases/latest'
   ])('rejects an invalid fallback redirect %s before probing assets', async (location) => {
     serveLatestRelease(location)
     const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
@@ -99,7 +99,7 @@ describe('latest stable release fallback', () => {
     const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
     await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
 
-    serveLatestRelease('https://github.com/stablyai/orca/releases/tag/v1.4.241')
+    serveLatestRelease('https://github.com/zpyoung/orca/releases/tag/v1.4.241')
     await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.241')
   })
 })

@@ -172,8 +172,9 @@ export abstract class OrcaRuntimeWithRuntimeId extends RuntimeConstructionServic
       rendererTabIdentityKeys: ReadonlySet<string>
       // Why: the baseline mergeRendererTerminalDockAcrossSnapshot diffs the next
       // publication against, so an untouched pane's stale echo can't win over a
-      // value another client patched into the stored snapshot in between.
-      rendererDockByPaneKeyByParentTabId: ReadonlyMap<
+      // value another client patched into the stored snapshot in between. Optional so
+      // an upstream test double that omits it turns the dock merge off.
+      rendererDockByPaneKeyByParentTabId?: ReadonlyMap<
         string,
         Record<string, TerminalDockPaneState> | undefined
       >

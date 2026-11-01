@@ -54,9 +54,16 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
     baseBranch,
     telemetrySource,
     launchSource,
+<<<<<<< fork
     agentOverride,
     agentArgs,
     launchOptions
+||||||| base
+    agentOverride,
+    agentArgs
+=======
+    agentOverride
+>>>>>>> upstream
   } = args
   let agentArgs = args.agentArgs
   const store = useAppStore.getState()
@@ -222,8 +229,20 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
       worktreePath,
       repoId,
       agentOverride,
+<<<<<<< fork
       agentArgs,
       launchOptions,
+||||||| base
+      agentArgs,
+=======
+      agentLaunchPreferences: args.agentLaunchPreferences,
+      agentArgs: args.agentArgs,
+      ...(args.sessionOptions ? { sessionOptions: args.sessionOptions } : {}),
+      resolveAgentArgs: args.resolveAgentArgs,
+      resolveSessionOptions: args.resolveSessionOptions,
+      launchChoice: args.launchChoice,
+      sessionOptionsYieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
+>>>>>>> upstream
       repoConnectionId,
       repoHost: repo,
       latestStore: useAppStore.getState(),

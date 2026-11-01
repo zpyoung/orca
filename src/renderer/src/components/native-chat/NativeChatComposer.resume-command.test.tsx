@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeChatPickerItem } from '../../../../shared/native-chat/input/native-chat-picker-items'
 import type { QueuedMessageInlineEditor } from './use-structured-agent-session-queued-edit'
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
-import type * as RemoteRuntimePtyIdModule from '../../../../shared/remote-runtime-pty-id'
+import type * as RemoteRuntimePtyIdModule from '../../../../shared/remote-runtime/remote-runtime-pty-id'
 
 type CommandItem = Extract<NativeChatPickerItem, { kind: 'command' }>
 
@@ -43,6 +43,9 @@ vi.mock('../../store', () => {
     activeWorkspaceExecutionHostId: 'ssh:box',
     tabsByWorktree: { 'wt-1': [{ id: 'tab-1' }] },
     unifiedTabsByWorktree: {},
+    worktreesByRepo: {},
+    detectedWorktreesByRepo: {},
+    folderWorkspaces: [],
     updateSettings: vi.fn(),
     clearNativeChatLaunchDraft: vi.fn(),
     markNativeChatLaunchDraftAdopted: vi.fn()
@@ -54,7 +57,7 @@ vi.mock('../../store', () => {
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
   sendRuntimePtyInput: vi.fn()
 }))
-vi.mock('../../../../shared/remote-runtime-pty-id', async (importOriginal) => ({
+vi.mock('../../../../shared/remote-runtime/remote-runtime-pty-id', async (importOriginal) => ({
   ...(await importOriginal<typeof RemoteRuntimePtyIdModule>()),
   isRemoteRuntimePtyId: () => false
 }))
@@ -128,6 +131,21 @@ vi.mock('../dictation/dictation-control-events', () => ({
 }))
 vi.mock('./fork-agent-composer/use-agent-composer-keydown', () => ({
   useAgentComposerKeyDown: (args: KeyDownArgs) => {
+    mocks.keyDownArgs = args
+    return vi.fn()
+  }
+}))
+vi.mock('./use-native-chat-draft', () => ({
+  useNativeChatDraft: () => ({ draft: mocks.draft, setDraft: mocks.setDraft })
+}))
+vi.mock('./NativeChatComposerField', () => ({
+  NativeChatComposerField: (props: FieldProps) => {
+    mocks.fieldProps = props
+    return <textarea ref={props.textareaRef} value={mocks.draft} readOnly />
+  }
+}))
+vi.mock('./use-native-chat-composer-keydown', () => ({
+  useNativeChatComposerKeyDown: (args: KeyDownArgs) => {
     mocks.keyDownArgs = args
     return vi.fn()
   }

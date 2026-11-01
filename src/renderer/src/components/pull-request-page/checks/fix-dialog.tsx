@@ -65,6 +65,7 @@ export function ChecksFixDialog({
           )
         )
       }}
+<<<<<<< fork
       onStart={({ agent, commandInput, agentArgs, launchOptions }) =>
         startFixChecksFromDialog({
           targetRepoId,
@@ -75,6 +76,19 @@ export function ChecksFixDialog({
           launchOptions
         })
       }
+||||||| base
+      onStart={({ agent, commandInput, agentArgs }) =>
+        startFixChecksFromDialog({
+          targetRepoId,
+          item,
+          agent,
+          commandInput,
+          agentArgs
+        })
+      }
+=======
+      onStart={(launch) => startFixChecksFromDialog({ targetRepoId, item, ...launch })}
+>>>>>>> upstream
     />
   )
 }

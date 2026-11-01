@@ -64,6 +64,7 @@ export const gitApi = {
     compareAgainstHead?: boolean
     connectionId?: string
     requestToken?: string
+    wakeWslDistro?: boolean
   }) => ipcRenderer.invoke('git:diff', args),
   cancelDiff: (args: { requestToken: string }): Promise<void> =>
     ipcRenderer.invoke('git:cancelDiff', args),

@@ -1,8 +1,11 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
-import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'
+import type {
+  ComposerAutocomplete,
+  NativeChatPickerItem
+} from '../../../../../shared/native-chat-composer-autocomplete'
 import { isMacPlatform } from '../native-chat-shortcut'
 import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
 

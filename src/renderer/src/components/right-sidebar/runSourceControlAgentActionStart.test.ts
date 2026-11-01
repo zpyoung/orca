@@ -486,41 +486,7 @@ describe('runSourceControlAgentActionStart CLI arguments applicability', () => {
 
     expect(mocks.launchAgentInNewTab).toHaveBeenCalledTimes(1)
     const launchCall = mocks.launchAgentInNewTab.mock.calls[0]?.[0]
-    expect(launchCall).toHaveProperty('agentArgs', undefined)
-  })
-
-  it('omits them on the onStart branch too', async () => {
-    const onStart = vi.fn().mockResolvedValue(true)
-
-    await expect(
-      runSourceControlAgentActionStart(
-        buildArgs({ agentArgsApply: false, onStart, worktreeId: undefined, groupId: undefined })
-      )
-    ).resolves.toBe(true)
-
-    expect(onStart).toHaveBeenCalledWith({
-      agent: 'codex',
-      commandInput: 'Fix the bug',
-      agentArgs: undefined,
-      launchOptions: {}
-    })
-  })
-
-  // Omitting a field must not overwrite saved terminal arguments.
-  it('still saves the recipe with the arguments the user had stored', async () => {
-    mocks.launchAgentInNewTab.mockReturnValue({
-      surface: { kind: 'local-terminal', tabId: 'tab-1' }
-    })
-
-    await runSourceControlAgentActionStart(
-      buildArgs({ agentArgsApply: false, saveTargetValue: 'global' })
-    )
-
-    expect(mocks.onSaveAgentDefault).toHaveBeenCalledWith(
-      expect.anything(),
-      'resolveComments',
-      expect.objectContaining({ agentArgs: '--model gpt-5' })
-    )
+    expect(launchCall).toHaveProperty('agentArgs', '--model gpt-5')
   })
 })
 
@@ -634,6 +600,14 @@ it.each(['--model gpt-5.6-luna', '--model gpt-5.6-sol'])(
     expect(nextOptions).toEqual({})
     const command = resolveAgentLaunchCommand({
       agent: 'codex',
+<<<<<<< fork
+      commandInput: 'Fix the bug',
+      agentArgs: undefined,
+      launchOptions: {}
+||||||| base
+      commandInput: 'Fix the bug',
+      agentArgs: undefined
+=======
       cmdOverrides: {},
       platform: 'linux',
       shell: 'posix',
@@ -645,6 +619,7 @@ it.each(['--model gpt-5.6-luna', '--model gpt-5.6-sol'])(
         sessionOptions: nextOptions.sessionOptions,
         yieldToAgentArgs: nextOptions.sessionOptionsYieldToAgentArgs
       })
+>>>>>>> upstream
     })
     expect(command).toMatchObject({
       ok: true,

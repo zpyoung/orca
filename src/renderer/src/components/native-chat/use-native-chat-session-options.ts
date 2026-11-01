@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
-import {
-  getAgentSessionOptionCatalog,
-  type CatalogModel
-} from '../../../../shared/agent-session-option-catalog'
-import { matchNativeChatCatalogModelId } from '../../../../shared/native-chat-session-option-state'
-import type { SessionOptionDescriptor } from '../../../../shared/native-chat-session-options'
+import { getAgentSessionOptionCatalog } from '../../../../shared/agent-session-option-catalog'
+import { matchNativeChatCatalogModelId } from '../../../../shared/native-chat/input/native-chat-session-option-state'
+import type { SessionOptionDescriptor } from '../../../../shared/native-chat/input/native-chat-session-options'
 import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
 import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import {
@@ -38,36 +35,6 @@ const subscribeEmpty = (): (() => void) => () => {}
 const getEmptySnapshot = (): SessionOptionDescriptor[] => EMPTY_SNAPSHOT
 
 const CLIENT_SETTINGS_TARGET = { kind: 'local' } as const
-
-/** Retire authoritative missing model defaults too: launch sites without a picker still turn persisted IDs into -m arguments. */
-export async function retirePersistedModelMissingFromDiscovery(
-  agent: AgentType,
-  models: readonly CatalogModel[]
-): Promise<void> {
-  if (!getAgentSessionOptionCatalog(agent)?.discoveredModelsAreAuthoritative) {
-    return
-  }
-  // An empty list means the probe failed, not that the account has no models.
-  if (models.length === 0) {
-    return
-  }
-  await enqueueSessionOptionSettingsWrite(CLIENT_SETTINGS_TARGET, {
-    type: 'clear-model-if-missing',
-    agent,
-    availableModelIds: models.map((model) => model.id)
-  })
-}
-
-async function retireModelsMissingFromDiscovery(
-  agent: AgentType,
-  hostKey: string,
-  models: readonly CatalogModel[]
-): Promise<void> {
-  await Promise.all([
-    retirePersistedModelMissingFromDiscovery(agent, models),
-    retireAutomationLaunchModelsMissingFromDiscovery(agent, hostKey, models)
-  ])
-}
 
 export function useNativeChatSessionOptions(args: {
   agent: AgentType
@@ -295,17 +262,21 @@ export function useNativeChatSessionOptions(args: {
             surface.reportSessionOptions(reportedValues)
           }
         }
-        void retireModelsMissingFromDiscovery(agent, discoveryContext.hostKey, models).catch(
-          () => undefined
-        )
+        void retireAutomationLaunchModelsMissingFromDiscovery(
+          agent,
+          discoveryContext.hostKey,
+          models
+        ).catch(() => undefined)
       }
     )
-    // Subscriptions do not replay; inspect cached discovery so pre-mount probes can retire stale defaults.
+    // Subscriptions do not replay; inspect cached discovery so pre-mount probes can retire stale automation models.
     const cached = readNativeChatEnrichedModels(agent, discoveryContext.hostKey)
     if (cached) {
-      void retireModelsMissingFromDiscovery(agent, discoveryContext.hostKey, cached).catch(
-        () => undefined
-      )
+      void retireAutomationLaunchModelsMissingFromDiscovery(
+        agent,
+        discoveryContext.hostKey,
+        cached
+      ).catch(() => undefined)
     }
     ensureNativeChatModelEnrichment({
       agent,

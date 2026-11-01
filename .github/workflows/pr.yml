@@ -22,7 +22,7 @@ jobs:
   code_paths:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     name: detect changes and check repository guards
-    # Start routing without waiting behind the GitHub-hosted test queue.
+    # Hosted runners start faster than Blacksmith's (~5s vs ~13s) and this sparse checkout fits one vCPU.
     runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
@@ -127,10 +127,8 @@ jobs:
     name: static analysis and typecheck
     needs: [code_paths]
     if: needs.code_paths.outputs.static_analysis == 'true' || needs.code_paths.outputs.typecheck == 'true'
-    # Leave headroom for typechecking and overlapping checks.
+    # Free hosted ARM: no job on the gate's critical path waits for preflight.
     runs-on: ubuntu-24.04-arm
-    outputs:
-      shards: ${{ steps.unit-plan.outputs.shards }}
 
     steps:
       - name: Checkout
@@ -164,6 +162,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: config/.bun-version
+          no-cache: true
 
       # Keep each check in its own log while sharing this runner.
       - name: Lint
@@ -212,32 +211,7 @@ jobs:
 
       - wait: localization-catalogs
 
-      # Planning shares setup and stays off the compiler's critical path.
-      - name: Plan unit selection
-        if: '!cancelled()'
-        id: unit-plan
-        background: true
-        env:
-          PREFLIGHT_PHASE_SELECTED: ${{ needs.code_paths.outputs.typecheck == 'true' }}
-          PREFLIGHT_PRIOR_SUCCESS: ${{ job.status == 'success' }}
-          ORCA_UNIT_SELECTION_MODE: ${{ vars.ORCA_UNIT_SELECTION_MODE || 'shadow' }}
-          ORCA_PULL_REQUEST_DRAFT: ${{ github.event.pull_request.draft }}
-          # Five shards use fewer runner minutes; the repository variable can request 2 to 10.
-          ORCA_UNIT_FULL_SHARD_COUNT: ${{ vars.ORCA_UNIT_FULL_SHARD_COUNT || '5' }}
-        run: |
-          if [ "$PREFLIGHT_PHASE_SELECTED" != true ] || [ "$PREFLIGHT_PRIOR_SUCCESS" != true ]; then exit 0; fi
-          node config/scripts/ci-unit-plan.mjs
-
       - wait: typecheck
-
-      - wait: unit-plan
-
-      - uses: actions/upload-artifact@v7
-        if: needs.code_paths.outputs.typecheck == 'true'
-        with:
-          name: unit-selection-attempt-${{ github.run_attempt }}
-          path: ci-shards/unit-selection.json
-          retention-days: 14
 
       - name: Test Mobile CI tools and runtime routing
         if: needs.code_paths.outputs.mobile_ci_tools == 'true'
@@ -293,7 +267,8 @@ jobs:
     uses: ./.github/workflows/unit-tests.yml
     with:
       node_versions: '["24"]'
-      runner: ubuntu-latest
+      # Free hosted ARM: 12 shards measured 361s median cold vs ~390s for 5 warm Blacksmith 8-vCPU shards.
+      runner: ubuntu-24.04-arm
       phase_diagnostics: true
       # Restore main's transform cache; the `ci:cold-unit-cache` label or ORCA_UNIT_MODULE_CACHE=off forces cold.
       module_cache: ${{ (vars.ORCA_UNIT_MODULE_CACHE == 'off' || contains(github.event.pull_request.labels.*.name, 'ci:cold-unit-cache')) && 'off' || 'warm' }}

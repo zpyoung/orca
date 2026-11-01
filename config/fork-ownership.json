@@ -140,7 +140,8 @@
         "src/renderer/src/store/slices/ui/ui-slice-contract-ledger-page.ts",
         "src/renderer/src/store/slices/ui/ui-slice-ledger-page-actions.ts",
         "src/renderer/src/web/web-ledger-api.ts",
-        "src/shared/ledger*.ts"
+        "src/shared/ledger*.ts",
+        "src/renderer/src/components/settings/fork-project-ledger/**"
       ]
     },
     {
@@ -499,11 +500,11 @@
       ]
     },
     {
-      "path": "src/shared/remote-runtime-client-capabilities.ts",
+      "path": "src/shared/remote-runtime/remote-runtime-client-capabilities.ts",
       "feature": "heimdall",
       "kind": "registration",
       "lines": [
-        "import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from './fork-heimdall/capability'",
+        "import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../fork-heimdall/capability'",
         "      ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES,"
       ]
     },
@@ -743,12 +744,6 @@
         "    ],",
         "    load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS"
       ]
-    },
-    {
-      "path": "src/cli/args.ts",
-      "feature": "heimdall",
-      "kind": "registration",
-      "lines": ["      'heimdall',"]
     },
     {
       "path": "src/main/startup/cli-command-names.ts",
@@ -1149,12 +1144,12 @@
       ]
     },
     {
-      "path": "src/main/runtime/rpc/methods/worktree.ts",
+      "path": "src/main/runtime/rpc/methods/worktree-set-method.ts",
       "feature": "worktree-groups",
       "kind": "passthrough",
       "lines": [
-        "        ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),",
-        "    handler: async (params, { runtime, clientKind }) => {"
+        "      ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),",
+        "  handler: async (params, { runtime, clientKind }) => {"
       ]
     },
     {
@@ -1196,7 +1191,7 @@
       "kind": "import-swap",
       "lines": [
         "import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'",
-        "      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })"
+        "          discoverLiveClaudePluginSkillSources({ homeDir, cwd: pluginCwd, signal: args.signal }),"
       ]
     },
     {
@@ -1216,12 +1211,6 @@
         "const TELEMETRY_ENABLED = false",
         "    (!TELEMETRY_ENABLED && !testTransportEnabled) ||"
       ]
-    },
-    {
-      "path": "src/main/updater.feed-attempt-lifetime.test.ts",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["      url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
     },
     {
       "path": "src/main/updater.publishing-window-feed.test.ts",
@@ -1317,19 +1306,16 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts",
+      "path": "src/shared/native-chat-composer-autocomplete.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": ["          pluginName: 'quirk',", "          pluginName: 'two words',"]
     },
     {
-      "path": "src/renderer/src/components/native-chat/native-chat-composer-state.ts",
+      "path": "src/shared/native-chat-composer-autocomplete.ts",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": [
-        "} from './fork-agent-composer/agent-composer-history'",
-        "    profile?.namespacesPluginSkills === true"
-      ]
+      "lines": ["    profile?.namespacesPluginSkills === true"]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts",
@@ -1374,25 +1360,22 @@
       ]
     },
     {
-      "path": "src/shared/native-chat-picker-items.ts",
+      "path": "src/shared/native-chat/input/native-chat-picker-items.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
       "lines": ["      pluginName?: string", "  namespacePluginSkills = false"]
     },
     {
-      "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
+      "path": "src/shared/native-chat-pty-session-options.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
       "lines": ["  ): boolean =>", "  const applyReport = ("]
     },
     {
-      "path": "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts",
+      "path": "src/shared/native-chat-session-option-cache.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
-      "lines": [
-        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'",
-        "): boolean {"
-      ]
+      "lines": ["): boolean {"]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx",
@@ -1424,12 +1407,6 @@
         "import { getSessionInfoActivityItem } from './fork-session-info/session-info-activity-item'",
         "      getSessionInfoActivityItem(),"
       ]
-    },
-    {
-      "path": "src/renderer/src/components/settings/ExperimentalPane.test.tsx",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["      'Terminal dock'", "    expect(markup).toContain('Terminal dock')"]
     },
     {
       "path": "src/renderer/src/components/settings/ExperimentalPane.tsx",
@@ -1553,7 +1530,7 @@
       "feature": "worktree-groups",
       "kind": "passthrough",
       "lines": [
-        "  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview",
+        "  worktreeGroupMembershipDragPreview?: WorktreeGroupMembershipDragPreview",
         "            'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
         "  sectionSeparatorClass?: string | false",
         "        args.sectionSeparatorClass,"
@@ -1873,7 +1850,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/lib/terminal-title-contrast.ts",
+      "path": "src/shared/terminal-title-contrast.ts",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
       "lines": [
@@ -2045,12 +2022,6 @@
       ]
     },
     {
-      "path": "src/main/updater/updater-release-feed.ts",
-      "feature": "fork-infra",
-      "kind": "registration",
-      "lines": ["    const url = 'https://github.com/zpyoung/orca/releases/latest/download'"]
-    },
-    {
       "path": "src/main/updater/updater-setup.ts",
       "feature": "fork-infra",
       "kind": "registration",
@@ -2177,13 +2148,13 @@
       "lines": ["    skillSourceOwner: 'grok',", "    skillSourceOwner: 'codex',"]
     },
     {
-      "path": "src/shared/native-chat-session-option-state.test.ts",
+      "path": "src/shared/native-chat/input/native-chat-session-option-state.test.ts",
       "feature": "native-chat-session-options",
       "kind": "passthrough",
       "lines": ["      value: 'max',", "      source: 'dispatched',"]
     },
     {
-      "path": "src/shared/native-chat-session-option-state.ts",
+      "path": "src/shared/native-chat/input/native-chat-session-option-state.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
       "lines": ["    [optionId]: tracked", "    record.model = tracked"]
@@ -2317,7 +2288,7 @@
       "kind": "passthrough",
       "lines": [
         "    usage: 'orca artifacts share <file> [--protect] [--api-url <url>] [--json]',",
-        "    allowedFlags: [...GLOBAL_FLAGS, ...CLOUD_FLAGS, 'file', 'protect'],"
+        "    allowedFlags: [...LOCAL_COMMAND_FLAGS, ...CLOUD_FLAGS, 'file', 'protect'],"
       ]
     },
     {
@@ -2737,18 +2708,14 @@
       "lines": [
         "import { appendClaudeSuppressionFlags } from './fork-ask-question-tool/claude-suppression-flag-composition'",
         "  claudeSuppressionFlags?: string[] | null",
-        "    ...appendClaudeSuppressionFlags({",
-        "      agent: args.agent,",
-        "      shell: args.shell,",
-        "      override,",
-        "      command: args.sessionOptionsOverrideAgentArgs",
-        "        ? commandWithOverrides",
-        "        : suffix.suffix",
-        "          ? `${commandWithOptions} ${suffix.suffix}`",
-        "          : commandWithOptions,",
-        "      commandWithoutSessionOptions,",
-        "      claudeSuppressionFlags: args.claudeSuppressionFlags,",
-        "      isRemote: args.isRemote"
+        "  const suppressed = appendClaudeSuppressionFlags({",
+        "    agent: args.agent,",
+        "    shell: args.shell,",
+        "    override,",
+        "    command: withArgs(render(launchTokens), launchHead),",
+        "    commandWithoutSessionOptions: withArgs(resumeArgs),",
+        "    claudeSuppressionFlags: args.claudeSuppressionFlags,",
+        "    isRemote: args.isRemote"
       ]
     },
     {
@@ -2779,12 +2746,6 @@
         "    keys: ['ask', 'ask wait', 'ask cancel'],",
         "    load: async () => (await import('./fork-ask-question-tool/handlers.js')).ASK_HANDLERS"
       ]
-    },
-    {
-      "path": "src/cli/args.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": ["      'ask',"]
     },
     {
       "path": "src/main/startup/cli-command-names.ts",
@@ -2821,11 +2782,7 @@
       "path": "src/cli/bundled-skill-guides.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
-      "lines": [
-        "    name: \"orca-ask\",",
-        "    markdown: ORCA_ASK_MARKDOWN,",
-        "    fullMarkdown: ORCA_ASK_MARKDOWN,"
-      ]
+      "lines": ["    name: \"orca-ask\",", "    markdown: ORCA_ASK_MARKDOWN,"]
     },
     {
       "path": "config/scripts/generate-bundled-skill-guides.mjs",
@@ -2843,11 +2800,7 @@
       "path": "src/cli/bundled-skill-guides.ts",
       "feature": "heimdall",
       "kind": "registration",
-      "lines": [
-        "    name: \"orca-heimdall\",",
-        "    markdown: ORCA_HEIMDALL_MARKDOWN,",
-        "    fullMarkdown: ORCA_HEIMDALL_MARKDOWN,"
-      ]
+      "lines": ["    name: \"orca-heimdall\",", "    markdown: ORCA_HEIMDALL_MARKDOWN,"]
     },
     {
       "path": "src/cli/root-help-text-primary.ts",
@@ -2948,7 +2901,7 @@
       "lines": [
         "import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'",
         "import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'",
-        "/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', \u2026)`. */",
+        "/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */",
         "export type AskApi = {",
         "  onSet: (callback: (event: AskRegistryEvent) => void) => () => void",
         "  getSuppressionVerdict: () => Promise<ClaudeSuppressionVerdict>",
@@ -3011,7 +2964,7 @@
         "        command: applyClaudeSuppressionFlagsToResumeCommand({",
         "          agent: args.agent,",
         "          shell,",
-        "          command: resolvedAgentCommand,",
+        "          command: withAgentTerminalInputArgs(",
         "          claudeSuppressionFlags: args.claudeSuppressionFlags,",
         "          isRemote: args.isRemote",
         "        isRemote: args.isRemote,",
@@ -3108,7 +3061,7 @@
       "kind": "registration",
       "lines": [
         "import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'",
-        "      rendererDockByPaneKeyByParentTabId: ReadonlyMap<"
+        "      rendererDockByPaneKeyByParentTabId?: ReadonlyMap<"
       ]
     },
     {
@@ -3805,7 +3758,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/RepositoryPane.tsx",
+      "path": "src/renderer/src/components/settings/repository/RepositoryPane.tsx",
       "feature": "project-ledger",
       "kind": "registration",
       "lines": [
@@ -3821,15 +3774,15 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/repository-search.ts",
+      "path": "src/renderer/src/components/settings/repository/repository-search.ts",
       "feature": "project-ledger",
       "kind": "registration",
       "lines": [
-        "import { getRepositoryLedgerSearchEntries } from './repository-ledger-search-entries'"
+        "import { getRepositoryLedgerSearchEntries } from '../repository-ledger-search-entries'"
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/repository-settings-targets.ts",
+      "path": "src/renderer/src/components/settings/repository/repository-settings-targets.ts",
       "feature": "project-ledger",
       "kind": "registration",
       "lines": ["export function getRepositoryLedgerSectionId(repoId: string): string {"]
@@ -3877,7 +3830,7 @@
       "feature": "project-ledger",
       "kind": "registration",
       "lines": [
-        "          {translate('auto.components.sidebar.WorktreeList.openLedger', 'Open ledger')}"
+        "            {translate('auto.components.sidebar.WorktreeList.openLedger', 'Open ledger')}"
       ]
     },
     {
@@ -3960,10 +3913,10 @@
       "lines": ["    searchKeywords: ['shortcut', 'ledger', 'observations', 'records'],"]
     },
     {
-      "path": "src/shared/plugins/plugin-command-actions.ts",
+      "path": "src/shared/plugins/contributions/plugin-command-actions.ts",
       "feature": "project-ledger",
       "kind": "registration",
-      "lines": ["  'view.ledger',"]
+      "lines": ["  'view.ledger',", "  'view.ledger': PLUGIN_SCHEMA_SINCE_V1,"]
     },
     {
       "path": "src/shared/rpc-contract/artifacts-params.ts",
@@ -4117,7 +4070,10 @@
       "path": ".github/workflows/ci-cache-warmup-platform-jobs.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["        runner: [ubuntu-24.04-arm, ubuntu-latest]", "    runs-on: ubuntu-latest"]
+      "lines": [
+        "        runner: [ubuntu-24.04-arm, ubuntu-22.04]",
+        "        runner: [ubuntu-24.04]"
+      ]
     },
     {
       "path": "src/renderer/src/components/cmd-j/palette-live-status.tsx",
@@ -4648,7 +4604,7 @@
       "path": "src/renderer/src/lib/launch-agent-in-new-tab.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
+      "lines": ["    includeSessionOptionCatalogDefaults,"]
     },
     {
       "path": "src/renderer/src/lib/launch-agent-web-host-tab.ts",
@@ -5070,7 +5026,8 @@
       "lines": [
         "} from '@/lib/fork-worker-takeover-gate/keyboard-input-gate'",
         "  primeTerminalUserInputKeyboardGate(session.pane.terminal)",
-        "    if (isTerminalUserInputFromKeyboard(session.pane.terminal)) {"
+        "    const fromKeyboard = isTerminalUserInputFromKeyboard(session.pane.terminal)",
+        "    if (fromKeyboard) {"
       ]
     },
     {
@@ -5082,7 +5039,7 @@
         "  announceMissingBaseline({",
         "        clearBuildOutputKeepingMobileWeb(root)",
         "  GOMEMLIMIT: NATIVE_COMPILER_MEMORY_LIMIT",
-        "  withNativeHeapEstimatesInSource(baselineSource(`config/scripts/${baselineName}`))"
+        "writeFileSync(baselineFile, withNativeHeapEstimatesInSource(baselineScript))"
       ]
     },
     {
@@ -5118,8 +5075,7 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": [
-        "        run: git fetch --no-tags --depth=1 https://github.com/stablyai/orca.git +refs/tags/v1.4.224:refs/tags/v1.4.224",
-        "    runs-on: ubuntu-latest"
+        "        run: git fetch --no-tags --depth=1 https://github.com/stablyai/orca.git +refs/tags/v1.4.224:refs/tags/v1.4.224"
       ]
     },
     {
@@ -5287,20 +5243,10 @@
       ]
     },
     {
-      "path": "src/cli/args.ts",
-      "feature": "fork-loops",
-      "kind": "registration",
-      "lines": ["      'loop',"]
-    },
-    {
       "path": "src/cli/bundled-skill-guides.ts",
       "feature": "fork-loops",
       "kind": "registration",
-      "lines": [
-        "    name: \"orca-loop\",",
-        "    markdown: ORCA_LOOP_MARKDOWN,",
-        "    fullMarkdown: ORCA_LOOP_MARKDOWN,"
-      ]
+      "lines": ["    name: \"orca-loop\",", "    markdown: ORCA_LOOP_MARKDOWN,"]
     },
     {
       "path": "src/cli/handler-group-manifest.ts",
@@ -5536,133 +5482,13 @@
       "path": ".github/workflows/ci-cache-warmup.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/ci-runner-demand.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-slim"]
+      "lines": ["        runner: [ubuntu-24.04]"]
     },
     {
       "path": ".github/workflows/ci-xterm-cache.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-24.04-arm"]
-    },
-    {
-      "path": ".github/workflows/cloud-verify.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-22.04"]
-    },
-    {
-      "path": ".github/workflows/computer-e2e.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": [
-        "    runs-on: ${{ matrix.os }}",
-        "    runs-on: macos-15",
-        "    runs-on: ubuntu-22.04"
-      ]
-    },
-    {
-      "path": ".github/workflows/dependency-security.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": [
-        "        default: ubuntu-latest",
-        "    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}"
-      ]
-    },
-    {
-      "path": ".github/workflows/docs.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/mobile.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-24.04-arm", "    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/node-next-compat.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/node-server-tests.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": [
-        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}",
-        "      ${{ inputs.fast_runners && fromJSON('{\"ubuntu-22.04\":\"blacksmith-8vcpu-ubuntu-2204\",\"ubuntu-24.04-arm\":\"blacksmith-8vcpu-ubuntu-2404-arm\",\"macos-15\":\"blacksmith-6vcpu-macos-15\",\"macos-15-intel\":\"macos-15-intel\",\"windows-2022\":\"blacksmith-8vcpu-windows-2025\",\"windows-11-arm\":\"windows-11-arm\"}')[matrix.os] || matrix.os }}",
-        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-8vcpu-ubuntu-2404' || 'ubuntu-latest' }}",
-        "    runs-on: ${{ inputs.fast_runners && (matrix.os == 'ubuntu-22.04' && 'blacksmith-8vcpu-ubuntu-2204' || 'blacksmith-8vcpu-ubuntu-2404-arm') || matrix.os }}",
-        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-8vcpu-ubuntu-2204' || 'ubuntu-22.04' }}",
-        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}"
-      ]
-    },
-    {
-      "path": ".github/workflows/packaged-browser-e2e.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/performance-contracts.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ${{ matrix.os }}"]
-    },
-    {
-      "path": ".github/workflows/pi-owner-runtime.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ${{ matrix.os }}"]
-    },
-    {
-      "path": ".github/workflows/pi-provider-runtime.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ${{ matrix.os }}"]
-    },
-    {
-      "path": ".github/workflows/pr-test-loc.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-slim"]
-    },
-    {
-      "path": "config/scripts/pr-test-loc-summary.test.mjs",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    expect(locJob['runs-on']).toBe('ubuntu-slim')"]
-    },
-    {
-      "path": "config/scripts/node-server-fast-runners.test.mjs",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": [
-        "    expect(runnerFor(workflow.jobs.persistence, os, undefined, event)).toBe(os)",
-        "  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'pull_request')).toBe(hostedRunner)",
-        "  expect(runnerFor(workflow.jobs[name], undefined, undefined, 'schedule')).toBe(hostedRunner)"
-      ]
-    },
-    {
-      "path": "config/scripts/ssh-windows-mobile-bundle.test.mjs",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["  expect(producer['runs-on']).toBe('ubuntu-latest')"]
-    },
-    {
-      "path": ".github/workflows/preflight-cli-platforms.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ${{ matrix.os }}"]
+      "lines": ["        runner: [ubuntu-24.04-arm]"]
     },
     {
       "path": ".github/workflows/release-javascript.yml",
@@ -5671,76 +5497,59 @@
       "lines": ["        default: ubuntu-latest"]
     },
     {
-      "path": ".github/workflows/release-ref-validation.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ${{ matrix.os }}"]
-    },
-    {
-      "path": ".github/workflows/ssh-hostile-hosts.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-22.04", "    runs-on: ubuntu-24.04"]
-    },
-    {
-      "path": ".github/workflows/ssh-windows-hosts.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/terminal-perf.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/unit-plan.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
-    },
-    {
-      "path": ".github/workflows/unit-selection-evidence.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-slim"]
-    },
-    {
       "path": ".github/workflows/unit-tests.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["        default: ubuntu-latest", "    runs-on: ubuntu-latest"]
+      "lines": ["        default: ubuntu-latest"]
     },
     {
-      "path": ".github/workflows/windows-typecheck-parity.yml",
-      "feature": "fork-infra",
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerPane.tsx",
+      "feature": "input-quarantine",
       "kind": "passthrough",
-      "lines": ["    runs-on: windows-2022"]
+      "lines": [
+        "      return { terminalTabId, ptyId: targetPtyId }",
+        "    }, [targetPtyId, terminalTabId])"
+      ]
     },
     {
-      "path": ".github/workflows/wsl-orcad-e2e-frozen-runner-retry.yml",
-      "feature": "fork-infra",
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx",
+      "feature": "project-ledger",
       "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-22.04"]
+      "lines": [
+        "    handleOpenProjectLedger,",
+        "      onOpenProjectLedger: handleOpenProjectLedger,",
+        "      handleOpenProjectLedger,"
+      ]
     },
     {
-      "path": ".github/workflows/wsl-orcad-e2e.yml",
-      "feature": "fork-infra",
+      "path": "src/renderer/src/lib/launch-agent-in-new-tab-args.ts",
+      "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": ["    runs-on: ubuntu-latest"]
+      "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
     },
     {
-      "path": ".github/workflows/zcode-credential-contract.yml",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["    runs-on: ${{ matrix.os }}"]
+      "path": "src/renderer/src/components/settings/keybinding-title-copy.ts",
+      "feature": "project-ledger",
+      "kind": "registration",
+      "lines": [
+        "import { LEDGER_KEYBINDING_TITLE_COPY } from './fork-project-ledger/keybinding-title-copy'",
+        "  ...LEDGER_KEYBINDING_TITLE_COPY,"
+      ]
     },
     {
-      "path": ".github/workflows/zcode-transcript-contract.yml",
-      "feature": "fork-infra",
+      "path": "src/renderer/src/components/settings/keybinding-title-copy.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { TERMINAL_DOCK_KEYBINDING_TITLE_COPY } from './fork-terminal-dock/keybinding-title-copy'",
+        "  ...TERMINAL_DOCK_KEYBINDING_TITLE_COPY"
+      ]
+    },
+    {
+      "path": "src/main/updater-latest-stable-feed.test.ts",
+      "feature": "release-routing",
       "kind": "passthrough",
-      "lines": ["    runs-on: ${{ matrix.os }}"]
+      "lines": ["const latestUrl = 'https://github.com/zpyoung/orca/releases/latest'"]
     }
   ],
   "exceptions": [
@@ -5883,7 +5692,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -6005,7 +5814,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -6146,7 +5955,7 @@
     },
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -6306,13 +6115,13 @@
       "status": "permanent"
     },
     {
-      "path": "src/shared/native-chat-transcript-retention.test.ts",
+      "path": "src/shared/native-chat/transcript/native-chat-transcript-retention.test.ts",
       "reason": "Tests for the retention-fix shared companion above.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#retention-fix"
     },
     {
-      "path": "src/shared/native-chat-transcript-retention.ts",
+      "path": "src/shared/native-chat/transcript/native-chat-transcript-retention.ts",
       "reason": "Retention bug fix's shared companion: the loading param whose error-phase exclusion is the actual fix.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#retention-fix"
@@ -6703,7 +6512,7 @@
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatComposer.tsx",
-      "reason": "Preserves terminal-tab identity when the native-chat composer resolves a quarantine-aware send target.",
+      "reason": "Preserves terminal-tab identity when the native-chat composer resolves a quarantine-aware send target. Its wrapper sends a composer with an editSession to upstream's NativeChatComposerPane, so queued-message editing stays upstream's, and every other composer to the fork pane.",
       "status": "pending-upstream",
       "ledger": "bug-1"
     },
@@ -6983,7 +6792,7 @@
       "added": 35,
       "removed": 0
     },
-    "src/shared/remote-runtime-client-capabilities.ts": {
+    "src/shared/remote-runtime/remote-runtime-client-capabilities.ts": {
       "added": 2,
       "removed": 0
     },
@@ -7079,10 +6888,6 @@
       "added": 55,
       "removed": 0
     },
-    "src/cli/args.ts": {
-      "added": 3,
-      "removed": 0
-    },
     "src/main/startup/cli-command-names.ts": {
       "added": 4,
       "removed": 0
@@ -7136,7 +6941,7 @@
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write-input.ts": {
-      "added": 20,
+      "added": 19,
       "removed": 0
     },
     "src/main/ipc/pty/ipc/write.ts": {
@@ -7263,7 +7068,7 @@
       "added": 2,
       "removed": 1
     },
-    "src/main/runtime/rpc/methods/worktree.ts": {
+    "src/main/runtime/rpc/methods/worktree-set-method.ts": {
       "added": 7,
       "removed": 1
     },
@@ -7291,13 +7096,9 @@
       "added": 8,
       "removed": 2
     },
-    "src/main/updater.feed-attempt-lifetime.test.ts": {
-      "added": 1,
-      "removed": 1
-    },
     "src/main/updater.publishing-window-feed.test.ts": {
-      "added": 5,
-      "removed": 5
+      "added": 3,
+      "removed": 3
     },
     "src/preload/api/native-chat-api.ts": {
       "added": 47,
@@ -7343,12 +7144,12 @@
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
-      "added": 157,
+    "src/shared/native-chat-composer-autocomplete.test.ts": {
+      "added": 160,
       "removed": 1
     },
-    "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
-      "added": 12,
+    "src/shared/native-chat-composer-autocomplete.ts": {
+      "added": 5,
       "removed": 1
     },
     "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
@@ -7371,33 +7172,29 @@
       "added": 1,
       "removed": 1
     },
-    "src/shared/native-chat-picker-items.ts": {
+    "src/shared/native-chat/input/native-chat-picker-items.ts": {
       "added": 76,
       "removed": 21
     },
-    "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
+    "src/shared/native-chat-pty-session-options.ts": {
       "added": 25,
       "removed": 8
     },
-    "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
-      "added": 32,
-      "removed": 1
+    "src/shared/native-chat-session-option-cache.ts": {
+      "added": 31,
+      "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx": {
       "added": 65,
       "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
-      "added": 84,
-      "removed": 11
+      "added": 81,
+      "removed": 9
     },
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
       "added": 19,
       "removed": 2
-    },
-    "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
-      "added": 31,
-      "removed": 0
     },
     "src/renderer/src/components/settings/ExperimentalPane.tsx": {
       "added": 8,
@@ -7468,11 +7265,11 @@
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx": {
-      "added": 7,
+      "added": 10,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts": {
-      "added": 5,
+      "added": 4,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx": {
@@ -7631,7 +7428,7 @@
       "added": 12,
       "removed": 0
     },
-    "src/renderer/src/lib/terminal-title-contrast.ts": {
+    "src/shared/terminal-title-contrast.ts": {
       "added": 3,
       "removed": 3
     },
@@ -7696,8 +7493,8 @@
       "removed": 0
     },
     "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
-      "added": 30,
-      "removed": 17
+      "added": 33,
+      "removed": 18
     },
     "src/renderer/src/web/preload-api/web-preference-normalization.ts": {
       "added": 25,
@@ -7714,10 +7511,6 @@
     "src/shared/global-settings-types.ts": {
       "added": 7,
       "removed": 0
-    },
-    "src/main/updater/updater-release-feed.ts": {
-      "added": 1,
-      "removed": 1
     },
     "src/main/updater/updater-setup.ts": {
       "added": 1,
@@ -7779,11 +7572,11 @@
       "added": 11,
       "removed": 1
     },
-    "src/shared/native-chat-session-option-state.test.ts": {
+    "src/shared/native-chat/input/native-chat-session-option-state.test.ts": {
       "added": 65,
       "removed": 0
     },
-    "src/shared/native-chat-session-option-state.ts": {
+    "src/shared/native-chat/input/native-chat-session-option-state.ts": {
       "added": 42,
       "removed": 4
     },
@@ -8012,8 +7805,8 @@
       "removed": 0
     },
     "src/shared/tui-agent-launch-command.ts": {
-      "added": 17,
-      "removed": 7
+      "added": 15,
+      "removed": 3
     },
     "src/shared/tui-agent-startup.ts": {
       "added": 7,
@@ -8028,7 +7821,7 @@
       "removed": 0
     },
     "src/cli/bundled-skill-guides.ts": {
-      "added": 44,
+      "added": 902,
       "removed": 0
     },
     "src/main/runtime/orca-runtime.ts": {
@@ -8052,8 +7845,8 @@
       "removed": 0
     },
     "src/shared/tui-agent-resume-startup.ts": {
-      "added": 11,
-      "removed": 2
+      "added": 16,
+      "removed": 7
     },
     "src/renderer/src/components/right-sidebar/index.tsx": {
       "added": 3,
@@ -8076,7 +7869,7 @@
       "removed": 0
     },
     "src/main/runtime/construction/runtime-identity-state.ts": {
-      "added": 8,
+      "added": 9,
       "removed": 0
     },
     "src/main/runtime/runtime-mobile-session-projection.ts": {
@@ -8359,7 +8152,7 @@
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/settings/RepositoryPane.tsx": {
+    "src/renderer/src/components/settings/repository/RepositoryPane.tsx": {
       "added": 7,
       "removed": 0
     },
@@ -8367,11 +8160,11 @@
       "added": 2,
       "removed": 1
     },
-    "src/renderer/src/components/settings/repository-search.ts": {
+    "src/renderer/src/components/settings/repository/repository-search.ts": {
       "added": 2,
       "removed": 0
     },
-    "src/renderer/src/components/settings/repository-settings-targets.ts": {
+    "src/renderer/src/components/settings/repository/repository-settings-targets.ts": {
       "added": 4,
       "removed": 0
     },
@@ -8392,7 +8185,7 @@
       "removed": 2
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/repo-header-project-actions.tsx": {
-      "added": 6,
+      "added": 8,
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/use-project-group-dialogs.ts": {
@@ -8400,8 +8193,8 @@
       "removed": 6
     },
     "src/renderer/src/i18n/locales/en.json": {
-      "added": 237,
-      "removed": 2
+      "added": 234,
+      "removed": 1
     },
     "src/renderer/src/store/project-groups/project-group-mutations.ts": {
       "added": 19,
@@ -8435,8 +8228,8 @@
       "added": 8,
       "removed": 0
     },
-    "src/shared/plugins/plugin-command-actions.ts": {
-      "added": 1,
+    "src/shared/plugins/contributions/plugin-command-actions.ts": {
+      "added": 2,
       "removed": 0
     },
     "src/shared/rpc-contract/artifacts-params.ts": {
@@ -8497,7 +8290,7 @@
     },
     ".github/workflows/ci-cache-warmup-platform-jobs.yml": {
       "added": 2,
-      "removed": 2
+      "removed": 8
     },
     "src/renderer/src/components/cmd-j/palette-live-status.tsx": {
       "added": 13,
@@ -8760,20 +8553,20 @@
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-background-session.ts": {
-      "added": 30,
-      "removed": 18
+      "added": 29,
+      "removed": 17
     },
     "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
       "added": 27,
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-in-new-tab.ts": {
-      "added": 10,
+      "added": 4,
       "removed": 1
     },
     "src/renderer/src/lib/launch-agent-web-host-tab.ts": {
-      "added": 19,
-      "removed": 3
+      "added": 21,
+      "removed": 6
     },
     "src/renderer/src/lib/launch-work-item-direct-agent.ts": {
       "added": 13,
@@ -8788,8 +8581,8 @@
       "removed": 1
     },
     "src/renderer/src/lib/runtime-agent-background-create.ts": {
-      "added": 11,
-      "removed": 2
+      "added": 13,
+      "removed": 5
     },
     "src/shared/agent-session-host-authority.ts": {
       "added": 2,
@@ -8996,8 +8789,8 @@
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/pty-connection/pane-host-capability-flags.ts": {
-      "added": 8,
-      "removed": 1
+      "added": 14,
+      "removed": 5
     },
     "config/scripts/pr-aggregate-gate-context.mjs": {
       "added": 12,
@@ -9008,7 +8801,7 @@
       "removed": 1
     },
     "config/scripts/benchmark-ci-preflight-critical-path.mjs": {
-      "added": 27,
+      "added": 24,
       "removed": 3
     },
     "config/scripts/benchmark-preflight-compat-boundary.mjs": {
@@ -9092,8 +8885,8 @@
       "removed": 0
     },
     ".github/workflows/e2e.yml": {
-      "added": 7,
-      "removed": 7
+      "added": 1,
+      "removed": 1
     },
     "src/shared/remote-runtime/control/remote-runtime-shared-control-protocol.ts": {
       "added": 2,
@@ -9107,75 +8900,7 @@
       "added": 1,
       "removed": 1
     },
-    ".github/workflows/ci-runner-demand.yml": {
-      "added": 1,
-      "removed": 1
-    },
     ".github/workflows/ci-xterm-cache.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/cloud-verify.yml": {
-      "added": 4,
-      "removed": 4
-    },
-    ".github/workflows/computer-e2e.yml": {
-      "added": 3,
-      "removed": 3
-    },
-    ".github/workflows/dependency-security.yml": {
-      "added": 4,
-      "removed": 4
-    },
-    ".github/workflows/docs.yml": {
-      "added": 3,
-      "removed": 3
-    },
-    ".github/workflows/mobile.yml": {
-      "added": 3,
-      "removed": 3
-    },
-    ".github/workflows/node-next-compat.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/node-server-tests.yml": {
-      "added": 7,
-      "removed": 7
-    },
-    ".github/workflows/packaged-browser-e2e.yml": {
-      "added": 2,
-      "removed": 2
-    },
-    ".github/workflows/performance-contracts.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/pi-owner-runtime.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/pi-provider-runtime.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/pr-test-loc.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    "config/scripts/pr-test-loc-summary.test.mjs": {
-      "added": 1,
-      "removed": 1
-    },
-    "config/scripts/node-server-fast-runners.test.mjs": {
-      "added": 3,
-      "removed": 3
-    },
-    "config/scripts/ssh-windows-mobile-bundle.test.mjs": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/preflight-cli-platforms.yml": {
       "added": 1,
       "removed": 1
     },
@@ -9183,53 +8908,25 @@
       "added": 1,
       "removed": 1
     },
-    ".github/workflows/release-ref-validation.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/ssh-hostile-hosts.yml": {
-      "added": 4,
-      "removed": 4
-    },
-    ".github/workflows/ssh-windows-hosts.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/terminal-perf.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/unit-plan.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/unit-selection-evidence.yml": {
-      "added": 1,
-      "removed": 1
-    },
     ".github/workflows/unit-tests.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/updater-latest-stable-feed.test.ts": {
+      "added": 9,
+      "removed": 9
+    },
+    "src/renderer/src/components/native-chat/NativeChatComposerPane.tsx": {
       "added": 2,
       "removed": 2
     },
-    ".github/workflows/windows-typecheck-parity.yml": {
-      "added": 1,
+    "src/renderer/src/components/settings/keybinding-title-copy.ts": {
+      "added": 5,
       "removed": 1
     },
-    ".github/workflows/wsl-orcad-e2e-frozen-runner-retry.yml": {
+    "src/renderer/src/lib/launch-agent-in-new-tab-args.ts": {
       "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/wsl-orcad-e2e.yml": {
-      "added": 2,
-      "removed": 2
-    },
-    ".github/workflows/zcode-credential-contract.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    ".github/workflows/zcode-transcript-contract.yml": {
-      "added": 1,
-      "removed": 1
+      "removed": 0
     }
   }
 }

@@ -30,5 +30,11 @@
         }
       }
     }
+  },
+  "keybindings": {
+    "title": {
+      "terminalDockToggle": "Toggle agent composer dock",
+      "terminalDockPassthrough": "Toggle terminal passthrough mode"
+    }
   }
 }

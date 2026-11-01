@@ -51,7 +51,8 @@ export async function readIncrementalTranscriptMessages(
   onBatch?: (messages: NativeChatMessage[]) => void,
   decodeCompanion?: NativeChatTranscriptCompanionDecoder | null,
   onCompanion?: (companion: NativeChatTranscriptCompanion) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sourceOrder = false
 ): Promise<NativeChatMessage[]> {
   const end = (await transcriptFileStat(filePath, 'exact', signal)).size
   if (end <= state.offset) {

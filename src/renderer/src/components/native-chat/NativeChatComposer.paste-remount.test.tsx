@@ -13,7 +13,7 @@ import type {
   AgentComposerFieldProps
 } from './fork-agent-composer/AgentComposerField'
 import { promptValue } from './fork-agent-composer/composer-textarea.test-support'
-import type * as RemoteRuntimePtyIdModule from '../../../../shared/remote-runtime-pty-id'
+import type * as RemoteRuntimePtyIdModule from '../../../../shared/remote-runtime/remote-runtime-pty-id'
 
 type FieldProps = {
   imageAttachments?: readonly NativeChatComposerImageAttachment[]

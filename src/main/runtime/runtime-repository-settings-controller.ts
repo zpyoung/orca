@@ -29,6 +29,7 @@ type RuntimeRepositorySettingsDependencies = {
   invalidateResolvedWorktrees: () => void
   invalidateWorktreeScan: (repoId: string) => void
   notifyReposChanged: () => void
+  notifyWorktreesChanged: (repoId: string, options: { invalidateGitScans: false }) => void
   withCatalogRemoval?: LedgerCatalogRemoval
 }
 

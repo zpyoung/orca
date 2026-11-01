@@ -72,7 +72,7 @@ function WorktreeSidebar({
 }
 
 function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element {
-  const { activeView, activeWorktreeId, activePendingCreationId, creationLayoutActive } = layout
+  const { activeView, hasActiveWorktree, activePendingCreationId, creationLayoutActive } = layout
   const ledgerPageData = useAppStore((s) => s.ledgerPageData)
   return (
     <>

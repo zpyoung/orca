@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import type { WorktreeRefreshResult } from '@/store/slices/worktrees/listing/worktree-refresh-result'
 import { ObjectiveEnrollmentSheet } from './ObjectiveEnrollmentSheet'
 
 const { enroll } = vi.hoisted(() => ({ enroll: vi.fn() }))
@@ -38,11 +39,11 @@ const repo = {
 }
 
 let originalState: ReturnType<typeof useAppStore.getState>
-const fetchAllWorktrees = vi.fn(async () => {})
+const fetchAllWorktrees = vi.fn(async (): Promise<WorktreeRefreshResult[]> => [])
 
 beforeEach(() => {
   originalState = useAppStore.getState()
-  fetchAllWorktrees.mockReset().mockResolvedValue(undefined)
+  fetchAllWorktrees.mockReset().mockResolvedValue([])
   enroll.mockReset().mockResolvedValue({})
   useAppStore.setState({
     repos: [repo],

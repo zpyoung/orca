@@ -54,7 +54,8 @@ cache-mode: read
 jobs:
   terminal-perf:
     name: terminal scale perf
-    runs-on: ubuntu-latest
+    # Presented-frame measurement only accepts GitHub-hosted Xvfb displays.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       NODE_OPTIONS: --max-old-space-size=4096

@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { translate } from '@/i18n/i18n'
+import { Trans } from 'react-i18next'
+import { i18n, translate } from '@/i18n/i18n'
 import type { LedgerRemovalPreview } from '../../../../shared/ledger'
 import {
   retentionChecking,

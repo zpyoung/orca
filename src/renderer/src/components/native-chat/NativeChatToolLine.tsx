@@ -116,12 +116,7 @@ export function NativeChatToolLine({
   // A call opens to its output; its arguments are the row's own words, bar a shortened command.
   const fullCommand = label?.commandDetail ?? null
   const commandAlone = label?.command === true && label.verb !== null && label.target.length > 0
-  const results = (isCall ? block.webSearchResults : undefined) ?? NO_SEARCH_RESULTS
   const categoryTextClass = nativeChatToolCategoryTextClass(name)
-  // An edit that has not landed has no output yet, but the change it proposes is worth opening.
-  const proposesChange = () => isCall && diffFromToolCall(block.name, block.input) !== null
-  const hasDetail =
-    body !== undefined || fullCommand !== null || results.length > 0 || proposesChange()
 
   return (
     <div>

@@ -70,7 +70,7 @@ For a failed GitHub Actions run, inspect the failed jobs and retry with `gh run 
 
 # Tests
 
-Avoid adding low-value tests. These might be fine for development but offer low value when checked in.
+Avoid adding low-value tests. These might be fine for development but offer negative value when checked in. [Anti-patterns](./docs/agents-md-refs/test-antipatterns.md)
 
 ## Running Tests: Remote Sandbox Only
 

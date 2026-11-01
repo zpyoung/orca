@@ -1,13 +1,15 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+import { memo } from 'react'
 import { ArrowUp, CircleAlert, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
-} from '../../../../../shared/native-chat-session-options'
+} from '../../../../../shared/native-chat/input/native-chat-session-options'
 import { NativeChatSessionOptionPickers } from '../NativeChatSessionOptionPickers'
 import { NativeChatComposerPermissionPicker } from '../NativeChatPermissionModePicker'
 import { NativeChatComposerGoalChip } from '../NativeChatComposerGoalChip'
@@ -16,6 +18,7 @@ import type { NativeChatContextUsageSummary } from '../native-chat-context-usage
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 
 export type AgentComposerActionsProps = {
+  editSession?: { cancel: () => void }
   attachDisabled: boolean
   dictationDisabled: boolean
   sendDisabled: boolean
@@ -46,7 +49,9 @@ export type AgentComposerActionsProps = {
   agent?: string
 }
 
-export function AgentComposerActions({
+// Memoized: typing re-renders the composer per keystroke, and these controls rarely change with it.
+export const AgentComposerActions = memo(function AgentComposerActions({
+  editSession,
   attachDisabled,
   dictationDisabled,
   sendDisabled,
@@ -70,6 +75,7 @@ export function AgentComposerActions({
   focusComposer,
   agent
 }: AgentComposerActionsProps): React.JSX.Element {
+  useUiLanguageRevision()
   const dictationLabel = isDictating
     ? translate('components.native-chat.composer.stopDictation', 'Stop dictation')
     : translate('components.native-chat.composer.startDictation', 'Start dictation')
@@ -77,7 +83,17 @@ export function AgentComposerActions({
   const stopLabel = isStopping
     ? translate('components.native-chat.status.stopping', 'Stopping…')
     : translate('components.native-chat.stop', 'Stop the agent')
-  const sendButton = (
+  const sendButton = editSession ? (
+    <Button
+      type="button"
+      size="sm"
+      disabled={sendDisabled}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onSend}
+    >
+      {translate('components.native-chat.queuedMessages.save', 'Save')}
+    </Button>
+  ) : (
     <Button
       type="button"
       aria-label={sendReason ?? translate('components.native-chat.composer.send', 'Send')}
@@ -199,6 +215,11 @@ export function AgentComposerActions({
           </Tooltip>
         )}
         <DraftNotSavedIcon shown={draftNotSaved === true} />
+        {editSession ? (
+          <Button type="button" variant="ghost" size="sm" onClick={editSession.cancel}>
+            {translate('common.cancel', 'Cancel')}
+          </Button>
+        ) : null}
         {sendReason ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -215,7 +236,7 @@ export function AgentComposerActions({
       </div>
     </div>
   )
-}
+})
 
 function DraftNotSavedIcon({ shown }: { shown: boolean }): React.JSX.Element | null {
   if (!shown) {

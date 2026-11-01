@@ -87,7 +87,8 @@ export async function launchAgentBackgroundSession(
     // The window quotes by its Settings shell, which its pane's spawn also reads.
     shell: undefined,
     extraAgentArgs: args.extraAgentArgs,
-    sessionOptions
+    sessionOptions,
+    suppressStartupUpdatePrompt: true
   })
   const startupShell = resolveStartupShell(launchPlatform, planInputs.shell)
   const trimmedPrompt = prompt?.trim() ?? ''

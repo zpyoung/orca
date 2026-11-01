@@ -1,8 +1,7 @@
-import { agentImagePasteWrites, formatAgentImagePath } from '../../../../shared/agent-image-paste'
+import { agentImagePasteWrites } from '../../../../shared/agent-image-paste'
+import { agentImagePastePath } from '../../../../shared/agent-image-paste-path'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { buildNativeChatImagePasteBytes } from '../../../../shared/native-chat-paste-bytes'
-import { formatImageDropPasteText } from '../terminal-pane/terminal-drop-image-path'
-import { isTerminalDropWindowsPathLike } from '../terminal-pane/terminal-drop-shell'
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'
 import {
   NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,
@@ -12,16 +11,6 @@ import {
 } from './native-chat-runtime-send'
 
 export { NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS }
-
-/** Escape image paths as terminal drops do; agent TUIs unescape before checking file existence. */
-export function agentImagePastePath(agent: AgentType, path: string): string {
-  const formatted = formatAgentImagePath(agent, path)
-  if (formatted !== path) {
-    return formatted
-  }
-  const targetShell = isTerminalDropWindowsPathLike(path) ? 'windows' : 'posix'
-  return formatImageDropPasteText(path, targetShell) ?? path
-}
 
 /** Agent-aware image pastes on the quarantine-scoped send path, which observes every write. */
 export function sendNativeChatMessageWithImageAttachments(

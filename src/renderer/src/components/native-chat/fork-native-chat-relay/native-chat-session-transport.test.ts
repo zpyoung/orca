@@ -95,7 +95,8 @@ describe('getNativeChatSessionTransport — selection', () => {
         sessionId: 'sess-1',
         limit: 40,
         transcriptPath: '/t/path',
-        beforeOffset: 4_096
+        beforeOffset: 4_096,
+        capabilities: { transcriptSourceOrder: 1 }
       },
       timeoutMs: 15_000
     })

@@ -1,6 +1,7 @@
 import { toAgentLaunchPreferences } from '../agent-launch-preferences'
 import type { AgentLaunchPreferences } from '../agent-session-host-authority'
-import type { SessionOptionValue } from '../native-chat-session-options'
+import type { AgentType } from '../agent-status-types'
+import type { SessionOptionValue } from '../native-chat/input/native-chat-session-options'
 
 const LEGACY_PREFERENCE_KEYS = new Set(['model', 'effort', 'mode'])
 
@@ -10,9 +11,9 @@ const LEGACY_PREFERENCE_KEYS = new Set(['model', 'effort', 'mode'])
  */
 export function toAgentLaunchPreferencesWithOptionValues(
   sessionOptions: Record<string, SessionOptionValue> | null | undefined,
-  options: { includeOptionValues?: boolean } = {}
+  options: { agent: AgentType; includeOptionValues?: boolean }
 ): AgentLaunchPreferences | undefined {
-  const preferences = toAgentLaunchPreferences(sessionOptions)
+  const preferences = toAgentLaunchPreferences(sessionOptions, options.agent)
   if (!options.includeOptionValues) {
     return preferences
   }

@@ -74,8 +74,14 @@ type SourceControlActionRecipeRowProps<ActionId extends AiActionId> = {
     argumentChoices?: ActionArgumentChoices | null
   ) => void
   onTemplateChange: (actionId: ActionId, value: string) => void
+<<<<<<< fork
   onAgentArgsChange: (actionId: ActionId, value: string) => void
   onLaunchOptionsChange?: (actionId: ActionId, value: AgentLaunchOptionSelection) => void
+||||||| base
+  onAgentArgsChange: (actionId: ActionId, value: string) => void
+=======
+  onAgentArgsChange: (actionId: ActionId, value: string, commit?: boolean) => void
+>>>>>>> upstream
   onAppendVariable: (actionId: ActionId, variable: string) => void
   onDiscard: (actionId: ActionId) => void
   onSave: (actionId: ActionId) => void
@@ -134,6 +140,7 @@ export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
   const isLaunchAction = !AI_TEXT_ACTION_ID_SET.has(actionId)
   const templateDirty =
     hasUnsavedChanges ?? JSON.stringify(draftValue) !== JSON.stringify(baseValue)
+<<<<<<< fork
   const launchAgent = resolveAgentArgsPlaceholderAgent(selectedAgent, defaultTuiAgent)
   const launchOverrides = actionRecipeDraftToAgentLaunchOverrides(draftValue)
   const onLaunchOverridesChange = (
@@ -150,6 +157,17 @@ export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
     }
   }
   const agentArgsPlaceholder = getSourceControlAgentArgsPlaceholder(launchAgent)
+||||||| base
+  const agentArgsPlaceholder = getSourceControlAgentArgsPlaceholder(
+    resolveAgentArgsPlaceholderAgent(selectedAgent, defaultTuiAgent)
+  )
+=======
+  const agentArgsPlaceholder =
+    (!selectedAgent && defaultAgentArgsPlaceholder) ||
+    getSourceControlAgentArgsPlaceholder(
+      resolveAgentArgsPlaceholderAgent(selectedAgent, defaultTuiAgent)
+    )
+>>>>>>> upstream
   const agentOptions = getAgentCatalogForAction(actionId, selectedAgent)
   const agentWarningText = getSourceControlActionAgentWarningText(actionId, selectedAgent)
   const agentSupportText =
@@ -219,6 +237,7 @@ export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
           ) : null}
         </div>
       </div>
+<<<<<<< fork
       <div className="mt-3 grid gap-3 sm:grid-cols-[220px_1fr]">
         {onLaunchOptionsChange ? (
           <AgentLaunchOverridesFields
@@ -247,6 +266,68 @@ export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
         )}
         <div className="space-y-2">
           <Label className="text-[11px] text-muted-foreground">
+||||||| base
+      <div className="mt-3 grid gap-3 sm:grid-cols-[220px_1fr]">
+        <div className="space-y-2">
+          <Label className="text-[11px] text-muted-foreground">
+            {translate(
+              'auto.components.settings.SourceControlAiActionRecipeDefaults.2cb4bb7e5d',
+              'CLI arguments'
+            )}
+          </Label>
+          <Input
+            value={draftValue.agentArgs}
+            spellCheck={false}
+            placeholder={agentArgsPlaceholder}
+            onChange={(event) => onAgentArgsChange(actionId, event.target.value)}
+            className="h-8 font-mono text-xs"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[11px] text-muted-foreground">
+=======
+      <div className="mt-3 grid min-w-0 grid-cols-1 items-start gap-3">
+        {isLaunchAction ? (
+          <div className="flex min-w-0 flex-wrap items-start gap-3">
+            <SourceControlActionArguments
+              showArguments={showArguments}
+              agent={pickerAgent}
+              value={draftValue.agentArgs}
+              preferences={
+                pickerAgent
+                  ? sourceControlActionSelectedPreferences(
+                      { ...draftValue, launchPreferences },
+                      pickerAgent
+                    )
+                  : undefined
+              }
+              authoredAgent={selectedAgent}
+              authoredPreferences={launchPreferences ?? null}
+              argumentChoices={draftValue.argumentChoices}
+              disabled={actual.status === 'pending' || isSavingTemplate}
+              onArgsChange={(value, commit) => onAgentArgsChange(actionId, value, commit)}
+              onPreferencesChange={(value, userArgs, nodes) =>
+                onLaunchPreferencesChange?.(actionId, value, userArgs, nodes)
+              }
+            />
+          </div>
+        ) : (
+          <SourceControlActionOptionField
+            label={translate('auto.components.settings.AgentsPane.cfb3f35775', 'Arguments')}
+          >
+            <Input
+              value={draftValue.agentArgs ?? ''}
+              spellCheck={false}
+              placeholder={agentArgsPlaceholder}
+              onChange={(event) => onAgentArgsChange(actionId, event.target.value)}
+              variant="code"
+              className="h-8"
+            />
+          </SourceControlActionOptionField>
+        )}
+        <div className="min-w-0 space-y-2">
+          <Label variant="settings">
+>>>>>>> upstream
             {translate(
               'auto.components.settings.SourceControlAiActionRecipeDefaults.fb09da4345',
               'Command template'

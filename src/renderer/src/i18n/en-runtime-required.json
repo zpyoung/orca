@@ -416,30 +416,16 @@
             "conflictsSection": "Conflicts",
             "createPrIntentConfigureAi": "Add a commit message or configure Source Control AI settings.",
             "createPrIntentGenerateFailed": "Could not generate a commit message. Add one and retry.",
-            "d2e9189866": "all",
-            "d4ef4bafc5": "Changes",
-            "d62bc0c7d8": "untracked",
-            "e59bca888a": "markdown",
-            "f3a1b8c204": "upstream",
-            "f62ce91ade": "origin",
-            "tooManyChanges": "Too many changes detected. Only the first {{value0}} changes are shown."
-          },
-          "SourceControlAgentActionDialogForm": {
-            "1bb611240f": "Use {basePrompt} for Orca's default prompt.",
-            "3e8f21954f": "error",
-            "74168d7ada": "idle",
-            "d8f40128ee": "{basePrompt} is Orca's default prompt."
+            "discardFailedSampleMore_one": "{{paths}}, +{{count}} more",
+            "discardFailedSampleMore_other": "{{paths}}, +{{count}} more",
+            "discardFailed_one": "Failed to discard {{count}} file",
+            "discardFailed_other": "Failed to discard {{count}} files",
+            "noteCount_one": "{{count}} note",
+            "noteCount_other": "{{count}} notes"
           },
           "SourceControlTextGenerationDialogForm": {
             "4eab815004": "CLI arguments",
             "551ffd111b": "--model sonnet"
-          },
-          "activity": {
-            "bar": {
-              "buttons": {
-                "f1132ea95d": "neutral"
-              }
-            }
           },
           "checks": {
             "panel": {
@@ -702,155 +688,6 @@
           "dailyWarning": "Daily builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy.",
           "hourlyWarning": "Hourly builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy."
         },
-        "RemoteServerUpdateDialog": {
-          "checkAgain": "Check for Server Updates",
-          "restartWarning": "Updating restarts these servers. {{value0}} live tabs and {{value1}} terminal panes may briefly disconnect.",
-          "updateOne": "Update server",
-          "updating": "Updating servers…"
-        },
-        "RepositoryGitHubAccountSection": {
-          "retry": "Retry"
-        },
-        "RepositoryHooksSection": {
-          "0e0dd5b9a5": "loaded",
-          "32f417fe17": "text-emerald-700 dark:text-emerald-300",
-          "8dbe6bedf5": "invalid",
-          "925f9e0dc4": "text-foreground",
-          "b5e3e77e89": "action",
-          "c90b858573": "text-amber-700 dark:text-amber-300"
-        },
-        "RepositoryIconPicker": {
-          "2b7d27b93c": "Use {{value0}} repo color"
-        },
-        "RepositoryPane": {
-          "createPendingSetup": "Track setup",
-          "creatingPendingSetup": "Creating...",
-          "settingUpHost": "Importing...",
-          "setupExistingFolder": "Import existing folder",
-          "setupExistingFolderHelp": "Make this project available on another host by linking a checkout that already exists there.",
-          "setupHost": "Import",
-          "setupProjectOnHost": "Set up on another host",
-          "setupProjectOnHostHelp": "Choose a host, then import an existing checkout, clone the repository there, or track a setup that will be provisioned later."
-        },
-        "RepositorySourceControlAiActionRows": {
-          "7a3a8e431d": "CLI arguments"
-        },
-        "RepositorySourceControlAiEnablement": {
-          "30ae6dcce8": "Global default is",
-          "84233d1bb3": "Off",
-          "bea897eec2": "On",
-          "cf5959c834": "Source Control AI enabled"
-        },
-        "RepositorySourceControlAiSection": {
-          "152268c295": "Save",
-          "57e6e9d4b1": "Saving...",
-          "67b3ff5467": "Discard",
-          "8b8bc5913a": "Repository action recipes. Global settings are used until this repository customizes them.",
-          "ccb07dd027": "Saved",
-          "e57dde9d93": "Unsaved changes"
-        },
-        "RuntimeAccessGrantList": {
-          "27cf8507ad": "Refresh shared access",
-          "68ec21309f": "Revoke access",
-          "87b16cd11d": "Created",
-          "8b82879581": "Anyone with an active grant can connect until you revoke it. Revoking shared access disconnects active clients immediately.",
-          "f031182867": "Shared Server Access",
-          "fd83b94095": "No shared server access yet."
-        },
-        "RuntimeEnvironmentsPane": {
-          "0ef838094a": "Protocol {{value0}}",
-          "163671f7b5": "Run",
-          "1826bd0608": "Saved Servers",
-          "2c85efb3e8": "Selecting a saved server makes this browser use that paired Orca runtime as its default Host.",
-          "3595fd1948": "New Link",
-          "3f67e8078a": "New projects are created on this computer unless you choose a saved server here. Existing projects, files and terminals stay on their own host.",
-          "54dee18f5c": "Hide Form",
-          "54ebacc600": "Server name",
-          "55fcc964cd": "on the server and paste the printed pairing URL.",
-          "64b6bea541": "Default host for new projects",
-          "6ce4664003": "Refresh servers",
-          "6e1280ca55": "Share this Orca server",
-          "78692becbd": "Local desktop",
-          "7b5986c8df": "Connected to {{value0}}. To create new projects there by default, choose it under Advanced > Default host for new projects.",
-          "84b9b2be05": "Create a revocable access grant so a browser or another Orca client can connect.",
-          "8cf8790697": "Saved servers route this browser through a paired Orca runtime.",
-          "960e901ae4": "orca serve --pairing-address <host>",
-          "9a3758d983": "No saved servers.",
-          "9bc9b83474": "Pairing code",
-          "9bee6bbeeb": "Add Server",
-          "9f7665a01b": "Removing the active server first switches Orca back to Local desktop. Existing host sessions are left alone.",
-          "activeServerRowHelp": "Default host for new projects. Existing projects stay on their own host.",
-          "advanced": "Advanced",
-          "advertiseThisApp": "Advertise this app as a server",
-          "advertiseThisAppHelp": "Create access links for browsers, mobile clients, or another Orca client to connect back to this running app.",
-          "aeb26635d2": "Remove {{value0}}",
-          "b2fda48c39": "Removing the active server disconnects this browser from that host. Existing host sessions are left alone.",
-          "c3d772c514": "orca://pair?code=...",
-          "cloudVmWorkflow": "Cloud VM",
-          "cloudVmWorkflowHelp": "Manage recipe-created cloud machines",
-          "connectToRemoteServers": "Connect to remote servers",
-          "connectToRemoteServersHelp": "Pair another Orca runtime, then connect or disconnect it here.",
-          "connectWorkflow": "Connect to a host",
-          "connectWorkflowHelp": "This app joins another machine",
-          "e038625857": "Dev box",
-          "f3a3d6d834": "{{value0}} capabilities",
-          "f75ce1c7a5": "Local keeps today's desktop behavior. Saved servers route supported client calls through the remote runtime.",
-          "orcaVersion": "Orca v{{value0}}",
-          "orcaVersionLastSeen": "Orca v{{value0}} (last seen)",
-          "removeActiveServerBlocked": "This server is the default host for new projects. Choose another one in Advanced before removing it.",
-          "removeActiveServerDescription": "This server is the default host for new projects. Choose another one in Advanced before removing it. Existing host sessions are left alone.",
-          "reviewServerUpdates": "Check for Server Updates",
-          "serverDetails": "Server details",
-          "shareWorkflow": "Share this host",
-          "shareWorkflowHelp": "Other devices join this machine",
-          "troubleshootDescription": "A link that uses 127.0.0.1 points back to the device opening it, not the computer that created it.",
-          "troubleshootStepAddress": "Choose Another device and select its Tailscale or LAN address.",
-          "troubleshootStepRegenerate": "Generate a new access link and use only the newest link here.",
-          "troubleshootStepShare": "On the other computer, open Share this host.",
-          "troubleshootTitle": "Create a new link on the other host",
-          "troubleshootTunnel": "Using an SSH local forward? Return to Connect to a host, paste the loopback link, then enable “I am using an SSH tunnel” under Advanced.",
-          "troubleshootWorkflow": "Connection troubleshooting",
-          "updateAvailableOne": "1 update available",
-          "updatesAvailable": "{{value0}} updates available",
-          "versionUnavailable": "Orca version unavailable",
-          "workflow": "Remote server workflow"
-        },
-        "RuntimeHostAccessForm": {
-          "addHost": "Add host",
-          "addWithTunnel": "Add host using tunnel",
-          "advanced": "Advanced",
-          "connectionDetails": "Connection details",
-          "endpointKind": "Endpoint kind",
-          "getLink": "Get an access link from the other host",
-          "headlessHelp": "Using headless orca serve? Run orca serve --pairing-address <reachable-host> on the other computer.",
-          "loopbackRecovery": "On the other computer, create a new link using Another device and choose its Tailscale or LAN address.",
-          "name": "Name in Orca",
-          "nameHelp": "This only changes how the computer appears in Orca.",
-          "networkConnection": "Network connection",
-          "notAttempted": "Not attempted",
-          "sshTunnel": "I am using an SSH tunnel to this local address",
-          "stepChooseAddress": "Choose Another device and select a reachable address.",
-          "stepCopyLink": "Generate the link, then copy the “Pair another Orca client” link.",
-          "stepOpenShare": "Open Settings → Remote Orca Servers → Share this host."
-        },
-        "RuntimePairingUrlGenerator": {
-          "279e0dcb57": "127.0.0.1 only works on this computer. Use a LAN, Tailscale, or custom address for another device.",
-          "2e5c4e3c93": "Pair another Orca client",
-          "6b9ca3e69b": "Open in browser",
-          "849825e829": "Paste this pairing URL into another Orca client.",
-          "8de0f84fff": "Generate Access Link",
-          "add-custom": "Add custom address…",
-          "b91e36a986": "web",
-          "de6d5cff95": "This computer (",
-          "intentQuestion": "Where will this link be opened?",
-          "localOnly": "This computer only",
-          "pairedRunsAsYou": "A paired client can run commands as you on this computer.",
-          "recommended": "Recommended",
-          "staleAddress": "The connection address changed. Generate a new link for {{address}}."
-        },
-        "RuntimeRepairDialog": {
-          "description": "{{name}} no longer accepts this computer. On {{name}}, open Settings → Remote Orca Servers → Share this host, create a link for another Orca client, then paste it here."
-        },
         "Settings": {
           "084d8fac5b": "Privacy & Security",
           "23931df7e8": "Remote Hosts",
@@ -1075,27 +912,9 @@
         "SidebarFilter": {
           "638a2d221d": "Hide sleeping"
         },
-        "SidebarHeader": {
-          "49f62c5665": "Workspace board",
-          "5c9c7c16aa": "Add a project to create workspaces",
-          "a30e34eb5c": "Close workspace board",
-          "projects": "Projects",
-          "spaces": "Spaces",
-          "views": "Sidebar view"
-        },
-        "SidebarHostScopeStrip": {
-          "backToAll": "All hosts",
-          "scopedTo": "{{value0}} visible"
-        },
-        "SidebarNav": {
-          "9c95e1ce91": "Agents"
-        },
-        "SidebarSettingsHelpMenu": {
-          "d396773ef0": "checking"
-        },
-        "SidebarToolbar": {
-          "19e32d0e5f": "Open folder picker to add a project",
-          "abc62b6328": "Add Project"
+        "SidebarRepositoryFilterSection": {
+          "selectedProjects_one": "{{count}} project",
+          "selectedProjects_other": "{{count}} projects"
         },
         "SidebarWorkspaceOptionsMenu": {
           "optionsActiveFilters_one": "Workspace options ({{count}} filter active)",
@@ -1112,32 +931,12 @@
           "workspacesMatch_other": "{{matchCount}} of {{count}} workspaces match"
         },
         "WorktreeCardPorts": {
-          "34f733dda2": "Go to Worktree",
-          "3e5f66564e": "Workspace unavailable"
-        },
-        "WorktreeCardReviewDetailSection": {
-          "copyLink": "Copy link",
-          "reviewHeader": "{{value0}} #{{value1}}"
+          "livePorts_one": "{{count}} live port",
+          "livePorts_other": "{{count}} live ports"
         },
         "WorktreeContextMenu": {
           "76865d827f": "Move to group",
           "d35dfeae58": "Remove from group"
-        },
-        "WorktreeIssueLinkField": {
-          "0a7a2c6efd": "Not a GitHub issue number or issue URL.",
-          "161b2d053a": "Open linked issue",
-          "25852bfc59": "Linear",
-          "269198eeda": "Couldn't open that issue. Check the number and your GitHub connection.",
-          "2c245ac134": "Saving unlinks {{link}} — a workspace tracks one issue.",
-          "5b440069e6": "GitHub",
-          "662ae142f8": "Issue #, or a GitHub or Linear URL",
-          "72486800ff": "Saving unlinks {{first}} and {{second}} — a workspace tracks one issue.",
-          "929c98d05a": "Issue provider",
-          "964d9bc00a": "Not a Linear issue key or linear.app issue URL.",
-          "ad78f9bee2": "Issue",
-          "d4785f9954": "Issue links are set when a folder workspace is created and can't be changed here yet.",
-          "d8c8a30d1f": "Couldn't open that issue. Check the identifier and your Linear connection.",
-          "f047887705": "Paste a GitHub or Linear URL, or enter a number. Leave blank to remove the link."
         },
         "WorktreeList": {
           "childCount_one": "{{count}} child",
@@ -2245,6 +2044,10 @@
       "summary_one": "{{entryCount}} entries across {{count}} ledger will be retained and detached as needed.",
       "summary_other": "{{entryCount}} entries across {{count}} ledgers will be retained and detached as needed."
     }
+  },
+  "localBuild": {
+    "liveTerminals_one": "{{count}} live terminal will reconnect after restart.",
+    "liveTerminals_other": "{{count}} live terminals will reconnect after restart."
   },
   "menu": {
     "quitApp": "Quit {{appName}}"

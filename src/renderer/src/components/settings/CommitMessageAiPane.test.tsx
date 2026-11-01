@@ -126,9 +126,17 @@ describe('CommitMessageAiPane', () => {
           instructionsByOperation: {},
           customAgentCommand: '',
           actions: {
+<<<<<<< fork
             fixChecks: {
               agentId: 'codex',
               agentArgs: '--verbose'
+||||||| base
+            fixChecks: {
+              agentId: 'codex'
+=======
+            commitMessage: {
+              agentId: 'codex'
+>>>>>>> upstream
             }
           },
           prCreationDefaults: {},

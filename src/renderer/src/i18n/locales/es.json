@@ -6064,7 +6064,13 @@
           "deleteWorktree": "Eliminar worktree",
           "sleepWithDescendants": "Dormir con Descendientes ({{value0}})",
           "sleepWithDescendantsDescription": "Cierre los paneles activos en este espacio de trabajo y en todos los descendientes anidados para liberar memoria y CPU.",
-          "deleteWithDescendants": "Eliminar con Descendientes…"
+          "deleteWithDescendants": "Eliminar con Descendientes…",
+          "3ae4748032": "Crea un grupo y mueve este worktree a él.",
+          "308b16a770": "Nuevo grupo del worktree",
+          "5bf97058a4": "Mover proyecto al grupo",
+          "a2d9a2b93e": "Quitar proyecto del grupo",
+          "addWorktreeToGroup": "Agregar worktree al grupo",
+          "removeWorktreeFromGroup": "Quitar worktree del grupo"
         },
         "WorktreeList": {
           "d880ea0744": "Crea un grupo y mueve este proyecto a él.",
@@ -6870,6 +6876,24 @@
           "needsInput": "Requiere intervención",
           "running": "En ejecución",
           "idle": "Inactivo"
+        },
+        "WorkspaceActivityWindowControl": {
+          "activityWindow": "Ventana de actividad",
+          "all": "Todo",
+          "live-only": "Solo activos",
+          "today": "Últimas 24 horas",
+          "week": "Últimos 7 días",
+          "month": "Últimos 30 días",
+          "custom": "Personalizado",
+          "customDays": "Días personalizados",
+          "customDaysError": "Introduce un número entero positivo."
+        },
+        "WorkspaceActivityHiddenCountRow": {
+          "hidden": "{{count}} espacios de trabajo ocultos por la ventana de actividad"
+        },
+        "WorkspaceReviewFilterRows": {
+          "hideCompleted": "Ocultar revisiones fusionadas/cerradas",
+          "hidePassing": "Ocultar comprobaciones aprobadas"
         }
       },
       "shared": {
@@ -15430,6 +15454,10 @@
             "reopenHint": "Vuelve a abrirlo cuando quieras desde Ayuda > Explorar Orca.",
             "done": "Listo",
             "continue": "Continuar"
+          },
+          "AiCommitPrSettingsFields": {
+            "a8a91aa917": "Definido por recetas de acciones.",
+            "b66be73624": "Su receta de acciones lo reemplaza para {{value0}}."
           }
         },
         "tips": {
@@ -17590,6 +17618,13 @@
           "partialFailureOfHosts_one": "Carga fallida en {{failed}} de {{count}} host",
           "partialFailureOfHosts_other": "Carga fallida en {{failed}} de {{count}} hosts",
           "partialFailureOfHosts_many": "Carga fallida en {{failed}} de {{count}} hosts"
+        },
+        "AutomationAgentLaunchFields": {
+          "launchSettingsUnsupported": "El host de esta automatización no admite la configuración de inicio. Actualiza el servidor remoto de Orca.",
+          "launchSettingsNotSaved": "La configuración de inicio no se puede guardar en este host y no se aplicará a las ejecuciones."
+        },
+        "AutomationRunLaunchDisplay": {
+          "off": "Desactivado"
         }
       },
       "agent": {
@@ -17604,6 +17639,21 @@
         "AgentSettingsDialog": {
           "50cdb57c03": "Administre agents de IA, establezca un valor predeterminado y personalice comandos.",
           "fc0268e4ed": "Agentes"
+        },
+        "launch": {
+          "AgentLaunchOverridesFields": {
+            "on": "Activado",
+            "off": "Desactivado",
+            "setByCliArguments": "Definido por argumentos de CLI",
+            "default": "Predeterminado",
+            "cliArguments": "Argumentos de CLI",
+            "inheritedHint": "Predeterminado: {{value0}}",
+            "model": "Modelo",
+            "defaultFromSettings": "Predeterminado (de Ajustes)",
+            "staleModel": "El modelo guardado {{value0}} no está en la lista de modelos actual.",
+            "advanced": "Avanzado",
+            "reuseSessionNote": "Se aplica cuando la sesión se inicia por primera vez. Las ejecuciones reutilizadas conservan la configuración original de la sesión."
+          }
         }
       },
       "activity": {
@@ -18191,7 +18241,57 @@
         "ArtifactsPageSkeleton": {
           "loading": "Cargando artefactos"
         },
-        "expiredCompact": "Caducado"
+        "expiredCompact": "Caducado",
+        "ArtifactPasswordPanel": {
+          "statusFailed": "El estado de la protección no está disponible.",
+          "rotationIncomplete": "El nuevo enlace está protegido, pero Orca no pudo confirmar la eliminación del enlace anterior. Es posible que el enlace anterior siga funcionando; Orca lo reintentará.",
+          "passphraseUnavailable": "La frase de contraseña no está disponible en este dispositivo. Puedes rotar la protección para crear un enlace y una frase de contraseña nuevos.",
+          "revealFailed": "No se pudo mostrar la frase de contraseña.",
+          "copyFailed": "No se pudo copiar la frase de contraseña.",
+          "protectedTitle": "Compartir con frase de contraseña",
+          "protectedDescription": "Orca cifra el archivo antes de subirlo y genera una frase de contraseña de seis palabras.",
+          "addProtection": "Añadir protección con frase de contraseña",
+          "shareProtected": "Compartir enlace protegido",
+          "protectedStatus": "Protegido con frase de contraseña",
+          "publicCiphertext": "Cualquier persona con el enlace puede descargar el archivo cifrado. Envía el enlace y la frase de contraseña por separado.",
+          "passphrase": "Frase de contraseña del artefacto",
+          "copied": "Frase de contraseña copiada",
+          "copy": "Copiar frase de contraseña",
+          "unavailable": "Frase de contraseña no disponible",
+          "reveal": "Mostrar frase de contraseña",
+          "rotate": "Rotar",
+          "remove": "Hacer público",
+          "unknown": "El estado de la protección es desconocido en esta versión de Orca.",
+          "rotateTitle": "¿Rotar la frase de contraseña?",
+          "removeTitle": "¿Quitar la protección con frase de contraseña?",
+          "rotateDescription": "Orca creará un enlace y una frase de contraseña nuevos y luego eliminará el enlace anterior. Las copias ya descargadas no se pueden revocar.",
+          "removeDescription": "El mismo enlace pasará a ser público. Cualquier persona con el enlace podrá leer el archivo.",
+          "cancel": "Cancelar",
+          "rotateConfirm": "Crear enlace nuevo",
+          "removeConfirm": "Hacer público",
+          "checkingProtection": "Comprobando el estado de la protección…"
+        },
+        "ArtifactProtectedDetail": {
+          "unavailable": "La frase de contraseña no está disponible en este dispositivo. Abre el archivo de origen para rotar la protección, o elimina el artefacto.",
+          "revealFailed": "No se pudo mostrar la frase de contraseña.",
+          "copyFailed": "No se pudo copiar la frase de contraseña.",
+          "unknownTitle": "Estado de protección desconocido",
+          "title": "Artefacto protegido con frase de contraseña",
+          "browserOnly": "Orca no carga páginas de compartición protegidas dentro de la aplicación. Abre este artefacto en tu navegador e introduce allí la frase de contraseña.",
+          "passphrase": "Frase de contraseña",
+          "copied": "Frase de contraseña copiada",
+          "copy": "Copiar frase de contraseña",
+          "reveal": "Mostrar frase de contraseña",
+          "noLocalRecord": "Este dispositivo no tiene el registro de protección local ni la frase de contraseña.",
+          "open": "Abrir en el navegador",
+          "caution": "El archivo cifrado se puede descargar públicamente. Introduce la frase de contraseña solo en una página de compartición en la que confíes. El HTML descifrado puede ejecutar scripts de quien lo publicó."
+        },
+        "artifactProtectionDisplay": {
+          "encryptedLink": "Cualquier persona con este enlace puede descargar el archivo cifrado. Se necesita la frase de contraseña para leerlo.",
+          "unknownLink": "El estado de la protección es desconocido en este dispositivo.",
+          "unknown": "Protección desconocida",
+          "protected": "Protegido"
+        }
       },
       "ComposerParentWorktreePicker": {
         "label": "Worktree padre",
@@ -20000,7 +20100,104 @@
       "deliveryFailed": "La nueva sesión de {{agent}} se inició, pero no se pudo enviar su contexto.",
       "launchFailed": "No se pudo iniciar una sesión nueva de {{agent}}.",
       "deliveryUnconfirmed": "Orca no pudo confirmar que {{agent}} recibió el contexto de la sesión. Revisa la nueva sesión y pégalo tú mismo si su entrada está vacía.",
-      "copyPrompt": "Copiar prompt"
+      "copyPrompt": "Copiar prompt",
+      "forkSessionHandoff": {
+        "agent": "Agente",
+        "agentDetectionFailed": "No se pudieron detectar agentes en el host de destino.",
+        "agentUnavailable": "El agente seleccionado ya no está disponible en el host de destino.",
+        "baseBranch": "Rama base (opcional)",
+        "baseBranchPlaceholder": "Rama actual",
+        "cancelTemplate": "Cancelar",
+        "captureAnyway": "Capturar de todos modos",
+        "captureChanged": "La sesión de origen cambió. La vista previa se actualizó: revísala y vuelve a iniciar.",
+        "content": "Contenido",
+        "contextMode": "Contexto de la sesión",
+        "contextUnavailable": "No se puede acceder a una transcripción completa guardada desde este destino. Se usará contexto enfocado.",
+        "costReadout": "{{characters}} caracteres · unos {{tokens}} tokens",
+        "createUnavailable": "No hay ningún repositorio Git disponible para crear un árbol de trabajo.",
+        "createWorktree": "Crear un árbol de trabajo nuevo",
+        "createdTargetUnavailable": "No se pudo resolver el árbol de trabajo nuevo.",
+        "deliveryAutomaticRetrySucceeded": "La entrega inicial falló y Orca volvió a enviar el resumen.",
+        "deliveryFailedRetry": "Fallaron la entrega del resumen y el reintento automático.",
+        "deliverySucceeded": "Se envió el resumen de transferencia.",
+        "deliveryUnconfirmed": "No se pudo confirmar la entrega del resumen.",
+        "deliveryUnconfirmedNoResend": "La sesión nueva se abrió, pero no se pudo confirmar la entrega del resumen y no se puede reenviar.",
+        "destination": "Destino",
+        "detachedNotice": "La vista previa ya no se actualiza automáticamente. Regenerarla descarta tus cambios.",
+        "detectingAgents": "Detectando agentes en el host de destino…",
+        "dialogDescription": "Revisa y personaliza el resumen, el destino y la entrega para una sesión nueva del agente. La sesión de origen sigue activa.",
+        "dialogTitle": "Continuar en una sesión nueva",
+        "diffBodies": "Contenido de los diffs",
+        "diffBodiesDetail": "Opcional y limitado a 12.000 caracteres.",
+        "diffTruncated": "El contenido de los diffs se truncó al límite de caracteres.",
+        "focusedContext": "Transferencia enfocada (recomendada)",
+        "focusedContextDescription": "Incluye indicios de estado y consulta detalles anteriores solo cuando hacen falta.",
+        "fullContext": "Transcripción completa de la sesión",
+        "fullContextDescription": "Pide al agente nuevo que lea toda la transcripción guardada.",
+        "hostChanged": "El resumen se enviará a otro host de ejecución.",
+        "includeContent": "Incluir en el resumen",
+        "launchFailed": "No se pudo iniciar la sesión nueva del agente. La transferencia no ha cambiado.",
+        "loadingRepoState": "Actualizando el estado del repositorio…",
+        "lockedSafetyBlock": "Nota de seguridad bloqueada · siempre se añade al final",
+        "newTemplate": "Nueva plantilla",
+        "noAgents": "No se detectaron agentes habilitados en el host de destino.",
+        "noContext": "Añade una nota de orientación o incluye contexto de sesión o repositorio antes de iniciar.",
+        "noLivePane": "Este origen no tiene un panel activo. No se puede esperar a que quede inactivo ni volver a capturar el historial en vivo.",
+        "noMatchingWorktrees": "No hay árboles de trabajo coincidentes.",
+        "noTemplate": "Sin plantilla",
+        "noTranscriptContext": "No se transferirá contexto de la transcripción. El resumen solo usa el estado del repositorio, indicios de estado y tu nota.",
+        "notes": "Notas",
+        "openEditorTabs": "Pestañas abiertas del editor",
+        "originalAgent": "Agente original: {{agent}}",
+        "preview": "Vista previa del resumen",
+        "previewAriaLabel": "Resumen editable de la transferencia de sesión",
+        "regenerate": "Regenerar desde los controles",
+        "relationship": "Relación",
+        "relationshipBranches": "Se bifurca de",
+        "relationshipContinues": "Continúa",
+        "relationshipReviews": "Revisa",
+        "repoState": "Estado de Git y rutas de archivos modificados",
+        "repoStateFailed": "No se pudo actualizar el estado del repositorio. La transferencia puede continuar.",
+        "resendAvailable": "El resumen se conserva para otro intento manual.",
+        "resendBrief": "Reenviar resumen",
+        "resendFailed": "No se pudo volver a enviar el resumen de transferencia.",
+        "resendManualOnly": "El reenvío es manual porque el agente de destino no ofrece evidencia de entrega.",
+        "resendMayDuplicate": "Es posible que el resumen ya haya llegado. Enviarlo otra vez puede crear un turno duplicado.",
+        "resendSucceeded": "Se volvió a enviar el resumen de transferencia.",
+        "resending": "Reenviando…",
+        "saveTemplate": "Guardar plantilla",
+        "savingTemplate": "Guardando…",
+        "searchWorktrees": "Buscar árboles de trabajo…",
+        "secretHits": "Se encontraron {{count}} posibles secretos. Revisa los marcadores de la vista previa antes de iniciar.",
+        "secretMarkerHover": "Posible secreto: {{excerpt}}",
+        "secretMarkersShown": "Se resaltan {{count}} posibles secretos en la vista previa.",
+        "selectAgent": "Seleccionar un agente",
+        "sendAgain": "Enviar otra vez",
+        "showPreview": "Vista previa del resumen",
+        "sourceBusy": "El agente de origen está trabajando. Captura ahora o espera un contexto más reciente.",
+        "stalePreview": "La vista previa editada está desactualizada respecto a los controles, el destino o el contexto de sesión más recientes.",
+        "startSession": "Iniciar sesión nueva",
+        "starting": "Iniciando…",
+        "steeringNote": "Nota de orientación",
+        "steeringNotePlaceholder": "¿En qué debe centrarse el agente nuevo?",
+        "template": "Plantilla reutilizable",
+        "templateBodyTooLong": "Acorta esta nota a {{limit}} caracteres antes de guardarla como plantilla.",
+        "templateContinueImplementation": "Continuar la implementación",
+        "templateDebugFailure": "Depurar el fallo",
+        "templateLimitReached": "Se alcanzó el límite de plantillas.",
+        "templateName": "Nombre de la plantilla",
+        "templateNamePlaceholder": "p. ej., Continuar la implementación",
+        "templateReviewCompletedWork": "Revisar lo realizado",
+        "transcriptUnreachable": "No se puede acceder a la transcripción desde el destino. Se usará una captura limitada si está disponible.",
+        "untitledSession": "Sesión actual",
+        "useExistingWorktree": "Usar un árbol de trabajo existente",
+        "waitForIdle": "Esperar a que quede inactivo",
+        "waitingForIdle": "Esperando a que la sesión de origen quede inactiva. Aun puedes iniciar ahora.",
+        "warnings": "Advertencias de transferencia",
+        "worktree": "Árbol de trabajo",
+        "worktreeName": "Nombre del árbol de trabajo",
+        "worktreeNamePlaceholder": "handoff-follow-up"
+      }
     },
     "terminalPane": {
       "TerminalContextMenu": {
@@ -20051,6 +20248,43 @@
             "chat": "chat"
           }
         }
+      },
+      "forkSessionHandoff": {
+        "title": "Transferencia de sesión",
+        "description": "Crea instrucciones reutilizables para continuar el trabajo en una nueva sesión de agente.",
+        "searchTitle": "Transferencia de sesión",
+        "searchDescription": "Crea plantillas de instrucciones reutilizables para continuar el trabajo en una nueva sesión de agente.",
+        "keywordHandoff": "transferencia",
+        "keywordSession": "sesión",
+        "keywordTemplate": "plantilla",
+        "keywordReusable": "reutilizable",
+        "keywordPrompt": "instrucción",
+        "keywordInstructions": "instrucciones",
+        "templates": "Plantillas",
+        "templatesDescription": "Añade un bloque de instrucciones guardado a cualquier transferencia a una sesión nueva.",
+        "add": "Añadir plantilla",
+        "editTemplate": "Editar {{name}}",
+        "removeTemplate": "Eliminar {{name}}",
+        "limitReached": "Se alcanzó el límite de plantillas.",
+        "count": "{{count}} de {{limit}} plantillas",
+        "reset": "Restablecer valores predeterminados",
+        "addTitle": "Añadir plantilla",
+        "editTitle": "Editar plantilla",
+        "editorDescription": "Añade instrucciones reutilizables al resumen para una nueva sesión de agente.",
+        "name": "Nombre",
+        "duplicateName": "Otra plantilla usa este nombre. Ambas seguirán disponibles.",
+        "body": "Instrucciones",
+        "variables": "Variables: {{gitStatus}}, {{changedPaths}} y {{openEditorTabs}}. También se admiten alias en MAYÚSCULAS.",
+        "cancel": "Cancelar",
+        "saving": "Guardando…",
+        "save": "Guardar plantilla",
+        "saveFailed": "No se pudieron guardar las plantillas",
+        "deleteTitle": "¿Eliminar “{{name}}”?",
+        "deleteDescription": "Esta plantilla dejará de estar disponible en el diálogo de transferencia.",
+        "delete": "Eliminar",
+        "resetTitle": "¿Restablecer las plantillas de transferencia?",
+        "resetDescription": "Se eliminarán las plantillas personalizadas y los cambios. Volverán los valores predeterminados más recientes.",
+        "resetConfirm": "Restablecer valores predeterminados"
       }
     },
     "onboarding": {
@@ -20213,6 +20447,60 @@
       "stepDownload": "Descargar",
       "stepUnpack": "Descomprimir",
       "stepCheck": "Comprobar"
+    },
+    "fork-ask-question-tool": {
+      "askCard": {
+        "cancel": "Cancelar",
+        "submitting": "Enviando…",
+        "submit": "Enviar",
+        "header_one": "{{count}} pregunta",
+        "header_other": "{{count}} preguntas",
+        "header_many": "{{count}} preguntas",
+        "statusAnswered": "Respondida",
+        "statusPartial": "Respondida parcialmente",
+        "statusDeclined": "Rechazada",
+        "statusTimedOut": "Tiempo agotado",
+        "statusUnavailable": "No disponible",
+        "yes": "Sí",
+        "no": "No",
+        "otherPlaceholder": "Escribe tu propia respuesta",
+        "optionalHint": "(opcional)",
+        "requiredError": "Esta pregunta es obligatoria.",
+        "textEmailError": "Introduce una dirección de correo electrónico válida.",
+        "textUrlError": "Introduce una URL válida.",
+        "textPatternError": "No coincide con el formato esperado.",
+        "numberInvalidError": "Introduce un número.",
+        "numberIntegerError": "Introduce un número entero.",
+        "numberMinError": "Introduce un número de al menos {{value0}}.",
+        "numberMaxError": "Introduce un número de como máximo {{value0}}.",
+        "dateInvalidError": "Introduce una fecha válida."
+      },
+      "askPreview": {
+        "hide": "Ocultar vista previa",
+        "show": "Mostrar vista previa",
+        "frameTitle": "Vista previa de la pregunta"
+      },
+      "badge": {
+        "pendingCountLabel_one": "{{count}} pregunta pendiente",
+        "pendingCountLabel_other": "{{count}} preguntas pendientes",
+        "pendingCountLabel_many": "{{count}} preguntas pendientes"
+      },
+      "notification": {
+        "title": "Pregunta pendiente en {{worktreeLabel}}",
+        "body": "Esperando tu respuesta."
+      },
+      "askPanel": {
+        "title": "Preguntas",
+        "empty": "Sin preguntas",
+        "emptyDescription": "Aquí aparece una pregunta que espera tu respuesta."
+      }
+    },
+    "rightSidebar": {
+      "dirtyBranchIndicator": {
+        "oneChange": "Control de código fuente — 1 cambio sin confirmar",
+        "manyChanges": "Control de código fuente — {{value0}} cambios sin confirmar",
+        "cappedChanges": "Control de código fuente — {{value0}}+ cambios sin confirmar"
+      }
     }
   },
   "dashboardPopout": {
@@ -23246,6 +23534,519 @@
     "disabledReason": {
       "needsPermission": "El agente necesita permiso",
       "statusStale": "El estado del agente está desactualizado"
+    }
+  },
+  "forkSessionHandoff": {
+    "lineage": {
+      "relationship": {
+        "branchesFrom": "se bifurca de",
+        "continues": "continúa",
+        "reviews": "revisa"
+      },
+      "vault": {
+        "handedOffRelationship": "Transferida · {{value0}}",
+        "reviews": "Revisa",
+        "branchesFrom": "Se bifurca de",
+        "continuesFrom": "Continúa desde"
+      },
+      "agentSession": "sesión de {{value0}}",
+      "relatedSession": "sesión relacionada",
+      "worktreeRemoved": "espacio de trabajo eliminado",
+      "noLivePane": "No hay ningún panel activo disponible.",
+      "jumpToChild": "Ir a la sesión transferida",
+      "jumpToParent": "Ir a la sesión de origen",
+      "handedOff": "Transferida",
+      "fromHandoff": "Desde una transferencia"
+    }
+  },
+  "fork": {
+    "sessionInfo": {
+      "title": "Información de sesión",
+      "agent": "Sesión del agente",
+      "agentLabel": "Agente",
+      "asOf": "A las {{time}}",
+      "staleAsOf": "Desactualizado · a las {{time}}",
+      "branch": "Rama",
+      "cacheReadTokens": "Lectura de caché",
+      "cacheWriteTokens": "Escritura de caché",
+      "configuredMcp": "Servidores MCP configurados",
+      "context": "Contexto",
+      "contextFill": "Uso del contexto",
+      "contextRemaining": "Restante",
+      "contextUsed": "contexto usado",
+      "contextUsedLabel": "Usado",
+      "contextWaiting": "Esperando contexto",
+      "contextWaitingLong": "Esperando la primera actualización de la línea de estado…",
+      "contextWaitingShort": "Esperando datos de contexto…",
+      "contextWindow": "Ventana",
+      "copied": "Copiado",
+      "copySessionId": "Copiar ID",
+      "cwd": "Directorio de trabajo",
+      "enableStatusLine": "Activar telemetría de sesión",
+      "filesTouched": "Archivos modificados",
+      "fiveHour": "Plan de 5 horas",
+      "focusPane": "Enfocar panel",
+      "hookDetail": "Detalle del hook",
+      "hooks": "Hooks",
+      "hooksAndMcp": "Hooks y MCP",
+      "hooksLoading": "Inspeccionando hooks y configuración MCP…",
+      "identity": "Identidad",
+      "inputTokens": "Entrada",
+      "linesAdded": "Líneas añadidas",
+      "linesRemoved": "Líneas eliminadas",
+      "liveActivity": "Actividad en vivo",
+      "model": "Modelo",
+      "noAgent": "No hay sesión de agente",
+      "noAgentDescription": "Enfoca un panel de terminal con una sesión de agente para inspeccionarla aquí.",
+      "noMcp": "No se encontraron servidores configurados.",
+      "openTranscript": "Abrir transcripción",
+      "openVault": "Abrir Vault",
+      "outputStyle": "Estilo de salida",
+      "outputTokens": "Salida",
+      "pane": "Panel",
+      "resetsAt": "{{used}} · se restablece {{time}}",
+      "retry": "Reintentar",
+      "revealTranscript": "Mostrar transcripción",
+      "sessionId": "ID de sesión",
+      "sevenDay": "Plan de 7 días",
+      "started": "Inicio",
+      "state": "Estado",
+      "stateBlocked": "Bloqueado",
+      "stateDone": "Terminado",
+      "stateWaiting": "Esperando",
+      "stateWorking": "Trabajando",
+      "statusLine": "Línea de estado",
+      "statusLineAvailable": "Se detectó una línea de estado personalizada",
+      "statusLineChained": "Encadenada",
+      "statusLineConsent": "Orca conservará y ejecutará tu comando de línea de estado actual.",
+      "statusLineDisabled": "No activada",
+      "statusLineDrifted": "La línea de estado personalizada cambió",
+      "statusLineError": "Requiere atención",
+      "statusLineManaged": "Gestionada",
+      "subagents": "Subagentes",
+      "tool": "Herramienta activa",
+      "toolInput": "Entrada",
+      "totalTokens": "Tokens totales",
+      "transcript": "Transcripción",
+      "turns": "Turnos",
+      "usage": "Uso",
+      "usageWaiting": "Esperando el primer turno completado…",
+      "version": "Versión",
+      "waiting": "Esperando datos de la sesión…",
+      "workspace": "Espacio de trabajo",
+      "hookInstalled": "Instalados",
+      "hookNotInstalled": "No instalados",
+      "hookPartial": "Instalación parcial",
+      "hookSkipped": "Omitidos",
+      "hookError": "Error",
+      "mcpEnabled": "Activado",
+      "mcpDisabled": "Desactivado",
+      "mcpInvalid": "No válido"
+    },
+    "sidebarSectionSeparator": {
+      "title": "Separadores de secciones de la barra lateral",
+      "description": "Muestra líneas divisorias entre proyectos y grupos de nivel superior.",
+      "keywordSidebar": "barra lateral",
+      "keywordSeparator": "separador",
+      "keywordDivider": "divisor",
+      "keywordProject": "proyecto",
+      "keywordGroup": "grupo"
+    },
+    "heimdall": {
+      "kind": {
+        "objective": "Vigilante de objetivos"
+      },
+      "status": {
+        "watching": "Observando",
+        "held": "Retenido",
+        "acting": "Actuando",
+        "escalated": "Escalado",
+        "parked": "Aparcado",
+        "terminal": "Completado",
+        "disabled": "Detenido",
+        "unreachable": "Equipo inaccesible",
+        "tickError": "Error · reintentando",
+        "lostContact": "Equipo inaccesible · última confirmación hace {{age}}",
+        "phase": "Fase actual"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "Equipo inaccesible · última confirmación hace {{age}}"
+      },
+      "host": {
+        "remote": "Remoto · {{host}}",
+        "local": "Este dispositivo"
+      },
+      "time": {
+        "never": "Nunca",
+        "now": "ahora",
+        "ago": "hace {{age}}"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "{{count}} vigilantes requieren atención",
+        "bucket": {
+          "attention": "Necesita tu atención",
+          "lostContact": "Sin contacto",
+          "active": "Activo"
+        }
+      },
+      "page": {
+        "back": "Volver",
+        "title": "Flota de Heimdall",
+        "summary": "{{active}} activos · {{attention}} requieren atención",
+        "refresh": "Actualizar flota",
+        "staleError": "No se pudo actualizar la flota; se muestra la última instantánea confirmada: {{error}}"
+      },
+      "fleet": {
+        "title": "Flota de vigilantes",
+        "emptyTitle": "No hay vigilantes en la flota",
+        "emptyDescription": "Activa un vigilante desde un espacio de trabajo compatible para verlo aquí.",
+        "name": "Vigilante",
+        "status": "Estado",
+        "phase": "Fase",
+        "activeBurn": "Tiempo activo",
+        "turns": "Turnos",
+        "elapsed": "Tiempo transcurrido",
+        "lastTick": "Último ciclo"
+      },
+      "detail": {
+        "back": "Volver a la flota",
+        "refreshing": "Actualizando detalles",
+        "observed": "Estado del propietario observado hace {{age}}",
+        "remote": "Caché remota",
+        "lostContact": "Última confirmación hace {{age}}; no se puede contactar con el propietario en este momento. Es posible que el vigilante aún esté en ejecución.",
+        "readOnly": "Solo lectura.",
+        "staleError": "No se pudieron actualizar los detalles; se muestran los últimos datos confirmados: {{error}}",
+        "loading": "Cargando detalles del propietario…",
+        "unavailable": "Los detalles del propietario no están disponibles.",
+        "selectPrompt": "Selecciona un vigilante para revisar sus decisiones, agentes y controles del propietario."
+      },
+      "controls": {
+        "title": "Controles del propietario",
+        "resume": "Reanudar",
+        "pause": "Pausar",
+        "disarm": "Desactivar",
+        "delete": "Eliminar vigilante",
+        "deleteTitle": "¿Eliminar vigilante?",
+        "deleteDescription": "El vigilante «{{name}}» y su historial guardado se eliminarán permanentemente. Los terminales de los agentes no se detendrán.",
+        "approve": "Aprobar",
+        "budgetResumeWarning": "Este vigilante ha agotado su presupuesto. Aumenta el límite antes de reanudarlo o volverá a quedar aparcado."
+      },
+      "command": {
+        "applied": "Aplicado por el propietario a las {{time}}.",
+        "refused": "El propietario rechazó el comando ({{reason}}): {{detail}}",
+        "indeterminate": "Es posible que el comando se haya aplicado o no. Volviendo a leer el estado del propietario… {{detail}}",
+        "stopAllIndeterminate": "{{count}} comandos de detención pueden haberse aplicado o no. Se está volviendo a leer el estado del propietario.",
+        "stopAllRefused": "{{count}} propietarios rechazaron el comando de detención."
+      },
+      "budget": {
+        "title": "Presupuesto",
+        "activeTime": "Tiempo activo",
+        "unlimited": "Ilimitado",
+        "unlimitedShort": "ilimitado",
+        "turns": "Turnos de agentes",
+        "exhausted": "Agotado: {{kind}}",
+        "minutesLimit": "Límite de minutos activos",
+        "turnLimit": "Límite de turnos de agentes",
+        "apply": "Aplicar presupuesto"
+      },
+      "escalations": {
+        "title": "Escalaciones abiertas"
+      },
+      "workers": {
+        "title": "Agentes activos",
+        "empty": "No hay agentes activos.",
+        "live": "Activo",
+        "unverifiable": "Inalcanzable",
+        "exited": "Finalizado",
+        "noContact": "Sin contacto confirmado",
+        "lastContact": "Último contacto hace {{age}}",
+        "stop": "Detener",
+        "answerPlaceholder": "Responde al agente",
+        "answerLabel": "Responder a la pregunta del agente",
+        "sendAnswer": "Enviar respuesta"
+      },
+      "trace": {
+        "title": "Traza de decisiones",
+        "noDecision": "No hay ninguna decisión registrada",
+        "decidedAction": "Actuar: {{action}}",
+        "empty": "Aún no hay trazas de decisiones.",
+        "tick": "Ciclo {{seq}}",
+        "running": "En ejecución",
+        "saw": "Observado",
+        "noSnapshot": "No hay ninguna instantánea registrada",
+        "decided": "Decisión tomada",
+        "gate": "Puerta",
+        "declined": "Rechazadas",
+        "noneDeclined": "No se rechazó ninguna fase"
+      },
+      "activity": {
+        "title": "Historial de acciones de la flota",
+        "asOf": "Última actualización: {{age}}",
+        "partial": "{{count}} historiales de vigilantes no se pudieron actualizar; se conservan los registros visibles.",
+        "empty": "Aún no hay acciones autónomas registradas."
+      },
+      "ledger": {
+        "title": "Actividad del vigilante",
+        "attemptResolved": "Intento resuelto",
+        "attemptAbandoned": "Intento abandonado",
+        "evidence": "Evidencia",
+        "activeTimeStarted": "Tiempo activo iniciado",
+        "activeTimeChecked": "Punto de control del tiempo activo",
+        "activeTimeStopped": "Tiempo activo detenido",
+        "workerTurn": "Turno del agente",
+        "finished": "Finalizado",
+        "empty": "Aún no hay actividad registrada."
+      },
+      "error": {
+        "unavailable": "El plano de control de Heimdall no está disponible.",
+        "ownerUnavailable": "El entorno de ejecución propietario no está disponible; no se envió ninguna inscripción."
+      }
+    },
+    "loops": {
+      "setup": {
+        "presetInterval": "Cada cierto tiempo",
+        "presetQueue": "Cola",
+        "presetUntilDone": "Hasta terminar",
+        "errorWholeNumber": "Introduce un número entero de al menos 1.",
+        "createFailed": "No se pudo iniciar el bucle.",
+        "runningLoopWarning": "Este espacio de trabajo ya tiene un bucle en ejecución. Un segundo bucle editará los mismos archivos al mismo tiempo.",
+        "name": "Nombre",
+        "namePlaceholder": "Por defecto, el prompt",
+        "agent": "Agente",
+        "noAgents": "No se detectaron agentes",
+        "preset": "Ejecución",
+        "queueItems": "Cola",
+        "queueItem": "Elemento {{n}} de la cola",
+        "queueMoveUp": "Subir el elemento {{n}} de la cola",
+        "queueMoveDown": "Bajar el elemento {{n}} de la cola",
+        "queueRemove": "Quitar el elemento {{n}} de la cola",
+        "queueNew": "Nuevo elemento de la cola",
+        "queueNewPlaceholder": "Un prompt para una iteración",
+        "queueAdd": "Añadir a la cola",
+        "errorQueueEmpty": "Añade al menos un prompt a la cola.",
+        "errorQueueBlankItem": "Los prompts de la cola no pueden estar en blanco.",
+        "repeatQueue": "Empezar de nuevo cuando la cola esté vacía",
+        "prompt": "Prompt",
+        "promptPlaceholder": "¿Qué debe hacer el agente en cada iteración?",
+        "intervalMinutes": "Ejecutar cada (minutos)",
+        "session": "Sesión",
+        "sessionFresh": "Sesión nueva en cada iteración",
+        "sessionContinue": "Continuar la misma sesión",
+        "maxIterations": "Máximo de iteraciones",
+        "maxIterationsHint": "Déjalo vacío para no poner límite.",
+        "advanced": "Avanzado",
+        "checkCommand": "Comando de comprobación",
+        "checkHint": "Se ejecuta en el espacio de trabajo. El código de salida 0 significa que el trabajo está terminado.",
+        "evaluator": "Condición de finalización",
+        "evaluatorHint": "Un segundo agente lee los cambios y juzga si esto se cumple.",
+        "maxCost": "Costo máximo (USD)",
+        "errorCost": "Introduce una cantidad mayor que 0.",
+        "protectedPaths": "Rutas protegidas",
+        "protectedPathsHint": "Una ruta o patrón por línea. El bucle se pausa si el agente cambia alguna.",
+        "noProgress": "Pausar tras 3 iteraciones sin cambios",
+        "checkpointCommits": "Hacer un commit de punto de control tras cada iteración",
+        "askBeforeNext": "Preguntar antes de cada nueva iteración",
+        "resumeAtLimitReset": "Reanudar cuando se restablezca el límite de uso",
+        "cancel": "Cancelar",
+        "start": "Iniciar bucle",
+        "title": "Nuevo bucle",
+        "description": "Ejecuta un agente en este espacio de trabajo una y otra vez hasta que el trabajo esté terminado.",
+        "menuItem": "Bucle…",
+        "intervalAnchor": "Contado desde",
+        "anchorFromEnd": "El final de la última iteración",
+        "anchorWallClock": "El reloj",
+        "checkTimeout": "Tiempo límite de la comprobación (segundos)",
+        "errorCheckTimeout": "Introduce de 1 a 600 segundos.",
+        "checkRunWhen": "Ejecutar la comprobación",
+        "runEveryIteration": "Después de cada iteración",
+        "runOnClaim": "Cuando el agente dice que terminó",
+        "maxActiveMinutes": "Máximo de minutos activos",
+        "errorPrompt": "Introduce un prompt para iniciar el bucle."
+      },
+      "rail": {
+        "action": {
+          "cancel": "Cancelar",
+          "edit": "Editar",
+          "pause": "Pausar",
+          "resume": "Reanudar",
+          "steer": "Dirigir…",
+          "stop": "Detener"
+        },
+        "actionFailed": "No se pudo completar la acción. Inténtalo de nuevo.",
+        "badge": {
+          "fail": "Fallo",
+          "none": "Sin comprobación",
+          "pass": "Correcto"
+        },
+        "check": {
+          "failed": "Comprobación fallida",
+          "none": "Sin comprobación",
+          "passed": "Comprobación superada"
+        },
+        "detail": {
+          "added": "{{value}} añadidas",
+          "back": "Volver",
+          "changes": "Cambios",
+          "check": "Comprobación de finalización",
+          "checkStderr": "Errores de la verificación",
+          "checkStdout": "Salida de la verificación",
+          "cost": "Coste",
+          "duration": "Duración",
+          "evaluator": "Evaluador",
+          "evaluatorMet": "Condición cumplida",
+          "evaluatorNotMet": "Condición no cumplida",
+          "evaluatorReason": "Motivo del evaluador",
+          "loadFailed": "No se pudo cargar la salida de esta iteración.",
+          "loading": "Cargando la salida…",
+          "noChanges": "Sin medir",
+          "noOutput": "No se capturó salida del agente.",
+          "noRecord": "No se registró salida para esta iteración.",
+          "outcome": "Resultado",
+          "outputTail": "Salida del agente",
+          "removed": "{{value}} eliminadas",
+          "title": "Iteración {{n}}"
+        },
+        "edit": {
+          "errorName": "Introduce un nombre.",
+          "errorPrompt": "Introduce un prompt.",
+          "name": "Nombre",
+          "pacing": "Ritmo",
+          "pacingInterval": "En un intervalo",
+          "pacingOnIdle": "En cuanto el agente esté inactivo",
+          "save": "Guardar"
+        },
+        "endReason": {
+          "crashed": "El agente falló",
+          "interrupted": "Interrumpida",
+          "running": "En curso",
+          "settled": "Terminada",
+          "stopped": "Detenida"
+        },
+        "iteration": {
+          "current": "Iteración {{n}}",
+          "currentOfMax": "Iteración {{n}} de {{max}}",
+          "done": "{{n}} iteraciones completadas",
+          "doneOfMax": "{{n}} de {{max}} iteraciones completadas"
+        },
+        "iterations": {
+          "empty": "Aún no hay iteraciones terminadas",
+          "title": "Iteraciones"
+        },
+        "label": "Bucle",
+        "lastCheck": {
+          "failed": "Fallo en la iteración {{n}}",
+          "passed": "Superada en la iteración {{n}}",
+          "title": "Última comprobación"
+        },
+        "meter": {
+          "cost": "Coste",
+          "costUnavailable": "Costo no disponible",
+          "ofCap": "{{spent}} de {{cap}}",
+          "time": "Tiempo"
+        },
+        "pause": {
+          "agentBlocked": "El agente está bloqueado",
+          "agentDecide": "El agente necesita una decisión",
+          "askBeforeNext": "Esperando tu visto bueno",
+          "capCost": "Se alcanzó el límite de coste",
+          "capIterations": "Se alcanzó el límite de iteraciones",
+          "capTime": "Se alcanzó el límite de tiempo",
+          "crashed": "El agente siguió fallando",
+          "interruptedByRestart": "Interrumpido por un reinicio de la app",
+          "noProgress": "Sin avances en las últimas iteraciones",
+          "protectedPath": "Tocó una ruta protegida",
+          "queueExhausted": "La cola está vacía",
+          "unverifiable": "Se perdió el contacto con el host del agente",
+          "usageLimit": "Se alcanzó el límite de uso del agente",
+          "user": "Pausado por ti"
+        },
+        "phase": {
+          "checking": "Ejecutando la comprobación de finalización",
+          "evaluating": "Evaluando el resultado",
+          "needsYou": "Esperándote",
+          "relaunching": "Reiniciando el agente",
+          "sending": "Enviando el prompt",
+          "waiting": "Esperando la siguiente iteración",
+          "working": "El agente está trabajando"
+        },
+        "preset": {
+          "interval": "Cada {{minutes}} min",
+          "queue": "Recorrer una cola",
+          "untilDone": "Hasta terminar"
+        },
+        "question": {
+          "blocked": "Bloqueado",
+          "decide": "Se necesita una decisión"
+        },
+        "queue": {
+          "add": "Añadir",
+          "done": "Hecho",
+          "editLabel": "Editar elemento de la cola",
+          "empty": "La cola está vacía",
+          "inFlight": "En curso",
+          "moveDown": "Bajar",
+          "moveUp": "Subir",
+          "newLabel": "Nuevo elemento de la cola",
+          "placeholder": "Describe la siguiente tarea",
+          "remove": "Quitar",
+          "title": "Cola"
+        },
+        "resume": {
+          "addLabel": "Iteraciones que añadir",
+          "iterations": "iteraciones"
+        },
+        "state": {
+          "completed": "Completado",
+          "needsYou": "Te necesita",
+          "paused": "En pausa",
+          "running": "En ejecución",
+          "stopped": "Detenido",
+          "unverifiable": "No verificable"
+        },
+        "steer": {
+          "label": "Nota de orientación",
+          "placeholder": "Indicaciones para la siguiente iteración",
+          "send": "Enviar"
+        },
+        "stop": {
+          "afterIteration": "Tras esta iteración",
+          "now": "Ahora",
+          "prompt": "Detener el bucle"
+        },
+        "strip": {
+          "label": "Estado del bucle",
+          "sessionFresh": "sesión nueva",
+          "sessionContinued": "sesión continuada"
+        },
+        "unverifiableHint": "No se puede contactar con el host del agente, así que el bucle no avanza.",
+        "skippedTicks_one": "{{count}} tic omitido",
+        "skippedTicks_other": "{{count}} tics omitidos",
+        "skippedTicks_many": "{{count}} tics omitidos"
+      },
+      "status": {
+        "glyph": {
+          "tooltip": "Bucle {{n}} · {{state}}",
+          "tooltipWithCap": "Bucle {{n}}/{{max}} · {{state}}",
+          "open": "Abrir bucle",
+          "state": {
+            "running": "En ejecución",
+            "needsYou": "Te necesita",
+            "paused": "En pausa",
+            "detached": "Desacoplado",
+            "unverifiable": "No verificable"
+          }
+        },
+        "close": {
+          "title": "¿Cerrar un bucle en ejecución?",
+          "description": "Esta pestaña ejecuta el bucle \"{{name}}\". Déjalo en segundo plano o deténlo ahora.",
+          "cancel": "Cancelar",
+          "stop": "Detener bucle",
+          "keepRunning": "Seguir ejecutando",
+          "failed": "No se pudo actualizar el bucle, así que la pestaña sigue abierta."
+        }
+      }
     }
   }
 }

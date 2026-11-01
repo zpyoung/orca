@@ -40,12 +40,9 @@ async function readSession(args: NativeChatReadSessionArgs): Promise<ReadTranscr
   return readNativeChatTranscriptTail({
     agent,
     sessionId,
-    transcriptPath: nativeChatTranscriptPathOnExecutionHost(
-      agentHookServer.getStatusSnapshot(),
-      sessionId,
-      args.transcriptPath
-    ),
+    transcriptPath,
     limit,
+    sourceOrder: true,
     ...(typeof args.beforeOffset === 'number' ? { beforeOffset: args.beforeOffset } : {})
   })
 }

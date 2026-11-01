@@ -204,7 +204,9 @@ export function tuiIdleNeedsVisibleScreenProbe(
   return lastAgentStatus === null && (waitText.length === 0 || agent === 'claude')
 }
 
-// Muse keeps its bare-cwd OSC title; only the body proves readiness, including the voice composer without skills.
+// Muse keeps its bare-cwd OSC title; its composer (❯ under a rule, labeled "voice input" only where voice exists) proves readiness.
+const MUSE_COMPOSER_RE = /\u2500\u2500\s*\u276F/
+
 function findMuseReadyPromptIndex(normalized: string): number | null {
   const headerIndex = normalized.lastIndexOf('muse code')
   if (headerIndex === -1) {

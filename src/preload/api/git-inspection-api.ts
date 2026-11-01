@@ -75,6 +75,7 @@ export type GitInspectionApi = {
     compareAgainstHead?: boolean
     connectionId?: string
     requestToken?: string
+    wakeWslDistro?: boolean
   }) => Promise<GitDiffResult>
   cancelDiff: (args: { requestToken: string }) => Promise<void>
   branchCompare: (args: {

@@ -3,7 +3,8 @@
     "heimdall": {
       "kind": {
         "objective": "Objective watcher",
-        "hostedReview": "Hosted review"
+        "hostedReview": "Hosted review",
+        "objectiveWatcher": "Objective watcher"
       },
       "status": {
         "watching": "Watching",

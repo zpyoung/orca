@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
 import { useAppStore } from '@/store'
+import { aiVaultSessionLogFilePath } from '../../../../../shared/ai-vault-session-log-resource'
+import { isAiVaultAgent } from '../../../../../shared/ai-vault-types'
 import type { SessionInfoIdentity } from '../../../../../shared/fork-session-info/session-info-types'
 import { openAiVaultSessionLogInOrca } from '../ai-vault-session-log-open'
 import type { FocusedSessionSelection } from './focused-session-info'
@@ -82,6 +84,12 @@ export function SessionInfoIdentitySection({
     })
   }, [identity.worktreeId, selection.leafId, selection.tabId])
   const localTranscript = selection.isLocalExecution ? identity.transcriptPath : undefined
+  const transcriptLog =
+    localTranscript && isAiVaultAgent(identity.agent)
+      ? { agent: identity.agent, filePath: localTranscript }
+      : undefined
+  const openableTranscriptLog =
+    transcriptLog && aiVaultSessionLogFilePath(transcriptLog) ? transcriptLog : undefined
 
   return (
     <div>
@@ -183,16 +191,18 @@ export function SessionInfoIdentitySection({
         />
         {localTranscript ? (
           <>
-            <ActionButton
-              icon={FileJson}
-              label={translate('fork.sessionInfo.openTranscript', 'Open transcript')}
-              onClick={() =>
-                void openAiVaultSessionLogInOrca({
-                  filePath: localTranscript,
-                  executionHostId: 'local'
-                })
-              }
-            />
+            {openableTranscriptLog ? (
+              <ActionButton
+                icon={FileJson}
+                label={translate('fork.sessionInfo.openTranscript', 'Open transcript')}
+                onClick={() =>
+                  void openAiVaultSessionLogInOrca({
+                    ...openableTranscriptLog,
+                    executionHostId: 'local'
+                  })
+                }
+              />
+            ) : null}
             <ActionButton
               icon={FolderOpen}
               label={translate('fork.sessionInfo.revealTranscript', 'Reveal transcript')}

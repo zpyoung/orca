@@ -7,7 +7,7 @@ export const WORKTREE_SET_METHOD = defineMethod({
   name: 'worktree.set',
   permission: 'workspace',
   params: WorktreeSet,
-  handler: async (params, { runtime }) => {
+  handler: async (params, { runtime, clientKind }) => {
     const worktree = await runtime.updateManagedWorktreeMeta(params.worktree, {
       displayName: params.displayName,
       ...(params.firstAgentMessageRenameError === null
@@ -53,6 +53,12 @@ export const WORKTREE_SET_METHOD = defineMethod({
         ? { diffCommentsBase: params.diffCommentsBase }
         : {}),
       mobileDiffReview: params.mobileDiffReview,
+      // Why: only the desktop app writes group membership. `worktree.set` is on
+      // the mobile allowlist as a whole and mobile has no group concept, so the
+      // key is omitted (not set to undefined, which would clobber on merge)
+      // rather than gating the whole method. 'runtime' still carries it, which is
+      // the path a desktop write to an SSH-hosted worktree takes.
+      ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),
       lineage:
         params.parentWorktree || params.noParent === true
           ? {

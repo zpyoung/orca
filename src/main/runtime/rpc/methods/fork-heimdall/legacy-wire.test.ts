@@ -5,7 +5,7 @@ import {
   NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES,
   RUNTIME_CAPABILITIES
 } from '../../../../../shared/protocol-version'
-import { remoteRuntimeClientCapabilities } from '../../../../../shared/remote-runtime-client-capabilities'
+import { remoteRuntimeClientCapabilities } from '../../../../../shared/remote-runtime/remote-runtime-client-capabilities'
 import type { WatcherListEntry } from '../../../../../shared/fork-heimdall/watcher-types'
 import { OrcaRuntimeService } from '../../../orca-runtime'
 import { eraseRpcMethods, isStreamingMethod, type RpcContext, type RpcMethod } from '../../core'

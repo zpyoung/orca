@@ -21,13 +21,6 @@ import {
 } from './native-chat/input/native-chat-picker-triggers'
 
 export type { SlashCommandSuggestion }
-export {
-  EMPTY_HISTORY,
-  pushHistory,
-  recallNext,
-  recallPrevious,
-  type HistoryState
-} from './fork-agent-composer/agent-composer-history'
 export { filterSlashCommands, isSlashCommandDraft, applySlashSuggestion, slashCommandDispatchText }
 export {
   classifyNativeChatSend,
@@ -162,6 +155,7 @@ function deriveSlashAutocomplete(
     sessionSkills,
     undefined,
     prefix,
+    commandAvailable,
     profile?.namespacesPluginSkills === true
   )
   return {

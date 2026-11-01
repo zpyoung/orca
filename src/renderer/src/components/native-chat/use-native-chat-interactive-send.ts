@@ -182,11 +182,11 @@ export function useNativeChatInteractiveSend(
 
   const cancel = useCallback(() => {
     cancelInFlight()
-    if (resolveNativeChatTranscriptAgent(agent) === 'opencode' && targetPtyId) {
+    if (nativeChatStopSendsSecondEscape(agent) && targetPtyId) {
       if (isTerminalInputQuarantined(terminalTabId)) {
         return
       }
-      // OpenCode confirms interruption with a second Escape; pace writes like mobile Stop.
+      // Pace the second Escape like an answer step so the TUI renders its confirm first.
       inFlightRef.current = sendNativeChatAskAnswer({ terminalTabId, ptyId: targetPtyId }, [
         { raw: ESC },
         { raw: ESC }

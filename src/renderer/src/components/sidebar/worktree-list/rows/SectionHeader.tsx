@@ -58,7 +58,7 @@ export type SectionHeaderRowContext = {
   highlightedRevealRowKey: string | null
   dragOverStatus: WorkspaceStatus | null
   pinDragOver: boolean
-  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview
+  worktreeGroupMembershipDragPreview?: WorktreeGroupMembershipDragPreview
   headerDrag: WorktreeSidebarHeaderDrag
   getCachedFolderWorkspacePathStatus: (request: {
     scope: 'project-group'
@@ -68,7 +68,7 @@ export type SectionHeaderRowContext = {
   projectActions: RepoHeaderProjectActions
   onRenameProjectGroup: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
   onDeleteProjectGroup: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
-  onOpenGroupLedger: (group: ProjectGroup) => void
+  onOpenGroupLedger?: (group: ProjectGroup) => void
   onCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
   onWorkspaceStatusDragOver: (event: React.DragEvent, status: WorkspaceStatus) => void
   onWorkspaceStatusDragLeave: (event: React.DragEvent) => void
@@ -256,11 +256,11 @@ export function renderWorktreeSectionHeaderRow(args: {
               ctx.pinDragOver &&
               'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
             projectGroupIdForHeader !== undefined &&
-              ctx.worktreeGroupMembershipDragPreview.target.kind === 'join' &&
+              ctx.worktreeGroupMembershipDragPreview?.target.kind === 'join' &&
               ctx.worktreeGroupMembershipDragPreview.target.groupId === projectGroupIdForHeader &&
               'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
             projectIdForHeader !== undefined &&
-              ctx.worktreeGroupMembershipDragPreview.target.kind === 'leave' &&
+              ctx.worktreeGroupMembershipDragPreview?.target.kind === 'leave' &&
               ctx.worktreeGroupMembershipDragPreview.repoId === projectIdForHeader &&
               'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
             row.repo && 'overflow-hidden'
@@ -385,8 +385,8 @@ export function renderWorktreeSectionHeaderRow(args: {
                 onRename={ctx.onRenameProjectGroup}
                 onDelete={ctx.onDeleteProjectGroup}
                 onOpenLedger={
-                  projectGroupForHeader
-                    ? () => ctx.onOpenGroupLedger(projectGroupForHeader)
+                  projectGroupForHeader && ctx.onOpenGroupLedger
+                    ? () => ctx.onOpenGroupLedger?.(projectGroupForHeader)
                     : undefined
                 }
               />

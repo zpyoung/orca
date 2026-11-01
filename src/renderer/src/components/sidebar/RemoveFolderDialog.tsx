@@ -12,6 +12,7 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import type { LedgerRemovalPreview } from '../../../../shared/ledger'
 import { requestLedger } from '@/runtime/runtime-ledger-client'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import {
   getRepoExecutionHostId,
   isRuntimeOwnedSshTargetId,

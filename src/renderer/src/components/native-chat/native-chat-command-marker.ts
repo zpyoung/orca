@@ -2,6 +2,7 @@
 
 import type { NativeChatMessage } from '../../../../shared/native-chat-types'
 import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'
+import { translate } from '@/i18n/i18n'
 
 /** Local slash-command feedback replaces user-turn echoes for commands dispatched into the TUI. */
 export type NativeChatCommandMarker = {

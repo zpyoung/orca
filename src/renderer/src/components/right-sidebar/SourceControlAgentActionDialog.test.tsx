@@ -233,6 +233,7 @@ describe('SourceControlAgentActionDialog', () => {
     useAppStore.setState(initialState, true)
     setLocalRuntimeCapabilitiesForTests(null)
   })
+<<<<<<< fork
   it('hides the dialog and auto-starts once when the saved global launch recipe matches', async () => {
     renderControlledDialog()
     expect(container.textContent).not.toContain('Launch agent')
@@ -269,7 +270,62 @@ describe('SourceControlAgentActionDialog', () => {
       agentId: 'codex' as const,
       commandInputTemplate: '{basePrompt}',
       agentArgs: '--model saved'
+||||||| base
+  it('hides the dialog and auto-starts once when the saved global launch recipe matches', async () => {
+    renderControlledDialog()
+    expect(container.textContent).not.toContain('Launch agent')
+    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(mocks.onOpenChange).toHaveBeenCalledWith(false))
+    expect(mocks.ensureDetectedAgents).toHaveBeenCalledTimes(1)
+    expect(mocks.onStart).toHaveBeenCalledWith({
+      agent: 'codex',
+      commandInput: 'Resolve conflicts.',
+      agentArgs: ''
+    })
+    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
+    expect(mocks.onSaveAgentDefault).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('Launch agent')
+  })
+  it('hides the dialog and auto-starts once when the saved repo launch recipe matches', async () => {
+    resetStore(
+      settingsWithGlobalRecipe({ agentId: 'claude', commandInputTemplate: '{basePrompt}' }),
+      [repoWithSavedRecipe()]
+    )
+    renderControlledDialog({ repoId: 'repo-1' })
+    expect(container.textContent).not.toContain('Launch agent')
+    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(mocks.onOpenChange).toHaveBeenCalledWith(false))
+    expect(mocks.ensureDetectedAgents).toHaveBeenCalledTimes(1)
+    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
+    expect(mocks.onSaveAgentDefault).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('Launch agent')
+  })
+  it('keeps saved arguments on a prospective SSH terminal launch', async () => {
+    setLocalRuntimeCapabilitiesForTests([STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY])
+    const recipe = {
+      agentId: 'codex' as const,
+      commandInputTemplate: '{basePrompt}',
+      agentArgs: '--model saved'
+=======
+  it.each(['global', 'repo'])(
+    'opens saved %s recipes for editing and Cancel starts nothing',
+    async (scope) => {
+      if (scope === 'repo') {
+        resetStore(settingsWithGlobalRecipe(), [repoWithSavedRecipe()])
+      }
+      renderControlledDialog(scope === 'repo' ? { repoId: 'repo-1' } : {})
+      await flushEffects()
+      expect(container.textContent).toContain('Launch agent')
+      expect(container.querySelector('textarea')?.value).toBe('{basePrompt}')
+      const cancel = [...container.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Cancel'
+      )!
+      act(() => cancel.click())
+      expect(mocks.onStart).not.toHaveBeenCalled()
+      expect(mocks.onLaunched).not.toHaveBeenCalled()
+>>>>>>> upstream
     }
+<<<<<<< fork
     resetStore(
       {
         ...settingsWithGlobalRecipe(null),
@@ -293,6 +349,34 @@ describe('SourceControlAgentActionDialog', () => {
     })
   })
   // Paired-server agents belong to the workspace owner; the client list cannot detect them (#21429).
+||||||| base
+    resetStore(
+      {
+        ...settingsWithGlobalRecipe(null),
+        experimentalNativeChat: true
+      },
+      [repoWithSavedRecipe('--model saved', 'build-box', 'ssh:build-box')]
+    )
+
+    renderControlledDialog({
+      repoId: 'repo-1',
+      connectionId: 'build-box',
+      savedAgentArgs: recipe.agentArgs
+    })
+
+    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1))
+    expect(mocks.onStart).toHaveBeenCalledWith({
+      agent: 'codex',
+      commandInput: 'Resolve conflicts.',
+      agentArgs: '--model saved'
+    })
+  })
+  // Paired-server agents belong to the workspace owner; the client list cannot detect them (#21429).
+=======
+  )
+  // Why (#21429): a paired server's workspace has no SSH connection on this client; its agents
+  // are on the server, and this client's own list says nothing about them.
+>>>>>>> upstream
   it('detects agents on the paired server that owns the workspace', async () => {
     detects([])
     mocks.ensureRuntimeDetectedAgents.mockImplementation(async (environmentId, worktreeId) => {
@@ -307,16 +391,8 @@ describe('SourceControlAgentActionDialog', () => {
 
     renderControlledDialog({ repoId: 'repo-1', worktreeId: 'repo-1::wt-1', connectionId: null })
 
-    await vi.waitFor(() =>
-      expect(mocks.ensureRuntimeDetectedAgents).toHaveBeenCalledWith('env-1', 'repo-1::wt-1')
-    )
-    await flushEffects()
-    expect(mocks.onStart).not.toHaveBeenCalled()
-    const start = [...container.querySelectorAll('button')].find((button) =>
-      button.textContent?.toLowerCase().includes('start agent')
-    )!
-    await act(async () => start.click())
-    expect(mocks.onStart).toHaveBeenCalledTimes(1)
+<<<<<<< fork
+    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1), { timeout: 6_000 })
     expect(mocks.ensureRuntimeDetectedAgents).toHaveBeenCalledWith('env-1', 'repo-1::wt-1')
     expect(mocks.ensureDetectedAgents).not.toHaveBeenCalled()
   })
@@ -376,130 +452,82 @@ describe('SourceControlAgentActionDialog', () => {
     resetStore(settingsWithGlobalRecipe())
     renderControlledDialog()
     expect(container.textContent).not.toContain('Launch agent')
-    await vi.waitFor(() =>
-      expect(container.textContent?.toLowerCase()).toContain('not enabled or was not detected')
+||||||| base
+    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1), { timeout: 6_000 })
+    expect(mocks.ensureRuntimeDetectedAgents).toHaveBeenCalledWith('env-1', 'repo-1::wt-1')
+    expect(mocks.ensureDetectedAgents).not.toHaveBeenCalled()
+  })
+  it('reveals, and never auto-starts, a saved action whose runtime is replaced mid-discovery', async () => {
+    resetStore(settingsWithGlobalRecipe(), [repoWithSavedRecipe('', null, 'runtime:env-1')])
+    const worktree = makeWorktree({ id: 'repo-1::wt-1', repoId: 'repo-1' })
+    useAppStore.setState({ worktreesByRepo: { 'repo-1': [worktree] } })
+    renderControlledDialog({ repoId: 'repo-1', worktreeId: worktree.id, connectionId: null })
+    for (const runtimeId of ['r1', 'r2']) {
+      await flushEffects()
+      expect(container.textContent).not.toContain('Launch agent')
+      const statuses = new Map([['env-1', runtimeStatusEntry(runtimeId, false)]])
+      act(() => useAppStore.setState({ runtimeStatusByEnvironmentId: statuses }))
+    }
+    await vi.waitFor(() => expect(container.textContent).toContain('Launch agent'))
+    await flushEffects()
+    expect(mocks.onStart).not.toHaveBeenCalled()
+  })
+  it('omits saved arguments from a structured local launch', async () => {
+    setLocalRuntimeCapabilitiesForTests([STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY])
+    const recipe = {
+      agentId: 'codex' as const,
+      commandInputTemplate: '{basePrompt}',
+      agentArgs: '--model saved'
+    }
+    resetStore(
+      {
+        ...settingsWithGlobalRecipe(recipe),
+        experimentalNativeChat: true
+      },
+      []
     )
+
+    renderControlledDialog({ savedAgentArgs: recipe.agentArgs })
+
+    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1))
+    expect(mocks.onStart).toHaveBeenCalledWith({
+      agent: 'codex',
+      commandInput: 'Resolve conflicts.',
+      agentArgs: undefined
+    })
+  })
+  it('renders the form and does not auto-start when the saved launch recipe mismatches', async () => {
+    resetStore(
+      settingsWithGlobalRecipe({ agentId: 'claude', commandInputTemplate: '{basePrompt}' })
+    )
+    renderControlledDialog()
+    await vi.waitFor(() => expect(mocks.ensureDetectedAgents).toHaveBeenCalledTimes(1))
+    await flushEffects()
     expect(mocks.onStart).not.toHaveBeenCalled()
     expect(container.textContent).toContain('Launch agent')
+    expect(container.textContent).toContain('Save & start agent')
   })
-  it('reveals the dialog and remains open when auto-start fails', async () => {
-    mocks.onStart.mockResolvedValue(false)
+  it('reveals the form with status copy when the saved agent is unavailable', async () => {
+    mocks.ensureDetectedAgents.mockResolvedValue([])
+    resetStore(settingsWithGlobalRecipe())
     renderControlledDialog()
     expect(container.textContent).not.toContain('Launch agent')
-    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1))
-    await vi.waitFor(() => expect(container.textContent).toContain('Launch agent'))
-    expect(mocks.onLaunched).not.toHaveBeenCalled()
-    expect(mocks.onOpenChange).not.toHaveBeenCalledWith(false)
-    expect(mocks.toastError).toHaveBeenCalledTimes(1)
-  })
-
-  it('keeps prompt editing available when async auto-start delivery fails', async () => {
-    mocks.onStart.mockImplementation(async () => {
-      await Promise.resolve()
-      return false
-    })
-    renderControlledDialog({
-      baseCommandInput: 'Resolve queued comments.',
-      savedCommandInputTemplate: '{basePrompt}'
-    })
-    expect(container.textContent).not.toContain('Launch agent')
-    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1))
-    await vi.waitFor(() => expect(container.textContent).toContain('Launch agent'))
-
-    expect(container.querySelector('textarea')?.value).toContain('{basePrompt}')
-    expect(container.textContent).toContain('Start agent')
-    expect(mocks.onLaunched).not.toHaveBeenCalled()
-    expect(mocks.onOpenChange).not.toHaveBeenCalledWith(false)
-  })
-
-  it('does not auto-start when a saved receipt appears after the dialog is already open', async () => {
-    let setSavedAgentId: (agent: TuiAgent | null) => void = () => {}
-
-    function Harness(): React.JSX.Element {
-      const [savedAgentId, setNextSavedAgentId] = useState<TuiAgent | null>(null)
-      setSavedAgentId = setNextSavedAgentId
-      return (
-        <SourceControlAgentActionDialog
-          open
-          onOpenChange={mocks.onOpenChange}
-          actionId="resolveConflicts"
-          title="Launch agent"
-          description="Review the launch recipe before starting."
-          baseCommandInput="Resolve conflicts."
-          savedCommandInputTemplate="{basePrompt}"
-          savedAgentArgs=""
-          launchSource="source_control_recovery"
-          savedAgentId={savedAgentId}
-          onSaveAgentDefault={mocks.onSaveAgentDefault}
-          onLaunched={mocks.onLaunched}
-          onStart={mocks.onStart}
-        />
-      )
-    }
-    act(() => {
-      root.render(<Harness />)
-    })
-    await vi.waitFor(() => expect(container.textContent).toContain('Launch agent'))
-    act(() => {
-      setSavedAgentId('codex')
-    })
+=======
+>>>>>>> upstream
+    await vi.waitFor(() =>
+      expect(mocks.ensureRuntimeDetectedAgents).toHaveBeenCalledWith('env-1', 'repo-1::wt-1')
+    )
     await flushEffects()
     expect(mocks.onStart).not.toHaveBeenCalled()
-    expect(container.textContent).toContain('Launch agent')
-  })
-  it('does not double-start during StrictMode effect replay', async () => {
-    renderControlledDialog({}, { strictMode: true })
-
-    await vi.waitFor(() => expect(mocks.onStart).toHaveBeenCalledTimes(1))
-    await flushEffects()
+    const start = [...container.querySelectorAll('button')].find((button) =>
+      button.textContent?.toLowerCase().includes('start agent')
+    )!
+    await act(async () => start.click())
     expect(mocks.onStart).toHaveBeenCalledTimes(1)
-    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
+    expect(mocks.ensureRuntimeDetectedAgents).toHaveBeenCalledWith('env-1', 'repo-1::wt-1')
+    expect(mocks.ensureDetectedAgents).not.toHaveBeenCalled()
   })
-
-  it.each(['detection', 'recovery'] as const)(
-    'cancels a manual launch during %s',
-    async (stage) => {
-      resetStore(settingsWithGlobalRecipe(null))
-      renderControlledDialog()
-      await vi.waitFor(() => expect(container.textContent).toContain('Save & start agent'))
-      await flushEffects()
-      const detection = deferred<TuiAgent[]>()
-      const check = deferred<{ inFlight: boolean }>()
-      if (stage === 'detection') {
-        mocks.ensureDetectedAgents.mockReturnValueOnce(detection.promise)
-      } else {
-        mocks.mutationInFlight.mockReturnValueOnce(check.promise)
-      }
-      const start = Array.from(container.querySelectorAll('button')).find((entry) =>
-        entry.textContent?.includes('Save & start agent')
-      )
-      if (!start) {
-        throw new Error('Missing start button')
-      }
-      await act(async () => start.click())
-      expect(
-        stage === 'detection' ? mocks.ensureDetectedAgents : mocks.mutationInFlight
-      ).toHaveBeenCalled()
-      const cancel = Array.from(container.querySelectorAll('button')).find(
-        (entry) => entry.textContent === 'Cancel'
-      )
-      if (!cancel) {
-        throw new Error('Missing cancel button')
-      }
-      act(() => cancel.click())
-      expect(mocks.onOpenChange).toHaveBeenCalledWith(false)
-      await act(async () => {
-        detection.resolve(['codex'])
-        check.resolve({ inFlight: false })
-      })
-      await flushEffects()
-      expect(mocks.onStart).not.toHaveBeenCalled()
-      expect(mocks.onLaunched).not.toHaveBeenCalled()
-      expect(mocks.onSaveAgentDefault).not.toHaveBeenCalled()
-    }
-  )
-
-  it('cancels saved-recipe recovery when the dialog unmounts during its host check', async () => {
+  it('cancels a manual launch during recovery admission', async () => {
     const check = deferred<{ inFlight: boolean }>()
     mocks.mutationInFlight.mockReturnValueOnce(check.promise)
     renderControlledDialog()

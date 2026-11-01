@@ -135,49 +135,8 @@ export function matches(actual: string[], expected: string[]): boolean {
   )
 }
 
-export function supportsBrowserPageFlag(commandPath: string[]): boolean {
-  const joined = commandPath.join(' ')
-  if (['open', 'status'].includes(commandPath[0])) {
-    return false
-  }
-  if (
-    [
-      'account',
-      'artifacts',
-      'ask',
-      'automations',
-      'heimdall',
-      'loop',
-      'project',
-      'repo',
-      'reference',
-      'worktree',
-      'terminal',
-      'file',
-      'orchestration',
-      'computer',
-      'emulator',
-      'note',
-      'diagnostics',
-      'speech',
-      'jira',
-      'linear',
-      'skills',
-      'search',
-      'ports',
-      'agent-context'
-    ].includes(commandPath[0])
-  ) {
-    return false
-  }
-  return ![
-    'tab list',
-    'tab create',
-    'tab current',
-    'tab profile list',
-    'tab profile create',
-    'tab profile delete'
-  ].includes(joined)
+export function supportsBrowserPageFlag(spec: Pick<CommandSpec, 'browserPageTarget'>): boolean {
+  return spec.browserPageTarget === true
 }
 
 export function effectiveAllowedFlags(spec: CommandSpec): string[] {

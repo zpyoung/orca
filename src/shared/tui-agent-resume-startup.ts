@@ -38,6 +38,8 @@ export function buildAgentResumeStartupPlan(args: {
   /** Open a copy of the conversation instead of re-entering it; null for agents that cannot. */
   fork?: boolean
   claudeSuppressionFlags?: string[] | null
+  /** OS that runs the agent when `platform` only picks quoting; null when unreported. */
+  agentHostPlatform?: NodeJS.Platform | null
 }): AgentStartupPlan | null {
   const resumeArgv = args.fork
     ? getAgentForkArgv(args.agent, args.providerSession)
@@ -64,11 +66,16 @@ export function buildAgentResumeStartupPlan(args: {
         command: applyClaudeSuppressionFlagsToResumeCommand({
           agent: args.agent,
           shell,
-          command: resolvedAgentCommand,
+          command: withAgentTerminalInputArgs(
+            resolvedAgentCommand,
+            args.agent,
+            args.agentHostPlatform === undefined ? args.platform : args.agentHostPlatform,
+            shell
+          ),
           claudeSuppressionFlags: args.claudeSuppressionFlags,
           isRemote: args.isRemote
         }),
-        commandWithoutSessionOptions: resolvedAgentCommand,
+        resumeLaunch: { agentCommand: resolvedAgentCommand },
         appliedSessionOptions: {}
       } as const)
     : resolveAgentLaunchCommand({
@@ -80,6 +87,7 @@ export function buildAgentResumeStartupPlan(args: {
         sessionOptions: args.sessionOptions,
         sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
         isRemote: args.isRemote,
+        agentHostPlatform: args.agentHostPlatform,
         claudeSuppressionFlags: args.claudeSuppressionFlags
       })
   if (!baseCommand.ok) {

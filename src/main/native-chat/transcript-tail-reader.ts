@@ -292,7 +292,9 @@ export async function readNativeChatTranscriptTail(
       true,
       args.beforeOffset,
       decodeCompanion,
-      signal
+      signal,
+      undefined,
+      args.sourceOrder
     )
     signal?.throwIfAborted()
     return {

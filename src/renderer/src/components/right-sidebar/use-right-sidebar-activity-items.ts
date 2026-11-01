@@ -150,7 +150,8 @@ export function useRightSidebarActivityItems({
       visiblePluginPanels,
       portsShortcut,
       sourceControlDirtyItemOverride,
-      sourceControlShortcut
+      sourceControlShortcut,
+      languageRevision
     ]
   )
 

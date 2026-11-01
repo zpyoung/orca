@@ -2,7 +2,7 @@ import type { LedgerOwner } from '../../../../shared/ledger'
 import type { Repo } from '../../../../shared/repo-types'
 import { getProjectIdentityKey } from '../../../../shared/project-host-setup-projection'
 import type { SettingsNavigationTarget } from '@/lib/settings-navigation-types'
-import { getRepositoryLedgerSectionId } from '../settings/repository-settings-targets'
+import { getRepositoryLedgerSectionId } from '../settings/repository/repository-settings-targets'
 
 /** Only a project ledger has a project settings pane; a group ledger has no such home. */
 export function getLedgerSettingsNavigation(

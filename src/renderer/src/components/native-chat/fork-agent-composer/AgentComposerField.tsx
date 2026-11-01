@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
@@ -8,8 +8,11 @@ import { X } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { basename } from '@/lib/path'
-import { isNativeChatPastedImagePath } from '../native-chat-image-paste'
-import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'
+import { isNativeChatPastedImagePath } from '../../../../../shared/native-chat-image-label'
+import type {
+  ComposerAutocomplete,
+  NativeChatPickerItem
+} from '../../../../../shared/native-chat-composer-autocomplete'
 import { NativeChatMentionMenu, NativeChatPickerMenu } from '../NativeChatAutocompleteMenus'
 import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
 import { AgentComposerActions } from './AgentComposerActions'
@@ -25,13 +28,17 @@ import {
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
-} from '../../../../../shared/native-chat-session-options'
+} from '../../../../../shared/native-chat/input/native-chat-session-options'
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
 import type { NativeChatComposerGoalMode } from '../use-native-chat-composer-submit'
 import { useNativeChatComposerDraftUnsaved } from '../use-native-chat-draft-unsaved'
+import { useLatestHandler } from '@/lib/use-latest-handler'
+
+function noop(): void {}
 
 export type AgentComposerFieldProps = {
+  editSession?: { cancel: () => void }
   terminalTabId: string
   /** Owner of the draft the field's text is saved with. */
   draftScopeKey: string
@@ -137,6 +144,7 @@ function imeComposedSegment(base: string, settled: string): string {
 }
 
 export function AgentComposerField({
+  editSession,
   terminalTabId,
   draftScopeKey,
   textareaRef,
@@ -194,6 +202,15 @@ export function AgentComposerField({
   // Value the IME started from, and whether a programmatic clear was dropped on top of it.
   const compositionBaseRef = useRef('')
   const droppedDraftClearRef = useRef(false)
+
+  // Stable identities let the memoized actions bar skip the per-keystroke render.
+  const attach = useLatestHandler(onAttach)
+  const dictationToggle = useLatestHandler(onDictationToggle)
+  const dictationHoldStart = useLatestHandler(onDictationHoldStart)
+  const dictationHoldEnd = useLatestHandler(onDictationHoldEnd)
+  const send = useLatestHandler(onSend)
+  const stop = useLatestHandler(onStop ?? noop)
+  const exitGoalMode = useLatestHandler(goalMode?.exit ?? noop)
 
   // Browser owns the provisional value; React synchronizes drafts only between IME sessions.
   useLayoutEffect(() => {
@@ -379,12 +396,15 @@ export function AgentComposerField({
                     : undefined
                 }
                 placeholder={
-                  goalMode?.active
-                    ? translate(
-                        'components.native-chat.goal.placeholder',
-                        'Describe your goal, define measurable outcomes for best results'
-                      )
-                    : (unavailableHint ?? nativeChatComposerPlaceholder(hasPty, canSend, afterStop))
+                  editSession
+                    ? translate('components.native-chat.queuedMessages.editMessage', 'Edit message')
+                    : goalMode?.active
+                      ? translate(
+                          'components.native-chat.goal.placeholder',
+                          'Describe your goal, define measurable outcomes for best results'
+                        )
+                      : (unavailableHint ??
+                        nativeChatComposerPlaceholder(hasPty, canSend, afterStop))
                 }
                 // Why: coarse-pointer min-height follows the app's touch target convention.
                 // field-sizing:content grows the field with the draft; the 8lh cap (plus
@@ -404,6 +424,7 @@ export function AgentComposerField({
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2 pt-0.5">
               <AgentComposerActions
+                editSession={editSession}
                 attachDisabled={attachDisabled}
                 dictationDisabled={dictationDisabled}
                 sendDisabled={sendButtonDisabled}
@@ -413,18 +434,18 @@ export function AgentComposerField({
                 isStopping={isStopping}
                 isDictating={isDictating}
                 isDictationHoldMode={isDictationHoldMode}
-                onAttach={onAttach}
-                onDictationToggle={onDictationToggle}
-                onDictationHoldStart={onDictationHoldStart}
-                onDictationHoldEnd={onDictationHoldEnd}
-                onSend={onSend}
-                onStop={onStop}
+                onAttach={attach}
+                onDictationToggle={dictationToggle}
+                onDictationHoldStart={dictationHoldStart}
+                onDictationHoldEnd={dictationHoldEnd}
+                onSend={send}
+                onStop={onStop ? stop : undefined}
                 sessionOptionsSurface={sessionOptionsSurface}
                 sessionOptionsSnapshot={sessionOptionsSnapshot}
                 contextUsage={contextUsage}
                 sessionOptionsPickerRequest={sessionOptionsPickerRequest}
                 focusComposer={focusComposer}
-                onExitGoalMode={goalMode?.active ? goalMode.exit : undefined}
+                onExitGoalMode={goalMode?.active ? exitGoalMode : undefined}
                 {...(agent ? { agent } : {})}
               />
             </div>

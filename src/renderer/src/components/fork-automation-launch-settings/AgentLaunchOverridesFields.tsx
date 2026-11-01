@@ -14,7 +14,7 @@ import {
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
+import type { SessionOptionValue } from '../../../../shared/native-chat/input/native-chat-session-options'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   buildAgentLaunchOverridesFieldState,

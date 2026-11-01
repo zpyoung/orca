@@ -88,6 +88,8 @@ export type NativeChatOptimisticSendOutcome = {
 export type NativeChatComposerProps = AgentComposerCoreProps & {
   /** Prompts recovered by a host from the pane transcript or live status. */
   historyPrompts?: readonly string[]
+  /** Input-only edit session: every submit saves, Escape cancels, and send-only actions are absent. */
+  editSession?: { save: () => void; cancel: () => void; canSave: boolean }
   /** Unsent-draft owner; defaults to paneKey, while structured chats share conversation scope. */
   draftScopeKey?: string
   /** This client's Stop request is in flight: the Stop control is disabled and says so. */
@@ -131,6 +133,8 @@ export type NativeChatLaunchSeed = {
 }
 
 export type NativeChatComposerHandle = AgentComposerHandle & {
+  isComposing?: () => boolean
+  insertPastedText?: (text: string) => boolean
   /** Whether the input is there and enabled, so text given to it lands. */
   acceptsText: () => boolean
   /** Append deduplicated text after a blank line and place the caret at its end. */

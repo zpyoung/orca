@@ -177,18 +177,38 @@ export async function launchSourceControlRecoveryAgentWithDefault({
     toast.error(copy.noEnabledAgent)
     return false
   }
+<<<<<<< fork
   const recipeSessionOptions = savedRecipe.launchOptions?.model
     ? agentLaunchOverridesToSessionOptionValues(savedRecipe.launchOptions)
     : undefined
+||||||| base
+=======
+  const { commandInput, ...projection } = projectSelectedSourceControlActionLaunch(
+    savedRecipe,
+    agent,
+    {
+      renderedPrompt: prompt,
+      settings: store.settings
+    }
+  )
+>>>>>>> upstream
   const result = launchAgentInNewTab({
     requestId: newAgentLaunchRequestId(),
     agent,
     worktreeId: activeWorktreeId,
     groupId: activeGroupId ?? activeWorktreeId,
+<<<<<<< fork
     prompt,
     agentArgs: savedRecipe.agentArgs,
     ...(recipeSessionOptions ? { sessionOptions: recipeSessionOptions } : {}),
     includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
+||||||| base
+    prompt,
+    agentArgs: savedRecipe.agentArgs,
+=======
+    prompt: commandInput,
+    ...projection,
+>>>>>>> upstream
     promptDelivery: 'submit-after-ready',
     launchPlatform: activeSourceControlLaunchPlatform,
     launchSource: 'source_control_recovery'

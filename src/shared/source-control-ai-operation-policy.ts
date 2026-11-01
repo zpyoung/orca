@@ -212,6 +212,7 @@ export function captureSourceControlActionSelection(input: {
     source.actions,
     input.actionId
   )
+<<<<<<< fork
   if (!repoRecipe) {
     return { ...globalRecipe, commandInputTemplate }
   }
@@ -233,4 +234,66 @@ export function captureSourceControlActionSelection(input: {
     delete resolved.launchOptions
   }
   return resolved
+||||||| base
+  return repoRecipe
+    ? {
+        ...globalRecipe,
+        commandInputTemplate,
+        ...(repoRecipe.agentId !== undefined ? { agentId: repoRecipe.agentId } : {}),
+        ...(typeof repoRecipe.commandInputTemplate === 'string'
+          ? { commandInputTemplate: repoRecipe.commandInputTemplate.trim() }
+          : {}),
+        ...(typeof repoRecipe.agentArgs === 'string'
+          ? { agentArgs: repoRecipe.agentArgs.trim() }
+          : repoRecipe.agentArgs === null
+            ? { agentArgs: '' }
+            : {})
+      }
+    : { ...globalRecipe, commandInputTemplate }
+=======
+  const ownsRaw = repoRecipe?.agentArgs !== undefined
+  const raw = ownsRaw ? repoRecipe : globalRecipe
+  const {
+    launchPreferences: _globalPreferences,
+    argumentChoices: _globalDocument,
+    agentArgs: _globalArgs,
+    surface: globalSurface,
+    ...globalBase
+  } = globalRecipe
+  const current = trimActionArgumentDocument({
+    ...globalBase,
+    commandInputTemplate,
+    ...(raw?.agentArgs !== undefined ? { agentArgs: raw.agentArgs ?? '' } : {}),
+    ...(raw?.argumentChoices ? { argumentChoices: raw.argumentChoices } : {}),
+    ...((repoRecipe?.surface ?? (repoRecipe?.agentId === undefined ? globalSurface : undefined))
+      ? { surface: repoRecipe?.surface ?? globalSurface }
+      : {}),
+    ...(repoRecipe?.agentId !== undefined ? { agentId: repoRecipe.agentId } : {}),
+    ...(typeof repoRecipe?.commandInputTemplate === 'string'
+      ? { commandInputTemplate: repoRecipe.commandInputTemplate.trim() }
+      : {})
+  })
+  return {
+    current,
+    source: repoRecipe
+      ? {
+          scope: 'repo',
+          authoredAgentId: repoRecipe.agentId,
+          authoredPreferences: repoRecipe.launchPreferences,
+          parentPreferences: globalRecipe.launchPreferences,
+          ownsArgs: ownsRaw
+        }
+      : {
+          scope: 'global',
+          authoredAgentId: globalRecipe.agentId,
+          authoredPreferences: globalRecipe.launchPreferences
+        }
+  }
+}
+
+export function resolveSourceControlActionRecipe(
+  input: Parameters<typeof captureSourceControlActionSelection>[0]
+): SelectedSourceControlActionRecipe {
+  return selectSourceControlActionRecipe(captureSourceControlActionSelection(input))
+>>>>>>> upstream
 }

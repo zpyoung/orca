@@ -249,6 +249,7 @@ export type WebSessionTabsSyncState = Pick<
       | 'recentlyRetiredAgentStatusPaneKeys'
       | 'retainedAgentsByPaneKey'
       | 'retentionSuppressedPaneKeys'
+      | 'runtimePaneTitlesByTabId'
       | 'settings'
       | 'terminalDockPendingMutationsByPaneKey'
     >

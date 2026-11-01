@@ -68,7 +68,12 @@ jobs:
     concurrency:
       group: ci-cache-warmup-linux-x64-${{ matrix.runner }}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: ${{ github.event_name != 'schedule' }}
-    runs-on: ubuntu-latest
+    # Blacksmith and GitHub-hosted jobs restore from separate cache stores; warm both.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     env:
       ORCA_BACKGROUND_LAUNCH: '1'

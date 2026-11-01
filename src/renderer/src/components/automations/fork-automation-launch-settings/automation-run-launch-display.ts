@@ -6,7 +6,7 @@ import {
   type CatalogOption
 } from '../../../../../shared/agent-session-option-catalog'
 import type { AutomationRunLaunchSettings } from '../../../../../shared/fork-automation-launch-settings/automation-run-launch-settings'
-import type { SessionOptionValue } from '../../../../../shared/native-chat-session-options'
+import type { SessionOptionValue } from '../../../../../shared/native-chat/input/native-chat-session-options'
 import { translate } from '@/i18n/i18n'
 
 export type AutomationRunLaunchDisplay = {

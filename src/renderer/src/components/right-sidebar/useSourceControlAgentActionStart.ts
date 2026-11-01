@@ -30,8 +30,15 @@ type UseSourceControlAgentActionStartArgs = {
   trimmedCommandInput: string
   /** False when the launch would be structured native chat, which reads no CLI arguments. */
   agentArgsApply: boolean
+<<<<<<< fork
   launchOptions?: AgentLaunchOptionSelection
   commandTemplate: string
+||||||| base
+  commandTemplate: string
+=======
+  prepareRecipe?: (agent: TuiAgent) => SelectedSourceControlActionRecipe
+  recipe: SelectedSourceControlActionRecipe
+>>>>>>> upstream
   saveLaunchRecipe: boolean
   saveTargetValue: string
   actionId: SourceControlLaunchActionId
@@ -48,6 +55,7 @@ type UseSourceControlAgentActionStartArgs = {
   launchSource: LaunchSource
   recoveryContext?: RuntimeGitContext | null
   connectionUnavailable: boolean
+<<<<<<< fork
   refreshDetectedAgents: () => Promise<TuiAgent[]>
   onStart?: (args: {
     agent: TuiAgent
@@ -56,6 +64,21 @@ type UseSourceControlAgentActionStartArgs = {
     agentArgs?: string
     launchOptions: AgentLaunchOptionSelection
   }) => boolean | Promise<boolean>
+||||||| base
+  refreshDetectedAgents: () => Promise<TuiAgent[]>
+  onStart?: (args: {
+    agent: TuiAgent
+    commandInput: string
+    /** Omitted when CLI arguments do not apply, so the launch resolves the global setting. */
+    agentArgs?: string
+  }) => boolean | Promise<boolean>
+=======
+  /** The dialog's one host observation; Start is gated on it having settled. */
+  detectedAgents: TuiAgent[]
+  /** The picker's choice as rendered when Start was pressed, captured before any await. */
+  launchChoice?: AgentLaunchChoice
+  onStart?: RunSourceControlAgentActionStartArgs['onStart']
+>>>>>>> upstream
   onSaveAgentDefault?: (
     target: SourceControlAiWriteTarget,
     actionId: SourceControlLaunchActionId,
@@ -89,8 +112,15 @@ export function useSourceControlAgentActionStart({
   commandInput,
   trimmedCommandInput,
   agentArgsApply,
+<<<<<<< fork
   launchOptions = {},
   commandTemplate,
+||||||| base
+  commandTemplate,
+=======
+  recipe,
+  prepareRecipe,
+>>>>>>> upstream
   saveLaunchRecipe,
   saveTargetValue,
   actionId,
@@ -188,11 +218,22 @@ export function useSourceControlAgentActionStart({
         return await runSourceControlAgentActionStart({
           selectedAgent,
           trimmedCommandInput,
+<<<<<<< fork
           agentArgs,
           agentArgsApply,
           launchOptions,
           commandTemplate,
           saveTargetValue: saveLaunchRecipe ? (saveTargetValueOverride ?? saveTargetValue) : 'none',
+||||||| base
+          agentArgs,
+          agentArgsApply,
+          commandTemplate,
+          saveTargetValue: saveLaunchRecipe ? (saveTargetValueOverride ?? saveTargetValue) : 'none',
+=======
+          launchChoice,
+          recipe: submitted,
+          saveTargetValue: saveLaunchRecipe ? saveTargetValue : 'none',
+>>>>>>> upstream
           actionId,
           repoId,
           settings,
@@ -224,11 +265,24 @@ export function useSourceControlAgentActionStart({
     },
     [
       actionId,
+<<<<<<< fork
       agentArgs,
       agentArgsApply,
       launchOptions,
       commandInput,
       commandTemplate,
+||||||| base
+      agentArgs,
+      agentArgsApply,
+      commandInput,
+      commandTemplate,
+=======
+      agentLaunchPreferences,
+      buildPlan,
+      launchChoice,
+      recipe,
+      prepareRecipe,
+>>>>>>> upstream
       connectionUnavailable,
       groupId,
       launchSource,

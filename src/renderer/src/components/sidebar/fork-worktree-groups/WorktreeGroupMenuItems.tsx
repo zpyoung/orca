@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx,src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 import React, { useCallback, useState } from 'react'
 import { CircleX, FolderInput, FolderPlus } from 'lucide-react'
 import {
@@ -272,8 +272,12 @@ export function useWorktreeGroupDialog({
           'auto.components.sidebar.WorktreeContextMenu.3ae4748032',
           'Create a group and move this worktree into it.'
         )}
-        initialName={`${worktree.displayName} group`}
-        confirmLabel="Create"
+        initialName={translate(
+          'auto.components.sidebar.ProjectGroupNameDialog.defaultGroupName',
+          '{{name}} group',
+          { name: worktree.displayName }
+        )}
+        confirmLabel={translate('auto.components.sidebar.ProjectGroupNameDialog.create', 'Create')}
         onOpenChange={handleOpenChange}
         onSubmit={handleSubmit}
       />

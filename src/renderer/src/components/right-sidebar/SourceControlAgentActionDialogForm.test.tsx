@@ -86,8 +86,16 @@ function renderForm(
       canStart: true,
       isStarting: false,
       startLabel: 'Start agent',
+<<<<<<< fork
       onSelectedAgentChange: () => {},
       onLaunchOverridesChange: () => {},
+||||||| base
+      onSelectedAgentChange: () => {},
+      onAgentArgsChange: () => {},
+=======
+      onAgentPick: () => {},
+      onAgentArgsChange: () => {},
+>>>>>>> upstream
       onCommandTemplateChange: () => {},
       onSaveLaunchRecipeChange: () => {},
       onSaveAgentDefaultChange: () => {},

@@ -5,7 +5,7 @@ import {
   HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type {

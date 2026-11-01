@@ -135,7 +135,7 @@ export function ArtifactPasswordPanel({
       if (publication?.rotationCleanupPending) {
         setError(
           translate(
-            'auto.components.artifacts.ArtifactPasswordPanel.rotationIncomplete',
+            'auto.components.artifacts.ArtifactPasswordPanel.rotationDeletionUnconfirmed',
             'The new link is protected, but Orca could not confirm deletion of the old link. The old link may still work; Orca will retry.'
           )
         )

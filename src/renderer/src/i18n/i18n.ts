@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next'
 
 import enRuntimeRequired from './en-runtime-required.json'
 import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'
+import deCatalogUrl from './locales/de.json?url'
 import esCatalogUrl from './locales/es.json?url'
 import frCatalogUrl from './locales/fr.json?url'
 import jaCatalogUrl from './locales/ja.json?url'

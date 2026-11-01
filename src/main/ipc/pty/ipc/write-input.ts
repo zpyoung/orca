@@ -268,8 +268,7 @@ export function createPtyWriteInput(deps: {
       return false
     }
     try {
-      noteRendererPtyInput(args)
-      return writePtyProviderInput(provider, args.id, args.data)
+      return writePtyProviderInput(provider, args)
     } catch {
       return false
     }

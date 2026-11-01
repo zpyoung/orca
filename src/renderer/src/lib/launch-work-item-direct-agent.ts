@@ -28,7 +28,13 @@ import { translate } from '@/i18n/i18n'
 export function buildDirectWorkItemAgentStartupPlan(args: {
   agent: TuiAgent | null
   agentArgs?: string | null
+<<<<<<< fork
   launchOptions?: AgentLaunchOptionSelection | null
+||||||| base
+=======
+  sessionOptions?: Readonly<Record<string, string>>
+  sessionOptionsYieldToAgentArgs?: true
+>>>>>>> upstream
   draftContent: string
   promptDelivery: 'draft' | 'submit-after-ready'
   settings:
@@ -63,10 +69,27 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
           readLaunchPermissionChoice(args.sessionOptions) ? 'own' : undefined
         )
       : args.agentArgs
+<<<<<<< fork
   const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings, args.launchPlatform)
   const recipeSessionOptions = args.launchOptions?.model
     ? agentLaunchOverridesToSessionOptionValues(args.launchOptions)
     : undefined
+||||||| base
+  const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings, args.launchPlatform)
+=======
+  const effectiveAgentEnv = resolveTuiAgentLaunchEnv(
+    args.agent,
+    permissionSettings,
+    args.launchPlatform
+  )
+  const sessionOptionInputs = terminalSessionOptionInputs({
+    agent: args.agent,
+    sessionOptions: args.sessionOptions,
+    yieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
+    agentArgs: effectiveAgentArgs,
+    shell: args.shell ?? (args.launchPlatform === 'win32' ? 'powershell' : 'posix')
+  })
+>>>>>>> upstream
   const draftLaunchPlan =
     args.promptDelivery === 'submit-after-ready'
       ? null
@@ -78,9 +101,16 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
           ...(args.shell ? { shell: args.shell } : {}),
           isRemote: args.isRemote,
           agentArgs: effectiveAgentArgs,
+<<<<<<< fork
           agentEnv: effectiveAgentEnv,
           sessionOptions: recipeSessionOptions,
           includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined
+||||||| base
+          agentEnv: effectiveAgentEnv
+=======
+          agentEnv: effectiveAgentEnv,
+          ...sessionOptionInputs
+>>>>>>> upstream
         })
 
   if (draftLaunchPlan) {
@@ -110,8 +140,13 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     isRemote: args.isRemote,
     agentArgs: effectiveAgentArgs,
     agentEnv: effectiveAgentEnv,
+<<<<<<< fork
     sessionOptions: recipeSessionOptions,
     includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
+||||||| base
+=======
+    ...sessionOptionInputs,
+>>>>>>> upstream
     allowEmptyPromptLaunch: true,
     ...(args.promptDelivery === 'submit-after-ready' ? { suppressStartupUpdatePrompt: true } : {})
   })

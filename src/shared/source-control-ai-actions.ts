@@ -1,7 +1,17 @@
+<<<<<<< fork
 import {
   normalizeAgentLaunchOverrides,
   type AgentLaunchOptionSelection
 } from './fork-automation-launch-settings/agent-launch-overrides'
+||||||| base
+=======
+import {
+  normalizeActionArgumentDocument,
+  trimActionArgumentDocument,
+  demoteActionArgumentChoices,
+  type ActionArgumentChoices
+} from './source-control-action-argument-choices'
+>>>>>>> upstream
 import { isCustomAgentId, type CustomAgentId } from './commit-message-agent-spec'
 import { isTuiAgent } from './tui-agent-config'
 import type { TuiAgent } from './tui-agent'
@@ -53,7 +63,26 @@ export type SourceControlActionRecipe = {
   agentId?: TuiAgent | CustomAgentId | null
   commandInputTemplate?: string
   agentArgs?: string
+<<<<<<< fork
   launchOptions?: AgentLaunchOptionSelection
+||||||| base
+=======
+  argumentChoices?: ActionArgumentChoices
+  /** Only the bound agent receives these values, on a chat or a terminal. */
+  launchPreferences?: SourceControlActionLaunchPreferences
+  /** Bound to `agentId` like `launchPreferences`; absent follows the agent's settings route. */
+  surface?: SourceControlActionSurface
+  /** Source bindings exist only in the resolved projection, never in writable recipes. */
+  resolvedChoiceSources?: {
+    model?: ActionModelSelection
+    permission?: SourceControlActionLaunchPreferences
+    canonicalAgentId?: TuiAgent
+    literalKeys: readonly string[]
+  }
+  /** Resolved only, never saved: the choice is inherited from Global while this repository sets
+   *  its own CLI arguments, so on terminals a flag those arguments set wins over the choice. */
+  launchPreferencesYieldToAgentArgs?: true
+>>>>>>> upstream
 }
 
 export type SourceControlAiActionDefaults = Partial<Record<AiActionId, SourceControlActionRecipe>>
@@ -151,6 +180,7 @@ export function normalizeSourceControlActionRecipe(
   if (typeof value.agentArgs === 'string') {
     normalized.agentArgs = value.agentArgs
   }
+<<<<<<< fork
   const launchOptions = normalizeAgentLaunchOverrides(value.launchOptions)
   if (launchOptions?.model || launchOptions?.optionValues) {
     normalized.launchOptions = {
@@ -159,6 +189,36 @@ export function normalizeSourceControlActionRecipe(
     }
   }
   return Object.keys(normalized).length > 0 ? normalized : undefined
+||||||| base
+  return Object.keys(normalized).length > 0 ? normalized : undefined
+=======
+  const launchPreferences = normalizeSourceControlActionLaunchPreferences(
+    value.launchPreferences,
+    agentId
+  )
+  if (launchPreferences) {
+    normalized.launchPreferences = launchAction
+      ? canonicalActionLaunchPreferences(launchPreferences)
+      : launchPreferences
+  }
+  if (value.surface === 'chat' || value.surface === 'terminal') {
+    normalized.surface = value.surface
+  }
+  const document = normalizeActionArgumentDocument(normalized, value.argumentChoices, agentId)
+  return Object.keys(document).length > 0 ? document : undefined
+}
+
+export function canonicalActionLaunchPreferences(
+  value: SourceControlActionLaunchPreferences | undefined
+): SourceControlActionLaunchPreferences | undefined {
+  const normalized = normalizeSourceControlActionLaunchPreferences(value)
+  if (!normalized) {
+    return undefined
+  }
+  const { model: _model, options: _options, ...preferences } = normalized
+  const modelSelection = readActionModelSelection(normalized)
+  return { ...preferences, ...(modelSelection ? { modelSelection } : {}) }
+>>>>>>> upstream
 }
 
 export function normalizeSourceControlAiActionDefaults(
@@ -200,9 +260,20 @@ export function readSourceControlActionDefault(
     ...(typeof value?.commandInputTemplate === 'string'
       ? { commandInputTemplate: value.commandInputTemplate.trim() }
       : {}),
+<<<<<<< fork
     ...(typeof value?.agentArgs === 'string' ? { agentArgs: value.agentArgs.trim() } : {}),
     ...(value?.launchOptions ? { launchOptions: structuredClone(value.launchOptions) } : {})
   }
+||||||| base
+    ...(typeof value?.agentArgs === 'string' ? { agentArgs: value.agentArgs.trim() } : {})
+  }
+=======
+    ...(typeof value?.agentArgs === 'string' ? { agentArgs: value.agentArgs } : {}),
+    ...(value?.argumentChoices ? { argumentChoices: value.argumentChoices } : {}),
+    ...(value?.launchPreferences ? { launchPreferences: value.launchPreferences } : {}),
+    ...(value?.surface ? { surface: value.surface } : {})
+  })
+>>>>>>> upstream
 }
 
 export function resolveSourceControlActionCommandTemplate(

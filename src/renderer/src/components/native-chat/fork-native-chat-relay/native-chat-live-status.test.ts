@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
 import { mergeNativeChatLiveSession } from './native-chat-live-status'
 import { selectNativeChatViewState } from './native-chat-view-state'
-import { shouldShowNativeChatWorking } from '../native-chat-working-suppression'
+import { shouldShowNativeChatWorking } from '../../../../../shared/native-chat/native-chat-working-suppression'
 
 function assistant(id: string, text: string): NativeChatMessage {
   return {

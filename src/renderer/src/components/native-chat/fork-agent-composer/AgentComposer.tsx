@@ -27,11 +27,11 @@ import type {
   ComposerAutocomplete,
   NativeChatPickerItem,
   NativeChatSendClassification
-} from '../native-chat-composer-state'
+} from '../../../../../shared/native-chat-composer-autocomplete'
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
-} from '../../../../../shared/native-chat-session-options'
+} from '../../../../../shared/native-chat/input/native-chat-session-options'
 import type { HistoryState } from './agent-composer-history'
 import { readAgentComposerDraftCache } from './agent-composer-draft-cache'
 import { useAgentComposerDraft } from './use-agent-composer-draft'

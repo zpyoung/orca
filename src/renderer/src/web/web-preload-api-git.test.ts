@@ -100,7 +100,7 @@ describe('web git preload API', () => {
       { method: 'git.remoteCommitUrl', params: { worktree: 'id:wt-1', sha: TEST_COMMIT_OID } }
     ])
     const range = { relativePath: 'a.ts', line: 10, endLine: 20 }
-    await globals.window.api.git.remoteFileUrl({ worktreePath: worktree.path, ...range })
+    await globals.window.api.git.remoteFileUrl({ worktreePath: TEST_WORKTREE.path, ...range })
     expect(runtimeCalls.at(-1)).toEqual({
       method: 'git.remoteFileUrl',
       params: { worktree: 'id:wt-1', ...range }

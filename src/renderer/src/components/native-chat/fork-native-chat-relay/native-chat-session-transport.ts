@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-session-transport.ts
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 import type {
   NativeChatApi,
   NativeChatAppendedMessages,
@@ -14,8 +14,9 @@ import { isRuntimeCompatBlockError } from '@/runtime/runtime-protocol-compat'
 import {
   parseRuntimeNativeChatReadSessionResult,
   parseRuntimeNativeChatCompanionFields,
-  RUNTIME_NATIVE_CHAT_READ_ERROR
+  runtimeNativeChatReadError
 } from './native-chat-runtime-contract'
+import { translate } from '@/i18n/i18n'
 
 /** The read/subscribe surface the live-session hook needs, decoupled from where
  *  the transcript actually lives. Same shape as `window.api.nativeChat`, so the
@@ -25,20 +26,24 @@ export type NativeChatSessionTransport = {
   subscribe: NativeChatApi['subscribe']
 }
 
-const RUNTIME_TOO_OLD =
-  'This remote runtime is too old to show agent chat history. Update the remote runtime to view it.'
+function runtimeTooOldMessage(): string {
+  return translate(
+    'components.native-chat.runtime.tooOld',
+    'This remote runtime is too old to show agent chat history. Update the remote runtime to view it.'
+  )
+}
 
 export const RUNTIME_NATIVE_CHAT_RECONNECT_MS = 2_000
 
 /** Label only method/version blocks as update requirements; transient failures need generic copy (KTD-4). */
 export function toRuntimeNativeChatErrorMessage(err: unknown): string {
   if (err instanceof RuntimeRpcCallError && err.code === 'method_not_found') {
-    return RUNTIME_TOO_OLD
+    return runtimeTooOldMessage()
   }
   if (isRuntimeCompatBlockError(err)) {
-    return RUNTIME_TOO_OLD
+    return runtimeTooOldMessage()
   }
-  return RUNTIME_NATIVE_CHAT_READ_ERROR
+  return runtimeNativeChatReadError()
 }
 
 /** The web preload bridge answers `subscribe` with a Promise instead of the
@@ -86,7 +91,14 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
         const result = await callRuntimeRpc<unknown>(
           target,
           'nativeChat.readSession',
-          { agent, sessionId, limit, transcriptPath, beforeOffset },
+          {
+            agent,
+            sessionId,
+            limit,
+            transcriptPath,
+            beforeOffset,
+            capabilities: { transcriptSourceOrder: 1 }
+          },
           { timeoutMs: 15_000 }
         )
         return parseRuntimeNativeChatReadSessionResult(result)
@@ -135,7 +147,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                 sessionId,
                 transcriptPath,
                 limit,
-                capabilities: { transcriptPending: 1 }
+                capabilities: { transcriptPending: 1, transcriptSourceOrder: 1 }
               },
               timeoutMs: 15_000
             },

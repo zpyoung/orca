@@ -11,8 +11,20 @@ import {
   getCommitMessageModel,
   isCustomAgentId
 } from './commit-message-agent-spec'
+<<<<<<< fork
 import { planCustomCommand, tokenizeCustomCommandTemplate } from './commit-message-prompt'
 import { applyCommitMessageRecipeEffortOverrides } from './fork-automation-launch-settings/commit-message-recipe-effort-overrides'
+||||||| base
+import { planCustomCommand, tokenizeCustomCommandTemplate } from './commit-message-prompt'
+=======
+import { planCustomCommand } from './commit-message-prompt'
+import {
+  KIMI_VALUE_OPTIONS,
+  findRecipeOption,
+  planAdditionalAgentArgs,
+  compactRecipeOptions
+} from './commit-message-generation-options'
+>>>>>>> upstream
 import type { TuiAgent } from './tui-agent'
 import { mergeOpenCodeGenerationArgs } from './opencode-generation-command'
 import { buildAntigravityGenerationInput } from './antigravity-generation-stream'
@@ -253,6 +265,7 @@ export function planCommitMessageGeneration(
   // Replace singleton values rather than stack them: yargs arrays crash CLIs such as OpenCode model.split.
   const merged = applySingletonOptionOverrides({
     generatedArgs: baseArgs,
+<<<<<<< fork
     prefixArgs: command.prefixArgs,
     recipeArgs: agentArgs.args,
     singletonOptions: spec.singletonOptions ?? DEFAULT_SINGLETON_OPTIONS
@@ -269,6 +282,22 @@ export function planCommitMessageGeneration(
     agentArgs: withEffort.recipeArgs,
     promptDelivery: spec.promptDelivery,
     prompt: argvPrompt
+||||||| base
+    prefixArgs: command.prefixArgs,
+    recipeArgs: agentArgs.args,
+    singletonOptions: spec.singletonOptions ?? DEFAULT_SINGLETON_OPTIONS
+  })
+  const args = insertAdditionalAgentArgs({
+    baseArgs: merged.generatedArgs,
+    agentArgs: merged.recipeArgs,
+    promptDelivery: spec.promptDelivery,
+    prompt: argvPrompt
+=======
+    prefixArgs,
+    recipeArgs,
+    singletonOptions: spec.singletonOptions ?? DEFAULT_SINGLETON_OPTIONS,
+    valueOptions: input.agentId === 'kimi' ? KIMI_VALUE_OPTIONS : []
+>>>>>>> upstream
   })
   const args =
     input.agentId === 'kimi'

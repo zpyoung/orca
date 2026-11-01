@@ -14,8 +14,16 @@ import {
 
 export type ActionRecipeDraftValue = {
   commandInputTemplate: string
+<<<<<<< fork
   agentArgs: string
   launchOptions?: AgentLaunchOptionSelection
+||||||| base
+  agentArgs: string
+=======
+  agentArgs?: string
+  argumentChoices?: SourceControlActionRecipe['argumentChoices']
+  launchPreferences?: SourceControlActionLaunchPreferences
+>>>>>>> upstream
 }
 
 export type ActionRecipeDraftState = {
@@ -33,6 +41,7 @@ function readActionRecipeInputValue(
   return {
     commandInputTemplate:
       typeof value === 'string' ? value : DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId],
+<<<<<<< fork
     agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs : '',
     launchOptions: recipe?.launchOptions ? structuredClone(recipe.launchOptions) : {}
   }
@@ -50,6 +59,13 @@ export function agentLaunchOptionSelectionFromOverrides(
   return {
     ...(value.model ? { model: value.model } : {}),
     ...(value.optionValues ? { optionValues: value.optionValues } : {})
+||||||| base
+    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs : ''
+=======
+    agentArgs: recipe?.agentArgs,
+    argumentChoices: recipe?.argumentChoices,
+    ...(recipe?.launchPreferences ? { launchPreferences: recipe.launchPreferences } : {})
+>>>>>>> upstream
   }
 }
 

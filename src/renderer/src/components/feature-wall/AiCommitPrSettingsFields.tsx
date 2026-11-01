@@ -141,6 +141,7 @@ export function AiCommitPrSettingsFields({
           <Label className="text-xs">
             {translate('auto.components.feature.wall.AiCommitPrSettingsCard.be8917699e', 'Model')}
           </Label>
+<<<<<<< fork
           <div className="space-y-1">
             <Select
               value={activeModel.id}
@@ -162,6 +163,33 @@ export function AiCommitPrSettingsFields({
             </Select>
             <RecipeOverrideNote actionIds={recipeOverrides.modelOverriddenBy} />
           </div>
+||||||| base
+          <Select value={activeModel.id} onValueChange={onModelChange}>
+            <SelectTrigger size="sm" className="h-8 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
+              {activeCapability.models.map((model) => (
+                <SelectItem key={model.id} value={model.id} className="cursor-pointer">
+                  {model.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+=======
+          <Select value={activeModel.id} onValueChange={onModelChange}>
+            <SelectTrigger size="sm" className="h-8 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
+              {activeCapability.models.map((model) => (
+                <SelectItem key={model.id} value={model.id} className="cursor-pointer">
+                  {sourceControlModelLabel(model)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+>>>>>>> upstream
         </div>
       ) : null}
 
@@ -173,6 +201,7 @@ export function AiCommitPrSettingsFields({
               'Thinking effort'
             )}
           </Label>
+<<<<<<< fork
           <div className="space-y-1">
             <Select
               value={activeThinking}
@@ -195,6 +224,33 @@ export function AiCommitPrSettingsFields({
             </Select>
             <RecipeOverrideNote actionIds={recipeOverrides.thinkingOverriddenBy} />
           </div>
+||||||| base
+          <Select value={activeThinking} onValueChange={onThinkingChange}>
+            <SelectTrigger size="sm" className="h-8 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
+              {activeModel.thinkingLevels.map((level) => (
+                <SelectItem key={level.id} value={level.id} className="cursor-pointer">
+                  {level.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+=======
+          <Select value={activeThinking} onValueChange={onThinkingChange}>
+            <SelectTrigger size="sm" className="h-8 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
+              {activeModel.thinkingLevels.map((level) => (
+                <SelectItem key={level.id} value={level.id} className="cursor-pointer">
+                  {sourceControlThinkingLabel(level)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+>>>>>>> upstream
         </div>
       ) : null}
 

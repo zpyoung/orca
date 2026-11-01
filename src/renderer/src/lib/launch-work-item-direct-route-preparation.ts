@@ -88,7 +88,16 @@ export async function prepareDirectWorkItemAgentLaunch(args: {
   agentLaunchPreferences?: LaunchWorkItemDirectArgs['agentLaunchPreferences']
   agentOverride?: TuiAgent
   agentArgs?: string | null
+<<<<<<< fork
   launchOptions?: AgentLaunchOptionSelection | null
+||||||| base
+=======
+  sessionOptions?: Readonly<Record<string, string>>
+  resolveAgentArgs?: (agent: TuiAgent) => string | null | undefined
+  resolveSessionOptions?: (agent: TuiAgent) => Readonly<Record<string, string>> | undefined
+  launchChoice?: LaunchWorkItemDirectArgs['launchChoice']
+  sessionOptionsYieldToAgentArgs?: true
+>>>>>>> upstream
   repoConnectionId: string | null
   repoHost: RepoHostFields & { path: string }
   latestStore: AppState
@@ -135,6 +144,7 @@ export async function prepareDirectWorkItemAgentLaunch(args: {
         // Non-critical: activation still has the explicit startup below.
       })
   }
+<<<<<<< fork
   const { startupPlan, draftLaunchedNatively, startupPlanFailed } = buildDirectWorkItemStartup({
     agent: effectiveAgent,
     agentArgs: args.agentArgs,
@@ -147,6 +157,27 @@ export async function prepareDirectWorkItemAgentLaunch(args: {
     launchConnectionId
   })
 
+||||||| base
+  const { startupPlan, draftLaunchedNatively, startupPlanFailed } = buildDirectWorkItemStartup({
+    agent: effectiveAgent,
+    agentArgs: args.agentArgs,
+    draftContent: args.draftContent,
+    promptDelivery: args.promptDelivery,
+    settings: args.settings,
+    launchHost: resolveDirectWorkItemLaunchHost(args),
+    terminalWindowsShell: resolveDirectWorkItemTabShell(args),
+    launchConnectionId
+  })
+
+=======
+  const agentArgs =
+    effectiveAgent && args.resolveAgentArgs ? args.resolveAgentArgs(effectiveAgent) : args.agentArgs
+  const sessionOptions = effectiveAgent
+    ? args.resolveSessionOptions
+      ? args.resolveSessionOptions(effectiveAgent)
+      : args.sessionOptions
+    : undefined
+>>>>>>> upstream
   const plan =
     effectiveAgent === null
       ? null

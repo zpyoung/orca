@@ -15,6 +15,8 @@ import {
 import { resolveWorktreeLaunchHost } from '../../worktree-launch-host-repo'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { Worktree } from '../../../../shared/worktree/types'
+import type { TerminalWorkspaceLaunchScope } from '../../runtime-legacy-worker-terminal-recovery-types'
 
 export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRuntimeWithCreateAgentSession {
   /** A create's scope: its `wslUserAct` lets the folder check start a stopped WSL distro (E9). */
@@ -174,6 +176,8 @@ export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRun
       extraAgentArgs?: string
       suppressStartupUpdatePrompt?: boolean
       launchOverrides?: AgentLaunchOverrides
+      /** Run now is the user's act; a scheduled run is background and a stopped WSL distro holds it. */
+      wslUserAct?: true
     }
   ): Promise<RuntimeTerminalCreate> {
     const worktree = await this.resolveGitWorktreeSelector(worktreeSelector)

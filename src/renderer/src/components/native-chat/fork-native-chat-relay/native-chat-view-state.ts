@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-view-state.ts
-// FORK-COPY-SHA: 86ad9d95cac792f3d1359d886cef9fb9b0aadd47
+// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
 // Pure mapping from an assembled NativeChatSession to the discrete view state the
 // UI renders. Keeping it a single function (not branching inside the .tsx) makes
 // the empty/loading/error/working/ready dispatch testable and keeps the render

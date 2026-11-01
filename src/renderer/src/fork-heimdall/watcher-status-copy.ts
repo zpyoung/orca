@@ -8,7 +8,7 @@ import { isHeimdallAttentionRow } from './fleet-selectors'
 export function watcherKindLabel(kind: WatcherKindId): string {
   return kind === 'hosted-review'
     ? translate('fork.hostedReviewSitter.title', 'PR Sitter')
-    : translate('fork.heimdall.kind.objective', 'Objective watcher')
+    : translate('fork.heimdall.kind.objectiveWatcher', 'Objective watcher')
 }
 
 export function watcherStatusLabel(status: Pick<WatcherStatus, 'state' | 'phase'>): string {

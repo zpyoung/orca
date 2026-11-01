@@ -34,7 +34,19 @@ export type LaunchWorkItemDirectArgs = {
   agentLaunchPreferences?: AgentLaunchPreferences
   agentOverride?: TuiAgent
   agentArgs?: string | null
+<<<<<<< fork
   launchOptions?: AgentLaunchOptionSelection | null
+||||||| base
+=======
+  /** The saved choice for `agentOverride`; a chat seeds it and a terminal applies it as flags. */
+  sessionOptions?: Readonly<Record<string, string>>
+  /** On terminals, a flag `agentArgs` sets itself wins over the inherited saved choice. */
+  sessionOptionsYieldToAgentArgs?: true
+  resolveAgentArgs?: (agent: TuiAgent) => string | null | undefined
+  resolveSessionOptions?: (agent: TuiAgent) => Readonly<Record<string, string>> | undefined
+  /** For `agentOverride`: a picked surface and host, or a saved replay's terminal. */
+  launchChoice?: Pick<AgentLaunchChoice, 'requestedSurface' | 'executionHostId'>
+>>>>>>> upstream
   promptDelivery?: 'draft' | 'submit-after-ready'
   launchPlatform?: NodeJS.Platform
 }

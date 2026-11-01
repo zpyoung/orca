@@ -170,6 +170,7 @@ export function installPanePtyVisibilityBind(session: ConnectPanePtySession): vo
       armTerminalInputQuarantine(session.deps.tabId)
     }
     session.remotePtyIncarnationId = nextIncarnationId
+    session.noteBoundProcessIncarnation(incarnationId)
     // Handle rotation replaces store identity within the same pane/session generation, without fresh-spawn exit semantics.
     session.bindActivePanePty(ptyId, { replacePtyId: replacedPtyId })
   }

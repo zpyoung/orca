@@ -24,6 +24,13 @@ import type { SourceControlAiWriteTarget } from '../../../../shared/source-contr
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+<<<<<<< fork
+||||||| base
+import { SourceControlAgentCliArgsField } from './SourceControlAgentCliArgsField'
+=======
+import type { AgentComboboxSurfaceRows } from '@/components/agent/agent-combobox-surface-items'
+import { SourceControlAgentCliArgsField } from './SourceControlAgentCliArgsField'
+>>>>>>> upstream
 import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
 import { describeSourceControlActionModel } from '../settings/source-control-action-model-copy'
 import { sourceControlActionRecipeSaveMatchesTarget } from './source-control-action-recipe-match'
@@ -49,7 +56,12 @@ type SourceControlAgentActionDialogFormProps = {
   agentArgs: string
   /** False when the launch would be structured native chat; the field is then absent, not disabled. */
   agentArgsApply: boolean
+<<<<<<< fork
   launchOptions: AgentLaunchOptionSelection
+||||||| base
+=======
+  recipe: SelectedSourceControlActionRecipe
+>>>>>>> upstream
   commandTemplate: string
   savedCommandInputTemplate?: string | null
   saveLaunchRecipe: boolean
@@ -62,10 +74,18 @@ type SourceControlAgentActionDialogFormProps = {
   canStart: boolean
   isStarting: boolean
   startLabel: string
+<<<<<<< fork
   onSelectedAgentChange: (agent: TuiAgent | null) => void
   onLaunchOverridesChange: (
     updater: (current: AgentLaunchOverrides) => AgentLaunchOverrides
   ) => void
+||||||| base
+  onSelectedAgentChange: (agent: TuiAgent | null) => void
+  onAgentArgsChange: (value: string) => void
+=======
+  onAgentPick: (agent: TuiAgent) => void
+  onAgentArgsChange: (value: string) => void
+>>>>>>> upstream
   onCommandTemplateChange: (value: string) => void
   onSaveLaunchRecipeChange: (value: boolean) => void
   onSaveAgentDefaultChange: (value: string) => void
@@ -99,7 +119,12 @@ export function SourceControlAgentActionDialogForm({
   statusCopy,
   agentArgs,
   agentArgsApply,
+<<<<<<< fork
   launchOptions,
+||||||| base
+=======
+  recipe,
+>>>>>>> upstream
   commandTemplate,
   savedCommandInputTemplate,
   saveLaunchRecipe,
@@ -112,8 +137,16 @@ export function SourceControlAgentActionDialogForm({
   canStart,
   isStarting,
   startLabel,
+<<<<<<< fork
   onSelectedAgentChange,
   onLaunchOverridesChange,
+||||||| base
+  onSelectedAgentChange,
+  onAgentArgsChange,
+=======
+  onAgentPick,
+  onAgentArgsChange,
+>>>>>>> upstream
   onCommandTemplateChange,
   onSaveLaunchRecipeChange,
   onSaveAgentDefaultChange,
@@ -123,6 +156,7 @@ export function SourceControlAgentActionDialogForm({
 }: SourceControlAgentActionDialogFormProps): React.JSX.Element {
   const defaultCommandTemplate = savedCommandInputTemplate ?? '{basePrompt}'
   const commandTemplateIncludesBasePrompt = commandTemplate.includes('{basePrompt}')
+<<<<<<< fork
   const selectedRecipe = selectedAgent
     ? {
         agentId: selectedAgent,
@@ -131,6 +165,20 @@ export function SourceControlAgentActionDialogForm({
         ...(Object.keys(launchOptions).length > 0 ? { launchOptions } : {})
       }
     : null
+||||||| base
+  const selectedRecipe = selectedAgent
+    ? {
+        agentId: selectedAgent,
+        commandInputTemplate: commandTemplate,
+        agentArgs
+      }
+    : null
+=======
+  const selectedRecipe = recipe
+  const selectedPreferences = selectedAgent
+    ? selectedSourceControlActionPreferences(selectedRecipe, selectedAgent)
+    : undefined
+>>>>>>> upstream
   const selectedSaveTarget = sourceControlLaunchSaveTargetFromValue(saveTargetValue, repo)
   // Copy describes only the selected save target, which is the only one start/save writes.
   const selectedLaunchRecipeAlreadySaved = Boolean(
