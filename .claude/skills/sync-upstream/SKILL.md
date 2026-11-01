@@ -28,8 +28,8 @@ Arguments: `--unattended` suppresses every confirmation prompt. It does **not** 
 latitude: the decisions this skill routes to a human stay routed to a human.
 
 **Escalating a decision means asking and waiting, attended or not.** Put the decision to the human
-through `orca ask` (load the `orca-ask` skill for the CLI), then wait with
-`orca-ask-wait <ask_id> 43200` run as a background command, which polls for up to 12 hours. On an
+through `orca ask` (load the `orca-ask` skill for the CLI), then wait up to 12 hours the way the next
+paragraph says. On an
 answer, continue as the human chose. On `declined`, `timed_out` or `unavailable`, stop and report
 "needs attention: <the decision>" — that is the only path to a decision-shaped stop. Build each
 option from what you have read, naming the files it touches and which local and remote callers
@@ -38,10 +38,21 @@ depend on them, never from a feature's name: v1.4.230's first relay ask offered 
 catch it. Read the gating code before asking at all — a second ask that run was withdrawn after one
 `rg` showed the new store was dark by default.
 
-**A run ends only at Step 16.** Every wait — on CI, on an ask, on a release build — is a background
-command whose exit re-invokes you. Never end the turn, schedule a wakeup, or hand back to the human
-while the run's PR is open. The 2026-10-16 run ended its turn behind a background poll; its green PR
-#120 then sat unmerged for 68 hours while the next three daily runs stopped behind it.
+**A run ends only at Step 16, and so does its turn.** Never end the turn, schedule a wakeup, or hand
+back to the human before then, whether or not a PR is open. In an Orca automation run, ending the
+turn reports the agent `done`: `createAutomationDispatchCompletion` marks the run completed and sleeps
+its workspace, and every background command and subagent dies with exit 144. The runs of 2026-10-28,
+10-29 and 10-30 each ended a turn "waiting on background agents" and died 9s, 3s and 74s later, and
+the next day's run redid their work. The 2026-10-16 run ended its turn behind a background poll; its
+green PR #120 then sat unmerged for 68 hours while the next three daily runs stopped behind it.
+
+**So every wait is a bounded foreground command, repeated until it resolves:** a loop around
+`orca ask wait --id <id> --json` that returns after about nine minutes, and `wait-pr-checks.mjs` with
+`--timeout-minutes 9`. Foreground Bash tops out at ten minutes. Completion notifications from
+background commands and subagents don't arrive during these calls, so check on that work between
+waits: a subagent's report is the last assistant text in
+`~/.claude/projects/<slug>/<session>/subagents/agent-*.jsonl`. Snapshot dirty work to a tag as you go,
+so a kill can't lose it.
 
 The run needs a disposable branch in a workspace of its own; the scheduled automation supplies one by
 creating a fresh worktree per run. This skill never creates, renames, or deletes a branch or a
@@ -158,7 +169,7 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
 `main` already contains upstream trunk commits absorbed by previous syncs; a plain
 `$UPSTREAM_TARGET..origin/main` range reports those as fork work and inflates N by dozens.
 
-- **Before the ancestry test, check that the target is not *older* than what `main` carries.**
+- **Before the ancestry test, check that the target is not _older_ than what `main` carries.**
   Read `upstream_synced` from `CHANGELOG.md`'s YAML frontmatter and compare by version order:
 
   ```sh
@@ -177,7 +188,8 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
   Step 6 resets every upstream-owned file to `$UPSTREAM_TARGET`, so merging an older tag rolls the
   whole fork back a release and breaks any fork commit written against the newer release's API
   shapes. `merge-base --is-ancestor` cannot catch this on its own — stable tags live on their own
-  release branches, so it fails for an *older* tag exactly as it does for a genuinely new one.
+  release branches, so it fails for an _older_ tag exactly as it does for a genuinely new one.
+
 - If `git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main` succeeds, `main` already contains
   this release. Skip to Step 12 and note "no new stable release (already at $STABLE_TAG)". This is
   the expected outcome on most days and is a success, not a warning.
@@ -194,7 +206,7 @@ Then check that the **previous** stable tag is still an ancestor:
 git merge-base --is-ancestor "$PREV_TAG" origin/main
 ```
 
-If it fails, the last sync PR was squash-merged. `main` still carries that release's *content*, so
+If it fails, the last sync PR was squash-merged. `main` still carries that release's _content_, so
 nothing looks wrong, but the tag commit is gone from the lineage and `git merge` resolves its base a
 release further back — v1.4.205 merged against a v1.4.203-era base and produced 2,536 differing
 paths and 287 conflicted files instead of a one-release step. Proceed with the normal procedure:
@@ -285,7 +297,7 @@ This merge is fork-against-fork, so `-X ours` is wrong here — it would discard
   afterwards (`npx oxfmt --write config/fork-ownership.json`), never `pnpm format`.
 - **Never merge residual numbers.** The two sides measured against different tags, so the merged
   value is meaningless either way. Re-measure with `--verify-residuals "$UPSTREAM_TARGET"` and
-  re-baseline what it flags. A budget that *shrank* is the normal case here and means the new
+  re-baseline what it flags. A budget that _shrank_ is the normal case here and means the new
   release absorbed a line the fork was carrying — on 2026-09-10 upstream's own fixture fix
   superseded a workaround `main` had landed for the same bug, and taking upstream's side dropped
   three budgets from `+5/-2`, `+5/-2`, `+13/-4` to `+1/-1`, `+1/-1`, `+9/-3`.
@@ -346,7 +358,7 @@ handed and stop rather than adapting to a workspace that fails any of these:
 - No rebase/merge/cherry-pick is in progress. Resolve each path with `git rev-parse --git-path`
   (`MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`) and test what it prints. A
   literal `.git/MERGE_HEAD` test can never fire here: the run always happens in a worktree, where
-  `.git` is a *file* pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
+  `.git` is a _file_ pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
   reads as absent no matter what is in progress.
 - `git merge-base --is-ancestor HEAD origin/main` succeeds. The branch carries no commits of its
   own, so the reset below destroys nothing. If it fails, the workspace holds someone's work.
@@ -511,7 +523,7 @@ fix policy forbids. That is a confirmed feature collision: stop and raise it, ra
 the hour first.
 
 A `reason` that reads like whole-file ownership ("the fork's release-tooling delta", "fork-specific
-thresholds") is exactly where this goes wrong: it is describing a *delta*, and the exception is
+thresholds") is exactly where this goes wrong: it is describing a _delta_, and the exception is
 keeping the whole file. v1.4.194 lost four that way — the Electron installer's staging-transaction
 rework, the packaged-runtime contract's move off `package.json`'s `pnpm` block, release-cut's new
 permission row, and `pr.yml`'s new real-IME lane. Every one passed both manifest checks, the local
@@ -577,7 +589,7 @@ done < <out-dir>/ours.txt
 
 Run this before the numstat loop; it removes paths from the decision list rather than adding them.
 
-The same staleness also hides *inside* a path that does diverge, where it reads as deliberate fork
+The same staleness also hides _inside_ a path that does diverge, where it reads as deliberate fork
 intent. Before defending a hunk the fork appears to have deleted, check whether a fork commit ever
 touched it — `git log -S'<symbol>' -- <path>` returning only upstream commits means the exception
 discarded upstream's addition at some earlier sync and no one chose anything.
@@ -587,7 +599,7 @@ and resolves to the tag, so a dependency the exception dropped makes `pnpm insta
 fail in Step 8 with a lockfile error that names nothing about ownership.
 
 **A `deleted: true` exception can be invalidated by the release you are merging.** The fork's
-deletions were decided against the *previous* tag's import graph; a new release can add files that
+deletions were decided against the _previous_ tag's import graph; a new release can add files that
 import a module the fork deletes. Nothing reports it — `remove.txt` honours the deletion, both
 manifest checks pass, and the ownership guard passes — so it surfaces as `TS2307` against upstream's
 own new files. Sweep right after `remove.txt` is applied.
@@ -623,19 +635,17 @@ drop the exception. Never delete the new upstream files to match, and never repo
 import at the fork's replacement unless that module really provides the same surface. See
 [`references/sync-lessons.md`](./references/sync-lessons.md) for the v1.4.200 case.
 
-**A reset upstream test may pin an upstream release tag this remote does not have.** The
-cross-version-wire harness resolves refs against git, so a constant naming a bare `vX.Y.Z` aborts
-the whole suite in PR CI — three releases have now added one. Sweep after the reset:
+**A bare upstream tag pinned in a cross-version test needs no repoint.** The exception-owned
+`tests/e2e/cross-version-wire/release-checkout.ts` has `resolveUpstreamStableTag`, which fetches a
+strict `vX.Y.Z` from stablyai/orca into `refs/remotes/upstream-releases/`. Upstream's pins therefore
+resolve in PR CI even though this remote has none of those tags: #131's `cross-version wire
+compatibility` passed with `v1.4.218` absent from origin. Only confirm the function survived the merge:
 
 ```sh
-git grep -nE "'v[0-9]+\.[0-9]+\.[0-9]+'" -- tests/e2e/cross-version-wire/
+git grep -n resolveUpstreamStableTag -- tests/e2e/cross-version-wire/release-checkout.ts
 ```
 
-A hit only matters where the string reaches `materializeReleaseCheckout`; fixture inputs to
-`selectLatestStableReleaseTag` are pure and stay as they are. For a real one, pick the fork release
-that contains that upstream tag and nothing newer (`merge-base --is-ancestor` both ways), prove the
-modules the harness loads are byte-identical across the two, repoint the constant, and declare it as
-a seam beside its siblings.
+If it's gone, restore it rather than repointing constants.
 
 **Sweep the release for upstream identity the fork must not inherit.** Upstream hardcodes its own
 signing team, bundle ids, runners and repository, and every new hardcode resets to the tag here.
@@ -698,7 +708,7 @@ A fix may:
 - apply lint and format fixes, committed one commit per rule. A stable tag can enable whole rule
   families that `--fix` cannot rewrite, and adopting those in fork-owned files **is the run's job** —
   it is never an escalation on its own. The fix is names and types only, taken from upstream's own
-  adoption commit for that rule; `references/file-ownership.md` § *When upstream tightens the linter*
+  adoption commit for that rule; `references/file-ownership.md` § _When upstream tightens the linter_
   has the method and its limits
 - remove a job from the fork's `pr.yml` that the release cannot route: its `verify` selection has
   no producer in the tag's `pr-code-change-scope.mjs`, or a script it runs does not exist in the
@@ -804,8 +814,8 @@ node config/scripts/fork-sync-gate/replay-pr-preflight.mjs
   replay takes about three minutes.
 
 Every step is absolute: stop at the first failure and treat it as a hard fail. The reference's
-rule-tightening carve-out is the one exception, and it is an exception about *how the tree is
-fixed*, not about tolerating a failure — lint must still pass before the push, and the mechanical
+rule-tightening carve-out is the one exception, and it is an exception about _how the tree is
+fixed_, not about tolerating a failure — lint must still pass before the push, and the mechanical
 `oxlint --fix` it permits is committed separately from the merge and the ownership commit.
 
 **Why no tests here.** Vitest cannot run on the machine this skill runs on; `AGENTS.md` routes every
@@ -900,18 +910,19 @@ failed advisory check is re-run once when its log shows a runner or network faul
 the report either way. Don't fix one in a sync PR: the benchmark workflows already carry fork-aware
 baselines (`fork-benchmark-baseline`), and they still fail on a sync-sized diff by construction.
 
-Wait with one background command, which polls every two minutes (`gh` shares the account's API rate
-limit, so do not tighten it):
+Wait with this bounded foreground command, repeated, which polls every two minutes (`gh` shares the
+account's API rate limit, so do not tighten it):
 
 ```sh
 node config/scripts/fork-sync-gate/wait-pr-checks.mjs --pr "$PR_NUMBER" --head "$(git rev-parse HEAD)" \
-  --advisory-minutes 15 --timeout-minutes <minutes left in the budget>
+  --advisory-minutes 15 --timeout-minutes 9
 ```
 
 It exits `1` on the first failed gating job and names it, which is usually well before `verify`
 settles. It exits `0` once the gate is green and the advisory checks have settled, or 15 minutes
 after the gate went green, whichever comes first. It exits `3` when the head moves under you (see
-*One writer per sync PR*), `4` when the PR closes, and `2` at the deadline. Read `verify`'s own log
+_One writer per sync PR_), `4` when the PR closes, and `2` at its own deadline, which only means run
+it again while the 4-hour budget lasts. Read `verify`'s own log
 when it fails: it is not a rollup, and its last lines name the selection or job that failed.
 
 This is where the test suite runs, so a failing `tests node <version> <shard>/<total>` check is the
@@ -949,7 +960,7 @@ patched-source guard then rejects it. v1.4.198 added exactly such a guard
 
 **The poison is self-perpetuating, and a green job is what writes it.** Do not look for a cancelled
 run: on 2026-09-10 the entry that failed the job had been written the previous afternoon by the
-*successful* WSL job that the previous run's cache deletion had just produced. `rebuild-native-deps.mjs`
+_successful_ WSL job that the previous run's cache deletion had just produced. `rebuild-native-deps.mjs`
 decides to skip from `probeElectronNativeModules`, which tests only whether the addon loads, while
 the patched-source check runs later in `ensure-native-runtime.mjs` — so a restored prebuild loads,
 the rebuild is skipped, and the guard rejects it. That file is byte-identical to upstream, so this is
@@ -957,7 +968,7 @@ an upstream defect: deleting the entry unblocks the run but does not stop the ne
 fresh bad entry. Expect to do this every sync until upstream's skip decision consults the guard.
 
 The tell is a failure whose whole path is byte-identical to the tag. Prove that before anything else,
-and diff the *real* paths — the patches live in `config/patches/`, not `patches/`, and a diff of a
+and diff the _real_ paths — the patches live in `config/patches/`, not `patches/`, and a diff of a
 directory that does not exist reports no changes and looks like proof:
 
 ```sh
@@ -991,7 +1002,7 @@ re-run behind a wait on run status rather than retrying the command. If you are 
 anyway, do that instead: the new run re-runs the job for free. Re-running a job also re-runs its
 dependents, which is why `verify` cannot be re-run on its own and does not need to be.
 
-Whether clearing a cache belongs on the fix policy's list of what a fix *may* do is a question for
+Whether clearing a cache belongs on the fix policy's list of what a fix _may_ do is a question for
 the skill's owner, not for a run to settle — raise it, do not assume it.
 
 **A reproduced CI failure is the fork's to fix, even if the merge did not cause it.** There is no
@@ -1046,14 +1057,14 @@ git rev-list --parents -n1 "$MAIN_NEW" | wc -w                # must be 3: the c
 ```
 
 **Both checks are load-bearing — run them and act on the result.** A squash puts the tag's
-*content* on `main` while leaving its *commit* out of the lineage, so the ancestor check fails and
+_content_ on `main` while leaving its _commit_ out of the lineage, so the ancestor check fails and
 the parent count reads 2 instead of 3. Verified on PR #82: after it was squashed,
 `git merge-base --is-ancestor v1.4.204 origin/main` exits 1 while `main`'s tree verifies clean
 against v1.4.204. The parent count is the more direct signal, because it also catches a rebase
 merge, whose single parent still carries the content forward.
 
 Nothing else notices for a long time, and what eventually does is confusing. The fork ownership
-guard picks the newest stable tag *reachable from HEAD*, so it silently falls back a release and
+guard picks the newest stable tag _reachable from HEAD_, so it silently falls back a release and
 reports every seam re-baselined since as drift — on **every** PR, including ones that touch nothing.
 #82 left #83 red that way, with ~25 false residual failures and no fault of its own. The next sync
 then merges against a base a release further back: v1.4.205 resolved against a v1.4.203-era base and
