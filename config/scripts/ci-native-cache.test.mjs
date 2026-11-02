@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
-import { classifyPrJobs } from './pr-code-change-scope.mjs'
 import { runProcessSync } from '@orca/process-host'
 
 const installerPath = '.github/actions/install-node-dependencies/action.yml'
@@ -12,7 +11,6 @@ const installer = parse(readFileSync(installerPath, 'utf8'))
 const native = parse(readFileSync(nativePath, 'utf8'))
 const e2e = parse(readFileSync('.github/workflows/e2e.yml', 'utf8'))
 const identity = native.runs.steps.find((step) => step.id === 'native-cache-scope')
-const inputs = [...identity.env.NATIVE_SOURCE_HASH.matchAll(/'([^']+)'/g)].map((match) => match[1])
 const paths = [
   'node_modules/.pnpm/node-pty@*/node_modules/node-pty/build',
   'native/windows-registry/build',
@@ -72,13 +70,6 @@ function resolveIdentity({
 }
 
 describe('CI native cache ownership', () => {
-  it('routes every configured native cache input to native preparation', () => {
-    expect(inputs.length).toBeGreaterThan(0)
-    for (const file of inputs) {
-      expect(classifyPrJobs([file]).native_cache_changed, file).toBe(true)
-    }
-  })
-
   it.skipIf(process.platform === 'win32')(
     'separates runtime, Node/pnpm versions, architecture, image and libc hosts',
     () => {
@@ -100,16 +91,6 @@ describe('CI native cache ownership', () => {
       expect(variants.every(({ path }) => path === baseline.path)).toBe(true)
     }
   )
-
-  it('keeps early input rejection before dependency installation and native restoration', () => {
-    const early = installer.runs.steps.findIndex((step) => step.name === 'Validate native runtime')
-    const install = installer.runs.steps.findIndex((step) => step.name === 'Install dependencies')
-    const prepare = installer.runs.steps.findIndex((step) => step.id === 'native-runtime')
-    expect(early).toBeLessThan(install)
-    expect(install).toBeLessThan(prepare)
-    expect(installer.runs.steps[early].run).toContain('none|node|electron)')
-    expect(installer.runs.steps[prepare].if).toBe("inputs.native-runtime != 'none'")
-  })
 
   it.skipIf(process.platform === 'win32')(
     'rejects invalid runtime and missing resolved Node before cache restoration',

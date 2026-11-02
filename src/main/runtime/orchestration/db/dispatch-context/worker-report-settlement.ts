@@ -1,3 +1,4 @@
+import { markUnreadFollowUpMail } from './worker-follow-up-lineage'
 import type { WorkerReportOutcome, WorkerReportSettlement } from '../../types'
 import type { OrchestrationDb } from '../orchestration-db'
 import { AGENT_PROMPT_STALLED_ERROR } from '../../../agent-prompt-submission-verification'

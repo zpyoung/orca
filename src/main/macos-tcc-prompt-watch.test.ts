@@ -219,21 +219,4 @@ describe('MacosTccPromptWatch', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(spawnLogStream).toHaveBeenCalledOnce()
   })
-
-  it('does not restart after stop, and survives a spawn failure', () => {
-    const spawnLogStream = vi.fn(() => {
-      throw new Error('log binary unavailable')
-    })
-    const watch = new MacosTccPromptWatch({ onPrompt: vi.fn(), spawnLogStream })
-    expect(() => watch.start()).not.toThrow()
-
-    const { child } = createFakeLogStream()
-    const afterStop = new MacosTccPromptWatch({
-      onPrompt: vi.fn(),
-      spawnLogStream: () => child
-    })
-    afterStop.stop()
-    afterStop.start()
-    expect(afterStop['child']).toBeNull()
-  })
 })

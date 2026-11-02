@@ -5,7 +5,7 @@ import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
 import type { TerminalLayoutSnapshot, TerminalTab } from './terminal-tab-types'
 import type { TuiAgent } from './tui-agent'
-import type { StructuredAgentId } from './agent-session-provider-handle'
+import type { StructuredAgentId } from './agent-session/lifecycle/agent-session-provider-handle'
 
 export type RuntimeMobileSessionTerminalTab = {
   type: 'terminal'
@@ -78,6 +78,7 @@ export type RuntimeMobileSessionFileTab = {
   language: string
   mode?: 'edit' | 'diff'
   diffSource?: 'staged' | 'unstaged'
+  oldPath?: string
   isDirty: boolean
   color?: string | null
   isPinned?: boolean
@@ -104,6 +105,8 @@ export type RuntimeMobileSessionBrowserTab = {
   color?: string | null
   isPinned?: boolean
   isActive: boolean
+  /** The paired server the page runs on. Its publisher sets it; runtimes strip it before serving. */
+  hostRuntimeEnvironmentId?: string
 }
 
 export type RuntimeMobileSessionAgentTab = {

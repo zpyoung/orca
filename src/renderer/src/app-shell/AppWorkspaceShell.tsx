@@ -20,6 +20,9 @@ const Landing = lazy(() => import('../components/Landing'))
 const WorktreeCreationPanel = lazy(
   () => import('../components/worktree-creation/WorktreeCreationPanel')
 )
+const PendingNativeChatCreation = lazy(
+  () => import('../components/worktree-creation/PendingNativeChatCreation')
+)
 const TaskPage = lazy(() => import('../components/task-page/TaskPage'))
 const AutomationsPage = lazy(() => import('../components/automations/AutomationsPage'))
 const HeimdallPage = lazy(() => import('../fork-heimdall/HeimdallPage'))
@@ -71,6 +74,18 @@ function WorktreeSidebar({
   )
 }
 
+// A chat-bound creation shows the chat itself, usable before its worktree exists.
+function PendingCreationSurface(props: {
+  creationId: string
+  reserveCollapsedSidebarHeaderSpace: boolean
+}): React.JSX.Element {
+  const opensChat = useAppStore((s) => {
+    const entry = s.pendingWorktreeCreations[props.creationId]
+    return entry ? pendingCreationOpensNativeChat(entry) : false
+  })
+  return opensChat ? <PendingNativeChatCreation {...props} /> : <WorktreeCreationPanel {...props} />
+}
+
 function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element {
   const { activeView, hasActiveWorktree, activePendingCreationId, creationLayoutActive } = layout
   const ledgerPageData = useAppStore((s) => s.ledgerPageData)
@@ -102,7 +117,7 @@ function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element 
         )
       ) : null}
       {activeView === 'terminal' && creationLayoutActive && activePendingCreationId ? (
-        <WorktreeCreationPanel
+        <PendingCreationSurface
           creationId={activePendingCreationId}
           reserveCollapsedSidebarHeaderSpace={layout.leftTitlebarChromeLayout.isFloating}
         />
@@ -126,6 +141,8 @@ export function AppWorkspaceShell(props: {
   const scrollAnchorRef = useRef<VirtualizedScrollAnchor>(null)
   const sidebarScrollRefs = { scrollOffsetRef, scrollAnchorRef }
   const { setOpenWithFocus } = floatingWorkspace
+  // `orca plugin shot` captures the right sidebar, which the parked launcher floats over.
+  const capturingPluginShot = usePluginViewCaptureStore((s) => s.capturing)
   const toggleFloatingWorkspace = useCallback(
     () => setOpenWithFocus((open) => !open),
     [setOpenWithFocus]
@@ -245,7 +262,7 @@ export function AppWorkspaceShell(props: {
                     </RecoverableRenderErrorBoundary>
                   </Suspense>
                 </div>
-                {floatingWorkspace.showToggleButton ? (
+                {floatingWorkspace.showToggleButton && !capturingPluginShot ? (
                   <MemoFloatingTerminalToggleButton
                     open={floatingWorkspace.open}
                     onToggle={toggleFloatingWorkspace}

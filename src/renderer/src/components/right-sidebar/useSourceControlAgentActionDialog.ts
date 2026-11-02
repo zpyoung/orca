@@ -241,8 +241,7 @@ export function useSourceControlAgentActionDialog({
     repoId,
     repo,
     recipe,
-    livePick,
-    settings
+    livePick
   })
   const launchAgentScope = useMemo(
     () =>

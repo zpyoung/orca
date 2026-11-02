@@ -10,18 +10,24 @@ export type WorktreeDragUnitGroup = WorktreeDragGroup & {
 type WorktreeDragUnitRow =
   | { type: 'host-header' }
   | { type: 'header'; key: string }
-  | { type: 'item'; worktree: { id: string }; depth: number; sectionKey: string }
+  | {
+      type: 'item'
+      worktree: { id: string; hostId?: ExecutionHostId }
+      depth: number
+      sectionKey: string
+    }
   | { type: 'imported-worktrees-card' }
   | { type: 'new-external-worktrees-inbox' }
   | { type: 'pending-creation' }
   | { type: 'folder-workspace' }
 
+/** Unit members are host identities, matching getWorktreeDragGroups. */
 export function getWorktreeDragUnitGroups(
   rows: readonly WorktreeDragUnitRow[]
 ): WorktreeDragUnitGroup[] {
   const groups: WorktreeDragUnitGroup[] = []
   let current: { key: string; units: WorktreeDragUnitGroup['units'] } | null = null
-  const naturalWorktreeIds = getNaturalWorktreeIds(rows)
+  const naturalWorktreeKeys = getNaturalWorktreeKeys(rows)
 
   for (const row of rows) {
     if (row.type === 'header') {
@@ -42,7 +48,8 @@ export function getWorktreeDragUnitGroups(
     ) {
       continue
     }
-    if (row.sectionKey === PINNED_GROUP_KEY && naturalWorktreeIds.has(row.worktree.id)) {
+    const worktreeKey = composeWorktreeHostIdentity(row.worktree.hostId, row.worktree.id)
+    if (row.sectionKey === PINNED_GROUP_KEY && naturalWorktreeKeys.has(worktreeKey)) {
       continue
     }
     if (current === null || needsWorktreeDragGroup(current.key, row.sectionKey)) {
@@ -54,10 +61,10 @@ export function getWorktreeDragUnitGroups(
       })
     }
     if (row.depth > 0 && current.units.length > 0) {
-      current.units.at(-1)!.worktreeIds.push(row.worktree.id)
+      current.units.at(-1)!.worktreeIds.push(worktreeKey)
       continue
     }
-    current.units.push({ worktreeId: row.worktree.id, worktreeIds: [row.worktree.id] })
+    current.units.push({ worktreeId: worktreeKey, worktreeIds: [worktreeKey] })
   }
 
   return groups

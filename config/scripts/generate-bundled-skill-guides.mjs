@@ -26,6 +26,7 @@ const CANONICAL_GUIDE_NAMES = [
   'orca-linear',
   'orca-loop',
   'orca-per-workspace-env',
+  'orca-plugin-authoring',
   'orchestration'
 ]
 
@@ -44,6 +45,7 @@ const GUIDE_ALIASES = {
   'orca-linear': [],
   'orca-loop': [],
   'orca-per-workspace-env': [],
+  'orca-plugin-authoring': [],
   orchestration: []
 }
 
@@ -63,6 +65,7 @@ const STUB_TOPICS = [
   'orca-linear',
   'orca-loop',
   'orca-per-workspace-env',
+  'orca-plugin-authoring',
   'orchestration'
 ]
 

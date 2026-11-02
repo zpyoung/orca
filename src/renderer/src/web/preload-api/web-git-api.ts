@@ -4,7 +4,7 @@ import { callAbortableRuntimeEnvironment } from '../../runtime/abortable-runtime
 import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
 import { translate } from '@/i18n/i18n'
 import { callRuntimeResult } from './web-runtime-calls'
-import { mutateGitPath, mutateGitPaths } from './web-git-mutations'
+import { mutateGitPath, mutateGitPaths, resolveGitConflict } from './web-git-mutations'
 import { requireGitStageWorktreeScopeReceipt } from '../../../../shared/git-stage-worktree-scope'
 import { requireActiveEnvironment, updateEnvironmentFromResponse } from './web-runtime-session'
 import {
@@ -112,12 +112,14 @@ export function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
     // Why: the "add huge folder to .gitignore" flow is desktop-only; the web runtime makes no offer, so return no candidates.
     findHugeFoldersToIgnore: async () => [],
     appendGitignore: async () => false,
-    history: async ({ worktreePath, limit, baseRef }) => {
+    history: async ({ worktreePath, limit, baseRef, branchOnly, skip }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
       return callRuntimeResult('git.history', {
         worktree: toRuntimeWorktreeSelector(worktree.id),
         limit,
-        baseRef
+        baseRef,
+        branchOnly,
+        skip
       })
     },
     mutationInFlight: async ({ worktreePath }) => {
@@ -264,6 +266,12 @@ export function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
         message
       })
     },
+    completeMerge: async ({ worktreePath }) => {
+      const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
+      return callRuntimeResult('git.completeMerge', {
+        worktree: toRuntimeWorktreeSelector(worktree.id)
+      })
+    },
     generateCommitMessage: async () => ({
       success: false,
       error: translate(
@@ -288,6 +296,8 @@ export function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
     }),
     cancelGeneratePullRequestFields: () => Promise.resolve(),
     stage: async ({ worktreePath, filePath }) => mutateGitPath('git.stage', worktreePath, filePath),
+    resolveConflict: async ({ worktreePath, filePath, resolution }) =>
+      resolveGitConflict(worktreePath, filePath, resolution),
     bulkStage: async ({ worktreePath, filePaths, scope }) => {
       if (!scope) {
         return mutateGitPaths('git.bulkStage', worktreePath, filePaths)

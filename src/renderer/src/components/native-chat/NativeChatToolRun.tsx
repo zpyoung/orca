@@ -12,7 +12,7 @@ import {
   type NativeChatBlock,
   type NativeChatSubagentGroupBlock,
   type NativeChatToolCallBlock
-} from '../../../../shared/native-chat-types'
+} from '../../../../shared/native-chat/native-chat-types'
 import { isRenderableSubagentGroup } from '../../../../shared/native-chat/transcript/native-chat-subagent-summary'
 import type { NativeChatDiffReveal } from './native-chat-turn-diffs'
 import { nativeChatToolRunSentence } from './native-chat-tool-run-label'
@@ -59,7 +59,8 @@ export function NativeChatToolRun({
   trailing,
   disclosureId,
   onLinkClick,
-  asides
+  asides,
+  runtimeContext
 }: {
   blocks: NativeChatBlock[]
   previousTodoWrite?: NativeChatToolCallBlock
@@ -85,6 +86,7 @@ export function NativeChatToolRun({
   disclosureId?: string
   onLinkClick?: CommentMarkdownLinkClickHandler
   asides?: NativeChatToolRunAsides
+  runtimeContext?: RuntimeFileOperationArgs | null
 }): React.JSX.Element | null {
   // This row owns the language subscription for its tool, diff, and task labels.
   useTranslation()
@@ -143,6 +145,7 @@ export function NativeChatToolRun({
     () => nativeChatToolRunHeader(blocks, { activeTurnIsWorking, trailing }),
     [activeTurnIsWorking, blocks, trailing]
   )
+  const viewedImages = useMemo(() => nativeChatToolRunViewedImages(headerBlocks), [headerBlocks])
   const hasAskCall = asks.length > 0
   const askSubject = hasAskCall ? nativeChatAskRunSubject(asks) : null
   const showsHeader = !hasAskCall || callCount > 0
@@ -233,6 +236,12 @@ export function NativeChatToolRun({
           <NativeChatBrowserRunPageButton calls={headerBlocks.filter(isToolCallBlock)} />
         </div>
       )}
+      {/* A read's result is the image the agent saw, so it shows without opening the run. */}
+      <NativeChatImageAttachments
+        blocks={viewedImages}
+        runtimeContext={runtimeContext}
+        className="mb-0 mt-1"
+      />
       <NativeChatExpandable open={open && showsHeader}>
         <NativeChatToolRunMembers
           followKey={blocks.length + asideCount}

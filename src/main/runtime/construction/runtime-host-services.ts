@@ -13,11 +13,7 @@ import type { ResolvedWorktree } from '../runtime-worktree-path-identity'
 import { confirmRunTerminalShellAlone, readRunTerminalClientUse } from '../run-terminal-client-use'
 import { ALL_EXECUTION_HOSTS_SCOPE, type ExecutionHostId } from '../../../shared/execution-host'
 import { RuntimePreservedBranchCleanup } from '../runtime-preserved-branch-cleanup'
-import type {
-  AgentSessionCreateOperation,
-  OrchestrationCompatibilitySshAttachmentAuthority,
-  RestoredOrchestrationAuthorityReceipt
-} from '../runtime-terminal-contracts'
+import type * as TerminalContracts from '../runtime-terminal-contracts'
 
 import type { AgentStatusIpcPayload } from '../../../shared/agent-status-types'
 
@@ -50,9 +46,14 @@ import { ClaudeAgentTeamsService } from '../claude-agent-teams-service'
 import { teardownFolderWorkspacePtys } from '../folder-workspace-pty-teardown'
 import { countRepoTerminalsNotKnownExited } from '../project-removal-impact'
 
+type SessionCreateOperation = TerminalContracts.AgentSessionCreateOperation
+
 export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTerminalDrivers {
   declare addRepo: RuntimeRepositoryCommandSurface['addRepo']
   declare cloneRepo: RuntimeRepositoryCommandSurface['cloneRepo']
+  declare acquireFileWatcherRemoval: ConstructorParameters<
+    typeof RuntimeProjectGroupController
+  >[0]['acquireFileWatcherRemoval']
   protected abstract tryGetWorkspaceSessionHostIdForWorktree(
     worktreeId: string
   ): ExecutionHostId | null
@@ -194,7 +195,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected readonly agentSessionClaimSigner!: HostBindings['agentSessionClaimSigner']
 
-  protected readonly agentSessionCreateOperations = new Map<string, AgentSessionCreateOperation>()
+  protected readonly agentSessionCreateOperations = new Map<string, SessionCreateOperation>()
 
   protected readonly agentPromptSubmissionTailByPtyId = new Map<string, Promise<void>>()
 
@@ -209,7 +210,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected readonly orchestrationCompatibilitySshAttachments = new Map<
     string,
-    OrchestrationCompatibilitySshAttachmentAuthority
+    TerminalContracts.OrchestrationCompatibilitySshAttachmentAuthority
   >()
 
   protected sshRelayRecoveryGenerationByTargetId = new Map<string, number>()
@@ -267,7 +268,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected restoredOrchestrationAuthorityByPtyId = new Map<
     string,
-    RestoredOrchestrationAuthorityReceipt
+    TerminalContracts.RestoredOrchestrationAuthorityReceipt
   >()
 
   protected ptyControllerInventorySequence = 0
@@ -276,7 +277,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected ptyControllerInventoryGenerationByProvider = new Map<string, number>()
 
-  protected readonly accounts = new RuntimeAccountController()
+  protected readonly accounts = new RuntimeAccountController(() => this.notifier)
 
   protected readonly mobileSpeech = new RuntimeMobileSpeechCatalog(() => this.store)
 
@@ -306,6 +307,8 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
     withCatalogRemoval: (removal, expectedLedgers, mutate) =>
       this.withLedgerCatalogRemoval(removal, expectedLedgers, mutate),
     resolveFolderConnectionId: (workspace) => this.resolveFolderWorkspaceConnectionId(workspace),
+    acquireFileWatcherRemoval: (path, connectionId) =>
+      this.acquireFileWatcherRemoval(path, connectionId),
     teardownFolderWorkspacePtys: (...target) =>
       teardownFolderWorkspacePtys(
         {

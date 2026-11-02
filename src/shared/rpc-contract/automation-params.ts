@@ -198,6 +198,15 @@ export const AutomationRuns = z.object({
 // Why strict: null or a non-string must fail rather than fall back to "omitted", which preserves.
 const ExtraAgentArgs = z.string({ message: 'Extra agent arguments must be text.' }).optional()
 
+export const AutomationLaunchSetupPatch = z
+  .strictObject({
+    surface: z.enum(['chat', 'terminal']).optional(),
+    arguments: z.strictObject({ kind: z.literal('legacy-extras'), value: z.string() }).optional()
+  })
+  .refine((patch) => patch.surface !== undefined || patch.arguments !== undefined, {
+    message: 'Choose an automation launch change.'
+  })
+
 export const AutomationCreate = z.object({
   creationKey: OptionalString,
   name: requiredString('Missing automation name'),

@@ -1,38 +1,8 @@
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runInNewContext } from 'node:vm'
 import { runProcess } from '@orca/process-host'
 import { describe, expect, it } from 'vitest'
-import { parse } from 'yaml'
-
-const { jobs } = parse(readFileSync('.github/workflows/release-cut.yml', 'utf8'))
-const { steps } = jobs.build
-const gate = steps.find((step) => step.id === 'mac-signing-gate')
-const submissions = steps.filter((step) =>
-  step.uses?.startsWith('signpath/github-action-submit-signing-request@')
-)
-
-function signingAllowed(submission, outcome, attempt = 1, platform = 'win', uploads = {}) {
-  const expression = submission.if.replace(/steps\.([a-z][a-z0-9-]*)/g, 'steps["$1"]')
-  return runInNewContext(expression, {
-    matrix: { platform },
-    github: { run_attempt: attempt },
-    steps: {
-      'mac-signing-gate': { outcome },
-      'upload-unsigned-inner': {
-        outcome: Object.hasOwn(uploads, 'upload-unsigned-inner')
-          ? uploads['upload-unsigned-inner']
-          : 'success'
-      },
-      'upload-unsigned-windows-installer': {
-        outcome: Object.hasOwn(uploads, 'upload-unsigned-windows-installer')
-          ? uploads['upload-unsigned-windows-installer']
-          : 'success'
-      }
-    }
-  })
-}
 
 describe('Windows release signing waits for macOS success', () => {
   it('packages concurrently, then verifies the exact dispatched macOS run before signing', () => {

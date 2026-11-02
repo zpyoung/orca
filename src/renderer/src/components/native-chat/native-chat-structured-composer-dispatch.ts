@@ -1,10 +1,10 @@
-import type { AgentJournalSkillRef } from '../../../../shared/agent-session-journal-types'
+import type { AgentJournalSkillRef } from '../../../../shared/agent-session/journal/agent-session-journal-types'
 import { structuredAgentSessionBlocksTooLarge } from '../../../../shared/rpc-contract/structured-agent-session-message-params'
-import { structuredAgentSessionSendBody } from '../../../../shared/structured-agent-session-send-mutation'
-import { AGENT_SESSION_MESSAGE_TOO_LARGE_PARTS } from '../../../../shared/agent-session-refusal-notice'
+import { structuredAgentSessionSendBody } from '../../../../shared/agent-session/requests/structured-agent-session-send-mutation'
+import { AGENT_SESSION_MESSAGE_TOO_LARGE_PARTS } from '../../../../shared/agent-session/failures/agent-session-refusal-notice'
 import { agentSessionWriteNoticeText } from './agent-session-write-notice-text'
 import { imageReferencesToPromptMarkers } from '../../../../shared/native-chat/transcript/native-chat-image-transcript-markers'
-import type { StructuredAgentSessionCommandOutcome } from '../../../../shared/structured-agent-session-composer'
+import type { StructuredAgentSessionCommandOutcome } from '../../../../shared/agent-session/view/structured-agent-session-composer'
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
 import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
@@ -36,9 +36,10 @@ export async function dispatchNativeChatStructuredComposerText(
       revealsTranscript: false
     }
   }
+  const request = { ...(skills.length > 0 ? { skills } : {}), ...intent }
   const admission =
-    skills.length > 0
-      ? transport.send(prompt, attachments, { skills })
+    Object.keys(request).length > 0
+      ? transport.send(prompt, attachments, request)
       : transport.send(prompt, attachments)
   return { accepted: admission !== false, error: null, revealsTranscript: admission === true }
 }

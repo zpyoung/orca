@@ -26,12 +26,14 @@ import {
 } from './submodule-gitlink-oid'
 import { buildSubmoduleInnerCommitRangeDiff, buildSubmodulePointerDiff } from './submodule-diff'
 
+type FileDiffOptions = GitRuntimeOptions & { oldPath?: string }
+
 export async function getDiff(
   worktreePath: string,
   filePath: string,
   staged: boolean,
   compareAgainstHead = false,
-  options: GitRuntimeOptions = {}
+  options: FileDiffOptions = {}
 ): Promise<GitDiffResult> {
   const readKey = stableInFlightKey([
     'diff',
@@ -39,6 +41,7 @@ export async function getDiff(
     filePath,
     staged,
     compareAgainstHead,
+    staged ? (options.oldPath ?? null) : null,
     ...gitRuntimeOptionsKey(options)
   ])
   return fileDiffReadLeaseOwner.lease(readKey, options.signal, (sharedSignal) =>
@@ -56,7 +59,7 @@ async function loadDiffThroughSettledCache(
   filePath: string,
   staged: boolean,
   compareAgainstHead: boolean,
-  options: GitRuntimeOptions
+  options: FileDiffOptions
 ): Promise<GitDiffResult> {
   // Start the mutation fence before awaited stats so writes during stamp collection also invalidate the read.
   const readGeneration = settledDiffCache.beginRead()
@@ -82,7 +85,7 @@ async function loadDiff(
   filePath: string,
   staged: boolean,
   compareAgainstHead: boolean,
-  options: GitRuntimeOptions
+  options: FileDiffOptions
 ): Promise<LoadedDiff> {
   // Gitlinks are not blobs: route root paths to pointer diffs and inner paths to submodule reads.
   const submodulePaths = await listSubmodulePaths(worktreePath, options)
@@ -126,7 +129,10 @@ async function loadDiff(
       }
       // The inner read stamps and caches against the submodule's own repo state.
       return notReusable(
-        await getDiff(submoduleWorktreePath, innerPath, staged, compareAgainstHead, options)
+        await getDiff(submoduleWorktreePath, innerPath, staged, compareAgainstHead, {
+          ...options,
+          oldPath: undefined
+        })
       )
     }
   }
@@ -143,7 +149,7 @@ async function loadDiff(
     if (staged) {
       // HEAD and index blobs are independent; read them concurrently.
       const [leftBlob, rightBlob] = await Promise.all([
-        readGitBlobAtOidPath(worktreePath, 'HEAD', filePath, options),
+        readGitBlobAtOidPath(worktreePath, 'HEAD', options.oldPath ?? filePath, options),
         readGitBlobAtIndexPath(worktreePath, filePath, options)
       ])
       originalContent = leftBlob.content

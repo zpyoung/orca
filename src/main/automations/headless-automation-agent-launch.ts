@@ -1,3 +1,5 @@
+import { parseWorkspaceKey } from '../../shared/workspace-scope'
+import { getRepoExecutionHostId } from '../../shared/execution-host'
 // Automations observe PTYs, so launch terminal agents regardless of the chat default.
 
 import type {
@@ -5,6 +7,7 @@ import type {
   AgentLaunchSurfaceExecution
 } from '../agent-launch/agent-launch-execution'
 import { executeAgentLaunch } from '../agent-launch/agent-launch-executor'
+import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-create-contract'
 import type { Automation, AutomationRun } from '../../shared/automations-types'
 import { findReusableAutomationRun } from '../../shared/automation-session-reuse'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -39,9 +42,29 @@ export async function launchHeadlessAutomationAgent(
   const { automation, run, target } = request
   const launchSettings = automationRunLaunchSettingsFor(runtime, automation, target.repo)
   const agent = automation.agentId
+  const selectedTarget =
+    automation.workspaceMode === 'existing'
+      ? await runtime.resolveManagedTerminalWorkspaceTarget(
+          `id:${requireWorkspaceId(automation)}`,
+          parseWorkspaceKey(automation.workspaceId ?? '')?.type === 'folder'
+            ? undefined
+            : getRepoExecutionHostId(target.repo),
+          false
+        )
+      : undefined
+  const selectedWorkspace = selectedTarget?.managedWorktree
+  if (automation.workspaceMode === 'existing' && !selectedWorkspace) {
+    throw new Error('The target workspace is no longer available.')
+  }
+  // The startup plan trims the prompt for every agent; a blank one launches the agent bare.
   const text = automation.prompt?.trim()
   if (automation.reuseSession && automation.workspaceMode === 'existing' && text) {
-    const reused = await sendToReusableSession(runtime, { ...request, text })
+    const reused = await sendToReusableSession(
+      runtime,
+      { ...request, text },
+      selectedWorkspace?.displayName ?? null,
+      selectedWorkspace?.hostId ?? getRepoExecutionHostId(target.repo)
+    )
     if (reused) {
       return reused
     }
@@ -70,7 +93,11 @@ export async function launchHeadlessAutomationAgent(
           run,
           repo: target.repo
         })
+        let startupTerminalCreation: RuntimeTerminalCreate | undefined
         const created = await runtime.createManagedWorktree({
+          onStartupTerminalCreated: (terminal) => {
+            startupTerminalCreation = terminal
+          },
           ...create,
           startupAgent,
           ...(startupPrompt ? { startupPrompt } : {})
@@ -89,6 +116,7 @@ export async function launchHeadlessAutomationAgent(
         return {
           worktreeId: created.worktree.id,
           startupTerminalHandle: startup.handle,
+          startupTerminalCreation,
           ...(startup.paneKey ? { startupTerminalPaneKey: startup.paneKey } : {}),
           // Creation stages long prompts while keeping them on the launch command.
           ...(startupPrompt ? { promptRodeLaunchCommand: true } : {})
@@ -111,16 +139,16 @@ export async function launchHeadlessAutomationAgent(
           launchOverrides: automation.launchOverrides ?? undefined
         })
         terminal = launched
-        const shown = await runtime.showManagedWorktree(`id:${launched.worktreeId}`)
-        workspace = { id: launched.worktreeId, displayName: shown.displayName ?? null }
+        workspace = { id: launched.worktreeId, displayName: resolved.displayName ?? null }
         return {
           handle: launched.handle,
+          terminalCreation: launched,
           ...(launched.paneKey ? { paneKey: launched.paneKey } : {}),
           ...(startupPrompt ? { promptRodeLaunchCommand: true } : {})
         }
       },
-      deliverTerminalPrompt: ({ handle, prompt }) =>
-        runtime.deliverStartupFollowup(handle, { agent, prompt: prompt.text })
+      deliverTerminalPrompt: ({ handle, prompt, terminalCreation }) =>
+        runtime.deliverStartupFollowup(handle, { agent, prompt: prompt.text }, { terminalCreation })
     }
   }
   await launchUntilPublished(execution)
@@ -145,7 +173,10 @@ async function sendToReusableSession(
     run: Pick<AutomationRun, 'id'>
     runs: readonly AutomationRun[]
     text: string
-  }
+    target: Extract<AutomationRunTargetResult, { ok: true }>
+  },
+  workspaceDisplayName: string | null,
+  physicalHostId: string
 ): Promise<HeadlessAutomationAgentLaunch | null> {
   const { automation, text } = request
   const worktreeId = requireWorkspaceId(automation)
@@ -153,6 +184,11 @@ async function sendToReusableSession(
     automationId: automation.id,
     agentId: automation.agentId,
     worktreeId,
+    target: {
+      hostId: getRepoExecutionHostId(request.target.repo),
+      repoId: request.target.repo.id,
+      path: request.target.repo.path
+    },
     currentRunId: request.run.id,
     runs: request.runs,
     agentStatusForPane: (paneKey) =>
@@ -162,7 +198,14 @@ async function sendToReusableSession(
         .toSorted((left, right) => right.receivedAt - left.receivedAt)[0],
     liveSession: (previous) => {
       const handle = runOwnHandle(runtime, previous)
-      return handle ? { handle, previous } : null
+      const liveWorktreeId = handle ? runtime.getTerminalWorktreeIdForHandle(handle) : null
+      const liveHostId = handle
+        ? runtime.getPtyExecutionHostMetadata(runtime.getTerminalPtyIdForHandle(handle))
+            .executionHostId
+        : undefined
+      return handle && liveWorktreeId === worktreeId && liveHostId === physicalHostId
+        ? { handle, previous }
+        : null
     }
   })
   if (
@@ -179,10 +222,9 @@ async function sendToReusableSession(
   ) {
     return null
   }
-  const shown = await runtime.showManagedWorktree(`id:${worktreeId}`)
   return {
     workspaceId: worktreeId,
-    workspaceDisplayName: shown.displayName ?? null,
+    workspaceDisplayName,
     terminalHandle: session.handle,
     terminalSessionId: session.previous.terminalSessionId,
     terminalPaneKey: session.previous.terminalPaneKey,

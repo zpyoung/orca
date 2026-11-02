@@ -4,10 +4,9 @@ import type {
 } from '../../../../shared/runtime-terminal-contracts'
 import {
   buildPtyTerminalWaitBlockedResult,
+  buildPtyTerminalWaitExitError,
   buildPtyTerminalWaitResult,
-  buildTerminalWaitBlockedResult,
-  buildTerminalWaitResult,
-  getTerminalState
+  getPtyTerminalState
 } from '../../terminal-wait-results'
 import { readsTrustedScreen } from '../../agent-state-rules/agent-state-rules-engine'
 import { showsScreenProbeBanner } from '../../agent-state-rules/agent-state-text-anchors'
@@ -15,38 +14,39 @@ import { buildTerminalWaitText } from '../../terminal-wait-tail-state'
 import { tuiIdleNeedsVisibleScreenProbe } from '../../terminal-wait-detection'
 import { evaluateTuiIdle, type TuiIdleVerdict } from '../../tui-idle-evidence'
 import {
-  leafTuiIdleEvidence,
+  outputClockOf,
   ptyTuiIdleEvidence,
   type TuiIdleEvidenceSource
 } from '../../tui-idle-evidence-source'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { TerminalWaiter } from '../../runtime-terminal-contracts'
-import type {
-  RuntimeLeafRecord,
-  RuntimePtyWorktreeRecord
-} from '../../runtime-terminal-state-records'
+import type { RuntimePtyWorktreeRecord } from '../../runtime-terminal-state-records'
 import type { RuntimeTerminalIdlePolls } from './terminal-idle-polls'
 import type { RuntimeTerminalWaiterRegistry } from './terminal-waiter-registry'
 
 /** Probe unseen/provider-only panes and clockless screen-ruled agents with untrusted restored models; clocked panes settle through quiet polling. profile.screenProbeBanner also opts in. */
 function shouldProbeVisibleScreen(
   paneAgent: TuiAgent | null,
-  record: Pick<RuntimePtyWorktreeRecord, 'lastAgentStatus' | 'lastOutputAt'>,
+  record: Pick<RuntimePtyWorktreeRecord, 'lastAgentStatus'>,
+  outputClockAt: number | null,
   waitText: string
 ): boolean {
   return (
     (record.lastAgentStatus === null && waitText.length === 0) ||
     showsScreenProbeBanner(waitText) ||
-    (readsTrustedScreen(paneAgent) && record.lastOutputAt === null)
+    (readsTrustedScreen(paneAgent) && outputClockAt === null)
   )
 }
 
 type RuntimeTerminalWaitDependencies = TuiIdleEvidenceSource & {
   defaultTimeoutMs: number
-  getLivePty(handle: string): { pty: RuntimePtyWorktreeRecord } | null
+  /** The terminal a handle names for this wait; throws `terminal_handle_stale` when it names none. */
+  getTerminalPty(
+    handle: string,
+    condition: RuntimeTerminalWaitCondition
+  ): { pty: RuntimePtyWorktreeRecord }
   /** A disconnected terminal that may still run, so an exit wait keeps waiting for its end. */
   exitUnsettled(pty: RuntimePtyWorktreeRecord): boolean
-  getLiveLeaf(handle: string): { leaf: RuntimeLeafRecord }
   startVisibleReadProbe(
     waiter: TerminalWaiter,
     waiterTimeoutMs: number,
@@ -61,14 +61,9 @@ export class RuntimeTerminalWait {
     private readonly polls: RuntimeTerminalIdlePolls
   ) {}
 
-  /** Why one helper per record kind: every satisfaction site must rank the same way,
-   *  or the immediate check and the poll disagree about the same pane. */
-  private evaluatePty(pty: RuntimePtyWorktreeRecord, waitText: string): TuiIdleVerdict {
+  /** Why one helper: the immediate check and the poll must rank the same terminal the same way. */
+  private evaluate(pty: RuntimePtyWorktreeRecord, waitText: string): TuiIdleVerdict {
     return evaluateTuiIdle(ptyTuiIdleEvidence(this.deps, pty, () => waitText))
-  }
-
-  private evaluateLeaf(leaf: RuntimeLeafRecord, waitText: string): TuiIdleVerdict {
-    return evaluateTuiIdle(leafTuiIdleEvidence(this.deps, leaf, () => waitText))
   }
 
   async wait(
@@ -165,22 +160,18 @@ export class RuntimeTerminalWait {
         }
       })
     }
-    const { leaf } = this.deps.getLiveLeaf(handle)
-    if (condition === 'exit' && getTerminalState(leaf) === 'exited') {
-      return buildTerminalWaitResult(handle, condition, leaf)
+    if (condition !== 'exit' && getPtyTerminalState(pty) === 'exited') {
+      throw buildPtyTerminalWaitExitError(pty)
     }
-
-    const leafWaitText = buildTerminalWaitText(leaf.tailBuffer, leaf.tailPartialLine, leaf.preview)
-    const leafVerdict = condition === 'tui-idle' ? this.evaluateLeaf(leaf, leafWaitText) : null
-    if (leafVerdict?.kind === 'blocked') {
-      return buildTerminalWaitBlockedResult(handle, condition, leaf, leafVerdict.reason)
+    const waitText = buildTerminalWaitText(pty.tailBuffer, pty.tailPartialLine, pty.preview)
+    // Only strong verdicts settle synchronously; weak evidence needs the poll's rendered-screen check.
+    const verdict = condition === 'tui-idle' ? this.evaluate(pty, waitText) : null
+    if (verdict?.kind === 'blocked') {
+      return buildPtyTerminalWaitBlockedResult(handle, condition, pty, verdict.reason)
     }
-
-    // Strong rest can satisfy before waiter registration; permission is user-blocked, not task completion.
-    if (leafVerdict?.kind === 'ready-strong') {
-      return buildTerminalWaitResult(handle, condition, leaf)
+    if (verdict?.kind === 'ready-strong') {
+      return buildPtyTerminalWaitResult(handle, condition, pty)
     }
-
     return await new Promise<RuntimeTerminalWaitResult>((resolve, reject) => {
       // Bound unsupported-agent waits so missing OSC classification cannot hang forever.
       const effectiveTimeoutMs =
@@ -189,9 +180,9 @@ export class RuntimeTerminalWait {
           : condition === 'tui-idle'
             ? this.deps.defaultTimeoutMs
             : 0
-
       const waiter: TerminalWaiter = {
         handle,
+        ptyId: pty.ptyId,
         condition,
         resolve,
         reject,
@@ -200,19 +191,16 @@ export class RuntimeTerminalWait {
         abortCleanup: null,
         ...(options?.launchReadiness ? { launchReadiness: true } : {})
       }
-
       if (!this.waiters.bindAbort(waiter, options?.signal)) {
         reject(new Error('request_aborted'))
         return
       }
-
       if (effectiveTimeoutMs > 0) {
         waiter.timeout = setTimeout(() => {
           this.waiters.remove(waiter)
           reject(new Error('timeout'))
         }, effectiveTimeoutMs)
       }
-
       this.waiters.add(waiter)
 
       // Revalidate after waiter registration to catch handle replacement or exit in the gap.
@@ -247,9 +235,6 @@ export class RuntimeTerminalWait {
             }
           }
         }
-      } catch (error) {
-        this.waiters.remove(waiter)
-        reject(error instanceof Error ? error : new Error(String(error)))
       }
     })
   }

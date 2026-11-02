@@ -3,7 +3,7 @@ import {
   AGENT_SESSION_TURN_ITEM_CAPABILITY,
   AGENT_SESSION_BACKGROUND_TASK_STOP_CAPABILITY,
   AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY
-} from '../agent-session-runtime-capabilities'
+} from '../agent-session/agent-session-runtime-capabilities'
 import { AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY } from '../automation-runtime-capabilities'
 import {
   REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,

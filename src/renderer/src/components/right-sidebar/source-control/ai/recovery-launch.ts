@@ -11,6 +11,7 @@ import { useAppStore } from '@/store'
 import type { TuiAgent } from '../../../../../../shared/tui-agent'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { settleAgentTabLaunch } from '@/lib/launch-agent-in-new-tab-host-agents'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { getConnectionId } from '@/lib/connection-context'
 import {
@@ -215,6 +216,17 @@ export async function launchSourceControlRecoveryAgentWithDefault({
   })
   if (!result) {
     toast.error(copy.launchCommandUnavailable)
+    return false
+  }
+
+  const settled = await settleAgentTabLaunch(result)
+  if (settled.kind !== 'terminal' && settled.kind !== 'structured') {
+    return false
+  }
+  const delivery =
+    result.promptDeliveryResult ??
+    (settled.kind === 'structured' ? settled.promptDeliveryResult : undefined)
+  if (delivery && !(await delivery).delivered) {
     return false
   }
 

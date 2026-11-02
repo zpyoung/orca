@@ -34,8 +34,8 @@ export type NativeChatReadSessionArgs = {
 async function readSession(args: NativeChatReadSessionArgs): Promise<ReadTranscriptResult> {
   const { agent, sessionId } = args
   const limit = args.limit && args.limit > 0 ? Math.floor(args.limit) : DESKTOP_READ_WINDOW
-  // Showing or paging a chat's history is a user act on its WSL distro.
-  const { transcriptPath, waking } = openNativeChatTranscript(sessionId, args.transcriptPath)
+  const wake = args.wakeWslDistro === true
+  const { transcriptPath, waking } = openNativeChatTranscript(sessionId, args.transcriptPath, wake)
   await waking
   return readNativeChatTranscriptTail({
     agent,
@@ -55,6 +55,8 @@ export type NativeChatSubscribeArgs = {
   /** Authoritative transcript path from the agent hook (providerSession). */
   transcriptPath?: string
   limit?: number
+  /** The user opened this chat: may start its stopped WSL distro (E9). Absent never does. */
+  wakeWslDistro?: boolean
 }
 
 export type NativeChatAppendedPayload = {
@@ -186,8 +188,8 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
   const canPublish = (): boolean =>
     !sender.isDestroyed() && !rendererSignal.aborted && !pending.controller.signal.aborted
 
-  // Opening a chat is a user act on its WSL distro; the watch that follows stays background.
-  const opened = openNativeChatTranscript(sessionId, transcriptPath)
+  // Only the user's open may start the distro; the watch that follows stays background.
+  const opened = openNativeChatTranscript(sessionId, transcriptPath, args.wakeWslDistro === true)
   const subscribeArgs: SubscribeNativeChatTranscriptArgs = {
     agent,
     sessionId,

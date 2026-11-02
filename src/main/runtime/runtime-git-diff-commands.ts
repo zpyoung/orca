@@ -29,6 +29,7 @@ export class RuntimeGitDiffCommands {
   ): Promise<GitDiffResult> {
     const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
     const relativePath = normalizeRuntimeGitRelativePath(filePath)
+    const oldRelativePath = oldPath ? normalizeRuntimeGitRelativePath(oldPath) : undefined
     return assertGitDiffWithinTransportBudget(
       await requireRuntimeGitProvider(target).getDiff(
         target.worktree.path,

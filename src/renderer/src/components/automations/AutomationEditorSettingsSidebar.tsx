@@ -23,6 +23,8 @@ import type { AutomationDraft } from './AutomationEditorDialog'
 
 type AutomationEditorSettingsSidebarProps = {
   /** The host picker: where a create lands, or the host an edit can move the record to. */
+  surface: 'chat' | 'terminal'
+  chatSupported: boolean | null
   destination?: AutomationCreateDestinationControl
   repos: readonly Repo[]
   projectHostSetups: readonly ProjectHostSetup[]
@@ -46,6 +48,8 @@ type AutomationEditorSettingsSidebarProps = {
 
 export function AutomationEditorSettingsSidebar({
   destination,
+  surface,
+  chatSupported,
   repos,
   projectHostSetups,
   automationYamlHooksByRepoKey,
@@ -97,6 +101,7 @@ export function AutomationEditorSettingsSidebar({
         >
           <AutomationProjectCombobox
             repos={repos}
+            recordedProject={destination?.recordedProject}
             value={draft.projectId}
             onValueChange={onProjectChange}
             placeholder={translate(

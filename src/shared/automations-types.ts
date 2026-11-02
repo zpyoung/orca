@@ -90,6 +90,11 @@ export type AutomationPrecheckResult = {
   completedAt: number
 }
 
+export type AutomationLaunchSetupPatch = {
+  surface?: 'chat' | 'terminal'
+  arguments?: { kind: 'legacy-extras'; value: string }
+}
+
 export type Automation = {
   id: string
   /** Optional client request key used to make cross-authority creates retry-safe. */
@@ -98,6 +103,8 @@ export type Automation = {
   prompt: string
   precheck: AutomationPrecheck | null
   agentId: TuiAgent
+  surface?: 'chat' | 'terminal'
+  launchSetup?: { surface?: 'chat' | 'terminal'; extraAgentArgs?: string }
   /** Saved text appended to the host's default agent Arguments on each fresh run; absent means none. */
   extraAgentArgs?: string
   launchOverrides?: AgentLaunchOptionSelection | null
@@ -146,7 +153,7 @@ export type AutomationRun = {
   workspaceId: string | null
   /** Keep run history understandable after workspace deletion removes live metadata. */
   workspaceDisplayName?: string | null
-  sessionKind: 'terminal'
+  sessionKind: 'terminal' | 'chat'
   chatSessionId: string | null
   terminalSessionId: string | null
   /** Retain the executed pane/PTY because terminal tabs may later point elsewhere. */
@@ -184,6 +191,7 @@ export type AutomationCreateInput = {
   prompt: string
   precheck?: AutomationPrecheck | null
   agentId: TuiAgent
+  launchSetupPatch?: AutomationLaunchSetupPatch
   /** Empty or whitespace means no extras. */
   extraAgentArgs?: string
   launchOverrides?: AgentLaunchOptionSelection | null
@@ -204,7 +212,7 @@ export type AutomationCreateInput = {
   missedRunGraceMinutes?: number
 }
 
-export type AutomationUpdateInput = Partial<
+export type AutomationUpdateInput = { launchSetupPatch?: AutomationLaunchSetupPatch } & Partial<
   Pick<
     Automation,
     | 'name'
@@ -237,6 +245,8 @@ export type AutomationDispatchRequest = {
 
 export type AutomationDispatchResult = {
   runId: string
+  sessionKind?: 'terminal' | 'chat'
+  chatSessionId?: string | null
   status: AutomationRunStatus
   workspaceId?: string | null
   workspaceDisplayName?: string | null
