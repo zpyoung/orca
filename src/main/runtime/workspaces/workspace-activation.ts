@@ -1,4 +1,4 @@
-import { OrcaRuntimeWithListManagedWorktrees } from './managed-workspace-operations'
+import { OrcaRuntimeWithForegroundInspection } from './workspace-foreground-inspection'
 import {
   type RuntimeNavigationTarget,
   navigationTargetsClients,
@@ -45,12 +45,6 @@ import {
   type WorktreeTerminalProvisioningHost
 } from '../runtime-worktree-terminal-provisioning'
 import { waitForTerminalComposer } from '../terminal/wait/terminal-composer-lifetime'
-import {
-  describeLaunchedAgentHost,
-  readLaunchedAgentForeground,
-  type LaunchedAgentForeground,
-  type LaunchedAgentHost
-} from '../launched-agent-foreground'
 import { worktreeRowTarget } from '../../persistence/host-qualified-worktree-meta'
 import {
   readPtyFreshComposerHold,
@@ -59,7 +53,7 @@ import {
   type FreshComposerPtyHost
 } from '../launch-composer-watch'
 
-export abstract class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListManagedWorktrees {
+export abstract class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithForegroundInspection {
   protected abstract toAgentSessionOptions(
     preferences: AgentLaunchPreferences | undefined
   ): Record<string, SessionOptionValue> | undefined
@@ -283,26 +277,6 @@ export abstract class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntime
       readHold: (ptyId) =>
         readPtyFreshComposerHold(this.ptysById.get(ptyId), this.readLiveTerminalScreenLines(ptyId))
     }
-  }
-
-  /** What holds the terminal a launch started its agent in, read fresh from the execution host. */
-  readLaunchedAgentForeground(ptyId: string, agent: TuiAgent): Promise<LaunchedAgentForeground> {
-    const host = this.launchedAgentHost(ptyId)
-    return readLaunchedAgentForeground(this.ptyController, host, ptyId, agent)
-  }
-
-  /** Whether the pane's execution host can find a launched agent in front: a Windows one cannot. */
-  launchedAgentHostProvesAgent(ptyId: string): boolean {
-    return !this.launchedAgentHost(ptyId).windows
-  }
-
-  launchedAgentHostProvesShellAlone(ptyId: string): boolean {
-    return this.launchedAgentHost(ptyId).shellAloneProvable
-  }
-
-  private launchedAgentHost(ptyId: string): LaunchedAgentHost {
-    const pty = this.ptysById.get(ptyId)
-    return describeLaunchedAgentHost(pty, () => this.pathFlavorForPty(pty))
   }
 
   deliverStartupFollowup(

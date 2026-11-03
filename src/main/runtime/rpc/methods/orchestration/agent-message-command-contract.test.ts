@@ -28,11 +28,11 @@ import {
 import { testOrcaSessionId } from '../../../../../shared/orca-session-address-test-fixture'
 import { agentMessageDisplayText } from '../../../../../shared/agent-session/agent-message-display-text'
 import { readAgentMessageSource } from '../../../../../shared/agent-session/agent-session-message-source'
-import { nativeChatMessageCopyText } from '../../../../../shared/native-chat-message-copy-text'
+import { nativeChatMessageCopyText } from '../../../../../shared/native-chat/transcript/native-chat-message-copy-text'
 import {
   projectQueuedMessageCards,
   queuedMessageCardLine
-} from '../../../../../shared/structured-agent-session-queued-cards'
+} from '../../../../../shared/agent-session/view/structured-agent-session-queued-cards'
 import {
   projectStructuredAgentSessionStatusSummary,
   projectStructuredItemToNativeChat

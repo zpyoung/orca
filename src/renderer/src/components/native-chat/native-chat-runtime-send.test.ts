@@ -680,6 +680,23 @@ describe('typeNativeChatCommand', () => {
     ])
   })
 
+  it('confirms a seeded draft is cleared before typing the command', async () => {
+    const clearInput = buildAgentTuiClearInputForText('alpha\nbeta\ngamma')
+    const confirmCleared = vi.fn(() => false)
+    const handle = sendNativeChatTypedCommand(PTY, '/s', { clearInput, confirmCleared })
+    await vi.runAllTimersAsync()
+    await handle.settled
+
+    expect(confirmCleared).toHaveBeenCalledTimes(1)
+    expectWriteOrder(sendRuntimePtyInput.mock.calls, [clearInput, AGENT_TUI_CLEAR_INPUT_MAX])
+    expectWriteOrder(sendRuntimePtyInputVerified.mock.calls, [
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      '/',
+      's',
+      NATIVE_CHAT_SUBMIT
+    ])
+  })
+
   it('does not clear into the next queued send after cancellation', async () => {
     const command = sendNativeChatTypedCommand(TARGET, '/status')
     command.cancel()

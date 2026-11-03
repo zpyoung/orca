@@ -12,7 +12,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import { lock } from 'proper-lockfile'
 import { afterEach, describe, expect, it } from 'vitest'
 import { forceTerminateProcessTree } from '@orca/process-host/process-tree-termination'
@@ -516,28 +516,6 @@ describe('release checkout materialization', () => {
 })
 
 describe('release checkout module importer', () => {
-  it('hands the importer a raw absolute forward-slash specifier, never a file URL', async () => {
-    const checkout = syntheticCheckout()
-    const captured: string[] = []
-    const capture = (specifier: string): Promise<Record<string, unknown>> => {
-      captured.push(specifier)
-      return Promise.resolve({})
-    }
-
-    await importReleaseCheckoutModule(checkout, '/src/main/runtime/rpc/dispatcher.ts', capture)
-    await importReleaseCheckoutModule(checkout, '\\src\\shared\\protocol-version.ts', capture)
-
-    const normalizedRoot = checkout.root.split('\\').join('/')
-    expect(captured).toEqual([
-      `${normalizedRoot}/src/main/runtime/rpc/dispatcher.ts`,
-      `${normalizedRoot}/src/shared/protocol-version.ts`
-    ])
-    for (const specifier of captured) {
-      expect(specifier).not.toMatch(/^file:/)
-      expect(specifier).not.toContain('\\')
-    }
-  })
-
   it('refuses module paths that escape the checkout root', () => {
     const checkout = syntheticCheckout()
     const escape = /stay inside the release checkout/

@@ -261,6 +261,7 @@ function SourceControlAgentActionEditor(
           deliveryPlan={deliveryPlan}
           canStart={canStart}
           isStarting={isStarting}
+          isCreateAccepted={isCreateAccepted}
           startLabel={startLabel}
           onAgentPick={onAgentPick}
           onAgentArgsChange={onAgentArgsChange}

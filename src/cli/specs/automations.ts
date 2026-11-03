@@ -9,7 +9,8 @@ const AUTOMATION_TARGET_FLAGS = [
   'project-host-setup',
   'source-context',
   'workspace-mode',
-  'base-branch'
+  'base-branch',
+  'setup'
 ]
 const AUTOMATION_SCHEDULE_FLAGS = ['trigger', 'schedule', 'time', 'day', 'timezone']
 const AUTOMATION_PRECHECK_FLAGS = ['precheck', 'precheck-timeout']
@@ -61,7 +62,8 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       'Use --project, or --project-host-setup, to run on a specific project host setup. --project takes the project id or the display name from `orca project list`, and --host is only needed when the project is set up on more than one host.',
       '--host takes local, ssh:<target-id>, runtime:<environment-id>, or the bare host name `orca host list` prints for any of them.',
       'Use --source-context with a JSON TaskSourceContext when task/provider data should come from a specific host/account; pass null on edit to clear it.',
-      'Use --workspace to run in an existing worktree; otherwise the automation creates a new worktree per run.',
+      'Use --workspace to run in an existing worktree. With --repo or a project target, the automation creates a new worktree per run; with no target, a local create runs in the current Orca worktree unless you pass --workspace-mode new-per-run.',
+      'Use --setup run|skip for repository setup on new-per-run automations. Explicit choices override the repository setup policy and need a host running current Orca. When omitted on create, no choice is saved; current Orca skips setup.',
       'Use --precheck to run a command only before scheduled runs; exit code 0 continues, any other exit, error, or timeout skips the run.',
       'Use --precheck-timeout <seconds> to set the time limit (default 60 seconds). Skips appear in Orca run history and orca automations runs --id <automation-id> as skipped_precheck.',
       'Run now in Orca and orca automations run intentionally bypass the precheck so you can test or override the scheduled condition.',
@@ -96,6 +98,9 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       ...AUTOMATION_STATE_FLAGS
     ],
     positionalArgs: ['id'],
+    notes: [
+      'Use --setup run|skip only for new-per-run automations. Omit it to preserve the saved setup choice.'
+    ],
     examples: [
       'orca automations edit 2f9e... --disabled',
       'orca automations edit --id 2f9e... --trigger "30 * * * *" --json',

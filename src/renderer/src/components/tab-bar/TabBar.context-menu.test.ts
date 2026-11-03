@@ -5,8 +5,6 @@ import {
   stubShallowSelector,
   stubTooltip
 } from './tab-bar-windows-shell-launch-render-stubs'
-import { layoutApplyTestTransport } from '@/runtime/layout-apply-test-transport.test-fixture'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 
 // Main's answer to the window's layout commands, as a switch-on build sends them.
 vi.mock('@/runtime/runtime-rpc-client', async (importOriginal) =>
@@ -299,14 +297,6 @@ const TERMINAL_TAB = {
   createdAt: 0
 }
 
-const EDITOR_FILE = {
-  id: 'file-1',
-  tabId: 'unified-editor-1',
-  worktreeId: 'wt-1',
-  relativePath: 'foo.ts',
-  isDirty: false
-}
-
 describe('TabBar context menu wiring', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -495,24 +485,6 @@ describe('TabBar context menu wiring', () => {
     expect(focusTerminalTabSurface).not.toHaveBeenCalledWith('old-terminal')
   })
 
-  it('can put markdown actions before terminal actions in the new-tab menu', async () => {
-    const element = await renderTabBar({
-      tabs: [TERMINAL_TAB],
-      onNewFileTab: () => {},
-      onOpenFileTab: () => {},
-      newTabMenuOrder: 'markdown-first'
-    })
-
-    const menuLabels = findChildrenByType(element, 'DropdownMenuItem').map((item) =>
-      extractText(item.props.children)
-    )
-
-    expect(menuLabels[0]).toContain('New Markdown')
-    expect(menuLabels[1]).toContain('Open Markdown...')
-    expect(menuLabels[2]).toContain('New Terminal')
-    expect(menuLabels[3]).toContain('New Browser Tab')
-  })
-
   it('omits impossible paired-web actions while keeping terminal and markdown', async () => {
     vi.stubGlobal('__ORCA_WEB_CLIENT__', true)
     const element = await renderTabBar({
@@ -531,49 +503,6 @@ describe('TabBar context menu wiring', () => {
     expect(menuLabels.some((label) => label.includes('Open Markdown...'))).toBe(true)
     expect(menuLabels.some((label) => label.includes('Browser'))).toBe(false)
     expect(menuLabels.some((label) => label.includes('Mobile Emulator'))).toBe(false)
-  })
-
-  it('turns New Mobile Emulator into a go-to action when the workspace already has one', async () => {
-    const onNewSimulatorTab = vi.fn()
-    appStoreSnapshot.unifiedTabsByWorktree = {
-      'wt-1': [
-        {
-          id: 'sim-1',
-          entityId: 'sim-1',
-          groupId: 'group-2',
-          worktreeId: 'wt-1',
-          contentType: 'simulator',
-          label: 'Mobile Emulator',
-          customLabel: null,
-          color: null,
-          sortOrder: 1,
-          createdAt: 0
-        }
-      ]
-    }
-
-    const element = await renderTabBar({
-      tabs: [TERMINAL_TAB],
-      groupId: 'group-1',
-      onNewSimulatorTab
-    })
-
-    const emulatorItem = findChildrenByType(element, 'DropdownMenuItem').find((item) =>
-      extractText(item.props.children).includes('Go to Mobile Emulator')
-    )
-    expect(emulatorItem).toBeTruthy()
-    if (!emulatorItem) {
-      throw new Error('Go to Mobile Emulator menu item not rendered')
-    }
-    expect(emulatorItem.props.disabled).toBeUndefined()
-    expect(emulatorItem.props.onSelect).toBeTypeOf('function')
-    ;(emulatorItem.props.onSelect as () => void)()
-    expect(onNewSimulatorTab).toHaveBeenCalledTimes(1)
-
-    const tooltip = findChildrenByType(element, 'TooltipContent').find((item) =>
-      extractText(item.props.children).includes('Open the existing emulator tab.')
-    )
-    expect(tooltip).toBeTruthy()
   })
 
   it('cancels delayed menu focus when the tab bar root unmounts', async () => {

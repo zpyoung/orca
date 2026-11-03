@@ -72,6 +72,7 @@ type SourceControlAgentActionDialogFormProps = {
   canSaveAgentDefault: boolean
   deliveryPlan: SourceControlAgentActionDeliveryPlanState
   canStart: boolean
+  isCreateAccepted?: boolean
   isStarting: boolean
   startLabel: string
 <<<<<<< fork
@@ -135,6 +136,7 @@ export function SourceControlAgentActionDialogForm({
   canSaveAgentDefault,
   deliveryPlan,
   canStart,
+  isCreateAccepted = false,
   isStarting,
   startLabel,
 <<<<<<< fork
@@ -418,7 +420,13 @@ export function SourceControlAgentActionDialogForm({
       </div>
 
       <DialogFooter className="flex-wrap gap-2 sm:justify-end">
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={isCreateAccepted}
+          onClick={onCancel}
+        >
           {translate(
             'auto.components.right.sidebar.SourceControlAgentActionDialogForm.ea4788705e',
             'Cancel'

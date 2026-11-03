@@ -8,7 +8,7 @@ import { sanitizeTerminalLayoutPaneTitles } from '../../../../shared/terminal-pa
 import { resolveNativeChatLeafTitleAgent } from './native-chat-leaf-title-agent'
 import { useTerminalPaneStoreActions } from './use-terminal-pane-store-actions'
 import { selectUnifiedTerminalTabFields } from './terminal-unified-tab-lookup'
-import { canToggleNativeChat } from '../../../../shared/native-chat-availability'
+import { canToggleNativeChat } from '../../../../shared/native-chat/native-chat-availability'
 import {
   nativeChatLaunchAgentForLeaf,
   resolveNativeChatLeafRoute,
@@ -245,13 +245,25 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
       setTabViewMode(unifiedTabId, 'terminal')
     }
   }, [chatLeafId, setChatLeafId, setTabViewMode, unifiedTabId])
-  const readNativeChatTerminalScreen = useCallback((): string | null => {
-    if (!chatLeafId) {
-      return null
-    }
-    const pane = managerRef.current?.getPanes().find((candidate) => candidate.leafId === chatLeafId)
-    return pane?.serializeAddon.serialize({ scrollback: 0 }) ?? null
-  }, [chatLeafId, managerRef])
+  const findNativeChatPane = useCallback(
+    () =>
+      chatLeafId
+        ? managerRef.current?.getPanes().find((candidate) => candidate.leafId === chatLeafId)
+        : undefined,
+    [chatLeafId, managerRef]
+  )
+  const readNativeChatTerminalScreen = useCallback(
+    (): string | null => findNativeChatPane()?.serializeAddon.serialize({ scrollback: 0 }) ?? null,
+    [findNativeChatPane]
+  )
+  const readNativeChatTerminalDraft = useCallback((): string | null => {
+    const pane = findNativeChatPane()
+    return pane
+      ? readTerminalComposerTypedText(
+          readTerminalCursorLineContext(pane.terminal, pane.terminal.rows)
+        )
+      : null
+  }, [findNativeChatPane])
 
   return {
     setTabPaneExpanded,
@@ -281,7 +293,8 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     handleToggleNativeChat,
     applyNativeChatLeafRoute,
     switchNativeChatToTerminal,
-    readNativeChatTerminalScreen
+    readNativeChatTerminalScreen,
+    readNativeChatTerminalDraft
   }
 }
 

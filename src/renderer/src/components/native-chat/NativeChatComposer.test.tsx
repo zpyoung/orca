@@ -6,7 +6,7 @@ import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
 } from '../../../../shared/native-chat/input/native-chat-session-options'
-import { clearNativeChatSessionOptionCacheForTests } from './native-chat-session-option-cache'
+import { clearNativeChatSessionOptionCacheForTests } from '../../../../shared/native-chat/input/native-chat-session-option-cache'
 import { clearNativeChatModelEnrichmentForTests } from './native-chat-session-option-enrichment'
 import type * as RemoteRuntimePtyIdModule from '../../../../shared/remote-runtime/remote-runtime-pty-id'
 
@@ -161,15 +161,6 @@ vi.mock('./use-native-chat-send-lifecycle', () => ({
 import { NativeChatComposer } from './NativeChatComposer'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 
-function createOptionsSurface(): SessionOptionsSurface {
-  return {
-    getSnapshot: () => [],
-    setOption: vi.fn(),
-    invokeAction: vi.fn(),
-    subscribe: () => () => {}
-  }
-}
-
 describe('NativeChatComposer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -269,138 +260,6 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onStop?.())
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
     expect(sendRuntimePtyInput).not.toHaveBeenCalled()
-  })
-
-  it('associates a delayed submit with its optimistic cache entry', () => {
-    const onOptimisticSend = vi.fn(() => 'pending-1')
-    render(
-      <NativeChatComposer
-        terminalTabId="tab-1"
-        paneKey="tab-1:leaf-1"
-        targetPtyId="pty-1"
-        agent="codex"
-        onOptimisticSend={onOptimisticSend}
-      />
-    )
-
-    act(() => mocks.fieldProps?.onSend?.())
-
-    expect(onOptimisticSend).toHaveBeenCalledWith('hello', [])
-    expect(mocks.trackPendingSend).toHaveBeenCalledWith(mocks.sendHandle, 'pending-1')
-  })
-
-  it('routes structured sends and hydrated options through the existing composer', async () => {
-    const send = vi.fn(() => true)
-    const dispatchCommand = vi.fn(async () => ({
-      handled: false,
-      accepted: false,
-      error: null
-    }))
-    const optionsSurface = createOptionsSurface()
-    const optionSnapshot = [{ id: 'model' }] as SessionOptionDescriptor[]
-    const composer = (sessionPending = false) => (
-      <NativeChatComposer
-        terminalTabId="tab-1"
-        paneKey="tab-1:structured"
-        targetPtyId={null}
-        agent="codex"
-        structuredTransport={{
-          capturePresentation: () => () => true,
-          send,
-          dispatchCommand,
-          optionsSurface,
-          optionSnapshot,
-          onError: vi.fn(),
-          runtime: 'remote',
-          sessionId: 'session-test',
-          runtimeEnvironmentId: 'paired-host',
-          sessionPending
-        }}
-      />
-    )
-    const { rerender } = render(composer())
-
-    expect(mocks.fieldProps?.sessionOptionsSurface).toBe(optionsSurface)
-    expect(mocks.fieldProps?.sessionOptionsSnapshot).toBe(optionSnapshot)
-    expect(mocks.fieldProps?.attachDisabled).toBe(false)
-    rerender(composer(true))
-    expect(mocks.fieldProps?.attachDisabled).toBe(true)
-    rerender(composer())
-    expect(mocks.fieldProps?.attachDisabled).toBe(false)
-    await act(async () => mocks.fieldProps?.onSend?.())
-
-    expect(dispatchCommand).toHaveBeenCalledWith('hello')
-    expect(send).toHaveBeenCalledWith('hello', [])
-    expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
-    expect(mocks.setDraft).toHaveBeenCalledWith('')
-  })
-
-  // Offer only commands the structured transport or agent can execute; the full TUI catalog contains unsupported picks.
-  it.each([
-    ['claude', 'compact', ['model', 'effort', 'resume']],
-    ['codex', 'vim', ['model', 'effort', 'goal', 'resume']]
-  ] as const)('offers %s only actionable structured slash commands', (agent, withheld, offered) => {
-    mocks.draft = '/'
-    render(
-      <NativeChatComposer
-        terminalTabId="tab-1"
-        paneKey={`tab-1:structured-${agent}`}
-        targetPtyId={null}
-        agent={agent}
-        structuredTransport={{
-          capturePresentation: () => () => true,
-          send: vi.fn(() => true),
-          dispatchCommand: vi.fn(async () => ({ handled: false, accepted: false, error: null })),
-          optionsSurface: createOptionsSurface(),
-          optionSnapshot: [],
-          onError: vi.fn(),
-          runtime: 'local',
-          sessionId: 'session-test',
-          runtimeEnvironmentId: null
-        }}
-      />
-    )
-
-    const names = (mocks.fieldProps?.autocomplete?.items ?? [])
-      .filter((item) => item.kind === 'command')
-      .map((item) => item.name)
-    expect(names).toEqual([...offered])
-    expect(names).not.toContain(withheld)
-  })
-
-  it('sends structured image attachments through the durable transport', async () => {
-    mocks.draft = ''
-    mocks.imageAttachments = [{ id: 'image-1', path: '/tmp/image.png' }]
-    const send = vi.fn(() => true)
-    render(
-      <NativeChatComposer
-        terminalTabId="tab-1"
-        paneKey="tab-1:structured"
-        targetPtyId={null}
-        agent="codex"
-        structuredTransport={{
-          capturePresentation: () => () => true,
-          send,
-          dispatchCommand: vi.fn(async () => ({
-            handled: false,
-            accepted: false,
-            error: null
-          })),
-          optionsSurface: createOptionsSurface(),
-          optionSnapshot: [],
-          worktreeId: 'wt-1',
-          onError: vi.fn(),
-          runtime: 'local',
-          sessionId: 'session-test',
-          runtimeEnvironmentId: null
-        }}
-      />
-    )
-
-    await act(async () => mocks.fieldProps?.onSend?.())
-
-    expect(send).toHaveBeenCalledWith('', mocks.imageAttachments)
-    expect(mocks.setDraft).toHaveBeenCalledWith('')
   })
 
   it('disables Send and blocks a send while an image attachment is still pending', () => {

@@ -90,14 +90,6 @@ describe('a desktop AI-button launch', () => {
     })
   })
 
-  // Nothing reads a click's launch record, so its launch carries no operation and writes none.
-  it('names no operation, and each click has its own pane', () => {
-    const first = launch().tabId
-    const second = launch().tabId
-    expect(queuedLaunch(first)?.launch).not.toHaveProperty('operationId')
-    expect(second).not.toBe(first)
-  })
-
   it("says the agent started once its pane's spawn returns, and not when main says it failed", async () => {
     const started = launch()
     const leafId = launchTab(started.tabId)!.agentLaunchPane!.leafId

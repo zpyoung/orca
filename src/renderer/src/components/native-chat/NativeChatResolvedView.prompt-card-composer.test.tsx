@@ -52,6 +52,7 @@ vi.mock('./NativeChatComposer', async () => {
             fieldRef.current?.focus()
             return true
           },
+          insertAgentReferences: () => false,
           insertTypedText: composer.typed,
           acceptsText: () => true,
           appendText: () => {},

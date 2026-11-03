@@ -232,6 +232,7 @@ export class RuntimeProjectGroupController {
     if (!store?.createFolderWorkspace) {
       throw new FolderWorkspaceCreateRefusedError('runtime_unavailable')
     }
+    const createFolder = store.createFolderWorkspace.bind(store)
     const projectGroups = store.getProjectGroups?.() ?? []
     const group = projectGroups.find((entry) => entry.id === input.projectGroupId)
     const folderPath =
@@ -256,10 +257,12 @@ export class RuntimeProjectGroupController {
     if (pathRefusal) {
       throw new FolderWorkspaceCreateRefusedError(pathRefusal)
     }
-    const workspace = store.createFolderWorkspace({
-      ...input,
-      creatorProvenance: input.creatorProvenance ?? { kind: 'host' }
-    })
+    const workspace = await createFolderWorkspaceWithPluginHooks(input, (request) =>
+      createFolder({
+        ...request,
+        creatorProvenance: request.creatorProvenance ?? { kind: 'host' }
+      })
+    )
     this.deps.notifyReposChanged()
     return workspace
   }
