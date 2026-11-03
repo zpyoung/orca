@@ -45,14 +45,16 @@ export async function startFixChecksFromDialog(args: {
   agentArgs?: string
 <<<<<<< fork
   launchOptions: Parameters<typeof launchWorkItemDirect>[0]['launchOptions']
+}): Promise<boolean> {
 ||||||| base
+}): Promise<boolean> {
 =======
   sessionOptions?: Readonly<Record<string, string>>
   launchChoice?: Parameters<typeof launchWorkItemDirect>[0]['launchChoice']
   agentLaunchPreferences?: Parameters<typeof launchWorkItemDirect>[0]['agentLaunchPreferences']
   sessionOptionsYieldToAgentArgs?: true
+}): Promise<DirectWorkItemLaunchResult> {
 >>>>>>> upstream
-}): Promise<boolean> {
   if (!args.targetRepoId) {
     return false
   }

@@ -32,7 +32,6 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}}件のウォッチャーに対応が必要です",
         "bucket": {
           "attention": "対応が必要",
           "lostContact": "接続を確認できません",
@@ -67,8 +66,7 @@
         "readOnly": "読み取り専用。",
         "staleError": "詳細の更新に失敗しました。最後に確認されたデータを表示しています: {{error}}",
         "loading": "オーナーの詳細を読み込み中…",
-        "unavailable": "オーナーの詳細を利用できません。",
-        "selectPrompt": "ウォッチャーを選択すると、その判断、ワーカー、オーナー操作を確認できます。"
+        "unavailable": "オーナーの詳細を利用できません。"
       },
       "controls": {
         "title": "オーナー操作",
@@ -78,7 +76,6 @@
         "delete": "ウォッチャーを削除",
         "deleteTitle": "ウォッチャーを削除しますか？",
         "deleteDescription": "ウォッチャー「{{name}}」と保存済みの履歴は完全に削除されます。ワーカーのターミナルは停止されません。",
-        "approve": "承認",
         "budgetResumeWarning": "このウォッチャーは予算を使い切りました。再開する前に上限を増やさないと、再び待機状態になります。"
       },
       "command": {
@@ -141,7 +138,6 @@
         "attemptAbandoned": "試行を放棄",
         "evidence": "証拠",
         "activeTimeStarted": "アクティブ時間を開始",
-        "activeTimeChecked": "アクティブ時間のチェックポイント",
         "activeTimeStopped": "アクティブ時間を停止",
         "workerTurn": "ワーカーターン",
         "finished": "完了",

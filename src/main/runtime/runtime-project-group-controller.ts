@@ -22,6 +22,7 @@ import {
 } from './runtime-visible-catalog'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
+import { createFolderWorkspaceWithPluginHooks } from '../plugins/hooks/workspace-create-plugin-hook'
 import {
   assertWslMoveProjectWritable,
   assertWslMoveRepoWritable,

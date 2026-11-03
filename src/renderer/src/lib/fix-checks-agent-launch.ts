@@ -310,8 +310,10 @@ async function launchFixChecksAgent(args: StartFixChecksAgentArgs): Promise<bool
 <<<<<<< fork
     launchOptions: recipe().launchOptions,
     ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
+    openModalFallback: args.openModalFallback
 ||||||| base
     ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
+    openModalFallback: args.openModalFallback
 =======
     resolveAgentArgs: (agent) =>
       sourceControlActionAgentArgs(recipe(), agent, useAppStore.getState().settings),
@@ -327,8 +329,9 @@ async function launchFixChecksAgent(args: StartFixChecksAgentArgs): Promise<bool
           }
         }
       : {}),
+    openModalFallback: args.openModalFallback,
+    onSetupRequired: args.onSetupRequired
 >>>>>>> upstream
-    openModalFallback: args.openModalFallback
   })
   return result === true
 }

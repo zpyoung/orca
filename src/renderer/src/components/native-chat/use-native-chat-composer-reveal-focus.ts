@@ -5,6 +5,15 @@ import { scheduleNextFrame } from '@/components/terminal-pane/terminal-ime-input
 import { getOverlayFocusOwners } from '@/lib/overlay-focus-ownership'
 import type { NativeChatComposerHandle } from './NativeChatComposer'
 import { registerNativeChatPane } from './native-chat-composer-mount'
+import {
+  getNativeChatComposerFocusRequestGeneration,
+  registerNativeChatComposerReclaim
+} from './native-chat-composer-focus-intent'
+export {
+  captureNativeChatComposerFocusIntent,
+  requestNativeChatComposerFocus,
+  type NativeChatComposerFocusIntent
+} from './native-chat-composer-focus-intent'
 
 /** Focus attempts per reveal, including recovery from delayed programmatic restoration. */
 const REVEAL_FOCUS_FRAMES = 6

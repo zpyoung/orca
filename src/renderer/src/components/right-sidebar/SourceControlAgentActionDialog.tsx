@@ -131,6 +131,7 @@ function SourceControlAgentActionEditor(
     onSelectedAgentChange,
     onAgentArgsChange,
 =======
+    isCreateAccepted,
     onAgentPick,
     onAgentArgsChange,
 >>>>>>> upstream

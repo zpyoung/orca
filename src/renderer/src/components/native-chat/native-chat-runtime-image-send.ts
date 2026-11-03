@@ -1,7 +1,7 @@
 import { agentImagePasteWrites } from '../../../../shared/agent-image-paste'
 import { agentImagePastePath } from '../../../../shared/agent-image-paste-path'
 import type { AgentType } from '../../../../shared/agent-status-types'
-import { buildNativeChatImagePasteBytes } from '../../../../shared/native-chat-paste-bytes'
+import { buildNativeChatImagePasteBytes } from '../../../../shared/native-chat/input/native-chat-paste-bytes'
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'
 import {
   NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,

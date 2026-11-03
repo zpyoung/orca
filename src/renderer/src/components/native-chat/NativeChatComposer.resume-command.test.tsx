@@ -423,7 +423,8 @@ describe('/resume in the native chat composer', () => {
     expect(mocks.openHistory).not.toHaveBeenCalled()
     expect(mocks.sendNativeChatTypedCommand).toHaveBeenCalledWith(
       { terminalTabId: 'tab-1', ptyId: 'pty-1' },
-      '/resume'
+      '/resume',
+      undefined
     )
   })
 

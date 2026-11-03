@@ -10,6 +10,7 @@ import {
   main as verifyUpstreamLocalizationCatalog
 } from './verify-localization-catalog.mjs'
 import { main as verifyUpstreamLocalizationExtraction } from './verify-localization-extraction.mjs'
+import { resolveLocaleSourceKey } from './locale-catalog/locale-plural-forms.mjs'
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts'])
 const SKIP_PATH_PARTS = new Set(['.git', 'dist', 'node_modules', 'out', '__snapshots__', 'assets'])
@@ -61,11 +62,13 @@ function collectInterpolationVariables(value) {
   return typeof value === 'string' ? [...(value.match(/\{\{[^}]+\}\}/g) ?? [])].sort() : []
 }
 
-function catalogParityIssues(enCatalog, localeCatalog) {
+function catalogParityIssues(enCatalog, localeCatalog, localeName) {
   const english = flattenEntries(enCatalog)
   const locale = flattenEntries(localeCatalog)
   const missing = [...english.keys()].filter((key) => !locale.has(key))
-  const extra = [...locale.keys()].filter((key) => !english.has(key))
+  const extra = [...locale.keys()].filter(
+    (key) => !resolveLocaleSourceKey(english, localeName, key)
+  )
   const interpolation = [...english.keys()].filter(
     (key) =>
       locale.has(key) &&
@@ -178,7 +181,7 @@ export async function validateForkLocalizationCatalogs(root = process.cwd(), opt
         locale: localeEntries,
         extra,
         interpolation
-      } = catalogParityIssues(english, target)
+      } = catalogParityIssues(english, target, locale)
       const generic = collectGenericTermRegressions(englishEntries, localeEntries, locale)
       if (extra.length || interpolation.length || generic.length) {
         console.error(

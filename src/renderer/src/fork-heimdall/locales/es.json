@@ -32,7 +32,6 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}} vigilantes requieren atención",
         "bucket": {
           "attention": "Necesita tu atención",
           "lostContact": "Sin contacto",
@@ -67,8 +66,7 @@
         "readOnly": "Solo lectura.",
         "staleError": "No se pudieron actualizar los detalles; se muestran los últimos datos confirmados: {{error}}",
         "loading": "Cargando detalles del propietario…",
-        "unavailable": "Los detalles del propietario no están disponibles.",
-        "selectPrompt": "Selecciona un vigilante para revisar sus decisiones, agentes y controles del propietario."
+        "unavailable": "Los detalles del propietario no están disponibles."
       },
       "controls": {
         "title": "Controles del propietario",
@@ -78,7 +76,6 @@
         "delete": "Eliminar vigilante",
         "deleteTitle": "¿Eliminar vigilante?",
         "deleteDescription": "El vigilante «{{name}}» y su historial guardado se eliminarán permanentemente. Los terminales de los agentes no se detendrán.",
-        "approve": "Aprobar",
         "budgetResumeWarning": "Este vigilante ha agotado su presupuesto. Aumenta el límite antes de reanudarlo o volverá a quedar aparcado."
       },
       "command": {
@@ -141,7 +138,6 @@
         "attemptAbandoned": "Intento abandonado",
         "evidence": "Evidencia",
         "activeTimeStarted": "Tiempo activo iniciado",
-        "activeTimeChecked": "Punto de control del tiempo activo",
         "activeTimeStopped": "Tiempo activo detenido",
         "workerTurn": "Turno del agente",
         "finished": "Finalizado",

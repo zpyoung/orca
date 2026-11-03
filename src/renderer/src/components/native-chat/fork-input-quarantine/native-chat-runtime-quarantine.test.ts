@@ -19,7 +19,7 @@ import {
   typeNativeChatCommand
 } from '../native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
-import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../../../../../shared/native-chat-paste-bytes'
+import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../../../../../shared/native-chat/input/native-chat-paste-bytes'
 import { NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT } from '../fork-agent-composer/native-chat-runtime-clear'
 import {
   _resetTerminalInputQuarantineForTests,

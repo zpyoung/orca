@@ -35,6 +35,7 @@ import { planAgentSessionLaunch } from '@/lib/agent-session-launch-plan'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 
 /** Create/activate a workspace and deliver work-item context to its agent. Setup decisions, unresolved repos or unavailable agents fall back to the modal; paste failures retain the usable workspace and surface a notice. */
+<<<<<<< fork
 export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Promise<boolean> {
   const {
     item,
@@ -43,22 +44,122 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
     baseBranch,
     telemetrySource,
     launchSource,
-<<<<<<< fork
     agentOverride,
     agentArgs,
     launchOptions
+  } = args
+  const store = useAppStore.getState()
+  const owner = resolveDirectLaunchOwnerRow(store.repos, repoId)
+  if (!owner) {
+    openModalFallback()
+    return false
+  }
+  const { repo, executionHostId: repoOwnerHostId, target: repoOwnerTarget } = owner
+
+  const settings = store.settings
+  const promptDelivery = args.promptDelivery ?? 'draft'
+  const repoConnectionId = repo.connectionId?.trim() || null
+  const githubIdentity =
+    item.number !== null && (item.type === 'issue' || item.type === 'pr')
+      ? resolveGitHubWorkItemIdentity({
+          type: item.type,
+          number: item.number,
+          url: item.url
+        })
+      : null
+  const itemType = githubIdentity?.type ?? item.type
+  const itemNumber = githubIdentity?.number ?? item.number
+  const repoProjectRuntime = repoConnectionId
+    ? undefined
+    : getLocalRepoProjectExecutionRuntimeContext(store, repoId, CLIENT_PLATFORM)
+  // Why: the agent runs on the repo's execution host, so its OS decides quoting, not this client's (#27971).
+  const repoLaunchFact = resolveRepoExecutionHostPlatform(store, repo, () => repoProjectRuntime)
+  if (repoLaunchFact.kind === 'withheld') {
+    toast.error(repoLaunchFact.reason)
+    return false
+  }
+  const repoLaunchHost = refineLocalLaunchPlatform(repoLaunchFact, args.launchPlatform)
+  const shell = repoLaunchHost.platform === 'win32' ? 'powershell' : 'posix'
+  const agentArgsPlan = planAgentCliArgsSuffix(agentArgs, shell)
+  if (!agentArgsPlan.ok) {
+    // Validate saved arguments before creation; planning after create would otherwise leave an invalid launch’s workspace behind.
+    toast.error(agentArgsPlan.error)
+    return false
+  }
+  // Start cold agent detection concurrently without delaying setup policy or workspace creation.
+  const detectedAgentsPromise = agentOverride ? null : ensureDetectedAgentsForRepo(store, repo)
+
+  const setupResolution = await resolveDirectSetupDecision(repoId, repo, repoOwnerHostId)
+  if (setupResolution.kind === 'needs-modal') {
+    openModalFallback()
 ||||||| base
+export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Promise<boolean> {
+  const {
+    item,
+    repoId,
+    openModalFallback,
+    baseBranch,
+    telemetrySource,
+    launchSource,
     agentOverride,
     agentArgs
-=======
-    agentOverride
->>>>>>> upstream
   } = args
+  const store = useAppStore.getState()
+  const owner = resolveDirectLaunchOwnerRow(store.repos, repoId)
+  if (!owner) {
+    openModalFallback()
+    return false
+  }
+  const { repo, executionHostId: repoOwnerHostId, target: repoOwnerTarget } = owner
+
+  const settings = store.settings
+  const promptDelivery = args.promptDelivery ?? 'draft'
+  const repoConnectionId = repo.connectionId?.trim() || null
+  const githubIdentity =
+    item.number !== null && (item.type === 'issue' || item.type === 'pr')
+      ? resolveGitHubWorkItemIdentity({
+          type: item.type,
+          number: item.number,
+          url: item.url
+        })
+      : null
+  const itemType = githubIdentity?.type ?? item.type
+  const itemNumber = githubIdentity?.number ?? item.number
+  const repoProjectRuntime = repoConnectionId
+    ? undefined
+    : getLocalRepoProjectExecutionRuntimeContext(store, repoId, CLIENT_PLATFORM)
+  // Why: the agent runs on the repo's execution host, so its OS decides quoting, not this client's (#27971).
+  const repoLaunchFact = resolveRepoExecutionHostPlatform(store, repo, () => repoProjectRuntime)
+  if (repoLaunchFact.kind === 'withheld') {
+    toast.error(repoLaunchFact.reason)
+    return false
+  }
+  const repoLaunchHost = refineLocalLaunchPlatform(repoLaunchFact, args.launchPlatform)
+  const shell = repoLaunchHost.platform === 'win32' ? 'powershell' : 'posix'
+  const agentArgsPlan = planAgentCliArgsSuffix(agentArgs, shell)
+  if (!agentArgsPlan.ok) {
+    // Validate saved arguments before creation; planning after create would otherwise leave an invalid launch’s workspace behind.
+    toast.error(agentArgsPlan.error)
+    return false
+  }
+  // Start cold agent detection concurrently without delaying setup policy or workspace creation.
+  const detectedAgentsPromise = agentOverride ? null : ensureDetectedAgentsForRepo(store, repo)
+
+  const setupResolution = await resolveDirectSetupDecision(repoId, repo, repoOwnerHostId)
+  if (setupResolution.kind === 'needs-modal') {
+    openModalFallback()
+=======
+export async function launchWorkItemDirect(
+  args: LaunchWorkItemDirectArgs
+): Promise<DirectWorkItemLaunchResult> {
+  const { item, repoId, openModalFallback, baseBranch } = args
+  const { telemetrySource, launchSource, agentOverride } = args
   let agentArgs = args.agentArgs
   let creationAccepted = false
   const reportFailure = (message: string): false => {
     toast.error(message)
     args.onFailureNotified?.()
+>>>>>>> upstream
     return false
   }
   try {
@@ -209,8 +310,10 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
 <<<<<<< fork
       agentArgs,
       launchOptions,
+      repoConnectionId,
 ||||||| base
       agentArgs,
+      repoConnectionId,
 =======
       agentLaunchPreferences: args.agentLaunchPreferences,
       agentArgs: args.agentArgs,
@@ -219,8 +322,8 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
       resolveSessionOptions: args.resolveSessionOptions,
       launchChoice: args.launchChoice,
       sessionOptionsYieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
+      repoConnectionId: context.repoConnectionId,
 >>>>>>> upstream
-      repoConnectionId,
       repoHost: repo,
       latestStore: useAppStore.getState(),
       draftContent,

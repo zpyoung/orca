@@ -151,6 +151,7 @@ export type NativeChatLaunchSeed = {
 }
 
 export type NativeChatComposerHandle = AgentComposerHandle & {
+  insertAgentReferences: (references: OrchestrationAgentReference[]) => boolean
   isComposing?: () => boolean
   insertPastedText?: (text: string) => boolean
   /** Whether the input is there and enabled, so text given to it lands. */

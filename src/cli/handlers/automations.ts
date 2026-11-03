@@ -58,6 +58,8 @@ import {
   hasAutomationLaunchOverrideFlags,
   resetAutomationLaunchOverridesForAgentChange
 } from './fork-automation-launch-settings/automation-launch-overrides'
+import { assertAutomationFieldsSupported } from './automation-host-support'
+import { assertAutomationSetupMode, getAutomationSetupFlag } from './automation-setup-flag'
 
 type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   destination?: AutomationDestination
@@ -135,8 +137,6 @@ async function getExplicitTarget(
   return { repo, workspace }
 }
 
-type AutomationShowResult = { automation: Automation; owner?: AutomationOwnerPrecondition }
-
 // Read the authoritative owner for fencing; older hosts omit it and impose no precondition.
 async function resolveAutomationMutationState(
   client: Parameters<CommandHandler>[0]['client'],
@@ -195,6 +195,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       agentId,
       extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(launchOverrides ? { launchOverrides } : {}),
+      ...(setupDecision !== undefined ? { setupDecision } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
       repo: target.repo,
@@ -207,7 +208,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
       ...schedule
     } satisfies AutomationCreateParams
-    await assertExtraAgentArgsSupported(client, create.extraAgentArgs)
+    await assertAutomationFieldsSupported(client, create)
     await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
     const destination = await resolveAutomationDestination(client, target)
     const result = await client.call<{ automation: Automation }>('automation.create', {
@@ -243,20 +244,21 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
       ...schedule
     } satisfies AutomationUpdateParams
-    await assertExtraAgentArgsSupported(client, updates.extraAgentArgs)
+    await assertAutomationFieldsSupported(client, updates)
     const hasLaunchOverrideFlags = hasAutomationLaunchOverrideFlags(flags)
-    // Why: the launch-override merge and the owner fence both need the saved record; read it once.
-    let shown: AutomationShowResult | null = null
-    const showAutomation = async (): Promise<AutomationShowResult> => {
-      shown ??= (await client.call<AutomationShowResult>('automation.show', { id })).result
-      return shown
+    if (hasLaunchOverrideFlags) {
+      await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
     }
+    const { owner: expectedOwner, automation: current } = await resolveAutomationMutationState(
+      client,
+      id
+    )
+    assertAutomationSetupMode(
+      setupDecision,
+      updates.workspaceMode ?? (target.workspace ? 'existing' : current.workspaceMode)
+    )
     let launchOverrides: AutomationUpdateInput['launchOverrides'] | undefined
     if (hasLaunchOverrideFlags || agentId) {
-      if (hasLaunchOverrideFlags) {
-        await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
-      }
-      const current = (await showAutomation()).automation
       const agentChanged = Boolean(agentId && agentId !== current.agentId)
       const resetOverrides = agentChanged
         ? resetAutomationLaunchOverridesForAgentChange(current.launchOverrides)
@@ -275,13 +277,14 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
           })
         : resetOverrides
     }
-    const expectedOwner = (await showAutomation()).owner
     // Owner fencing covers the source host; moves must fence the destination too.
     const destination = await resolveAutomationDestination(client, target)
     const result = await client.call<{ automation: Automation }>('automation.update', {
       id,
       ...(expectedOwner ? { expectedOwner } : {}),
       ...(destination ? { destination } : {}),
+      // A setup choice that relies on the current mode must not land after a switch to existing.
+      ...(setupDecision && !updates.workspaceMode ? { expectedWorkspaceMode: 'new_per_run' } : {}),
       updates: {
         ...updates,
         ...(launchOverrides !== undefined ? { launchOverrides } : {})

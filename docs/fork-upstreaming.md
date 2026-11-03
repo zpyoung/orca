@@ -452,7 +452,7 @@ that do not supply a signal.
 **Regression coverage:**
 
 - `src/main/ipc/filesystem/filesystem-git-status-staging.test.ts`
-- `src/main/runtime/rpc/methods/git.test.ts`
+- `src/main/runtime/rpc/methods/fork-git-diff-cancellation/git-diff-cancellation.test.ts`
 - `src/main/runtime/orca-runtime-git-diff-budget.test.ts`
 - `src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts`
 - `src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts`

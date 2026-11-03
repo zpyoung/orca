@@ -71,7 +71,6 @@
         "secretHits": "发现 {{count}} 个潜在机密。启动前请检查预览中的行内标记。",
         "secretMarkerHover": "潜在机密：{{excerpt}}",
         "secretMarkersShown": "预览中已突出显示 {{count}} 个潜在机密标记。",
-        "selectAgent": "选择代理",
         "sendAgain": "再次发送",
         "showPreview": "摘要预览",
         "sourceBusy": "源代理正在工作。立即捕获或等待更新的上下文。",

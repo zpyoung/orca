@@ -42,7 +42,12 @@ import {
   OrcadPeerDesktopsParamsSchema
 } from '../orcad-peer-desktops-contract'
 import { OrcadTerminalCensusParamsSchema } from '../orcad-terminal-census'
+<<<<<<< fork
 import { pluginConsentRequestSchema } from '../plugins/approval/plugin-consent-request'
+||||||| base
+=======
+import { CrewSubscribeParams } from '../orchestration-crew'
+>>>>>>> upstream
 import {
   AccountsUnsubscribeParams,
   AddClaudeFromConfigDirParams,
@@ -497,6 +502,17 @@ import {
   PluginInvokeCommandParams,
   PluginReadPanelEntryParams,
   PluginSetEnabledParams,
+<<<<<<< fork
+||||||| base
+  PluginSetSystemEnabledParams,
+  PluginShotParams,
+=======
+  PluginSetSystemEnabledParams,
+  PluginShotChromeParams,
+  PluginShotEditorParams,
+  PluginShotParams,
+  PluginShotReplayParams,
+>>>>>>> upstream
   PluginsPanelActionParams
 } from './plugins-params'
 import {
@@ -1294,12 +1310,42 @@ export const RPC_PARAMS_BY_METHOD = {
   'pairing.getEndpoints': PairingGetEndpointsParamsSchema,
   'pairing.provisionRelay': PairingProvisionRelayParamsSchema,
   'pairing.registerDeviceKey': RegisterDeviceKeyParamsSchema,
+<<<<<<< fork
   'plugins.consent': pluginConsentRequestSchema,
+||||||| base
+  'plugins.consent': PluginRpcConsentParams,
+  'plugins.devEmit': PluginDevEmitParams,
+  'plugins.devInspect': PluginDevInspectParams,
+  'plugins.devLoad': PluginDevLoadParams,
+  'plugins.devRequest': PluginDevRequestParams,
+  'plugins.devUnload': PluginDevUnloadParams,
+  'plugins.getLogs': PluginGetLogsParams,
+=======
+  'plugins.consent': PluginRpcConsentParams,
+  'plugins.devEmit': PluginDevEmitParams,
+  'plugins.devHook': PluginDevEmitParams,
+  'plugins.devInspect': PluginDevInspectParams,
+  'plugins.devLoad': PluginDevLoadParams,
+  'plugins.devRequest': PluginDevRequestParams,
+  'plugins.devUnload': PluginDevUnloadParams,
+  'plugins.getLogs': PluginGetLogsParams,
+>>>>>>> upstream
   'plugins.invokeCommand': PluginInvokeCommandParams,
   'plugins.list': null,
   'plugins.panelAction': PluginsPanelActionParams,
   'plugins.readPanelEntry': PluginReadPanelEntryParams,
   'plugins.setEnabled': PluginSetEnabledParams,
+<<<<<<< fork
+||||||| base
+  'plugins.setSystemEnabled': PluginSetSystemEnabledParams,
+  'plugins.shot': PluginShotParams,
+=======
+  'plugins.setSystemEnabled': PluginSetSystemEnabledParams,
+  'plugins.shot': PluginShotParams,
+  'plugins.shotChrome': PluginShotChromeParams,
+  'plugins.shotEditor': PluginShotEditorParams,
+  'plugins.shotReplay': PluginShotReplayParams,
+>>>>>>> upstream
   'preflight.check': PreflightCheck,
   'preflight.detectAgents': PreflightProjectAgentDetection,
   'preflight.detectRemoteAgents': PreflightDetectRemoteAgents,

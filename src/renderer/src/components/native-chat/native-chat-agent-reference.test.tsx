@@ -188,7 +188,7 @@ it('serializes the captured draft before structured and PTY sends', async () => 
       disabled: false,
       isDispatchingSessionOption: false,
       launchDraftResolved: true,
-      resolveTarget: () => ({ ptyId: 'pty-left', settings: null }),
+      resolveTarget: () => ({ terminalTabId: 'tab-left', ptyId: 'pty-left', settings: null }),
       classifySend: () => 'chat',
       sessionOptionsSurface: null,
       terminalTabId: 'tab-left',

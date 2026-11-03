@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
+// FORK-COPY-SHA: 97b9bb3613a333450a38057d745628323f3ad185
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
@@ -7,13 +7,12 @@ import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard
 import { X } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
+import { useNotificationCardComposerClearance } from '@/lib/notification-card-composer-clearance'
 import { basename } from '@/lib/path'
-import { isNativeChatPastedImagePath } from '../../../../../shared/native-chat-image-label'
-import type { NativeChatFollowUpBehavior } from '../../../../../shared/native-chat-follow-up-behavior'
-import type {
-  ComposerAutocomplete,
-  NativeChatPickerItem
-} from '../../../../../shared/native-chat-composer-autocomplete'
+import { isNativeChatPastedImagePath } from '../../../../../shared/native-chat/native-chat-image-label'
+import type { NativeChatFollowUpBehavior } from '../../../../../shared/native-chat/input/native-chat-follow-up-behavior'
+import type { ComposerAutocomplete } from '../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
+import type { NativeChatPickerItem } from '../../../../../shared/native-chat/input/native-chat-picker-items'
 import { NativeChatMentionMenu, NativeChatPickerMenu } from '../NativeChatAutocompleteMenus'
 import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
 import { AgentComposerActions } from './AgentComposerActions'
@@ -244,12 +243,19 @@ export function AgentComposerField({
 
   // Stable so the memoized option pickers keep their identity.
   const focusComposer = useCallback(() => textareaRef.current?.focus(), [textareaRef])
+  const paneRef = useRef<HTMLDivElement>(null)
+  const columnRef = useRef<HTMLDivElement>(null)
+  useNotificationCardComposerClearance(paneRef, columnRef, editSession === undefined)
 
   return (
-    <div className={cn('bg-chat-pane', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}>
+    <div
+      ref={paneRef}
+      className={cn('bg-chat-pane', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}
+    >
       {/* Extra bottom padding keeps the chat input box off the window rim. */}
       <div className={cn(layout === 'dock' ? 'h-full min-h-0' : 'px-3 pb-4 pt-2 sm:px-4')}>
         <div
+          ref={columnRef}
           className={cn(
             'relative w-full',
             layout === 'dock'

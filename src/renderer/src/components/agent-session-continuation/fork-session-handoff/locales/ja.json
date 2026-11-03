@@ -71,7 +71,6 @@
         "secretHits": "機密情報の可能性がある項目が {{count}} 件見つかりました。開始前にプレビュー内のマーカーを確認してください。",
         "secretMarkerHover": "機密情報の可能性: {{excerpt}}",
         "secretMarkersShown": "プレビューで機密情報の可能性がある {{count}} 件を強調表示しています。",
-        "selectAgent": "Agentを選択",
         "sendAgain": "もう一度送信",
         "showPreview": "概要のプレビュー",
         "sourceBusy": "元のAgentは作業中です。今取得するか、新しいコンテキストを待ってください。",

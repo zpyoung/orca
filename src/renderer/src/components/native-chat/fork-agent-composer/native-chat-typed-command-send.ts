@@ -13,8 +13,12 @@ import {
   enqueueNativeChatPtySend,
   waitForNativeChatPtyIdle
 } from '../native-chat-pty-send-queue'
-import { clearUnsubmittedAgentInput } from './native-chat-runtime-clear'
-import type { NativeChatSendHandle } from '../native-chat-runtime-send'
+import {
+  clearConfirmDurationMs,
+  clearThenWrite,
+  clearUnsubmittedAgentInput
+} from './native-chat-runtime-clear'
+import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 
 /** Types a slash command as individual keys so Codex opens its command palette. */
@@ -61,12 +65,14 @@ export async function typeNativeChatCommand(
 /** Queues a typed slash command with composer sends on the same PTY. */
 export function sendNativeChatTypedCommand(
   target: NativeChatResolvedTarget,
-  command: string
+  command: string,
+  /** A seeded draft's clear, confirmed like a message send's; the command's own Ctrl+U reaches one line. */
+  options?: Pick<NativeChatSendOptions, 'clearInput' | 'confirmCleared'>
 ): NativeChatSendHandle {
   const controller = new AbortController()
   return enqueueNativeChatPtySend(
     target.ptyId,
-    (command.length + 1) * AGENT_TUI_COMMAND_KEY_INTERVAL_MS,
+    (command.length + 1) * AGENT_TUI_COMMAND_KEY_INTERVAL_MS + clearConfirmDurationMs(options),
     ({ isCancelled, delay, markSubmitted }) => {
       const finish = (outcome: 'accepted' | 'rejected' | 'unknown'): void => {
         if (!isCancelled() && outcome !== 'accepted') {
@@ -78,20 +84,27 @@ export function sendNativeChatTypedCommand(
         }
         markSubmitted()
       }
-      void typeAgentTuiCommand({
-        command,
-        signal: controller.signal,
-        write: async (key) => {
-          if (isCancelled()) {
-            return 'rejected'
+      const typeCommand = (): void => {
+        void typeAgentTuiCommand({
+          command,
+          signal: controller.signal,
+          write: async (key) => {
+            if (isCancelled()) {
+              return 'rejected'
+            }
+            return (await sendRuntimePtyInputVerified(target.ptyId, key, 'driving', {
+              isCancelled: () => isCancelled() || controller.signal.aborted
+            }))
+              ? 'accepted'
+              : 'rejected'
           }
-          return (await sendRuntimePtyInputVerified(target.ptyId, key, 'driving', {
-            isCancelled: () => isCancelled() || controller.signal.aborted
-          }))
-            ? 'accepted'
-            : 'rejected'
-        }
-      }).then(finish, () => finish('rejected'))
+        }).then(finish, () => finish('rejected'))
+      }
+      if (options?.clearInput) {
+        clearThenWrite(target.ptyId, options, delay, typeCommand, markSubmitted)
+      } else {
+        typeCommand()
+      }
     },
     {
       terminalTabId: target.terminalTabId,

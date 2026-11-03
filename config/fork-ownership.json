@@ -307,7 +307,7 @@
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": [
-        "          ? sendNativeChatTypedCommand(target, text)",
+        "          ? sendNativeChatTypedCommand(target, text, launchSendOptions)",
         "          : sendNativeChatMessage(target, text, sendOptions)",
         "        target,",
         "      pendingHandle = sendNativeChatMessage(target, text, sendOptions)",
@@ -973,11 +973,7 @@
       "path": "tests/e2e/cross-version-wire/release-checkout.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": [
-        "      ref: 'v1.4.191-rc.0.zy01',",
-        "    const checkout = await materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot })",
-        "      [secondRef, 'v1.4.191-rc.0.zy01']"
-      ]
+      "lines": ["      ref: 'v1.4.191-rc.0.zy01',", "      [secondRef, 'v1.4.191-rc.0.zy01']"]
     },
     {
       "path": "tests/e2e/cross-version-wire/agent-session-newer-chat-refusal.unit.test.ts",
@@ -1002,8 +998,7 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": [
-        "const PRE_QODER_HOSTS = ['v1.4.216-rc.0.zy01', 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c']",
-        "    const baseline = await releaseSearchSchemas('v1.4.216-rc.0.zy01')"
+        "const PRE_QODER_HOSTS = ['v1.4.216-rc.0.zy01', 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c']"
       ]
     },
     {
@@ -1291,13 +1286,13 @@
       ]
     },
     {
-      "path": "src/shared/native-chat-composer-autocomplete.test.ts",
+      "path": "src/shared/native-chat/input/native-chat-composer-autocomplete.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": ["          pluginName: 'quirk',", "          pluginName: 'two words',"]
     },
     {
-      "path": "src/shared/native-chat-composer-autocomplete.ts",
+      "path": "src/shared/native-chat/input/native-chat-composer-autocomplete.ts",
       "feature": "agent-composer",
       "kind": "registration",
       "lines": ["    profile?.namespacesPluginSkills === true"]
@@ -1351,13 +1346,13 @@
       "lines": ["      pluginName?: string", "  namespacePluginSkills = false"]
     },
     {
-      "path": "src/shared/native-chat-pty-session-options.ts",
+      "path": "src/shared/native-chat/input/native-chat-pty-session-options.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
       "lines": ["  ): boolean =>", "  const applyReport = ("]
     },
     {
-      "path": "src/shared/native-chat-session-option-cache.ts",
+      "path": "src/shared/native-chat/input/native-chat-session-option-cache.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
       "lines": ["): boolean {"]
@@ -1709,15 +1704,6 @@
       "lines": ["    dockContainer: {} as never,"]
     },
     {
-      "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": [
-        "import { shouldFocusTerminalFromPanePointerDown } from './pane-pointer-focus'",
-        "describe('createPaneDOM dock slot', () => {"
-      ]
-    },
-    {
       "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.ts",
       "feature": "terminal-dock",
       "kind": "registration",
@@ -1742,12 +1728,6 @@
       "lines": ["    dockContainer: {} as never,"]
     },
     {
-      "path": "src/renderer/src/lib/pane-manager/pane-initial-fit-lifecycle.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
-    },
-    {
       "path": "src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
@@ -1761,18 +1741,6 @@
         "  dockContainer?: HTMLElement",
         "  /** Empty strip beneath xtermContainer reserved for portaling a composer; see terminal.css. */"
       ]
-    },
-    {
-      "path": "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
-    },
-    {
-      "path": "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-tree-ops.test.ts",
@@ -4068,7 +4036,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/worktree-jump-palette-recent-inclusion.ts",
+      "path": "src/renderer/src/components/worktree-jump/worktree-jump-palette-recent-inclusion.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
@@ -4078,7 +4046,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/use-worktree-jump-palette-recent-tabs.ts",
+      "path": "src/renderer/src/components/worktree-jump/use-worktree-jump-palette-recent-tabs.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
@@ -5496,15 +5464,6 @@
       "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
     },
     {
-      "path": "src/renderer/src/lib/agent-launch-through-host.test.ts",
-      "feature": "automation-launch-settings",
-      "kind": "passthrough",
-      "lines": [
-        "import { withoutForkOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'",
-        "        withoutForkOptionValues(preferences),"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/settings/keybinding-title-copy.ts",
       "feature": "project-ledger",
       "kind": "registration",
@@ -5520,6 +5479,22 @@
       "lines": [
         "import { TERMINAL_DOCK_KEYBINDING_TITLE_COPY } from './fork-terminal-dock/keybinding-title-copy'",
         "  ...TERMINAL_DOCK_KEYBINDING_TITLE_COPY"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-agent-reference.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "      resolveTarget: () => ({ terminalTabId: 'tab-left', ptyId: 'pty-left', settings: null }),"
+      ]
+    },
+    {
+      "path": "skill-guides/orca-plugin-authoring/references/host-api.md",
+      "feature": "project-ledger",
+      "kind": "passthrough",
+      "lines": [
+        "  `(params: { action: \"worktree.history.back\" | \"worktree.history.forward\" | \"sidebar.left.toggle\" | \"sidebar.sleepingWorkspaces.toggle\" | \"floatingWorkspace.maximize\" | \"tab.rename\" | \"workspace.rename\" | \"workspace.openBoard\" | \"view.tasks\" | \"view.ledger\" | \"sidebar.right.toggle\" | \"sidebar.explorer.toggle\" | \"sidebar.search.toggle\" | \"sidebar.sourceControl.toggle\" | \"sidebar.checks.toggle\" | \"sidebar.ports.toggle\" }) => { ran: true }`"
       ]
     }
   ],
@@ -6298,7 +6273,7 @@
       "ledger": "bug-12"
     },
     {
-      "path": "src/main/runtime/rpc/methods/git.test.ts",
+      "path": "src/main/runtime/rpc/methods/fork-git-diff-cancellation/git-diff-cancellation.test.ts",
       "reason": "Regression coverage for cancellation reaching runtime Git diff execution.",
       "status": "pending-upstream",
       "ledger": "bug-12"
@@ -6630,8 +6605,8 @@
       "removed": 0
     },
     "tests/e2e/native-chat-ssh-delivery.unit.test.ts": {
-      "added": 10,
-      "removed": 9
+      "added": 8,
+      "removed": 7
     },
     "tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts": {
       "added": 5,
@@ -6862,7 +6837,7 @@
       "removed": 4
     },
     "AGENTS.md": {
-      "added": 146,
+      "added": 148,
       "removed": 1
     },
     "config/localization-coverage-allowlist.json": {
@@ -6942,8 +6917,8 @@
       "removed": 2
     },
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
-      "added": 12,
-      "removed": 15
+      "added": 6,
+      "removed": 9
     },
     "tests/e2e/cross-version-wire/agent-session-newer-chat-refusal.unit.test.ts": {
       "added": 1,
@@ -6958,8 +6933,8 @@
       "removed": 1
     },
     "tests/e2e/cross-version-wire/qoder-history-search-downgrade.unit.test.ts": {
-      "added": 2,
-      "removed": 2
+      "added": 1,
+      "removed": 1
     },
     "tests/e2e/cross-version-wire/session-search-agent-set-downgrade.unit.test.ts": {
       "added": 1,
@@ -7093,11 +7068,11 @@
       "added": 1,
       "removed": 1
     },
-    "src/shared/native-chat-composer-autocomplete.test.ts": {
+    "src/shared/native-chat/input/native-chat-composer-autocomplete.test.ts": {
       "added": 160,
       "removed": 1
     },
-    "src/shared/native-chat-composer-autocomplete.ts": {
+    "src/shared/native-chat/input/native-chat-composer-autocomplete.ts": {
       "added": 5,
       "removed": 1
     },
@@ -7125,11 +7100,11 @@
       "added": 76,
       "removed": 21
     },
-    "src/shared/native-chat-pty-session-options.ts": {
+    "src/shared/native-chat/input/native-chat-pty-session-options.ts": {
       "added": 25,
       "removed": 8
     },
-    "src/shared/native-chat-session-option-cache.ts": {
+    "src/shared/native-chat/input/native-chat-session-option-cache.ts": {
       "added": 31,
       "removed": 0
     },
@@ -7301,10 +7276,6 @@
       "added": 1,
       "removed": 0
     },
-    "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts": {
-      "added": 56,
-      "removed": 0
-    },
     "src/renderer/src/lib/pane-manager/pane-dom-creation.ts": {
       "added": 6,
       "removed": 0
@@ -7321,24 +7292,12 @@
       "added": 1,
       "removed": 0
     },
-    "src/renderer/src/lib/pane-manager/pane-initial-fit-lifecycle.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
     "src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts": {
       "added": 3,
       "removed": 0
     },
     "src/renderer/src/lib/pane-manager/pane-manager-types.ts": {
       "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts": {
-      "added": 1,
       "removed": 0
     },
     "src/renderer/src/lib/pane-manager/pane-tree-ops.test.ts": {
@@ -7762,12 +7721,12 @@
       "removed": 0
     },
     "src/cli/bundled-skill-guides.ts": {
-      "added": 903,
-      "removed": 1
+      "added": 905,
+      "removed": 3
     },
     "skill-guides/orca-plugin-authoring/references/manifest.md": {
-      "added": 1,
-      "removed": 1
+      "added": 2,
+      "removed": 2
     },
     "src/main/runtime/orca-runtime.ts": {
       "added": 5,
@@ -8241,11 +8200,11 @@
       "added": 13,
       "removed": 2
     },
-    "src/renderer/src/components/worktree-jump-palette-recent-inclusion.ts": {
+    "src/renderer/src/components/worktree-jump/worktree-jump-palette-recent-inclusion.ts": {
       "added": 4,
       "removed": 2
     },
-    "src/renderer/src/components/use-worktree-jump-palette-recent-tabs.ts": {
+    "src/renderer/src/components/worktree-jump/use-worktree-jump-palette-recent-tabs.ts": {
       "added": 5,
       "removed": 1
     },
@@ -8286,11 +8245,11 @@
       "removed": 0
     },
     "src/cli/handlers/automations.ts": {
-      "added": 52,
-      "removed": 4
+      "added": 42,
+      "removed": 3
     },
     "src/cli/specs/automations.ts": {
-      "added": 8,
+      "added": 7,
       "removed": 2
     },
     "src/main/automations/headless-dispatch.ts": {
@@ -8861,8 +8820,12 @@
       "added": 1,
       "removed": 0
     },
-    "src/renderer/src/lib/agent-launch-through-host.test.ts": {
-      "added": 7,
+    "src/renderer/src/components/native-chat/native-chat-agent-reference.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "skill-guides/orca-plugin-authoring/references/host-api.md": {
+      "added": 1,
       "removed": 1
     }
   }

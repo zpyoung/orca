@@ -1,6 +1,6 @@
 import { buildAgentTuiClearInputForText } from '../../../../../shared/agent-tui-input-clear'
 import type { NativeChatSendOptions } from '../native-chat-runtime-send'
-import { agentInputLineCleared } from '../native-chat-launch-draft-send'
+import { agentInputLineCleared } from './agent-input-line-cleared'
 import type { SendOutcome } from './native-chat-send-outcome'
 import type { ComposerSendTier } from './composer-send-tier'
 

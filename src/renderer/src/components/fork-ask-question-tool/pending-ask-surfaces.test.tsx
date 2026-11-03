@@ -11,11 +11,11 @@ import {
   PaletteRecentTabStatusDot,
   PaletteWorktreeStatusDot
 } from '../cmd-j/palette-live-status'
-import { shouldIncludeOpenTabInRecentSection } from '../worktree-jump-palette-recent-inclusion'
+import { shouldIncludeOpenTabInRecentSection } from '../worktree-jump/worktree-jump-palette-recent-inclusion'
 import { usePendingAskTabIds } from './use-pending-ask-tab-ids'
 import { getWorktreeStatusLabel } from '@/lib/worktree-status'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { OpenTabPaletteItem, OpenTabRecentRow } from '../worktree-jump-palette-model'
+import type { OpenTabPaletteItem, OpenTabRecentRow } from '../worktree-jump/worktree-jump-palette-model'
 import type { Worktree } from '../../../../shared/worktree/types'
 
 const PANE_KEY = 'tab-1:123'

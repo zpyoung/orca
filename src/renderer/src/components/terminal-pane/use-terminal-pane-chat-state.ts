@@ -16,6 +16,8 @@ import {
 } from '../native-chat/native-chat-leaf-routing'
 import type { TerminalPaneTitleController } from './use-terminal-pane-title-state'
 import { notifyTerminalDockConfirmedAgentExit } from './fork-terminal-dock/terminal-dock-controller-bridge'
+import { readTerminalCursorLineContext } from '../../../../shared/terminal-cursor-line-context'
+import { readTerminalComposerTypedText } from '../../../../shared/terminal-composer-draft'
 
 export function useTerminalPaneChatState(controller: TerminalPaneTitleController) {
   const {

@@ -1,16 +1,16 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx
-// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
+// FORK-COPY-SHA: 97b9bb3613a333450a38057d745628323f3ad185
 // @vitest-environment happy-dom
 
 import { cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import type { KeyboardEventHandler } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { EMPTY_HISTORY } from './agent-composer-history'
+import { applyPickerSuggestion } from '../../../../../shared/native-chat/input/native-chat-picker-triggers'
 import {
-  applyPickerSuggestion,
   deriveComposerAutocomplete,
   type ComposerAutocomplete
-} from '../../../../../shared/native-chat-composer-autocomplete'
+} from '../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
 import { getNativeChatAgentProfile } from '../../../../../shared/native-chat/native-chat-agent-profiles'
 import { useAgentComposerKeyDown } from './use-agent-composer-keydown'
 

@@ -43,7 +43,6 @@
         "unavailable": "PR Sitter unavailable"
       },
       "unavailable": {
-        "pairedRuntime": "PR Sitter is not available for peer-hosted workspaces.",
         "missingApi": "This Orca host does not provide the PR Sitter service.",
         "title": "Unavailable.",
         "noSourceWorkspace": "Link or create a source workspace for this pull request before configuring PR Sitter.",
@@ -59,19 +58,10 @@
         "workerDispatched": "Worker dispatched: {{id}}",
         "resultingHead": "Resulting head {{sha}}",
         "rerunAccepted": "Provider accepted the re-run request",
-        "actionState": "{{action}} · {{state}}",
         "approvedAction": "Approved {{action}}",
         "rejectedAction": "Rejected {{action}}",
-        "head": "Head {{sha}}",
-        "discrepancyState": "{{kind}} · {{state}}",
         "fixPublished": "Fix published for {{check}}",
         "fixHeads": "Prepared {{preparedSha}}; resulting head {{headSha}}",
-        "activeTime": "Recorded {{duration}} active time",
-        "checkpoint": "Periodic checkpoint",
-        "paused": "Paused",
-        "shutdown": "Orca closed",
-        "reviewMerged": "Review merged",
-        "reviewClosed": "Review closed",
         "attempted": "Attempted {{action}}",
         "running": "Running {{action}}",
         "settled": "Finished {{action}}",
@@ -97,9 +87,6 @@
         "parked": "Parked",
         "terminal": "Complete",
         "unreachable": "Host unreachable",
-        "budgetExhausted": "Budget exhausted",
-        "merged": "Merged",
-        "closed": "Closed",
         "disabled": "Stopped",
         "waitingForGates": "Waiting for {{blockers}}.",
         "requiredCheckFailed": "Required check failed: {{check}}.",
@@ -151,12 +138,6 @@
         "enqueue": "Enter merge queue"
       },
       "stopCurrent": "Stop this sitter",
-      "actionState": {
-        "attempted": "Attempted",
-        "running": "Running",
-        "completed": "Completed",
-        "failed": "Failed"
-      },
       "discrepancy": {
         "checkFailure": "Check failure",
         "mergeConflict": "Merge conflict",
@@ -198,9 +179,6 @@
         "discussions": "open discussions",
         "policy": "repository policy",
         "unknown": "provider readiness"
-      },
-      "indicator": {
-        "tooltip": "PR Sitter · {{state}}"
       },
       "debugReport": {
         "copy": "Copy debug report",

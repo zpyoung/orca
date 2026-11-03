@@ -77,14 +77,16 @@ export type RunSourceControlAgentActionStartArgs = {
     agentArgs?: string
 <<<<<<< fork
     launchOptions: AgentLaunchOptionSelection
+  }) => boolean | Promise<boolean>
 ||||||| base
+  }) => boolean | Promise<boolean>
 =======
     /** The action's saved choice, on either route. */
     sessionOptions?: Readonly<Record<string, string>>
     launchChoice?: AgentLaunchChoice
     sessionOptionsYieldToAgentArgs?: true
+  }) => DirectWorkItemLaunchResult | Promise<DirectWorkItemLaunchResult>
 >>>>>>> upstream
-  }) => boolean | Promise<boolean>
   onSaveAgentDefault?: (
     target: SourceControlAiWriteTarget,
     actionId: SourceControlLaunchActionId,

@@ -64,27 +64,7 @@ export function readGitBlobAtIndexPath(
   options: GitRuntimeOptions = {},
   conversion?: BlobConversion
 ): Promise<GitBlobReadResult> {
-  // Git blob syntax requires forward slashes, including on Windows.
-  const gitPath = filePath.replace(/\\/g, '/')
-  try {
-    const { stdout } = await gitExecFileAsyncBuffer(['cat-file', 'blob', '--', `:${gitPath}`], {
-      ...gitReadOptionsForWorktree(worktreePath, options),
-      maxBuffer: MAX_GIT_SHOW_BYTES
-    })
-
-    return { ...bufferToBlob(stdout, filePath), exists: true }
-  } catch (error) {
-    options.signal?.throwIfAborted()
-    if (isMaxBufferOverflowError(error)) {
-      return TOO_LARGE_BLOB
-    }
-    return {
-      content: '',
-      isBinary: false,
-      exists: false,
-      failed: !(await verifyMissingBlobPath(error, worktreePath, gitPath, options))
-    }
-  }
+  return readGitBlob(worktreePath, undefined, filePath, options, conversion)
 }
 
 export function readGitBlobAtOidPath(
@@ -138,6 +118,7 @@ async function readGitBlob(
     )
     return { ...bufferToBlob(stdout, filePath), exists: true }
   } catch (error) {
+    options.signal?.throwIfAborted()
     if (isMaxBufferOverflowError(error)) {
       return TOO_LARGE_BLOB
     }

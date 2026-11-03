@@ -13,10 +13,10 @@ import {
 import {
   buildNativeChatPasteBytes,
   NATIVE_CHAT_SUBMIT
-} from '../../../../../shared/native-chat-paste-bytes'
+} from '../../../../../shared/native-chat/input/native-chat-paste-bytes'
 import { enqueueNativeChatPtySend } from '../native-chat-pty-send-queue'
 import { sendNativeChatAskAnswer as sendNativeChatAskAnswerRaw } from './native-chat-ask-answer-send'
-import type { AskAnswerKeyGroup } from '../../../../../shared/native-chat-ask-answer'
+import type { AskAnswerKeyGroup } from '../../../../../shared/native-chat/input/native-chat-ask-answer'
 import type { NativeChatSendHandle } from '../native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 

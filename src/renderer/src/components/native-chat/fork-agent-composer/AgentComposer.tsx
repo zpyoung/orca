@@ -23,11 +23,9 @@ import type { NativeChatComposerGoalMode } from '../use-native-chat-composer-sub
 import type { NativeChatContextUsageSummary } from '../native-chat-context-usage-summary'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 import { isTerminalInputQuarantined } from '../../terminal-pane/terminal-input-quarantine'
-import type {
-  ComposerAutocomplete,
-  NativeChatPickerItem,
-  NativeChatSendClassification
-} from '../../../../../shared/native-chat-composer-autocomplete'
+import type { ComposerAutocomplete } from '../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
+import type { NativeChatPickerItem } from '../../../../../shared/native-chat/input/native-chat-picker-items'
+import type { NativeChatSendClassification } from '../../../../../shared/native-chat/input/native-chat-slash-commands'
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface

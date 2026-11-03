@@ -65,13 +65,7 @@ Every change must consider these areas:
 
 If changing code around `git`, `gh`, source-control, or review behavior read [`docs/agents-md-refs/git-workflow.md`](./docs/agents-md-refs/git-workflow.md).
 
-When waiting for CI, sleep for 7 minutes before checking status. If checks are still running, repeat the 7-minute sleep before each check to avoid wasting tokens on frequent polling.
-
-For a failed GitHub Actions run, inspect the failed jobs and retry with `gh run rerun <run-id> --failed --repo stablyai/orca`. Preserve successful jobs; use a full rerun only when the failure requires revalidating them. A code fix needs a new push and fresh checks, not a retry of the old SHA.
-
 # Tests
-
-Avoid adding low-value tests. These might be fine for development but offer negative value when checked in. [Anti-patterns](./docs/agents-md-refs/test-antipatterns.md)
 
 ## Running Tests: Remote Sandbox Only
 

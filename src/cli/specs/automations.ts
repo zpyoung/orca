@@ -43,7 +43,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     path: ['automations', 'create'],
     summary: 'Create a scheduled Orca automation',
     usage:
-      'orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--model <id>] [--effort <value>] [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id-or-name> [--host <host>]|--project-host-setup <id>] [--json]',
+      'orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--model <id>] [--effort <value>] [--precheck <command>] [--setup run|skip] [--repo <selector>|--workspace <selector>|--project <id-or-name> [--host <host>]|--project-host-setup <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'name',
@@ -83,7 +83,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     path: ['automations', 'edit'],
     summary: 'Edit an Orca automation',
     usage:
-      'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--model <id|inherit>] [--effort <value|inherit>] [--json]',
+      'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--model <id|inherit>] [--effort <value|inherit>] [--setup run|skip] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'id',

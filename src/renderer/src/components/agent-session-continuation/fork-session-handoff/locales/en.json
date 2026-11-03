@@ -72,7 +72,6 @@
         "secretHits": "{{count}} potential secrets found. Review the inline preview markers before starting.",
         "secretMarkerHover": "Potential secret: {{excerpt}}",
         "secretMarkersShown": "{{count}} potential secret markers are highlighted in the preview.",
-        "selectAgent": "Select an Agent",
         "sendAgain": "Send again",
         "showPreview": "Brief preview",
         "sourceBusy": "The source Agent is working. Capture now or wait for newer context.",

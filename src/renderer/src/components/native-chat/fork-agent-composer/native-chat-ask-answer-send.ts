@@ -6,12 +6,12 @@ import {
   sendRuntimePtyInput,
   sendRuntimePtyInputVerified
 } from '@/runtime/runtime-terminal-inspection'
-import type { AskAnswerKeyGroup } from '../../../../../shared/native-chat-ask-answer'
+import type { AskAnswerKeyGroup } from '../../../../../shared/native-chat/input/native-chat-ask-answer'
 import {
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS
 } from '../../../../../shared/native-chat/input/native-chat-answer-stepping'
-import { buildNativeChatPasteBytes } from '../../../../../shared/native-chat-paste-bytes'
+import { buildNativeChatPasteBytes } from '../../../../../shared/native-chat/input/native-chat-paste-bytes'
 import type { NativeChatSendHandle } from '../native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 

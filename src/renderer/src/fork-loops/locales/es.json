@@ -9,9 +9,7 @@
         "createFailed": "No se pudo iniciar el bucle.",
         "runningLoopWarning": "Este espacio de trabajo ya tiene un bucle en ejecución. Un segundo bucle editará los mismos archivos al mismo tiempo.",
         "name": "Nombre",
-        "namePlaceholder": "Por defecto, el prompt",
         "agent": "Agente",
-        "noAgents": "No se detectaron agentes",
         "preset": "Ejecución",
         "queueItems": "Cola",
         "queueItem": "Elemento {{n}} de la cola",
@@ -218,7 +216,8 @@
         },
         "unverifiableHint": "No se puede contactar con el host del agente, así que el bucle no avanza.",
         "skippedTicks_one": "{{count}} tic omitido",
-        "skippedTicks_other": "{{count}} tics omitidos"
+        "skippedTicks_other": "{{count}} tics omitidos",
+        "skippedTicks_many": "{{count}} tics omitidos"
       },
       "status": {
         "glyph": {

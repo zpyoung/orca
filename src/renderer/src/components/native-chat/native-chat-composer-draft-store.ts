@@ -205,16 +205,18 @@ export function appendToNativeChatComposerDraft(
   scopeKey: string,
   addition: NativeChatComposerDraftAddition,
   owner?: NativeChatComposerDraftOwner,
-  position?: (draft: NativeChatComposerDraft) => NativeChatDraftPosition
+  position?: (draft: NativeChatComposerDraft) => NativeChatDraftPosition,
+  independent = false
 ): boolean {
   scopeKey = currentDraftScope(scopeKey)
   const before = records.get(scopeKey)
   const current = readNativeChatComposerDraft(scopeKey)
   const placed = placeNativeChatComposerDraftAddition(current, addition)
-  const { text, images, document, pastedTextFiles } = withNativeChatComposerDraftAddition(
-    current,
-    placed
-  )
+  const add = independent
+    ? withIndependentNativeChatComposerDraft
+    : withNativeChatComposerDraftAddition
+  const compose = (base: StoredNativeChatComposerDraft) => ({ ...base, ...add(base, placed) })
+  const { text, images, document, pastedTextFiles } = compose({ ...current, savedAt: 0 })
   updateNativeChatComposerDraft(
     scopeKey,
     {
@@ -226,7 +228,7 @@ export function appendToNativeChatComposerDraft(
     },
     'immediate',
     (loaded) => {
-      const merged = { ...loaded, ...withNativeChatComposerDraftAddition(loaded, placed) }
+      const merged = compose(loaded)
       if (position) {
         nativeChatDraftPositions.set(merged, position(merged))
       }

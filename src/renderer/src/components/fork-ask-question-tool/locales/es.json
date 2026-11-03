@@ -7,6 +7,7 @@
         "submit": "Enviar",
         "header_one": "{{count}} pregunta",
         "header_other": "{{count}} preguntas",
+        "header_many": "{{count}} preguntas",
         "statusAnswered": "Respondida",
         "statusPartial": "Respondida parcialmente",
         "statusDeclined": "Rechazada",
@@ -33,7 +34,8 @@
       },
       "badge": {
         "pendingCountLabel_one": "{{count}} pregunta pendiente",
-        "pendingCountLabel_other": "{{count}} preguntas pendientes"
+        "pendingCountLabel_other": "{{count}} preguntas pendientes",
+        "pendingCountLabel_many": "{{count}} preguntas pendientes"
       },
       "notification": {
         "title": "Pregunta pendiente en {{worktreeLabel}}",

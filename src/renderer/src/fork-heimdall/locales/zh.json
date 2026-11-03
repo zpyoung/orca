@@ -32,7 +32,6 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "有 {{count}} 个监视器需要关注",
         "bucket": {
           "attention": "需要关注",
           "lostContact": "失去联系",
@@ -67,8 +66,7 @@
         "readOnly": "只读。",
         "staleError": "详情刷新失败；正在显示上次确认的数据：{{error}}",
         "loading": "正在加载所有者详情…",
-        "unavailable": "所有者详情不可用。",
-        "selectPrompt": "请选择一个监视器，以查看其决策、工作进程和所有者控制项。"
+        "unavailable": "所有者详情不可用。"
       },
       "controls": {
         "title": "所有者控制",
@@ -78,7 +76,6 @@
         "delete": "删除监视器",
         "deleteTitle": "删除监视器？",
         "deleteDescription": "监视器“{{name}}”及其保存的历史记录将被永久删除。工作进程终端不会停止。",
-        "approve": "批准",
         "budgetResumeWarning": "该监视器已耗尽预算。请先提高限制，否则恢复后它会再次进入停驻状态。"
       },
       "command": {
@@ -141,7 +138,6 @@
         "attemptAbandoned": "尝试已放弃",
         "evidence": "证据",
         "activeTimeStarted": "活动时长已开始",
-        "activeTimeChecked": "活动时长检查点",
         "activeTimeStopped": "活动时长已停止",
         "workerTurn": "工作进程轮次",
         "finished": "已完成",

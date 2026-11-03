@@ -3,7 +3,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionOptionDescriptor } from '../../../../../shared/native-chat/input/native-chat-session-options'
-import type { NativeChatPtySessionOptionsSurface } from '../../../../../shared/native-chat-pty-session-options'
+import type { NativeChatPtySessionOptionsSurface } from '../../../../../shared/native-chat/input/native-chat-pty-session-options'
 
 const mocks = vi.hoisted(() => ({
   subscribeLocal: vi.fn(),

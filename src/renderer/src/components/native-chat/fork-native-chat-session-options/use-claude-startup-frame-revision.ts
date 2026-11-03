@@ -3,7 +3,7 @@ import type { AgentType } from '../../../../../shared/agent-status-types'
 import { isRemoteRuntimePtyId } from '../../../../../shared/remote-runtime/remote-runtime-pty-id'
 import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-stream'
 import { subscribeToPtyData } from '../../terminal-pane/pty-data-sidecar-subscriptions'
-import type { NativeChatPtySessionOptionsSurface } from '../../../../../shared/native-chat-pty-session-options'
+import type { NativeChatPtySessionOptionsSurface } from '../../../../../shared/native-chat/input/native-chat-pty-session-options'
 
 const FRAME_SETTLE_MS = 100
 const FRAME_RETRY_MS = 500

@@ -9,9 +9,7 @@
         "createFailed": "Impossible de démarrer la boucle.",
         "runningLoopWarning": "Cet espace de travail a déjà une boucle en cours. Une deuxième boucle modifie les mêmes fichiers en même temps.",
         "name": "Nom",
-        "namePlaceholder": "Par défaut, le prompt",
         "agent": "Agent",
-        "noAgents": "Aucun agent détecté",
         "preset": "Exécution",
         "queueItems": "File d'attente",
         "queueItem": "Élément {{n}} de la file",
@@ -218,7 +216,8 @@
         },
         "unverifiableHint": "L'hôte de l'agent est injoignable, donc la boucle n'avance pas.",
         "skippedTicks_one": "{{count}} tick ignoré",
-        "skippedTicks_other": "{{count}} ticks ignorés"
+        "skippedTicks_other": "{{count}} ticks ignorés",
+        "skippedTicks_many": "{{count}} ticks ignorés"
       },
       "status": {
         "glyph": {

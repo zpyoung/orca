@@ -52,6 +52,7 @@ export type UseSourceControlAgentActionDialogResult = {
   onSelectedAgentChange: (agent: TuiAgent | null) => void
   onAgentArgsChange: (value: string) => void
 =======
+  isCreateAccepted: boolean
   onAgentPick: (agent: TuiAgent, surface?: AgentLaunchSurface) => void
   onAgentArgsChange: (value: string) => void
 >>>>>>> upstream

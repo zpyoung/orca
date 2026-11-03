@@ -19,10 +19,7 @@ import {
   collectRemovedHostTwins
 } from './repo-removal-host-twin-teardown'
 import { twinSelectionPatch } from './repo-removal-host-twin-attribution'
-import {
-  captureWorkspaceChatDraftKeys,
-  deleteWorkspaceChatDrafts
-} from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
+import * as chatDrafts from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
 import { isLedgerRemovalConflict } from './ledger-removal-conflict'
 import {
   flushPurgedWorkspaceEdits,

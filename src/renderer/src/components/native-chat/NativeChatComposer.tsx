@@ -130,9 +130,7 @@ const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCom
     useNativeChatLaunchDraftAdoption({
       terminalTabId,
       agent,
-      launchDraft: launchSeed?.launchDraft,
-      launchDraftResolved: launchSeed?.launchDraftResolved === true,
-      ownsTabWideLaunchDraft: launchSeed?.ownsTabWideLaunchDraft === true,
+      launchSeed,
       draft: core.draft,
       setDraft: core.setDraft,
       setCaret: core.setCaret
@@ -320,6 +318,16 @@ const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCom
       [dispatchPtyPickerCommand, sendStructured, structuredTransport]
     )
 
+    const buildLaunchSendOptions = (): ReturnType<
+      typeof resolveNativeChatLaunchDraftSend
+    >['sendOptions'] =>
+      resolveNativeChatLaunchDraftSend({
+        launchDraft: launchSeed?.launchDraft,
+        launchDraftResolved: launchSeed?.launchDraftResolved === true,
+        agent,
+        readInputLine: () => launchSeed?.readTerminalDraft?.()
+      }).sendOptions
+
     const bridges: AgentComposerHostBridges = {
       ...(structuredTransport ? { sendOverride: submitStructured } : {}),
       sendHeld: structuredTransport?.sendOut === true,
@@ -377,15 +385,9 @@ const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCom
       // one lands as literal text.
       sendTypedCommand: (target, text) =>
         agent === 'codex' && isSlashCommandDraft(text)
-          ? sendNativeChatTypedCommand(target, text)
+          ? sendNativeChatTypedCommand(target, text, buildLaunchSendOptions())
           : null,
-      buildSendOptions: () =>
-        resolveNativeChatLaunchDraftSend({
-          launchDraft: launchSeed?.launchDraft,
-          launchDraftResolved: launchSeed?.launchDraftResolved === true,
-          agent,
-          readScreen: () => readTerminalScreen?.() ?? null
-        }).sendOptions,
+      buildSendOptions: buildLaunchSendOptions,
       onAfterSend: ({ ptyId }) => {
         // Why: U10 telemetry — record adoption + local-vs-remote runtime split.
         emitNativeChatMessageSent({
@@ -406,6 +408,7 @@ const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCom
         isComposing: core.imeEnterGesture.isComposing,
         focus: core.focus,
         insertTypedText: core.insertTypedText,
+        insertAgentReferences: () => false,
         acceptsText: core.acceptsText,
         appendText: core.appendText,
         handlePasteEvent: handlePaste,

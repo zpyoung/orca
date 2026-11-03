@@ -1,11 +1,9 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
+// FORK-COPY-SHA: 97b9bb3613a333450a38057d745628323f3ad185
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
-import type {
-  ComposerAutocomplete,
-  NativeChatPickerItem
-} from '../../../../../shared/native-chat-composer-autocomplete'
+import type { ComposerAutocomplete } from '../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
+import type { NativeChatPickerItem } from '../../../../../shared/native-chat/input/native-chat-picker-items'
 import { isMacPlatform } from '../native-chat-shortcut'
 import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
 import type { NativeChatComposerSendIntent } from '../native-chat-composer-types'
@@ -62,8 +60,9 @@ export function useAgentComposerKeyDown({
         }
         return
       }
-      // An open layer that keeps focus here, like the context card, already spent this Escape closing itself.
-      if (event.key === 'Escape' && event.defaultPrevented) {
+      // An open layer that keeps focus here, like the context card, already spent this Escape closing
+      // itself; a layer around the composer (a launch panel) leaves an open picker to take it.
+      if (event.key === 'Escape' && event.defaultPrevented && autocomplete.mode === 'none') {
         return
       }
 

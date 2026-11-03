@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import {
@@ -180,24 +179,7 @@ export function importReleaseCheckoutModule(
     import(/* @vite-ignore */ specifier) as Promise<Record<string, unknown>>
 ): Promise<Record<string, unknown>> {
   return importModule(
-    checkoutModulePath(checkout.root, locateReleaseModule(checkout, rootRelativePath))
-  )
-}
-
-/**
- * Where a module lived in releases older than the one a suite names it for. The fork's newest
- * release can predate an upstream move, and the baseline is that release, not an upstream stable.
- */
-const EARLIER_MODULE_LOCATIONS: Record<string, readonly string[]> = {}
-
-function locateReleaseModule(checkout: ReleaseCheckout, rootRelativePath: string): string {
-  const alternatives = EARLIER_MODULE_LOCATIONS[rootRelativePath.replace(/^[/\\]+/, '')]
-  if (!alternatives || existsSync(checkoutModulePath(checkout.root, rootRelativePath))) {
-    return rootRelativePath
-  }
-  return (
-    alternatives.find((candidate) => existsSync(checkoutModulePath(checkout.root, candidate))) ??
-    rootRelativePath
+    checkoutModulePath(checkout.root, releaseModuleLocation(checkout.root, rootRelativePath))
   )
 }
 

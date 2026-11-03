@@ -71,7 +71,6 @@
         "secretHits": "Se encontraron {{count}} posibles secretos. Revisa los marcadores de la vista previa antes de iniciar.",
         "secretMarkerHover": "Posible secreto: {{excerpt}}",
         "secretMarkersShown": "Se resaltan {{count}} posibles secretos en la vista previa.",
-        "selectAgent": "Seleccionar un agente",
         "sendAgain": "Enviar otra vez",
         "showPreview": "Vista previa del resumen",
         "sourceBusy": "El agente de origen está trabajando. Captura ahora o espera un contexto más reciente.",

@@ -32,7 +32,6 @@
       },
       "sidebar": {
         "title": "Heimdall",
-        "attention": "{{count}} observateurs nécessitent votre attention",
         "bucket": {
           "attention": "Votre attention requise",
           "lostContact": "Contact perdu",
@@ -67,8 +66,7 @@
         "readOnly": "Lecture seule.",
         "staleError": "Échec de l’actualisation des détails ; affichage des dernières données confirmées : {{error}}",
         "loading": "Chargement des détails du runtime propriétaire…",
-        "unavailable": "Les détails du runtime propriétaire sont indisponibles.",
-        "selectPrompt": "Sélectionnez un observateur pour examiner ses décisions, ses agents et les contrôles du runtime propriétaire."
+        "unavailable": "Les détails du runtime propriétaire sont indisponibles."
       },
       "controls": {
         "title": "Contrôles du runtime propriétaire",
@@ -78,7 +76,6 @@
         "delete": "Supprimer l’observateur",
         "deleteTitle": "Supprimer l’observateur ?",
         "deleteDescription": "L’observateur « {{name}} » et son historique enregistré seront définitivement supprimés. Les terminaux des agents ne seront pas arrêtés.",
-        "approve": "Approuver",
         "budgetResumeWarning": "Le budget de cet observateur est épuisé. Augmentez la limite avant de le reprendre, sinon il sera de nouveau mis en pause."
       },
       "command": {
@@ -141,7 +138,6 @@
         "attemptAbandoned": "Tentative abandonnée",
         "evidence": "Preuve",
         "activeTimeStarted": "Temps actif démarré",
-        "activeTimeChecked": "Point de contrôle du temps actif",
         "activeTimeStopped": "Temps actif arrêté",
         "workerTurn": "Tour de l’agent",
         "finished": "Terminé",

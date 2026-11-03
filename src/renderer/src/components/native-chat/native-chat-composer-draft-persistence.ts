@@ -7,6 +7,7 @@ import { isAgentSessionAttachmentStorePath } from '../../../../shared/agent-sess
 import {
   dirtyScopes,
   deferredRemovals,
+  isNativeChatSetupDraft,
   hasLocalChange,
   load,
   nextSavedAt,

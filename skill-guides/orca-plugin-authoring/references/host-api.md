@@ -120,7 +120,7 @@ HTML panels and custom editors get these CSS variables from Orca's active theme,
 - `editor.open` (capability `workspace:write`; worker; since 1.3): Opens a file of a workspace in an editor tab of Orca's window; desktop app only. `workspace.open` shows the workspace.
   `(params: { workspaceId: string; path: string }) => { opened: true }`
 - `commands.run` (capability `workspace:write`; worker; since 1.3): Runs one of Orca's built-in actions in its window, never a plugin's replacement of it; desktop app only.
-  `(params: { action: "worktree.history.back" | "worktree.history.forward" | "sidebar.left.toggle" | "sidebar.sleepingWorkspaces.toggle" | "floatingWorkspace.maximize" | "tab.rename" | "workspace.rename" | "workspace.openBoard" | "view.tasks" | "sidebar.right.toggle" | "sidebar.explorer.toggle" | "sidebar.search.toggle" | "sidebar.sourceControl.toggle" | "sidebar.checks.toggle" | "sidebar.ports.toggle" }) => { ran: true }`
+  `(params: { action: "worktree.history.back" | "worktree.history.forward" | "sidebar.left.toggle" | "sidebar.sleepingWorkspaces.toggle" | "floatingWorkspace.maximize" | "tab.rename" | "workspace.rename" | "workspace.openBoard" | "view.tasks" | "view.ledger" | "sidebar.right.toggle" | "sidebar.explorer.toggle" | "sidebar.search.toggle" | "sidebar.sourceControl.toggle" | "sidebar.checks.toggle" | "sidebar.ports.toggle" }) => { ran: true }`
 
 ## Hooks
 

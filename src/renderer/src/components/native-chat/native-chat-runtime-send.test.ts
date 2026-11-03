@@ -31,10 +31,14 @@ import {
   NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS
 } from './fork-agent-composer/native-chat-send-outcome'
 import {
+  AGENT_TUI_CLEAR_INPUT_MAX,
+  buildAgentTuiClearInputForText
+} from '../../../../shared/agent-tui-input-clear'
+import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,
   NATIVE_CHAT_SUBMIT
-} from '../../../../shared/native-chat-paste-bytes'
+} from '../../../../shared/native-chat/input/native-chat-paste-bytes'
 import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'
 import { sendNativeChatMessageWithImageAttachments as sendNativeChatMessageWithAgentImageAttachments } from './native-chat-runtime-image-send'
 
@@ -683,18 +687,13 @@ describe('typeNativeChatCommand', () => {
   it('confirms a seeded draft is cleared before typing the command', async () => {
     const clearInput = buildAgentTuiClearInputForText('alpha\nbeta\ngamma')
     const confirmCleared = vi.fn(() => false)
-    const handle = sendNativeChatTypedCommand(PTY, '/s', { clearInput, confirmCleared })
+    const handle = sendNativeChatTypedCommand(TARGET, '/s', { clearInput, confirmCleared })
     await vi.runAllTimersAsync()
     await handle.settled
 
     expect(confirmCleared).toHaveBeenCalledTimes(1)
-    expectWriteOrder(sendRuntimePtyInput.mock.calls, [clearInput, AGENT_TUI_CLEAR_INPUT_MAX])
-    expectWriteOrder(sendRuntimePtyInputVerified.mock.calls, [
-      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      '/',
-      's',
-      NATIVE_CHAT_SUBMIT
-    ])
+    expect(mergedWriteBytes().join('')).toBe(clearInput + AGENT_TUI_CLEAR_INPUT_MAX)
+    expectVerifiedWriteOrder([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, '/', 's', NATIVE_CHAT_SUBMIT])
   })
 
   it('does not clear into the next queued send after cancellation', async () => {

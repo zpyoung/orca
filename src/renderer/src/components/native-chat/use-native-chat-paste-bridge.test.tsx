@@ -32,6 +32,7 @@ function composerHandle(): NativeChatComposerHandle {
   return {
     focus: vi.fn(() => true),
     insertTypedText: vi.fn(() => true),
+    insertAgentReferences: vi.fn(() => false),
     acceptsText: vi.fn(() => true),
     appendText: vi.fn(),
     // The harness's textarea stands in for the composer's own field.
