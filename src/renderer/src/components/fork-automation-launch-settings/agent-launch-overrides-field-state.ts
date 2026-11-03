@@ -1,9 +1,11 @@
 import {
   findCatalogModel,
-  getAgentSessionOptionCatalog,
-  type AgentSessionOptionCatalog,
-  type CatalogOption
-} from '../../../../shared/agent-session-option-catalog'
+  getAgentSessionOptionCatalog
+} from '../../../../shared/agent-session/options/agent-session-option-catalog'
+import type {
+  AgentSessionOptionCatalog,
+  CatalogOption
+} from '../../../../shared/agent-session/options/agent-session-option-catalog-types'
 import {
   describeOverriddenOptionIds,
   type AgentLaunchOverrides

@@ -19,7 +19,6 @@ import {
 import { resolveWorktreeLaunchHost } from '../../worktree-launch-host-repo'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import type { Worktree } from '../../../../shared/worktree/types'
 import type { TerminalWorkspaceLaunchScope } from '../../runtime-legacy-worker-terminal-recovery-types'
 
 export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRuntimeWithCreateAgentSession {
@@ -204,7 +203,13 @@ export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRun
       ...(opts.extraAgentArgs ? { extraAgentArgs: opts.extraAgentArgs } : {}),
       ...(opts.suppressStartupUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {}),
       ...(opts.launchOverrides ? { launchOverrides: opts.launchOverrides } : {}),
-      launchScope: await this.resolveTerminalWorkspaceLaunchScope(`id:${worktree.id}`)
+      launchScope: await this.resolveTerminalWorkspaceLaunchScope(
+        `id:${worktree.id}`,
+        undefined,
+        { wslUserAct: opts.wslUserAct === true },
+        worktree,
+        resolvedTarget?.folderWorkspace
+      )
     })
     if (startup.launchRuntime instanceof Error) {
       throw startup.launchRuntime

@@ -52,6 +52,13 @@ function git(args: string[]): string {
   }).trim()
 }
 
+function releaseTagsOldestFirst(tags: string[]): string[] {
+  const stable = tags.filter((tag) => !tag.includes('-'))
+  // A repo that only ever ships prereleases (forks) has no stable tag to pair against,
+  // and its newest prerelease is the last build its users actually run.
+  return (stable.length > 0 ? stable : tags).sort(compareReleaseTags)
+}
+
 /**
  * The version point the harness pairs current code against. An explicit
  * {@link BASELINE_REF_ENV} wins; otherwise the newest non-prerelease `v*` tag,
@@ -74,11 +81,7 @@ export function resolveBaselineReleaseRef(): string {
         `Run it inside a git checkout, or pin a ref with ${BASELINE_REF_ENV}.`
     )
   }
-  const stable = tags.filter((tag) => !tag.includes('-'))
-  // A repo that only ever ships prereleases (forks) has no stable tag to pair against,
-  // and its newest prerelease is the last build its users actually run.
-  const releases = (stable.length > 0 ? stable : tags).sort(compareReleaseTags)
-  const latest = releases.at(-1)
+  const latest = releaseTagsOldestFirst(tags).at(-1)
   if (!latest) {
     throw new Error(
       'Cross-version harness found no tags matching v[0-9]*. ' +
@@ -87,6 +90,21 @@ export function resolveBaselineReleaseRef(): string {
     )
   }
   return latest
+}
+
+/** The newest `count` stable desktop releases, newest first: the ones a downgrade can reach. */
+export function resolveRecentStableReleaseRefs(count: number): string[] {
+  const releases = releaseTagsOldestFirst(
+    git(['tag', '--list', 'v[0-9]*']).split('\n').filter(Boolean)
+  )
+  const recent = releases.slice(Math.max(releases.length - count, 0)).toReversed()
+  if (recent.length < count) {
+    throw new Error(
+      `Cross-version harness found ${recent.length} of ${count} stable desktop release tags; ` +
+        'a shallow CI clone needs `fetch-depth: 0`.'
+    )
+  }
+  return recent
 }
 
 const UPSTREAM_RELEASE_URL = 'https://github.com/stablyai/orca.git'
@@ -168,12 +186,7 @@ export function importReleaseCheckoutModule(
  * Where a module lived in releases older than the one a suite names it for. The fork's newest
  * release can predate an upstream move, and the baseline is that release, not an upstream stable.
  */
-const EARLIER_MODULE_LOCATIONS: Record<string, readonly string[]> = {
-  // Moved to src/shared in v1.4.228; the old module exports the same isStructuredTab.
-  'src/shared/structured-agent-session-tab.ts': [
-    'src/renderer/src/components/native-chat/structured-agent-session-tabs.ts'
-  ]
-}
+const EARLIER_MODULE_LOCATIONS: Record<string, readonly string[]> = {}
 
 function locateReleaseModule(checkout: ReleaseCheckout, rootRelativePath: string): string {
   const alternatives = EARLIER_MODULE_LOCATIONS[rootRelativePath.replace(/^[/\\]+/, '')]

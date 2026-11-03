@@ -1,8 +1,6 @@
 import type { AgentType } from '../../../../../shared/agent-status-types'
-import {
-  getAgentSessionOptionCatalog,
-  type CatalogModel
-} from '../../../../../shared/agent-session-option-catalog'
+import { getAgentSessionOptionCatalog } from '../../../../../shared/agent-session/options/agent-session-option-catalog'
+import type { CatalogModel } from '../../../../../shared/agent-session/options/agent-session-option-catalog-types'
 import { normalizeAutomationLaunchOverrides } from '../../../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
 import {
   listAutomationsForTarget,

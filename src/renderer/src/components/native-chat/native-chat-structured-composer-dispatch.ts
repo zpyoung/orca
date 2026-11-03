@@ -7,12 +7,14 @@ import { imageReferencesToPromptMarkers } from '../../../../shared/native-chat/t
 import type { StructuredAgentSessionCommandOutcome } from '../../../../shared/agent-session/view/structured-agent-session-composer'
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
 import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
+import type { StructuredAgentSessionSendRequest } from './structured-agent-session-send-slot'
 
 export async function dispatchNativeChatStructuredComposerText(
   transport: NativeChatStructuredComposerTransport,
   draftText: string,
   attachments: readonly AgentComposerImageAttachment[] = [],
-  skills: readonly AgentJournalSkillRef[] = []
+  skills: readonly AgentJournalSkillRef[] = [],
+  intent: Pick<StructuredAgentSessionSendRequest, 'alternate'> = {}
 ): Promise<Omit<StructuredAgentSessionCommandOutcome, 'handled'> & { revealsTranscript: boolean }> {
   // Number image chips by their attachment order in this message.
   const prompt = imageReferencesToPromptMarkers(

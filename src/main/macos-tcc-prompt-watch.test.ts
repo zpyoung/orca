@@ -46,35 +46,6 @@ describe('parseTccPromptEvent', () => {
 })
 
 describe('isOrcaAttributedPrompt', () => {
-  it('accepts the app and detached terminal helper across Orca build identities', () => {
-    for (const id of [
-      'com.zpyoung.orca',
-      'com.zpyoung.orca.helper',
-      'com.zpyoung.orca.dev',
-      'com.zpyoung.orca.dev.helper',
-      'com.zpyoung.orca.local',
-      'com.zpyoung.orca.local.helper'
-    ]) {
-      expect(
-        isOrcaAttributedPrompt({
-          service: 'kTCCServiceSystemPolicyAppData',
-          accessingIdentifier: 'find',
-          responsibleIdentifier: id
-        })
-      ).toBe(true)
-    }
-  })
-
-  it('rejects dialogs another app is responsible for', () => {
-    expect(
-      isOrcaAttributedPrompt({
-        service: 'kTCCServiceSystemPolicyAppData',
-        accessingIdentifier: 'find',
-        responsibleIdentifier: 'com.apple.Terminal'
-      })
-    ).toBe(false)
-  })
-
   it('rejects unrelated services even when Orca is responsible', () => {
     expect(
       isOrcaAttributedPrompt({

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type {
   NativeChatMessage,
   NativeChatSubagentEntry
-} from '../../../../shared/native-chat-types'
+} from '../../../../shared/native-chat/native-chat-types'
 import type { NativeChatTranscriptCompanion } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { RpcContext } from '../core'
 

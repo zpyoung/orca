@@ -1,10 +1,12 @@
 import {
   findCatalogModel,
   findCatalogOption,
-  getAgentSessionOptionCatalog,
-  type CatalogModel,
-  type CatalogOption
-} from '../../../../../shared/agent-session-option-catalog'
+  getAgentSessionOptionCatalog
+} from '../../../../../shared/agent-session/options/agent-session-option-catalog'
+import type {
+  CatalogModel,
+  CatalogOption
+} from '../../../../../shared/agent-session/options/agent-session-option-catalog-types'
 import type { AutomationRunLaunchSettings } from '../../../../../shared/fork-automation-launch-settings/automation-run-launch-settings'
 import type { SessionOptionValue } from '../../../../../shared/native-chat/input/native-chat-session-options'
 import { translate } from '@/i18n/i18n'

@@ -13,7 +13,7 @@ import {
 import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherListEntry } from '../../shared/fork-heimdall/watcher-types'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import {
   buildHeimdallDebugReport,
   collapseWatcherHomeDirectory,

@@ -30,7 +30,7 @@ import {
 } from '../../shared/fork-heimdall-objective/detail-types'
 import { paceObjective } from '../../shared/fork-heimdall-objective/pacing'
 import { OBJECTIVE_STOP_PREDICATES } from '../../shared/fork-heimdall-objective/stop-policy'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { JudgmentAuthority, JudgmentService } from '../fork-heimdall/judgment/service'
 import { readObjectiveJudgmentReports } from '../fork-heimdall/judgment/report-projection'

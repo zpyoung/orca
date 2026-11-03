@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { AGENT_SESSION_SEND_OPTIONS_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session/agent-session-create-capabilities'
 import { resolveBaselineReleaseRef } from './release-checkout'
-import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'
+import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session/agent-session-runtime-capabilities'
 import { installableHost, structuredHostStub } from './structured-agent-session-host-fixture'
 import {
   resetOperationIds,

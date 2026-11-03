@@ -8,7 +8,6 @@ import { getExperimentalPaneSearchEntries, getExperimentalSearchEntry } from './
 import { HiddenExperimentalGroup } from './HiddenExperimentalGroup'
 import { NumberField, SettingsSwitch } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
-import { NativeChatExperimentalSetting } from './NativeChatExperimentalSetting'
 import { TerminalDockExperimentalSetting } from './fork-terminal-dock/TerminalDockExperimentalSetting'
 import { AgentDashboardExperimentalSetting } from './AgentDashboardExperimentalSetting'
 import { EphemeralVmsExperimentalSetting } from './EphemeralVmsExperimentalSetting'
@@ -39,9 +38,6 @@ export function ExperimentalPane({
 }: ExperimentalPaneProps): React.JSX.Element {
   const searchQuery = useAppStore((s) => s.settingsSearchQuery)
   const showPet = matchesSettingsSearch(searchQuery, [getExperimentalSearchEntry().pet])
-  const showNativeChat = matchesSettingsSearch(searchQuery, [
-    getExperimentalSearchEntry().nativeChat
-  ])
   const showTerminalDock = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().terminalDock
   ])
@@ -102,10 +98,6 @@ export function ExperimentalPane({
             />
           </div>
         </SearchableSetting>
-      ) : null}
-
-      {showNativeChat ? (
-        <NativeChatExperimentalSetting settings={settings} updateSettings={updateSettings} />
       ) : null}
 
       {showTerminalDock ? (

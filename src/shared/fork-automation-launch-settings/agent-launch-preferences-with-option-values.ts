@@ -1,5 +1,5 @@
 import { toAgentLaunchPreferences } from '../agent-launch-preferences'
-import type { AgentLaunchPreferences } from '../agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../agent-session/agent-session-host-authority'
 import type { AgentType } from '../agent-status-types'
 import type { SessionOptionValue } from '../native-chat/input/native-chat-session-options'
 
@@ -21,4 +21,15 @@ export function toAgentLaunchPreferencesWithOptionValues(
     Object.entries(sessionOptions ?? {}).filter(([id]) => !LEGACY_PREFERENCE_KEYS.has(id))
   )
   return { ...preferences, optionValues }
+}
+
+/** Upstream's flat preferences shape, for callers typed against plain session-option records. */
+export function withoutForkOptionValues(
+  preferences: AgentLaunchPreferences | undefined
+): Omit<AgentLaunchPreferences, 'optionValues'> {
+  if (!preferences) {
+    return {}
+  }
+  const { optionValues: _optionValues, ...flat } = preferences
+  return flat
 }

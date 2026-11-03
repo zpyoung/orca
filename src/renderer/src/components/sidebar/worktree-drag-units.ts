@@ -1,6 +1,8 @@
 import type { WorktreeDragGroup } from './worktree-manual-order'
 import { PINNED_GROUP_KEY } from '../../../../shared/sidebar-list/group-keys'
-import { getNaturalWorktreeIds } from './natural-worktree-ids'
+import { getNaturalWorktreeKeys } from './natural-worktree-keys'
+import { composeWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'
 
 export type WorktreeDragUnitGroup = WorktreeDragGroup & {

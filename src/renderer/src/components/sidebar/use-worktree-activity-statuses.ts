@@ -9,23 +9,8 @@ import {
   selectRuntimePaneTitlesForWorktree
 } from './worktree-card-status-inputs'
 import { selectWorktreeAgentActivitySummary } from './worktree-agent-activity-summary'
+import { selectWorktreeActivityPtyIds } from './use-worktree-activity-status'
 import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
-
-type WorktreeActivityStatusState = Pick<
-  AppState,
-  | 'tabsByWorktree'
-  | 'browserTabsByWorktree'
-  | 'unifiedTabsByWorktree'
-  | 'structuredChatSleptAtByPaneKey'
-  | 'runtimePaneTitlesByTabId'
-  | 'ptyIdsByTabId'
-  | 'terminalLayoutsByTabId'
-  | 'agentStatusEpoch'
-  | 'agentStatusByPaneKey'
-  | 'migrationUnsupportedByPtyId'
-  | 'retainedAgentsByPaneKey'
-  | 'runtimeAgentOrchestrationByPaneKey'
->
 
 export function selectWorktreeActivityStatuses(
   statusInputs: AppState,

@@ -1,14 +1,14 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
-  type AgentType,
   type NativeChatMessage,
   type NativeChatSession,
   type NativeChatTurnLifecycle,
   type NativeChatSessionOptionObservation
-} from '../../../../../shared/native-chat-types'
+} from '../../../../../shared/native-chat/native-chat-types'
+import type { AgentType } from '../../../../../shared/agent-status-types'
 import { nativeChatCompanionFromFrame } from '../../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import {
   applyAppend,
@@ -28,6 +28,7 @@ import {
 import { getNativeChatSessionTransport } from './native-chat-session-transport'
 import { useNativeChatTranscriptCompanion } from '../fork-native-chat-session-options/use-native-chat-transcript-companion'
 import { useNativeChatHookStatus } from '../use-native-chat-hook-status'
+import { takeNativeChatOpenWake } from '../native-chat-open-wake'
 
 export type UseNativeChatLiveSessionArgs = {
   /** Composite `${tabId}:${leafId}` hook-entry key. */
@@ -71,6 +72,9 @@ export type NativeChatLiveSession = NativeChatSession & {
    *  until a turn lands, or on a host that predates the field. */
   sessionOptions?: NativeChatSessionOptionObservation
 }
+
+// Paging is the user's own click, so it may start a stopped WSL distro.
+const USER_PAGING = { wakeWslDistro: true } as const
 
 // Stable empty-base reference so a non-ready read doesn't churn the base axis.
 const EMPTY_MESSAGES: readonly NativeChatMessage[] = []
@@ -140,10 +144,13 @@ export function useNativeChatLiveSession(
   const [hookState, hookStateStartedAt, hookHasWorkingSubagents] = useNativeChatHookStatus(paneKey)
 
   const latestEnabled = useRef(enabled)
+  // Read, not a dependency: the source key below already changes with the pane.
+  const latestPaneKey = useRef(paneKey)
   // Fence late frames before passive cleanup closes the previous stream.
   useLayoutEffect(() => {
     latestEnabled.current = enabled
-  }, [enabled])
+    latestPaneKey.current = paneKey
+  }, [enabled, paneKey])
   const sourceKey = JSON.stringify([
     paneKey,
     runtimeEnvironmentId ?? null,
@@ -202,6 +209,7 @@ export function useNativeChatLiveSession(
     replaceList(appendMergerRef.current, [])
     setAppended([])
     setHasMore(false)
+    const wake = { wakeWslDistro: takeNativeChatOpenWake(latestPaneKey.current, sourceKey) }
 
     // Independent initial seed in case subscribe never delivers a snapshot; applied only until an authoritative frame lands so a live snapshot wins.
     const cancelSeedRead = startNativeChatSeedRead({
@@ -210,7 +218,8 @@ export function useNativeChatLiveSession(
           agent,
           sessionId,
           limit: limitRef.current,
-          ...(transcriptPath ? { transcriptPath } : {})
+          ...(transcriptPath ? { transcriptPath } : {}),
+          ...wake
         }),
       // A not-yet-flushed transcript: stay in 'loading' and retry with backoff instead of a permanent error (#8401).
       isPending: (result) =>
@@ -243,7 +252,8 @@ export function useNativeChatLiveSession(
         agent,
         sessionId,
         transcriptPath: transcriptPath ?? undefined,
-        limit: limitRef.current
+        limit: limitRef.current,
+        wakeWslDistro: wake.wakeWslDistro
       },
       (frame) => {
         if (!cancelled && latestEnabled.current) {
@@ -323,7 +333,8 @@ export function useNativeChatLiveSession(
         sessionId,
         limit: request.limit,
         ...(transcriptPath ? { transcriptPath } : {}),
-        ...(request.mode === 'before' ? { beforeOffset: request.beforeOffset } : {})
+        ...(request.mode === 'before' ? { beforeOffset: request.beforeOffset } : {}),
+        ...USER_PAGING
       })
       .then((result): NativeChatOlderPageResult => {
         if (

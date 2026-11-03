@@ -25,7 +25,7 @@ import type {
   ObjectiveWorld
 } from '../../shared/fork-heimdall-objective/detail-types'
 import { deriveObjectiveBudgetBucket } from '../../shared/fork-heimdall-objective/pacing'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {
   buildObjectiveRolePrompt,

@@ -1,7 +1,7 @@
 import { useMemo, type RefObject } from 'react'
 import { useAppStore } from '../../../store'
 import type { AgentType } from '../../../../../shared/agent-status-types'
-import { isNativeChatSupportedAgent } from '../../../../../shared/native-chat-agent-support'
+import { isNativeChatSupportedAgent } from '../../../../../shared/native-chat/native-chat-agent-support'
 import type { ComposerSendTier } from '../../native-chat/fork-agent-composer/composer-send-tier'
 import type { SendOutcome } from '../../native-chat/fork-agent-composer/native-chat-send-outcome'
 import type { NativeChatComposerHandle } from '../../native-chat/native-chat-composer-types'

@@ -3,7 +3,7 @@ import {
   findCatalogModel,
   findCatalogOption,
   getAgentSessionOptionCatalog
-} from '../../shared/agent-session-option-catalog'
+} from '../../shared/agent-session/options/agent-session-option-catalog'
 import type { Automation } from '../../shared/automations-types'
 
 /** Format persisted automation launch overrides for human-readable CLI output. */

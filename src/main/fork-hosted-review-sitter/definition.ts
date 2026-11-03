@@ -8,7 +8,7 @@ import type {
   HostedReviewSitterDefinition
 } from '../../shared/fork-hosted-review-sitter/types'
 import { HostedReviewEnrollmentCandidateSchema } from '../../shared/fork-hosted-review-sitter/enrollment-candidate'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import { getAutomationSchedulerOwner } from '../persistence/scheduling-automations/automation-context-migration'
 import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'

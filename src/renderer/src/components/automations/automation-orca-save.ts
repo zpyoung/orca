@@ -45,9 +45,8 @@ export async function saveOrcaAutomation(
   context: AutomationSaveContext,
   time: { hour: number; minute: number; now: number; surface: 'chat' | 'terminal' }
 ): Promise<void> {
-  const { store, local, setup, destination, destinationForm, pageRefresh, launchOverridesGate } =
-    context
-  const { repos, projectHostSetups } = store
+  const { store, local, setup, destination, destinationForm, launchOverridesGate } = context
+  const { projectHostSetups } = store
   const {
     draft,
     editingAutomationId,
@@ -119,7 +118,14 @@ export async function saveOrcaAutomation(
     draft.launchOverrides,
     launchOverridesGate
   )
-  const reposForDraft = editingAutomationId !== null ? dialogRepos : repos
+  const recordedContext =
+    currentAutomation && editingDestination && isSameAutomationWorkspace(currentAutomation, draft)
+      ? recordedAutomationRunContext(
+          currentAutomation,
+          capturedAutomationOwner(context.list.capturedAutomationOwners, editingRowKey),
+          editingDestination.destination
+        )
+      : null
   const setupResolution =
     editingAutomationId !== null
       ? editHostResolution
@@ -213,35 +219,36 @@ export async function saveOrcaAutomation(
           workspaceId: draft.workspaceId
         }
       : {}),
-    ...launchOverridesUpdateFields,
-    runContext,
-    projectId: draft.projectId,
-    workspaceMode: draft.workspaceMode,
-    workspaceId: draft.workspaceId,
-    baseBranch: draft.baseBranch.trim() || null,
-    setupDecision,
-    reuseSession: draft.workspaceMode === 'existing' && draft.reuseSession,
-    timezone,
-    missedRunGraceMinutes
+    ...(currentAutomation && edited('launchOverrides') ? launchOverridesUpdateFields : {}),
+    ...(edited('baseBranch') ? { baseBranch: draft.baseBranch.trim() || null } : {}),
+    ...(edited('setupDecision') || setupDecision !== currentAutomation?.setupDecision
+      ? { setupDecision }
+      : {}),
+    ...(edited('reuseSession') || edited('workspaceMode')
+      ? { reuseSession: draft.workspaceMode === 'existing' && draft.reuseSession }
+      : {}),
+    ...(edited('missedRunGraceMinutes') ? { missedRunGraceMinutes } : {})
   }
   if (!currentAutomation || (scheduleEdited && currentAutomation.rrule !== rrule)) {
     updates.rrule = rrule
     updates.dtstart = time.now
   }
   const createInput: AutomationCreateInput = {
-    name: draft.name,
-    prompt: draft.prompt,
-    precheck,
-    agentId: draft.agentId,
-    ...(hasExtraAgentArgs(draft.extraAgentArgs) ? { extraAgentArgs: draft.extraAgentArgs } : {}),
+    name: currentAutomation ? currentAutomation.name : draft.name,
+    prompt: currentAutomation ? currentAutomation.prompt : draft.prompt,
+    precheck: currentAutomation ? currentAutomation.precheck : precheck,
+    agentId: currentAutomation ? currentAutomation.agentId : draft.agentId,
+    ...launchSetup,
     ...launchOverridesCreateFields,
-    runContext,
-    projectId: draft.projectId,
-    workspaceMode: draft.workspaceMode,
-    workspaceId: draft.workspaceId,
-    baseBranch: draft.baseBranch.trim() || null,
-    setupDecision,
-    reuseSession: draft.workspaceMode === 'existing' && draft.reuseSession,
+    runContext: currentAutomation ? currentAutomation.runContext : runContext,
+    projectId: currentAutomation ? currentAutomation.projectId : draft.projectId,
+    workspaceMode: currentAutomation ? currentAutomation.workspaceMode : draft.workspaceMode,
+    workspaceId: currentAutomation ? currentAutomation.workspaceId : draft.workspaceId,
+    baseBranch: currentAutomation ? currentAutomation.baseBranch : draft.baseBranch.trim() || null,
+    setupDecision: currentAutomation ? currentAutomation.setupDecision : setupDecision,
+    reuseSession: currentAutomation
+      ? currentAutomation.reuseSession
+      : draft.workspaceMode === 'existing' && draft.reuseSession,
     timezone,
     rrule: currentAutomation ? currentAutomation.rrule : rrule,
     dtstart: currentAutomation ? currentAutomation.dtstart : (updates.dtstart ?? time.now),

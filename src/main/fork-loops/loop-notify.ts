@@ -1,7 +1,7 @@
 import * as electron from 'electron'
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
 import { deliverNativeNotification } from '../ipc/native-notification-delivery'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 
 export type LoopNotifyEvent = 'completed' | 'paused' | 'needs-you' | 'cap-reached'
 

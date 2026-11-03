@@ -1,4 +1,5 @@
-import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
+import type { AgentType } from '../../shared/agent-status-types'
+import type { NativeChatMessage } from '../../shared/native-chat/native-chat-types'
 import type { NativeChatCompanionFrameFields } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 
 // notFound marks a not-yet-on-disk miss (retry-worthy) vs a real read/parse error (#8401).
@@ -70,6 +71,8 @@ export type NativeChatReadSessionArgs = {
   /** Read the window ending at this byte offset instead of the file's tail —
    *  a prior result's `beforeOffset`, which pages older history. */
   beforeOffset?: number
+  /** The user opened or paged this chat: may start its stopped local WSL distro (E9). */
+  wakeWslDistro?: boolean
 }
 
 export type NativeChatApi = {

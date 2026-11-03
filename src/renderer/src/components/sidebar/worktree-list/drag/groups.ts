@@ -1,5 +1,6 @@
 import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/group-keys'
-import { getNaturalWorktreeIds } from '../../natural-worktree-ids'
+import { getNaturalWorktreeKeys } from '../../natural-worktree-keys'
+import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import { needsWorktreeDragGroup } from '../../fork-worktree-groups/worktree-drag-group-key'
 import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
 import type { WorktreeDragGroup } from '../../worktree-manual-order'

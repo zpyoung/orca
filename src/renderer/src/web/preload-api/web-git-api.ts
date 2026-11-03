@@ -146,14 +146,15 @@ export function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
         worktree: toRuntimeWorktreeSelector(worktree.id)
       })
     },
-    diff: async ({ worktreePath, filePath, staged, compareAgainstHead, requestToken }) => {
+    diff: async ({ worktreePath, filePath, staged, compareAgainstHead, oldPath, requestToken }) => {
       const resolveParams = async (): Promise<Record<string, unknown>> => {
         const file = await resolveRuntimeFilePath(filePath, worktreePath)
         return {
           worktree: toRuntimeWorktreeSelector(file.worktree.id),
           filePath: file.relativePath,
           staged,
-          compareAgainstHead
+          compareAgainstHead,
+          ...(oldPath ? { oldPath } : {})
         }
       }
       if (!requestToken) {

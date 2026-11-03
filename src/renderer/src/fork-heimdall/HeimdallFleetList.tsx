@@ -293,7 +293,7 @@ export function HeimdallFleetList({
                 </span>
                 <span className="block truncate text-[11px] text-muted-foreground">
                   {row.entry.enrollment.kind === 'objective'
-                    ? translate('fork.heimdall.kind.objective', 'Objective')
+                    ? translate('fork.heimdall.kind.objective', 'Objective watcher')
                     : translate('fork.heimdall.kind.hostedReview', 'Hosted review')}
                 </span>
               </span>

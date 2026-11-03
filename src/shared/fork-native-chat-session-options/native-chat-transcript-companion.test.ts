@@ -5,7 +5,7 @@ import {
   nativeChatCompanionFromFrame,
   retainNativeChatTranscriptCompanion
 } from './native-chat-transcript-companion'
-import type { NativeChatTurnLifecycle } from '../native-chat-types'
+import type { NativeChatTurnLifecycle } from '../native-chat/native-chat-types'
 
 const LIFECYCLE: NativeChatTurnLifecycle = {
   state: 'completed',

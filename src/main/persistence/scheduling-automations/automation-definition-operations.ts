@@ -20,7 +20,6 @@ import {
   migrateLegacyAutomationLaunchArgs,
   normalizeAutomationLaunchOverrides
 } from '../../../shared/fork-automation-launch-settings/automation-launch-overrides-migration'
-import type { WorkspaceRunContext } from '../../../shared/task-source-context'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
 import {
   assertAutomationExtraAgentArgs,
@@ -63,9 +62,8 @@ export type AutomationDefinitionOperations = {
 
 export function listAutomations(state: PersistedState): Automation[] {
   return (state.automations ?? [])
-    .map((automation) =>
-      normalizeAutomationSessionReuse(migrateLegacyAutomationLaunchArgs(automation))
-    )
+    .map((automation) => migrateLegacyAutomationLaunchArgs(automation))
+    .map((automation) => automationWithLaunchSetup(normalizeAutomationSessionReuse(automation)))
     .sort((left, right) => left.name.localeCompare(right.name))
 }
 
@@ -110,9 +108,10 @@ export function createAutomation(
   }
   const schedulerOwner = getAutomationSchedulerOwner(repo)
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
+  const setup = applyAutomationLaunchSetupPatch(input)
   const extraAgentArgs = storedExtraAgentArgs(
     foldLegacyLaunchAgentArgs(
-      input.extraAgentArgs,
+      setup.extraAgentArgs,
       legacyLaunchOverridesAgentArgs(input.launchOverrides)
     )
   )

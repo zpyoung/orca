@@ -4,7 +4,7 @@ import { ClaudePromptRegistry } from '../../claude/claude-prompt-registry'
 import {
   buildClaudePromptReply,
   encodeClaudeQuestionOptionId
-} from '../../claude/claude-structured-prompt-replies'
+} from '../../claude/structured/journal/claude-structured-prompt-replies'
 import {
   askResultToClaudeAnswers,
   askResultToCodexAnswers,

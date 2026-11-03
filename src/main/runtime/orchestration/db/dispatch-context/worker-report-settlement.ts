@@ -287,7 +287,11 @@ export function settleWorkerReportInTransaction(
   if (params.outcome === 'succeeded') {
     this.promoteReadyTasks(params.taskId)
   }
+  if (reportingWorker && this.workerAutoReleaseEnabled?.() !== false) {
+    this.armWorkerTerminalAutoReleaseStatement(params.dispatchId)
+  }
   recordWorkerReportFact(this, params)
+  markUnreadFollowUpMail(this, params.dispatchId)
   this.db.exec('RELEASE settle_worker_report')
   return { action: 'settled', outcome: params.outcome, duplicate: false }
 }

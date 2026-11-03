@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest'
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { NativeChatBlock } from '../../../../../shared/native-chat-types'
+import type { NativeChatBlock } from '../../../../../shared/native-chat/native-chat-types'
 import { NativeChatToolRun } from '../NativeChatToolRun'
 
 afterEach(cleanup)

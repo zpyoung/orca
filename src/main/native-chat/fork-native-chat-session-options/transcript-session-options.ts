@@ -4,11 +4,9 @@
 // reader and the live tailer both call these and must agree, so nothing here may
 // carry state between lines. A record that names neither value returns null.
 
-import type {
-  AgentType,
-  NativeChatSessionOptionObservation
-} from '../../../shared/native-chat-types'
-import { resolveNativeChatTranscriptAgent } from '../../../shared/native-chat-agent-support'
+import type { NativeChatSessionOptionObservation } from '../../../shared/native-chat/native-chat-types'
+import type { AgentType } from '../../../shared/agent-status-types'
+import { resolveNativeChatTranscriptAgent } from '../../../shared/native-chat/native-chat-agent-support'
 import {
   asRecord,
   extractModel,

@@ -11,7 +11,7 @@ import {
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import { ObjectivePlanTaskSchema } from '../../shared/fork-heimdall-objective/plan-schema'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { deriveObjectiveFailureContext } from './dispatch-failure-context'
 import { executeObjectiveDispatch } from './dispatch-executor'

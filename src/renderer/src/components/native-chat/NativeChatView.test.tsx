@@ -48,20 +48,6 @@ function entry(overrides: Partial<AgentStatusEntry> & Pick<AgentStatusEntry, 'pa
   }
 }
 
-function renderResolution(
-  props: Omit<React.ComponentProps<typeof NativeChatSessionGate>, 'children'>
-): void {
-  render(
-    <NativeChatSessionGate {...props}>
-      {(resolution) => (
-        <div data-testid="native-chat-resolution">
-          {resolution.agent}:{resolution.sessionId ?? 'no-session'}:{resolution.paneKey}
-        </div>
-      )}
-    </NativeChatSessionGate>
-  )
-}
-
 function DraftProbe({ paneKey, sessionId }: { paneKey: string; sessionId: string | null }) {
   const { draft, setDraft } = useAgentComposerDraft(paneKey)
   return (

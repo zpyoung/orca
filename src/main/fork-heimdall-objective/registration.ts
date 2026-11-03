@@ -1,4 +1,4 @@
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { getJudgmentQuestionPolicy } from '../../shared/fork-heimdall/judgment/registry'
 import type { JudgmentPersistencePort } from '../fork-heimdall/judgment/store'

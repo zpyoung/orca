@@ -243,8 +243,8 @@ export type AgentComposerHostBridges = {
   dispatchPickerCommand?: (item: Extract<NativeChatPickerItem, { kind: 'command' }>) => void
   mentionFiles?: NativeChatMentionFiles
   completeMention?: (path: string) => void
-  /** Cmd/Ctrl+Enter from an empty composer: send the newest queued draft now. */
-  steerQueued?: () => boolean
+  /** Cmd/Ctrl+Shift+Enter steers the head queued card; false when it can't. */
+  steerHead?: () => boolean
   goalMode?: NativeChatComposerGoalMode
   contextUsage?: NativeChatContextUsageSummary | null
   /** The host holds sends for this reason, which the disabled Send button says. */
@@ -358,7 +358,7 @@ export function useAgentComposerCompose(
     dismissPicker: bridges?.dismissPicker ?? noop,
     interrupt: core.interrupt,
     send,
-    ...(bridges?.steerQueued ? { steerQueued: bridges.steerQueued } : {}),
+    ...(bridges?.steerHead ? { steerHead: bridges.steerHead } : {}),
     setActiveSuggestion: core.setActiveSuggestion,
     setDraft: core.setDraft,
     setCaret: core.setCaret,

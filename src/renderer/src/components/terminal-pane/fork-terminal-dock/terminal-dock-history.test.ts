@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentStatusEntry } from '../../../../../shared/agent-status-types'
-import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
+import type { NativeChatMessage } from '../../../../../shared/native-chat/native-chat-types'
 import { terminalDockHistoryPrompts } from './terminal-dock-history'
 
 function userMessage(text: string, timestamp: number | null): NativeChatMessage {

@@ -57,10 +57,11 @@ async function createPreparedRuntimeAgentBackgroundTerminal(
   const keyboardProtocol = buildDefaultTerminalOptions().vtExtensions?.kittyKeyboard
   const keyboardOptions = createAgentSessionKeyboardOptions(keyboardProtocol)
   const operation = createAgentSessionCreateOperation()
-  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(args.sessionOptions, {
-    agent: args.agent,
-    includeOptionValues: args.useLaunchOverrides
-  })
+  const applied = args.legacy.sessionOptions ?? args.sessionOptions
+  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(
+    capable ? args.sessionOptions : applied,
+    { agent: args.agent, includeOptionValues: args.useLaunchOverrides }
+  )
   return await runRemoteAgentSessionLaunch({
     environmentId: args.environmentId,
     hostAuthority: agentLaunchNeedsPreparedCommand(args.agent, applied)

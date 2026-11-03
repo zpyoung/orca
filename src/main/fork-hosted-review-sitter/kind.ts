@@ -15,7 +15,7 @@ import {
   type HostedReviewSitterAction,
   type HostedReviewWorld
 } from '../../shared/fork-hosted-review-sitter'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { readHostedReviewPreparedCommit } from './agent-execution'
 import {

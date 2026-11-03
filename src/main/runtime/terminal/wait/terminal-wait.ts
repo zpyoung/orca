@@ -77,88 +77,9 @@ export class RuntimeTerminalWait {
     }
   ): Promise<RuntimeTerminalWaitResult> {
     const condition = options?.condition ?? 'exit'
-    const pty = this.deps.getLivePty(handle)
-    if (pty) {
-      if (condition === 'exit' && !pty.pty.connected && !this.deps.exitUnsettled(pty.pty)) {
-        return buildPtyTerminalWaitResult(handle, condition, pty.pty)
-      }
-      const ptyWaitText = buildTerminalWaitText(
-        pty.pty.tailBuffer,
-        pty.pty.tailPartialLine,
-        pty.pty.preview
-      )
-      // Only strong verdicts settle synchronously; weak evidence needs the poll's rendered-screen check.
-      const ptyVerdict = condition === 'tui-idle' ? this.evaluatePty(pty.pty, ptyWaitText) : null
-      if (ptyVerdict?.kind === 'blocked') {
-        return buildPtyTerminalWaitBlockedResult(handle, condition, pty.pty, ptyVerdict.reason)
-      }
-      if (ptyVerdict?.kind === 'ready-strong') {
-        return buildPtyTerminalWaitResult(handle, condition, pty.pty)
-      }
-      return await new Promise<RuntimeTerminalWaitResult>((resolve, reject) => {
-        const effectiveTimeoutMs =
-          typeof options?.timeoutMs === 'number' && options.timeoutMs > 0
-            ? options.timeoutMs
-            : condition === 'tui-idle'
-              ? this.deps.defaultTimeoutMs
-              : 0
-        const waiter: TerminalWaiter = {
-          handle,
-          condition,
-          resolve,
-          reject,
-          timeout: null,
-          cancelIdlePoll: null,
-          abortCleanup: null,
-          ...(options?.launchReadiness ? { launchReadiness: true } : {})
-        }
-        if (!this.waiters.bindAbort(waiter, options?.signal)) {
-          reject(new Error('request_aborted'))
-          return
-        }
-        if (effectiveTimeoutMs > 0) {
-          waiter.timeout = setTimeout(() => {
-            this.waiters.remove(waiter)
-            reject(new Error('timeout'))
-          }, effectiveTimeoutMs)
-        }
-        this.waiters.add(waiter)
-        const live = this.deps.getLivePty(handle)
-        if (!live) {
-          this.waiters.remove(waiter)
-          reject(new Error('terminal_handle_stale'))
-        } else if (
-          condition === 'exit' &&
-          !live.pty.connected &&
-          !this.deps.exitUnsettled(live.pty)
-        ) {
-          this.waiters.resolve(waiter, buildPtyTerminalWaitResult(handle, condition, live.pty))
-        } else if (condition === 'tui-idle') {
-          const livePtyWaitText = buildTerminalWaitText(
-            live.pty.tailBuffer,
-            live.pty.tailPartialLine,
-            live.pty.preview
-          )
-          const verdict = this.evaluatePty(live.pty, livePtyWaitText)
-          if (verdict.kind === 'blocked') {
-            this.waiters.resolve(
-              waiter,
-              buildPtyTerminalWaitBlockedResult(handle, condition, live.pty, verdict.reason)
-            )
-          } else if (verdict.kind === 'ready-strong') {
-            this.waiters.resolve(waiter, buildPtyTerminalWaitResult(handle, condition, live.pty))
-          } else {
-            this.polls.startPty(waiter, live.pty, verdict)
-            const paneAgent = this.deps.getPaneAgent(live.pty.ptyId)
-            if (
-              shouldProbeVisibleScreen(paneAgent, live.pty, livePtyWaitText) ||
-              tuiIdleNeedsVisibleScreenProbe(live.pty.lastAgentStatus, livePtyWaitText, paneAgent)
-            ) {
-              this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs, paneAgent)
-            }
-          }
-        }
-      })
+    const { pty } = this.deps.getTerminalPty(handle, condition)
+    if (condition === 'exit' && !pty.connected && !this.deps.exitUnsettled(pty)) {
+      return buildPtyTerminalWaitResult(handle, condition, pty)
     }
     if (condition !== 'exit' && getPtyTerminalState(pty) === 'exited') {
       throw buildPtyTerminalWaitExitError(pty)
@@ -202,38 +123,15 @@ export class RuntimeTerminalWait {
         }, effectiveTimeoutMs)
       }
       this.waiters.add(waiter)
-
-      // Revalidate after waiter registration to catch handle replacement or exit in the gap.
-      try {
-        const live = this.deps.getLiveLeaf(handle)
-        if (getTerminalState(live.leaf) === 'exited') {
-          this.waiters.resolve(waiter, buildTerminalWaitResult(handle, condition, live.leaf))
-        } else if (condition === 'tui-idle') {
-          const liveLeafWaitText = buildTerminalWaitText(
-            live.leaf.tailBuffer,
-            live.leaf.tailPartialLine,
-            live.leaf.preview
-          )
-          const verdict = this.evaluateLeaf(live.leaf, liveLeafWaitText)
-          if (verdict.kind === 'blocked') {
-            this.waiters.resolve(
-              waiter,
-              buildTerminalWaitBlockedResult(handle, condition, live.leaf, verdict.reason)
-            )
-          } else if (verdict.kind === 'ready-strong') {
-            // Status is retained evidence, not a consumable signal; clearing idle strands subsequent waiters.
-            this.waiters.resolve(waiter, buildTerminalWaitResult(handle, condition, live.leaf))
-          } else {
-            // Ready previews can precede idle OSC titles; keep polling both.
-            this.polls.startLeaf(waiter, live.leaf, verdict)
-            const paneAgent = this.deps.getPaneAgent(live.leaf.ptyId)
-            if (
-              shouldProbeVisibleScreen(paneAgent, live.leaf, liveLeafWaitText) ||
-              tuiIdleNeedsVisibleScreenProbe(live.leaf.lastAgentStatus, liveLeafWaitText, paneAgent)
-            ) {
-              this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs, paneAgent)
-            }
-          }
+      if (verdict) {
+        // Ready previews can precede idle OSC titles; keep polling both.
+        this.polls.start(waiter, pty, verdict)
+        const paneAgent = this.deps.getPaneAgent(pty.ptyId)
+        if (
+          shouldProbeVisibleScreen(paneAgent, pty, outputClockOf(this.deps, pty), waitText) ||
+          tuiIdleNeedsVisibleScreenProbe(pty.lastAgentStatus, waitText, paneAgent)
+        ) {
+          this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs, paneAgent)
         }
       }
     })

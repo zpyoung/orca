@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest'
 import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getAgentSessionOptionCatalog } from '../../../shared/agent-session-option-catalog'
+import { getAgentSessionOptionCatalog } from '../../../shared/agent-session/options/agent-session-option-catalog'
 import { defaultWatcherOwnerDraft, type WatcherOwnerDraft } from './watcher-owner-draft'
 import { WatcherOwnerPicker } from './WatcherOwnerPicker'
 

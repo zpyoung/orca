@@ -27,6 +27,7 @@ import {
   getZoomEntries
 } from './appearance-search'
 import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'
+import { getReduceVisualEffectsEntries } from './appearance-reduce-visual-effects-search'
 import { getTerminalAppearanceSearchEntries } from './terminal-search'
 import { TerminalAppearanceSection } from './TerminalAppearanceSection'
 import type { UseGhosttyImportReturn } from './useGhosttyImport'

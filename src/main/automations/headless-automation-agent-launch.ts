@@ -128,16 +128,28 @@ export async function launchHeadlessAutomationAgent(
         throw new Error(TERMINAL_ONLY_MESSAGE)
       },
       createTerminalAgent: async ({ worktreeId, startupPrompt }) => {
-        const launched = await runtime.launchAgentTerminal(`id:${worktreeId}`, {
-          agent,
-          prompt: startupPrompt ?? '',
-          title: run.title,
-          suppressStartupUpdatePrompt: true,
-          ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
-          // Run now is the user's act and may start a stopped WSL distro; a scheduled run never does.
-          ...(run.trigger === 'scheduled' ? {} : { wslUserAct: true as const }),
-          launchOverrides: automation.launchOverrides ?? undefined
-        })
+        const resolved = selectedWorkspace
+        if (!resolved) {
+          throw new Error('The target workspace is no longer available.')
+        }
+        const launched = await runtime.launchAgentTerminal(
+          `id:${worktreeId}`,
+          {
+            agent,
+            prompt: startupPrompt ?? '',
+            title: run.title,
+            suppressStartupUpdatePrompt: true,
+            ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
+            // Run now is the user's act and may start a stopped WSL distro; a scheduled run never does.
+            ...(run.trigger === 'scheduled' ? {} : { wslUserAct: true as const }),
+            launchOverrides: automation.launchOverrides ?? undefined
+          },
+          {
+            worktree: resolved,
+            repo: target.repo,
+            folderWorkspace: selectedTarget?.scope.folderWorkspace ?? undefined
+          }
+        )
         terminal = launched
         workspace = { id: launched.worktreeId, displayName: resolved.displayName ?? null }
         return {

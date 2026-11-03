@@ -21,7 +21,7 @@ import { toAgentLaunchPreferencesWithOptionValues } from '../../../shared/fork-a
 import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
-import type { AgentTerminalLaunchCompletion } from './structured-agent-session-launch-admission'
+import type { AgentTerminalLaunchCompletion } from './agent-session/launch/structured-agent-session-launch-admission'
 import { agentLaunchNeedsPreparedCommand } from '../../../shared/agent-launch-preferences'
 
 /** Paired web tabs are host-owned; never create a local tab, and return tabId:null. */
@@ -100,10 +100,10 @@ export async function launchAgentInWebHostTab(args: {
         AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY
       ).catch(() => false))
     : false
-  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(startupPlan.sessionOptions, {
-    agent,
-    includeOptionValues
-  })
+  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(
+    capable ? args.sessionOptions : startupPlan.sessionOptions,
+    { agent, includeOptionValues }
+  )
   const structuredPromptDelivery: AgentPromptDelivery =
     promptDelivery === 'draft' ? 'draft' : 'auto-submit'
   const launch = {
@@ -118,7 +118,7 @@ export async function launchAgentInWebHostTab(args: {
     ...(useLaunchOverrides
       ? { hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY }
       : {}),
-    // Why: with or without a prompt, the desktop's launch settings decide args (#31986).
+    // Prepared delivery retains caller settings; authoritative creation resolves the host defaults.
     launchAgent: agent,
     preparedAgentCommand: agentLaunchNeedsPreparedCommand(agent, startupPlan.sessionOptions),
     command: startupPlan.launchCommand,

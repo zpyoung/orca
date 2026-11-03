@@ -140,6 +140,7 @@ export function buildDefaultSettings(args: {
     experimentalBrowserExtensions: false,
     experimentalTerminalDock: false,
     dockTerminalComposerByDefault: true,
+    agentDefaultSurface: 'terminal',
     nativeChatResumeWorkOnRestart: false,
     nativeChatQueueFollowUps: true,
     nativeChatInlineVisuals: true,

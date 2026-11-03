@@ -3,7 +3,7 @@ import type { WatcherDetail } from '../../shared/fork-heimdall/fleet-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
 import { deliverNativeNotification } from '../ipc/native-notification-delivery'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 
 export type WatcherNotificationPublication = 'seed' | 'live' | 'replay'
 

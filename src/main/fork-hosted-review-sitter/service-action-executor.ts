@@ -9,7 +9,7 @@ import type {
   HostedReviewSitterActionResult,
   HostedReviewWorld
 } from '../../shared/fork-hosted-review-sitter/types'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {
   buildHostedReviewWorkerDispatch,

@@ -66,13 +66,10 @@ export function skippedTicksLabel(loop: LoopSnapshot): string | null {
   if (loop.skippedTicks <= 0) {
     return null
   }
-  return loop.skippedTicks === 1
-    ? translate('fork.loops.rail.skippedTicks_one', '{{count}} tick skipped', {
-        count: loop.skippedTicks
-      })
-    : translate('fork.loops.rail.skippedTicks_other', '{{count}} ticks skipped', {
-        count: loop.skippedTicks
-      })
+  return translate('fork.loops.rail.skippedTicks', '{{count}} ticks skipped', {
+    count: loop.skippedTicks,
+    defaultValue_one: '{{count}} tick skipped'
+  })
 }
 
 export function phaseLabel(phase: IterationPhase): string {

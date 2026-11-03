@@ -1,3 +1,4 @@
+import { AutomationSurfaceField } from './AutomationSurfaceField'
 import { translate } from '@/i18n/i18n'
 import { isValidAutomationSchedule } from '../../../../shared/automation-schedule-parsing'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -35,7 +36,7 @@ type AutomationEditorSettingsSidebarProps = {
   settings: GlobalSettings | null
   draft: AutomationDraft
   visibleAgents: AgentCatalogEntry[]
-  launchOverridesGate: AutomationLaunchOverridesGate
+  launchOverridesGate?: AutomationLaunchOverridesGate
   pickerTriggerClassName: string
   segmentedGroupClassName: string
   segmentedItemClassName: string
@@ -78,10 +79,18 @@ export function AutomationEditorSettingsSidebar({
             settings={settings}
             visibleAgents={visibleAgents}
             pickerTriggerClassName={pickerTriggerClassName}
-            launchOverridesGate={launchOverridesGate}
+            launchOverridesGate={launchOverridesGate ?? 'unsupported'}
             onDraftChange={onDraftChange}
           />
-          <AutomationExtraAgentArgsField draft={draft} onDraftChange={onDraftChange} />
+          <AutomationSurfaceField
+            draft={draft}
+            settings={settings}
+            supported={chatSupported}
+            onDraftChange={onDraftChange}
+          />
+          {surface === 'terminal' ? (
+            <AutomationExtraAgentArgsField draft={draft} onDraftChange={onDraftChange} />
+          ) : null}
         </div>
         {destination ? (
           <div className="mb-4">

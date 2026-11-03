@@ -10,7 +10,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { translate } from '@/i18n/i18n'
 import { getAgentCatalog } from '@/lib/agent-catalog'
-import { getAgentSessionOptionCatalog } from '../../../shared/agent-session-option-catalog'
+import { getAgentSessionOptionCatalog } from '../../../shared/agent-session/options/agent-session-option-catalog'
 import { WATCHER_OWNER_SUPPORTED_AGENT, type WatcherOwnerDraft } from './watcher-owner-draft'
 
 const UNAVAILABLE_OWNER_HARNESS_IDS = ['codex', 'gemini', 'cursor', 'grok'] as const

@@ -4,7 +4,7 @@ import {
   findCatalogModel,
   findCatalogOption,
   getAgentSessionOptionCatalog
-} from '../../../shared/agent-session-option-catalog'
+} from '../../../shared/agent-session/options/agent-session-option-catalog'
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'

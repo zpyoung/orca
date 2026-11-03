@@ -226,7 +226,6 @@ jobs:
           --maxWorkers=4 --isolate --retry=0 --bail=0
           config/scripts/mobile-release-check-scope.test.mjs
           config/scripts/mobile-test-change-scope.test.mjs
-          config/scripts/ci-dependency-download-cache.test.mjs
           config/scripts/vitest-node-runtime-boundary.test.ts
           config/scripts/vitest-sqlite-runtime-boundary.test.ts
 

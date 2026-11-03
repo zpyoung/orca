@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
 import type {
@@ -8,6 +8,7 @@ import type {
 } from '../../../../../shared/native-chat-composer-autocomplete'
 import { isMacPlatform } from '../native-chat-shortcut'
 import type { NativeChatMentionFiles } from '../use-native-chat-mention-files'
+import type { NativeChatComposerSendIntent } from '../native-chat-composer-types'
 
 export type UseAgentComposerKeyDownArgs = {
   autocomplete: ComposerAutocomplete
@@ -23,9 +24,9 @@ export type UseAgentComposerKeyDownArgs = {
   dispatchPickerCommand: (item: Extract<NativeChatPickerItem, { kind: 'command' }>) => void
   dismissPicker: (triggerKey: string) => void
   interrupt: () => void
-  send: () => void
-  /** Empty-composer Cmd/Ctrl+Enter steers the newest card; false falls through to send. */
-  steerQueued?: (() => boolean) | undefined
+  send: (intent?: NativeChatComposerSendIntent) => void
+  /** Cmd/Ctrl+Shift+Enter steers the head queued card, whatever the composer holds. */
+  steerHead?: (() => boolean) | undefined
   setActiveSuggestion: Dispatch<SetStateAction<number>>
   setDraft: Dispatch<SetStateAction<string>>
   setCaret: Dispatch<SetStateAction<number>>
@@ -46,7 +47,7 @@ export function useAgentComposerKeyDown({
   dismissPicker,
   interrupt,
   send,
-  steerQueued,
+  steerHead,
   setActiveSuggestion,
   setDraft,
   setCaret,
@@ -113,16 +114,24 @@ export function useAgentComposerKeyDown({
         interrupt()
         return
       }
-      if (event.key === 'Enter' && !event.shiftKey) {
-        const steerChord = isMacPlatform() ? event.metaKey : event.ctrlKey
-        // Only from an empty composer: the chord never sends a card past what the user just wrote.
-        const composerEmpty = draft.trim() === '' && !hasAttachments
-        if (steerChord && composerEmpty && steerQueued?.()) {
-          event.preventDefault()
-          return
-        }
+      const modified = event.key === 'Enter' && (isMacPlatform() ? event.metaKey : event.ctrlKey)
+      // Why before Shift+Enter: that adds a newline, and this chord leaves the draft alone.
+      if (modified && event.shiftKey) {
         event.preventDefault()
-        send()
+        // A held chord would otherwise steer each card that becomes the head.
+        if (!event.repeat) {
+          steerHead?.()
+        }
+        return
+      }
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault()
+        if (!modified) {
+          send()
+        } else if (draft.trim() !== '' || hasAttachments) {
+          // The other thing than the setting; an empty composer has nothing to send either way.
+          send({ alternate: true })
+        }
         return
       }
       if (event.key === 'ArrowUp' && (draft === '' || history.index !== null)) {
@@ -159,7 +168,7 @@ export function useAgentComposerKeyDown({
       isComposing,
       mentionFiles,
       send,
-      steerQueued,
+      steerHead,
       setActiveSuggestion,
       setCaret,
       setDraft,

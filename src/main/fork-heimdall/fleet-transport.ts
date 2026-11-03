@@ -10,7 +10,7 @@ import {
   type WatcherFleetEntry,
   type WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { HeimdallDebugReport } from './debug-report'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import {

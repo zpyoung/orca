@@ -3,6 +3,7 @@ import type * as AgentStatusModule from '@/lib/agent-status'
 import { createTabsSliceMockApi } from '../store/slices/tabs-slice-test-harness'
 import { createTestStore } from '../store/slices/store-test-helpers'
 import { toAgentLaunchPreferences } from '../../../shared/agent-launch-preferences'
+import { withoutForkOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'
 import { resolveAgentSessionOptionLaunch } from '../../../shared/agent-session/options/agent-session-option-launch'
 import { terminalSessionOptionInputs } from '../../../shared/tui-agent-launch-command'
 
@@ -128,7 +129,12 @@ describe('a desktop AI-button launch', () => {
         queuedLaunch(tabId)?.launch.sessionOptions,
         'cursor'
       )
-      return resolveAgentSessionOptionLaunch('cursor', { ...preferences }, [], false).args.join(' ')
+      return resolveAgentSessionOptionLaunch(
+        'cursor',
+        withoutForkOptionValues(preferences),
+        [],
+        false
+      ).args.join(' ')
     }
     const thinking = { model: 'claude-opus-4-8', thinking: 'true', effort: 'high' }
     const yielded = terminalSessionOptionInputs({

@@ -2,7 +2,7 @@
 // they cover rather than in the hook's test file, which owns the IO harness.
 
 import { describe, expect, it } from 'vitest'
-import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
+import type { NativeChatMessage } from '../../../../../shared/native-chat/native-chat-types'
 import { mergeNativeChatLiveSession } from './native-chat-live-status'
 import { selectNativeChatViewState } from './native-chat-view-state'
 import { shouldShowNativeChatWorking } from '../../../../../shared/native-chat/native-chat-working-suppression'

@@ -12,12 +12,19 @@ const readNativeChatSession = (
   argsOrAgent: NativeChatReadSessionArgs | AgentType,
   sessionId?: string,
   limit?: number,
-  transcriptPath?: string
+  transcriptPath?: string,
+  options?: { wakeWslDistro?: boolean }
 ): Promise<NativeChatReadSessionResult> =>
   ipcRenderer.invoke(
     'nativeChat:readSession',
     typeof argsOrAgent === 'string'
-      ? { agent: argsOrAgent, sessionId: sessionId ?? '', limit, transcriptPath }
+      ? {
+          agent: argsOrAgent,
+          sessionId: sessionId ?? '',
+          limit,
+          transcriptPath,
+          wakeWslDistro: options?.wakeWslDistro
+        }
       : argsOrAgent
   )
 

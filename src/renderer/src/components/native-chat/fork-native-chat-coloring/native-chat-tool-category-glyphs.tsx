@@ -3,7 +3,10 @@ import {
   categorizeNativeChatTool,
   type NativeChatToolCategory
 } from '../../../../../shared/fork-native-chat-coloring/native-chat-tool-category'
-import { isToolCallBlock, type NativeChatBlock } from '../../../../../shared/native-chat-types'
+import {
+  isToolCallBlock,
+  type NativeChatBlock
+} from '../../../../../shared/native-chat/native-chat-types'
 
 const TEXT_CLASS_BY_CATEGORY: Record<NativeChatToolCategory, string> = {
   read: 'text-tool-read',

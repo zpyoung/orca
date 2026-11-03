@@ -12,7 +12,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ProjectedAgentMenuItems } from './QuickLaunchButton'
 import { LoopMenuItem } from '@/fork-loops/LoopMenuItem'
-import TabBarCreateEntry from './TabBarCreateEntry'
+import { TabBarAgentPickerEntry } from './TabBarAgentPickerEntry'
 import { TabStripScrollIndicator } from './TabStripScrollIndicator'
 import { TabStripTooltipProvider } from './TabStripTooltipProvider'
 import { getTabStripScrollMaskClassName } from './tab-strip-scroll-metrics'
@@ -283,7 +283,13 @@ export function renderTabBarSurface({
           {showStaticCreateMenuItems && showAgentLaunchItems ? (
             <>
               <DropdownMenuSeparator />
-              <ProjectedAgentMenuItems model={agentMenu} runLaunch={launchAgentRow} />
+              <ProjectedAgentMenuItems
+                model={agentMenu}
+                pickerInventory={agentPickerInventory}
+                onSelectPickerAgent={selectPickerAgent}
+                hidePickerSearch={!terminalOnly && Boolean(onOpenEntry)}
+                runLaunch={launchAgentRow}
+              />
               <LoopMenuItem worktreeId={worktreeId} groupId={resolvedGroupId} />
             </>
           ) : null}

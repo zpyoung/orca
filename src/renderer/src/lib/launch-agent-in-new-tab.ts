@@ -123,38 +123,27 @@ export function launchAgentInNewTabWithOutcome(
     args.focusIntent?.cancel()
     return { refused: { delivered: false, failureNotified: notifyFailure } }
   }
-  // The saved choice becomes flags that replace conflicting raw ones, unless it yields to them.
-  const terminalOptions = terminalSessionOptionInputs({
-    agent,
-    sessionOptions,
-    yieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
-    agentArgs: effectiveAgentArgs,
-    shell: terminalShell
-  })
-  const startupPlanBase = {
-    agent,
-    cmdOverrides: store.settings?.agentCmdOverrides ?? {},
-    platform: resolvedLaunchPlatform,
-    shell: queuedShell,
-    isRemote,
-    agentArgs: effectiveAgentArgs,
-    agentEnv,
-    ...terminalOptions,
-    includeSessionOptionCatalogDefaults
-  }
-  const { startupPlan, pasteDraftAfterLaunch, submitPastedPrompt } = planLaunchAgentStartupPrompt({
-    base: startupPlanBase,
-    prompt: trimmedPrompt,
-    promptDelivery,
-    isFollowupPath
-  })
-  let promptDeliveryResult: Promise<{ delivered: boolean; failureNotified: boolean }> | undefined
-
-  if (!startupPlan) {
-    args.focusIntent?.cancel()
-    return null
-  }
-
+  const buildStartup = (
+    agentLaunchChoices = readAgentLaunchPreferencesForWorktree(store, worktreeId).agentLaunchChoices
+  ) =>
+    planLaunchAgentStartupPrompt({
+      base: {
+        ...resolveAgentStartupPlanInputs({
+          agent,
+          settings: { ...store.settings, agentLaunchChoices },
+          agentArgs,
+          sessionOptions,
+          sessionOptionsYieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
+          platform: resolvedLaunchPlatform,
+          shell: queuedShell,
+          isRemote
+        }),
+        includeSessionOptionCatalogDefaults
+      },
+      prompt: trimmedPrompt,
+      promptDelivery,
+      isFollowupPath
+    })
   args.focusIntent?.cancel()
   const runtimeEnvironmentId = runtimeEnvironmentIdOrLocalUnlessTwin(store, worktreeId)
   if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
@@ -173,7 +162,6 @@ export function launchAgentInNewTabWithOutcome(
       promptDelivery,
       agentArgs,
       useLaunchOverrides: includeSessionOptionCatalogDefaults === false,
-      // Send the resolved terminal choice explicitly or a paired host could substitute its own chat default.
       viewMode: 'terminal',
       ...(activate === false ? { activate } : {}),
       onPromptDelivered

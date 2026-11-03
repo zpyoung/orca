@@ -3,15 +3,14 @@ import {
   isResumableTuiAgent,
   type AgentProviderSessionMetadata,
   type ResumableTuiAgent
-} from './agent-session-resume'
-import type { SessionOptionValue } from './native-chat/input/native-chat-session-options'
-import type { RuntimeTerminalCreate, RuntimeTerminalPresentation } from './runtime-types'
-import { isTerminalLeafId } from './stable-pane-id'
-import { isValidTerminalTabId } from './terminal-tab-id'
-import type { TuiAgent } from './tui-agent'
-import type { SpawnIntent } from './host-spawn-admission'
-
-export { AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY as AGENT_SESSION_HOST_AUTHORITY_CAPABILITY } from './protocol-version'
+} from './lifecycle/agent-session-resume'
+import type { SessionOptionValue } from '../native-chat/input/native-chat-session-options'
+import type { RuntimeTerminalCreate } from '../runtime-terminal-create-contract'
+import type { RuntimeTerminalPresentation } from '../runtime-terminal-contracts'
+import { isTerminalLeafId } from '../stable-pane-id'
+import { isValidTerminalTabId } from '../terminal-tab-id'
+import type { TuiAgent } from '../tui-agent'
+import type { SpawnIntent } from '../host-spawn-admission'
 
 export const AGENT_SESSION_RPC_ERROR_CODES = [
   'agent_session_identity_required',

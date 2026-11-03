@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { HOSTED_REVIEW_AGENT_CHANNELS } from '../../shared/fork-hosted-review-sitter/api'
 import { isTuiAgent } from '../../shared/tui-agent-config'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { launchHostedReviewSitterFixAgent } from './agent'
 

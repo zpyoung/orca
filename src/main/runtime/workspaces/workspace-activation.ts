@@ -19,7 +19,7 @@ import {
   buildWorktreeStartupForDraft,
   resolveWorktreeStartupDraftAgent
 } from '../runtime-worktree-agent-startup'
-import type { AgentLaunchPreferences } from '../../../shared/agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../../../shared/agent-session/agent-session-host-authority'
 import type { SessionOptionValue } from '../../../shared/native-chat/input/native-chat-session-options'
 import type { AgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { Automation } from '../../../shared/automations-types'

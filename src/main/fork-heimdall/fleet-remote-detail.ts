@@ -5,7 +5,7 @@ import type {
   WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
 import { WatcherDetailReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type {
   FleetEnvironmentIdentity,
   FleetEnvironmentTransport

@@ -3,7 +3,7 @@ import type {
   NativeChatAppendedMessages,
   NativeChatReadSessionArgs
 } from '../../../../preload/api-types'
-import type { AgentType } from '../../../../shared/native-chat-types'
+import type { AgentType } from '../../../../shared/agent-status-types'
 import { buildNativeChatUnsubscribe } from '../../../../shared/native-chat/native-chat-stream-unsubscribe'
 import {
   parseRuntimeNativeChatReadSessionResult,

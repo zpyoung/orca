@@ -1,4 +1,4 @@
-import { hasUnsafeProviderSessionIdChars } from '../agent-session-resume'
+import { hasUnsafeProviderSessionIdChars } from '../agent-session/lifecycle/agent-session-resume'
 
 /** Request and verdict shapes for the handoff transcript probe, shared by the
  *  renderer probe, the preload wrapper, and the main-process resolver. */

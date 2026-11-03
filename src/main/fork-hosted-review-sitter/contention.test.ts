@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { RuntimeListingHostScope } from '../../shared/runtime-listing-host-scope'
 import type { HostedReviewSitterDefinition } from '../../shared/fork-hosted-review-sitter/types'

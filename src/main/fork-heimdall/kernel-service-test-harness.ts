@@ -7,7 +7,7 @@ import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { EnrollInput, WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { HeimdallBudgetClock } from './budget-clock'
 import { HeimdallDatabase } from './database'

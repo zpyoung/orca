@@ -3,9 +3,9 @@ import {
   findCatalogModel,
   getAgentSessionOptionCatalog,
   sessionOptionValueIsValid
-} from '../agent-session-option-catalog'
-import type { CatalogOptionApply } from '../agent-session-option-catalog-types'
-import { resolveAgentSessionOptionLaunch } from '../agent-session-option-launch'
+} from '../agent-session/options/agent-session-option-catalog'
+import type { CatalogOptionApply } from '../agent-session/options/agent-session-option-catalog-types'
+import { resolveAgentSessionOptionLaunch } from '../agent-session/options/agent-session-option-launch'
 import type { SessionOptionValue } from '../native-chat/input/native-chat-session-options'
 import { tokenizeStartupCommand, type AgentStartupShell } from '../tui-agent-startup-shell'
 

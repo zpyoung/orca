@@ -3,7 +3,7 @@ import type { AgentType } from '../../../../shared/agent-status-types'
 import { getAgentSessionOptionCatalog } from '../../../../shared/agent-session/options/agent-session-option-catalog'
 import { matchNativeChatCatalogModelId } from '../../../../shared/native-chat/input/native-chat-session-option-state'
 import type { SessionOptionDescriptor } from '../../../../shared/native-chat/input/native-chat-session-options'
-import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
+import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat/native-chat-types'
 import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import {
   hasDispatchedNativeChatSessionOption,

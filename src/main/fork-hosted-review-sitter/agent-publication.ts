@@ -8,7 +8,7 @@ import type {
   PublishConflictResolutionAction,
   PublishFixAction
 } from '../../shared/fork-hosted-review-sitter/types'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { assertBranchAndHead, verifyPreparedCommit, type PublishAction } from './agent-execution'
 import {

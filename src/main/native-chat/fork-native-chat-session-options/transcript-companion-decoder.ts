@@ -3,7 +3,7 @@
 // lifecycle and session options — into a single call so a reader threads one
 // decode/collect pair rather than one per value.
 
-import type { AgentType } from '../../../shared/native-chat-types'
+import type { AgentType } from '../../../shared/agent-status-types'
 import type { NativeChatTranscriptCompanion } from '../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import { nativeChatSessionOptionDecoderForAgent } from './transcript-session-options'
 import { nativeChatTurnLifecycleDecoderForAgent } from '../transcript-turn-lifecycle'

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
 // @vitest-environment happy-dom
 
 import { cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
@@ -11,7 +11,7 @@ import {
   deriveComposerAutocomplete,
   type ComposerAutocomplete
 } from '../../../../../shared/native-chat-composer-autocomplete'
-import { getNativeChatAgentProfile } from '../../../../../shared/native-chat-agent-profiles'
+import { getNativeChatAgentProfile } from '../../../../../shared/native-chat/native-chat-agent-profiles'
 import { useAgentComposerKeyDown } from './use-agent-composer-keydown'
 
 const COMMAND = {

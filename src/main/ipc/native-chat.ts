@@ -1,6 +1,7 @@
 import { DESKTOP_READ_WINDOW } from '../native-chat/transcript-watch-contract'
 import { ipcMain, type IpcMainEvent, type WebContents } from 'electron'
-import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
+import type { AgentType } from '../../shared/agent-status-types'
+import type { NativeChatMessage } from '../../shared/native-chat/native-chat-types'
 import {
   nativeChatCompanionFrameFields,
   type NativeChatCompanionFrameFields
@@ -27,6 +28,8 @@ export type NativeChatReadSessionArgs = {
   /** Hook-authoritative path when session IDs no longer identify transcript filenames. */
   transcriptPath?: string
   beforeOffset?: number
+  /** The user opened or paged this chat: may start its stopped WSL distro (E9). Absent never does. */
+  wakeWslDistro?: boolean
 }
 
 // Bound parsing and rendering to the recent window; pagination raises the limit.

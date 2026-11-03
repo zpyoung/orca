@@ -16,6 +16,8 @@ import {
   publicKeyToBase64
 } from '../../shared/e2ee-crypto'
 import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall/capability'
+import { sendWebSocketRequestWithStatusPreflight } from './websocket-transport'
+import { getRemoteRuntimeRequestAdmissionEvidence } from '../../shared/remote-runtime/requests/remote-runtime-prepared-request-admission'
 import { RuntimeClient } from './client'
 import { requestWorktreeRemoval } from '../handlers/worktree-removal-request'
 import { launchOrcaApp } from './launch'

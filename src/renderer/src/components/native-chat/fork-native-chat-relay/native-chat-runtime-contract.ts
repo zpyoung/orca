@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-runtime-contract.ts
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
 import type {
   NativeChatAppendedMessages,
   NativeChatReadSessionResult
@@ -7,7 +7,7 @@ import type {
 import type {
   NativeChatSessionOptionObservation,
   NativeChatTurnLifecycle
-} from '../../../../../shared/native-chat-types'
+} from '../../../../../shared/native-chat/native-chat-types'
 import type { NativeChatCompanionFrameFields } from '../../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import { translate } from '@/i18n/i18n'
 

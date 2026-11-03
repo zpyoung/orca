@@ -82,7 +82,7 @@ const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCom
       launchSeed,
       reportedSessionOptions,
       structuredTransport,
-      steerQueued,
+      steerHead,
       inputOwnedByCard = false,
       notices
     },
@@ -352,7 +352,7 @@ const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCom
       dispatchPickerCommand: resume.interceptPick(dispatchPickerCommand),
       mentionFiles,
       completeMention: picker.completeMention,
-      ...(steerQueued ? { steerQueued } : {}),
+      ...(steerHead ? { steerHead } : {}),
       goalMode,
       contextUsage: contextUsageSummary,
       imageAttachments,

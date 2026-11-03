@@ -20,6 +20,7 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
     name: automation.name,
     prompt: automation.prompt,
     agentId: automation.agentId,
+    surface: automation.launchSetup?.surface ?? automation.surface ?? 'terminal',
     extraAgentArgs: migrateLegacyAutomationLaunchArgs(automation).extraAgentArgs ?? '',
     launchOverrides: normalizeAutomationLaunchOverrides(automation.launchOverrides) ?? {},
     projectId: getAutomationRunRepoId(automation),

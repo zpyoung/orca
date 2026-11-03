@@ -9,7 +9,7 @@
 import type {
   NativeChatSessionOptionObservation,
   NativeChatTurnLifecycle
-} from '../native-chat-types'
+} from '../native-chat/native-chat-types'
 
 export type NativeChatTranscriptCompanion = {
   lifecycle?: NativeChatTurnLifecycle

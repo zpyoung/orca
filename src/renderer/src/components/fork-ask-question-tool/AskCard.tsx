@@ -22,13 +22,10 @@ export type AskCardProps = {
 }
 
 function questionCountLabel(count: number): string {
-  return count === 1
-    ? translate('components.fork-ask-question-tool.askCard.header_one', '{{count}} question', {
-        count
-      })
-    : translate('components.fork-ask-question-tool.askCard.header_other', '{{count}} questions', {
-        count
-      })
+  return translate('components.fork-ask-question-tool.askCard.header', '{{count}} questions', {
+    count,
+    defaultValue_one: '{{count}} question'
+  })
 }
 
 function buildInitialDrafts(model: AskCardModel): Record<string, AskQuestionDraft> {

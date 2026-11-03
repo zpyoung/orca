@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
 }))
 
 async function createStore() {
-  const { Store } = await import('../persistence')
+  const { Store } = await import('../persistence/loading-store/store')
   const { createSqliteTestStore } = await import('../persistence/persistence-test-harness')
   return createSqliteTestStore(Store, { dataFile: join(dataDir, 'orca-data.json') })
 }

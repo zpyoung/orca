@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
@@ -9,6 +9,7 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { basename } from '@/lib/path'
 import { isNativeChatPastedImagePath } from '../../../../../shared/native-chat-image-label'
+import type { NativeChatFollowUpBehavior } from '../../../../../shared/native-chat-follow-up-behavior'
 import type {
   ComposerAutocomplete,
   NativeChatPickerItem
@@ -58,6 +59,8 @@ export type AgentComposerFieldProps = {
   /** Why the send button is disabled, when the user can do something about it. */
   sendBlockedReason?: string | null
   isWorking: boolean
+  /** While the agent works: what Cmd/Ctrl+Enter would do instead of a plain send, when it differs. */
+  alternateSend?: NativeChatFollowUpBehavior
   /** This client's Stop request is in flight: the Stop control is disabled and says so. */
   isStopping?: boolean
   /** After Stop, describe whether the host queues the next message as a card or holds the send. */
@@ -162,6 +165,7 @@ export function AgentComposerField({
   sendButtonDisabled,
   sendBlockedReason,
   isWorking,
+  alternateSend,
   isStopping = false,
   afterStop,
   attachDisabled,
@@ -242,7 +246,7 @@ export function AgentComposerField({
   const focusComposer = useCallback(() => textareaRef.current?.focus(), [textareaRef])
 
   return (
-    <div className={cn('bg-chat-canvas', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}>
+    <div className={cn('bg-chat-pane', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}>
       {/* Extra bottom padding keeps the chat input box off the window rim. */}
       <div className={cn(layout === 'dock' ? 'h-full min-h-0' : 'px-3 pb-4 pt-2 sm:px-4')}>
         <div
@@ -431,6 +435,7 @@ export function AgentComposerField({
                 sendBlockedReason={sendBlockedReason}
                 draftNotSaved={draftNotSaved}
                 isWorking={isWorking}
+                alternateSend={alternateSend}
                 isStopping={isStopping}
                 isDictating={isDictating}
                 isDictationHoldMode={isDictationHoldMode}

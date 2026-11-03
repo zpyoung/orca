@@ -38,6 +38,7 @@ export type IGitProvider = {
     filePath: string,
     staged: boolean,
     compareAgainstHead?: boolean,
+    oldPath?: string,
     options?: { signal?: AbortSignal }
   ): Promise<GitDiffResult>
   stageFile(worktreePath: string, filePath: string): Promise<void>

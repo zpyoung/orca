@@ -1,11 +1,13 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
 import { memo } from 'react'
 import { ArrowUp, CircleAlert, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { getScreenSubmitShortcutLabel } from '@/lib/screen-submit-shortcut'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import type { NativeChatFollowUpBehavior } from '../../../../../shared/native-chat-follow-up-behavior'
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
@@ -27,6 +29,8 @@ export type AgentComposerActionsProps = {
   /** Storage refused this draft; it is held in memory only. */
   draftNotSaved?: boolean
   isWorking: boolean
+  /** While the agent works: what Cmd/Ctrl+Enter would do instead of a plain send, when it differs. */
+  alternateSend?: NativeChatFollowUpBehavior
   /** This client's Stop request is in flight: the Stop control is disabled and says so. */
   isStopping?: boolean
   isDictating: boolean
@@ -58,6 +62,7 @@ export const AgentComposerActions = memo(function AgentComposerActions({
   sendBlockedReason,
   draftNotSaved,
   isWorking,
+  alternateSend,
   isStopping = false,
   isDictating,
   isDictationHoldMode,
@@ -80,6 +85,17 @@ export const AgentComposerActions = memo(function AgentComposerActions({
     ? translate('components.native-chat.composer.stopDictation', 'Stop dictation')
     : translate('components.native-chat.composer.startDictation', 'Start dictation')
   const sendReason = sendBlockedReason ?? null
+  const sendHint =
+    sendReason ??
+    (alternateSend
+      ? alternateSend === 'steer'
+        ? translate('components.native-chat.composer.alternateSteerHint', '{{shortcut}} to steer', {
+            shortcut: getScreenSubmitShortcutLabel()
+          })
+        : translate('components.native-chat.composer.alternateQueueHint', '{{shortcut}} to queue', {
+            shortcut: getScreenSubmitShortcutLabel()
+          })
+      : null)
   const stopLabel = isStopping
     ? translate('components.native-chat.status.stopping', 'Stopping…')
     : translate('components.native-chat.stop', 'Stop the agent')
@@ -220,14 +236,14 @@ export const AgentComposerActions = memo(function AgentComposerActions({
             {translate('common.cancel', 'Cancel')}
           </Button>
         ) : null}
-        {sendReason ? (
+        {sendHint ? (
           <Tooltip>
             <TooltipTrigger asChild>
               {/* A disabled button gets no pointer events, so the wrapper carries the hover. */}
               <span className="inline-flex">{sendButton}</span>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4}>
-              {sendReason}
+              {sendHint}
             </TooltipContent>
           </Tooltip>
         ) : (

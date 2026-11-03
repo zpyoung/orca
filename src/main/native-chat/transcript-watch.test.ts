@@ -7,7 +7,7 @@ import type {
   NativeChatMessage,
   NativeChatSessionOptionObservation,
   NativeChatTurnLifecycle
-} from '../../shared/native-chat-types'
+} from '../../shared/native-chat/native-chat-types'
 import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { NativeChatTranscriptSubscription } from './transcript-watch-contract'
 import {

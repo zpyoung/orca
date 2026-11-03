@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CatalogModel } from '../../../../../shared/agent-session-option-catalog'
+import type { CatalogModel } from '../../../../../shared/agent-session/options/agent-session-option-catalog-types'
 import { nativeChatReportedValuesFromObservation } from './native-chat-session-option-observation'
 
 // What a host probe returns for Claude: exact ids, with the seed's option menus

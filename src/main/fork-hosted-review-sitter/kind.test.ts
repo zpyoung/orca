@@ -11,7 +11,7 @@ import {
   type HostedReviewSnapshot,
   type HostedReviewWorld
 } from '../../shared/fork-hosted-review-sitter'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HostedReviewSitterGitExecution } from './provider'
 import { resolveHostedReviewSitterOutcome } from './service-action-executor'

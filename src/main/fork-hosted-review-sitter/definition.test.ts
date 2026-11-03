@@ -5,7 +5,7 @@ import type { AuthorizedEnrollment, EnrollInput } from '../../shared/fork-heimda
 import type { HostedReviewInfo } from '../../shared/hosted-review'
 import { authorizeKindEnrollment } from '../fork-heimdall/kernel-enrollment'
 import { WatcherKindRegistry, type RegisteredWatcherKind } from '../fork-heimdall/registry'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { createHostedReviewKind } from './kind'
 import {

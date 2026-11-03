@@ -12,7 +12,10 @@ import {
 } from '../../../../shared/agent-session/view/structured-agent-session-composer'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { dispatchNativeChatStructuredComposerText } from './native-chat-structured-composer-dispatch'
-import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
+import type {
+  NativeChatComposerSendIntent,
+  NativeChatStructuredComposerTransport
+} from './native-chat-composer-types'
 import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 import { nativeChatAttachImagesAgainReason } from './native-chat-image-reattach'
 import { nativeChatNoticeFromError } from './native-chat-composer-notice'

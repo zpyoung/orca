@@ -1,15 +1,14 @@
 // FORK-COPY-OF: src/shared/native-chat/native-chat-live-status.ts
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
 // Reconcile live working state with provider turn boundaries so a dropped final hook cannot leave Stop stuck.
 
-import type { AgentStatusState } from '../../../../../shared/agent-status-types'
+import type { AgentStatusState, AgentType } from '../../../../../shared/agent-status-types'
 import { assembleNativeChatSession, type NativeChatSources } from '../native-chat-session-assembler'
 import type {
-  AgentType,
   NativeChatSession,
   NativeChatSessionStatus,
   NativeChatTurnLifecycle
-} from '../../../../../shared/native-chat-types'
+} from '../../../../../shared/native-chat/native-chat-types'
 import { LIFECYCLE_CLOCK_SKEW_SLACK_MS } from '../../../../../shared/native-chat-clock-skew'
 
 export type NativeChatLiveMergeInput = {

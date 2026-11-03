@@ -138,12 +138,10 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
       structuredWorktreeId: structuredTransport?.worktreeId
     })
 
-    const resolveTarget = useCallback(() => {
-      if (!targetPtyId) {
-        return null
-      }
-      return { terminalTabId, ptyId: targetPtyId }
-    }, [targetPtyId, terminalTabId])
+    const resolveTarget = useCallback(
+      () => (targetPtyId ? { terminalTabId, ptyId: targetPtyId } : null),
+      [targetPtyId, terminalTabId]
+    )
 
     const attachments = useNativeChatComposerAttachments({
       attachmentScopeKey: draftScopeKey,

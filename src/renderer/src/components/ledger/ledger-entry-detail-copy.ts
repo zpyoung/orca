@@ -68,9 +68,10 @@ export function detailFullHistory(): string {
 }
 
 export function detailRevisionCount(count: number): string {
-  return count === 1
-    ? translate('ledger.detail.revisionCount_one', '{{count}} revision', { count })
-    : translate('ledger.detail.revisionCount_other', '{{count}} revisions', { count })
+  return translate('ledger.detail.revisionCount', '{{count}} revisions', {
+    count,
+    defaultValue_one: '{{count}} revision'
+  })
 }
 
 export function detailEdit(): string {

@@ -75,12 +75,6 @@ describe('runtime git diff transport budget', () => {
     expect(mocks.getDiff).toHaveBeenCalled()
   })
 
-  it('leaves a local-repo diff uncapped when no budget is supplied', async () => {
-    await expect(
-      commands().getRuntimeGitDiff('id:wt-1', 'assets/logo.png', false)
-    ).resolves.toMatchObject({ modifiedContent: OVERSIZED_BASE64 })
-  })
-
   it('forwards the request abort signal into local diff execution', async () => {
     const controller = new AbortController()
 

@@ -1,5 +1,5 @@
 import { agentStartedTelemetry } from '../agent-launch/agent-started-telemetry'
-import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../../shared/agent-session/agent-session-host-authority'
 import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOverrides

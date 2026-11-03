@@ -104,7 +104,6 @@ export default function AiVaultPanel({
     setAllAgentsEnabled,
     resetViewOptions
   } = usePersistedAiVaultViewOptions(initialAgents)
-  useSessionInfoVaultNavigation(setQuery, setAgentEnabled)
   const { executionHostScope, onExecutionHostScopeChange, hostScopeOptions } =
     useAiVaultPanelHostScope(activeWorktreeId ?? null, resumeTargetState)
   const activeWorktreePath = activeWorktree?.path ?? null
@@ -137,6 +136,7 @@ export default function AiVaultPanel({
     activeWorktreeId,
     activeProjectKey
   })
+  useSessionInfoVaultNavigation(setQuery, setAgentEnabled)
   const projectLabelByKey = projectScopeContext.projectLabelByKey
   // Sent to the scanner so scoped views surface sessions older than the global cap.
   const scopePaths = useMemo(

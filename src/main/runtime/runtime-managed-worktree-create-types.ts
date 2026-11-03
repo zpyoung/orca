@@ -1,4 +1,5 @@
-import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-create-contract'
+import type { AgentLaunchPreferences } from '../../shared/agent-session/agent-session-host-authority'
 import type { AgentLaunchOverrides } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { CreateWorktreeArgs } from '../../shared/worktree/create-types'
 import type {

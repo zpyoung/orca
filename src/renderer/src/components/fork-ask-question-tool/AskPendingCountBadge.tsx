@@ -4,17 +4,11 @@ import { translate } from '@/i18n/i18n'
 import { selectPendingAskCount } from '../../store/slices/fork-ask-question-tool/asks'
 
 function pendingAskCountLabel(count: number): string {
-  return count === 1
-    ? translate(
-        'components.fork-ask-question-tool.badge.pendingCountLabel_one',
-        '{{count}} pending question',
-        { count }
-      )
-    : translate(
-        'components.fork-ask-question-tool.badge.pendingCountLabel_other',
-        '{{count}} pending questions',
-        { count }
-      )
+  return translate(
+    'components.fork-ask-question-tool.badge.pendingCountLabel',
+    '{{count}} pending questions',
+    { count, defaultValue_one: '{{count}} pending question' }
+  )
 }
 
 /** Counts asks awaiting an answer across every pane. */

@@ -2,7 +2,7 @@
 
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { NativeChatTurnLifecycle } from '../../../../../shared/native-chat-types'
+import type { NativeChatTurnLifecycle } from '../../../../../shared/native-chat/native-chat-types'
 import { useNativeChatTranscriptCompanion } from './use-native-chat-transcript-companion'
 
 const WORKING: NativeChatTurnLifecycle = { state: 'working', turnId: 't-1', timestamp: 10 }

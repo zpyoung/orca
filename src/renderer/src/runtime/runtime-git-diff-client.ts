@@ -23,6 +23,7 @@ export async function getRuntimeGitDiff(
     filePath: string
     staged: boolean
     compareAgainstHead?: boolean
+    oldPath?: string
     signal?: AbortSignal
   },
   options?: GitDiffWakeOptions

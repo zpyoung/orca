@@ -1,6 +1,6 @@
 import { basename, dirname } from 'node:path'
 import { readdir } from 'node:fs/promises'
-import { OrcaRuntimeWithMigrationCatalog } from './orca-runtime-migration-catalog'
+import { OrcaRuntimeWithWindowlessTerminalActivity } from './orca-runtime-windowless-terminal-activity'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import type { Worktree } from '../../shared/worktree/types'
 import {
@@ -30,11 +30,11 @@ import type {
 } from './runtime-ledger-catalog-removal'
 
 /** Owns the profile-scoped ledger store and keeps its catalog in step with the repo graph. */
-export abstract class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCatalog {
+export abstract class OrcaRuntimeWithLedger extends OrcaRuntimeWithWindowlessTerminalActivity {
   private readonly ledgerService: LedgerRuntimeService | null
   private ledgerCatalogReconcileQueue: Promise<void> = Promise.resolve()
 
-  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithMigrationCatalog>) {
+  constructor(...args: ConstructorParameters<typeof OrcaRuntimeWithWindowlessTerminalActivity>) {
     super(...args)
     const store = args[0]
     const dataFile = store?.getDataFile?.()
@@ -79,7 +79,7 @@ export abstract class OrcaRuntimeWithLedger extends OrcaRuntimeWithMigrationCata
   }
 
   notifyWorktreesChanged(
-    ...args: Parameters<OrcaRuntimeWithMigrationCatalog['notifyWorktreesChanged']>
+    ...args: Parameters<OrcaRuntimeWithWindowlessTerminalActivity['notifyWorktreesChanged']>
   ): void {
     this.queueLedgerCatalogReconciliation()
     super.notifyWorktreesChanged(...args)

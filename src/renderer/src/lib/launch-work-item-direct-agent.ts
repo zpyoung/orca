@@ -6,11 +6,17 @@ import {
   type AgentStartupPlan
 } from '@/lib/tui-agent-startup'
 import type { AgentStartedTelemetry } from '@/lib/worktree-startup-payload'
+<<<<<<< fork
 import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-resume'
 import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOptionSelection
 } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+||||||| base
+import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-resume'
+=======
+import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session/lifecycle/agent-session-resume'
+>>>>>>> upstream
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
 import type { TuiAgent } from '../../../shared/tui-agent'
@@ -50,33 +56,23 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     return { startupPlan: null, draftLaunchedNatively: false, startupPlanFailed: false }
   }
 
-  const permissionSettings = agentLaunchPermissionSettings(
-    args.agent,
-    args.settings ?? {},
-    args.sessionOptions
-  )
+<<<<<<< fork
   const effectiveAgentArgs =
     args.agentArgs === undefined
-      ? resolveTuiAgentLaunchArgs(
-          args.agent,
-          permissionSettings,
-          readLaunchPermissionChoice(args.sessionOptions) ? 'own' : undefined
-        )
+      ? resolveTuiAgentLaunchArgs(args.agent, args.settings)
       : args.agentArgs
-<<<<<<< fork
   const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings, args.launchPlatform)
   const recipeSessionOptions = args.launchOptions?.model
     ? agentLaunchOverridesToSessionOptionValues(args.launchOptions)
     : undefined
 ||||||| base
+  const effectiveAgentArgs =
+    args.agentArgs === undefined
+      ? resolveTuiAgentLaunchArgs(args.agent, args.settings)
+      : args.agentArgs
   const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings, args.launchPlatform)
 =======
-  const effectiveAgentEnv = resolveTuiAgentLaunchEnv(
-    args.agent,
-    permissionSettings,
-    args.launchPlatform
-  )
-  const sessionOptionInputs = terminalSessionOptionInputs({
+  const startupInputs = resolveAgentStartupPlanInputs({
     agent: args.agent,
     settings: args.settings ?? {},
     agentArgs: args.agentArgs,
@@ -91,6 +87,7 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     args.promptDelivery === 'submit-after-ready'
       ? null
       : buildAgentDraftLaunchPlan({
+<<<<<<< fork
           agent: args.agent,
           draft: args.draftContent,
           cmdOverrides: args.settings?.agentCmdOverrides ?? {},
@@ -98,15 +95,21 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
           ...(args.shell ? { shell: args.shell } : {}),
           isRemote: args.isRemote,
           agentArgs: effectiveAgentArgs,
-<<<<<<< fork
           agentEnv: effectiveAgentEnv,
           sessionOptions: recipeSessionOptions,
           includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined
 ||||||| base
+          agent: args.agent,
+          draft: args.draftContent,
+          cmdOverrides: args.settings?.agentCmdOverrides ?? {},
+          platform: args.launchPlatform,
+          ...(args.shell ? { shell: args.shell } : {}),
+          isRemote: args.isRemote,
+          agentArgs: effectiveAgentArgs,
           agentEnv: effectiveAgentEnv
 =======
-          agentEnv: effectiveAgentEnv,
-          ...sessionOptionInputs
+          ...startupInputs,
+          draft: args.draftContent
 >>>>>>> upstream
         })
 
@@ -134,18 +137,23 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
   const startupPlan = buildAgentStartupPlan({
     ...startupInputs,
     prompt: '',
+<<<<<<< fork
     cmdOverrides: args.settings?.agentCmdOverrides ?? {},
     platform: args.launchPlatform,
     ...(args.shell ? { shell: args.shell } : {}),
     isRemote: args.isRemote,
     agentArgs: effectiveAgentArgs,
     agentEnv: effectiveAgentEnv,
-<<<<<<< fork
     sessionOptions: recipeSessionOptions,
     includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
 ||||||| base
+    cmdOverrides: args.settings?.agentCmdOverrides ?? {},
+    platform: args.launchPlatform,
+    ...(args.shell ? { shell: args.shell } : {}),
+    isRemote: args.isRemote,
+    agentArgs: effectiveAgentArgs,
+    agentEnv: effectiveAgentEnv,
 =======
-    ...sessionOptionInputs,
 >>>>>>> upstream
     allowEmptyPromptLaunch: true,
     ...(args.promptDelivery === 'submit-after-ready' ? { suppressStartupUpdatePrompt: true } : {})

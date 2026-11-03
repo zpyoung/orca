@@ -15,7 +15,7 @@ import {
 } from '../../shared/source-control-ai-actions'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 
 export type PrepareAction = PrepareFixAction | PrepareConflictResolutionAction
 export type HostedReviewWorkerDispatch = {

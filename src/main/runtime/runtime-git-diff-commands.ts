@@ -25,7 +25,8 @@ export class RuntimeGitDiffCommands {
     staged: boolean,
     compareAgainstHead?: boolean,
     maxContentBytes?: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    oldPath?: string
   ): Promise<GitDiffResult> {
     const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
     const relativePath = normalizeRuntimeGitRelativePath(filePath)
@@ -36,6 +37,7 @@ export class RuntimeGitDiffCommands {
         relativePath,
         staged,
         compareAgainstHead,
+        oldRelativePath,
         signal ? { signal } : undefined
       ),
       maxContentBytes

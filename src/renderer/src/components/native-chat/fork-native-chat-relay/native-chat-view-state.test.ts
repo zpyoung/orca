@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import type { NativeChatMessage, NativeChatSession } from '../../../../../shared/native-chat-types'
+import type {
+  NativeChatMessage,
+  NativeChatSession
+} from '../../../../../shared/native-chat/native-chat-types'
 import { selectNativeChatViewState } from './native-chat-view-state'
 
 const message: NativeChatMessage = {

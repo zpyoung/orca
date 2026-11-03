@@ -1,10 +1,11 @@
 import { useMemo, useRef } from 'react'
-import type { AgentType, NativeChatMessage } from '../../../../../shared/native-chat-types'
+import type { NativeChatMessage } from '../../../../../shared/native-chat/native-chat-types'
+import type { AgentType } from '../../../../../shared/agent-status-types'
 import {
   assembleCachedTranscript,
   createNativeChatTranscriptCache
 } from './native-chat-incremental-assembler'
-import { getVerifiedNativeChatCommands } from '../../../../../shared/native-chat-agent-profiles'
+import { getVerifiedNativeChatCommands } from '../../../../../shared/native-chat/native-chat-agent-profiles'
 import { surfaceSkillInvocationUserTurns } from '../../../../../shared/native-chat/native-chat-command-envelope'
 
 /**

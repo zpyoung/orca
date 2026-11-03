@@ -240,7 +240,7 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": [
-        "import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'",
+        "import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session/agent-session-runtime-capabilities'",
         "    for (const build of sendsDelivery ? [current, baseline] : [current]) {"
       ]
     },
@@ -312,15 +312,6 @@
         "        target,",
         "      pendingHandle = sendNativeChatMessage(target, text, sendOptions)",
         "      submitNativeChatPrompt(target)"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.test.tsx",
-      "feature": "agent-composer",
-      "kind": "passthrough",
-      "lines": [
-        "      resolveTarget: () => ({ terminalTabId: 'tab', ptyId: 'pty' }),",
-        "    { terminalTabId: 'tab', ptyId: 'pty' },"
       ]
     },
     {
@@ -1153,12 +1144,6 @@
       ]
     },
     {
-      "path": "src/main/skills/claude-plugin-skill-sources.test.ts",
-      "feature": "skill-plugin-attribution",
-      "kind": "passthrough",
-      "lines": ["        pluginName: 'compound-engineering',"]
-    },
-    {
       "path": "src/main/skills/claude-plugin-skill-sources.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
@@ -1392,7 +1377,7 @@
         "  hasDispatchedNativeChatSessionOption,",
         "  useClaudeStartupFrameRevision",
         "} from './fork-native-chat-session-options/use-claude-startup-frame-revision'",
-        "import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'"
+        "import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat/native-chat-types'"
       ]
     },
     {
@@ -1784,19 +1769,7 @@
       "lines": ["    dockContainer: {} as never,"]
     },
     {
-      "path": "src/renderer/src/lib/pane-manager/pane-split-close.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
-    },
-    {
       "path": "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
-    },
-    {
-      "path": "src/renderer/src/lib/pane-manager/pane-terminal-gpu-acceleration.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": ["    dockContainer: {} as never,"]
@@ -2142,7 +2115,7 @@
       "lines": ["    appId: 'com.zpyoung.orca',"]
     },
     {
-      "path": "src/shared/native-chat-agent-profiles.ts",
+      "path": "src/shared/native-chat/native-chat-agent-profiles.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
       "lines": ["    skillSourceOwner: 'grok',", "    skillSourceOwner: 'codex',"]
@@ -2160,7 +2133,7 @@
       "lines": ["    [optionId]: tracked", "    record.model = tracked"]
     },
     {
-      "path": "src/shared/native-chat-types.ts",
+      "path": "src/shared/native-chat/native-chat-types.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
       "lines": ["  model?: string", "  effort?: string"]
@@ -2569,11 +2542,11 @@
       ]
     },
     {
-      "path": "src/main/claude/claude-structured-inbound-control.ts",
+      "path": "src/main/claude/structured/claude-structured-inbound-control.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
-        "import { bridgeClaudeAsk } from '../fork-ask-question-tool/native-bridge/claude-native-ask-bridge'",
+        "import { bridgeClaudeAsk } from '../../fork-ask-question-tool/native-bridge/claude-native-ask-bridge'",
         "  return { canUseTool: bridgeClaudeAsk(deps.sessionId, canUseTool), onUserDialog }"
       ]
     },
@@ -4027,7 +4000,7 @@
       "feature": "project-ledger",
       "kind": "import-swap",
       "lines": [
-        "import { OrcaRuntimeWithLedger as OrcaRuntimeWithMigrationCatalog } from './orca-runtime-ledger'"
+        "import { OrcaRuntimeWithLedger as OrcaRuntimeWithWindowlessTerminalActivity } from './orca-runtime-ledger'"
       ]
     },
     {
@@ -4214,9 +4187,7 @@
       "path": "src/main/persistence/scheduling-automations/automation-definition-operations.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": [
-        "      normalizeAutomationSessionReuse(migrateLegacyAutomationLaunchArgs(automation))"
-      ]
+      "lines": ["    .map((automation) => migrateLegacyAutomationLaunchArgs(automation))"]
     },
     {
       "path": "src/main/persistence/scheduling-automations/automation-run-operations.ts",
@@ -4595,12 +4566,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts",
-      "feature": "automation-launch-settings",
-      "kind": "passthrough",
-      "lines": ["      includeSessionOptionCatalogDefaults: false"]
-    },
-    {
       "path": "src/renderer/src/lib/launch-agent-in-new-tab.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
@@ -4610,9 +4575,7 @@
       "path": "src/renderer/src/lib/launch-agent-web-host-tab.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": [
-        "  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(startupPlan.sessionOptions, {"
-      ]
+      "lines": ["  const launchPreferences = toAgentLaunchPreferencesWithOptionValues("]
     },
     {
       "path": "src/renderer/src/lib/launch-work-item-direct-agent.ts",
@@ -4638,12 +4601,10 @@
       "path": "src/renderer/src/lib/runtime-agent-background-create.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
-      "lines": [
-        "  const launchPreferences = toAgentLaunchPreferencesWithOptionValues(args.sessionOptions, {"
-      ]
+      "lines": ["  const launchPreferences = toAgentLaunchPreferencesWithOptionValues("]
     },
     {
-      "path": "src/shared/agent-session-host-authority.ts",
+      "path": "src/shared/agent-session/agent-session-host-authority.ts",
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": ["  optionValues?: Record<string, SessionOptionValue>"]
@@ -4863,7 +4824,9 @@
       "feature": "automation-launch-settings",
       "kind": "passthrough",
       "lines": [
-        "    expect(resolveAgentSessionOptionLaunch('omp', { model }, [], false)).toEqual({"
+        "    expect(resolveAgentSessionOptionLaunch('omp', { model }, [], false)).toEqual({",
+        "import { withoutForkOptionValues } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'",
+        "        withoutForkOptionValues(launch.preferences),"
       ]
     },
     {
@@ -4964,7 +4927,7 @@
       "lines": [
         "import { automationRunLaunchSettingsFor } from './fork-automation-launch-settings/run-launch-settings-for-dispatch'",
         "  const launchSettings = automationRunLaunchSettingsFor(runtime, automation, target.repo)",
-        "          launchOverrides: automation.launchOverrides ?? undefined",
+        "            launchOverrides: automation.launchOverrides ?? undefined",
         "    ...(launchSettings ? { launchSettings } : {})"
       ]
     },
@@ -5018,17 +4981,6 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": ["  terminalDockByPaneKey: 'unwritten'"]
-    },
-    {
-      "path": "src/renderer/src/components/terminal-pane/pty-connection/pane-host-capability-flags.ts",
-      "feature": "worker-takeover-gate",
-      "kind": "registration",
-      "lines": [
-        "} from '@/lib/fork-worker-takeover-gate/keyboard-input-gate'",
-        "  primeTerminalUserInputKeyboardGate(session.pane.terminal)",
-        "    const fromKeyboard = isTerminalUserInputFromKeyboard(session.pane.terminal)",
-        "    if (fromKeyboard) {"
-      ]
     },
     {
       "path": "config/scripts/benchmark-ci-preflight-critical-path.mjs",
@@ -5247,6 +5199,22 @@
       "feature": "fork-loops",
       "kind": "registration",
       "lines": ["    name: \"orca-loop\",", "    markdown: ORCA_LOOP_MARKDOWN,"]
+    },
+    {
+      "path": "src/cli/bundled-skill-guides.ts",
+      "feature": "project-ledger",
+      "kind": "registration",
+      "lines": [
+        "  \"- `action` (one of worktree.history.back, worktree.history.forward, sidebar.left.toggle, sidebar.sleepingWorkspaces.toggle, floatingWorkspace.maximize, tab.rename, workspace.rename, workspace.openBoard, view.tasks, view.ledger, sidebar.right.toggle, sidebar.explorer.toggle, sidebar.search.toggle, sidebar.sourceControl.toggle, sidebar.checks.toggle, sidebar.ports.toggle, since 1.4.160): Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker; one without needs `main`.\","
+      ]
+    },
+    {
+      "path": "skill-guides/orca-plugin-authoring/references/manifest.md",
+      "feature": "project-ledger",
+      "kind": "registration",
+      "lines": [
+        "- `action` (one of worktree.history.back, worktree.history.forward, sidebar.left.toggle, sidebar.sleepingWorkspaces.toggle, floatingWorkspace.maximize, tab.rename, workspace.rename, workspace.openBoard, view.tasks, view.ledger, sidebar.right.toggle, sidebar.explorer.toggle, sidebar.search.toggle, sidebar.sourceControl.toggle, sidebar.checks.toggle, sidebar.ports.toggle, since 1.4.160): Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker; one without needs `main`."
+      ]
     },
     {
       "path": "src/cli/handler-group-manifest.ts",
@@ -5507,8 +5475,8 @@
       "feature": "input-quarantine",
       "kind": "passthrough",
       "lines": [
-        "      return { terminalTabId, ptyId: targetPtyId }",
-        "    }, [targetPtyId, terminalTabId])"
+        "      () => (targetPtyId ? { terminalTabId, ptyId: targetPtyId } : null),",
+        "      [targetPtyId, terminalTabId]"
       ]
     },
     {
@@ -5528,6 +5496,15 @@
       "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
     },
     {
+      "path": "src/renderer/src/lib/agent-launch-through-host.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { withoutForkOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'",
+        "        withoutForkOptionValues(preferences),"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/settings/keybinding-title-copy.ts",
       "feature": "project-ledger",
       "kind": "registration",
@@ -5544,12 +5521,6 @@
         "import { TERMINAL_DOCK_KEYBINDING_TITLE_COPY } from './fork-terminal-dock/keybinding-title-copy'",
         "  ...TERMINAL_DOCK_KEYBINDING_TITLE_COPY"
       ]
-    },
-    {
-      "path": "src/main/updater-latest-stable-feed.test.ts",
-      "feature": "release-routing",
-      "kind": "passthrough",
-      "lines": ["const latestUrl = 'https://github.com/zpyoung/orca/releases/latest'"]
     }
   ],
   "exceptions": [
@@ -5853,11 +5824,6 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/release-windows-signing-gate.test.mjs",
-      "reason": "Upstream's Windows signing-gate contract, kept against the fork's release-cut.yml: the fork's Windows/Linux build job is disabled, so it asserts if: false where upstream asserts the build-mac success condition.",
-      "status": "permanent"
-    },
-    {
       "path": "config/scripts/release-rc-history.mjs",
       "reason": "Fork release-tooling delta for the fork's own RC history.",
       "status": "permanent"
@@ -6040,6 +6006,12 @@
       "ledger": "bug-1"
     },
     {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.test.tsx",
+      "reason": "Upstream's PTY composer-send coverage, which upstream deleted, kept and run against the fork's quarantine-scoped send target.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
       "reason": "The tag test mocks the upstream transport and imports the upstream live-session module, so it cannot exercise the fork copy; the copy's own test covers hidden-pane read gating.",
       "status": "permanent",
@@ -6150,7 +6122,7 @@
       "ledger": "docs/fork-upstreaming.md#changed-lines-type-aware-scan-reaches-into-mobile"
     },
     {
-      "path": "src/main/runtime/structured-agent-session-integration.test.ts",
+      "path": "src/main/runtime/agent-session/structured-agent-session-integration.test.ts",
       "reason": "Awaits the deferred event sink before the history page read: the takeover's reap tombstones the running turn's status row asynchronously, so on a loaded runner the page still carries it and the ordering assertion fails.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#structured-session-history-page-races-the-reap-tombstone"
@@ -6224,11 +6196,6 @@
     {
       "path": "config/scripts/wsl-e2e-lane-contract.test.mjs",
       "reason": "Retains WSL routing and reusable-lane contracts without requiring the Windows PR job omitted by this macOS-only release fork.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/ci-dependency-download-cache.test.mjs",
-      "reason": "Contracts for the fork-owned PR job graph. Upstream asserts its Windows lane still carries the addon checks; this fork removed the Windows PR lanes, so the case asserts the removal instead.",
       "status": "permanent"
     },
     {
@@ -6586,16 +6553,6 @@
       "status": "permanent"
     },
     {
-      "path": "src/main/updater-agent-state-rules-release.test.ts",
-      "reason": "Runs upstream's rules-release regression against the fork's own app release feed (MAIN_RELEASE_REPO), which is where this fork's updater reads.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/ci-native-cache.test.mjs",
-      "reason": "Contracts for the fork-owned PR job graph: this fork removed the Windows PR packaging lane, so the case asserts its removal instead of the lane's Node-ABI save ordering.",
-      "status": "permanent"
-    },
-    {
       "path": "config/scripts/check-node-runtime-pin.test.mjs",
       "reason": "Asserts PR jobs and preflight steps the fork's trimmed pr.yml no longer runs; the fork keeps only lint, typecheck, unit tests, cross-version wire and the ownership guard.",
       "status": "permanent",
@@ -6716,10 +6673,6 @@
       "added": 5,
       "removed": 5
     },
-    "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.test.tsx": {
-      "added": 5,
-      "removed": 2
-    },
     "src/renderer/src/components/native-chat/native-chat-context-command.test.tsx": {
       "added": 1,
       "removed": 1
@@ -6813,7 +6766,7 @@
       "removed": 0
     },
     "src/renderer/src/app-shell/AppWorkspaceShell.tsx": {
-      "added": 22,
+      "added": 21,
       "removed": 0
     },
     "src/renderer/src/components/sidebar/SidebarNav.tsx": {
@@ -6969,8 +6922,8 @@
       "removed": 1
     },
     "src/main/macos-tcc-prompt-watch.test.ts": {
-      "added": 10,
-      "removed": 10
+      "added": 4,
+      "removed": 4
     },
     "src/main/macos-tcc-prompt-watch.ts": {
       "added": 6,
@@ -6978,7 +6931,7 @@
     },
     "src/main/native-chat/transcript-tail-reader.ts": {
       "added": 25,
-      "removed": 20
+      "removed": 19
     },
     "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": {
       "added": 4,
@@ -7021,20 +6974,20 @@
       "removed": 1
     },
     "src/main/native-chat/transcript-watch.test.ts": {
-      "added": 117,
-      "removed": 17
+      "added": 113,
+      "removed": 16
     },
     "src/main/native-chat/transcript-incremental-reader.ts": {
       "added": 8,
-      "removed": 6
+      "removed": 9
     },
     "src/main/native-chat/transcript-watch-contract.ts": {
       "added": 5,
-      "removed": 8
+      "removed": 7
     },
     "src/main/native-chat/transcript-watch-engine.ts": {
       "added": 21,
-      "removed": 17
+      "removed": 20
     },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
@@ -7072,10 +7025,6 @@
       "added": 7,
       "removed": 1
     },
-    "src/main/skills/claude-plugin-skill-sources.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
     "src/main/skills/claude-plugin-skill-sources.ts": {
       "added": 7,
       "removed": 6
@@ -7101,8 +7050,8 @@
       "removed": 3
     },
     "src/preload/api/native-chat-api.ts": {
-      "added": 47,
-      "removed": 29
+      "added": 49,
+      "removed": 28
     },
     "src/preload/api/pty-api.ts": {
       "added": 1,
@@ -7113,8 +7062,8 @@
       "removed": 0
     },
     "src/preload/api/native-chat-bridge.ts": {
-      "added": 15,
-      "removed": 7
+      "added": 22,
+      "removed": 14
     },
     "src/preload/api/pty-bridge-session-control.ts": {
       "added": 2,
@@ -7388,15 +7337,7 @@
       "added": 1,
       "removed": 0
     },
-    "src/renderer/src/lib/pane-manager/pane-split-close.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
     "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/lib/pane-manager/pane-terminal-gpu-acceleration.test.ts": {
       "added": 1,
       "removed": 0
     },
@@ -7568,7 +7509,7 @@
       "added": 1,
       "removed": 1
     },
-    "src/shared/native-chat-agent-profiles.ts": {
+    "src/shared/native-chat/native-chat-agent-profiles.ts": {
       "added": 11,
       "removed": 1
     },
@@ -7580,7 +7521,7 @@
       "added": 42,
       "removed": 4
     },
-    "src/shared/native-chat-types.ts": {
+    "src/shared/native-chat/native-chat-types.ts": {
       "added": 14,
       "removed": 0
     },
@@ -7760,7 +7701,7 @@
       "added": 2,
       "removed": 0
     },
-    "src/main/claude/claude-structured-inbound-control.ts": {
+    "src/main/claude/structured/claude-structured-inbound-control.ts": {
       "added": 2,
       "removed": 1
     },
@@ -7821,8 +7762,12 @@
       "removed": 0
     },
     "src/cli/bundled-skill-guides.ts": {
-      "added": 902,
-      "removed": 0
+      "added": 903,
+      "removed": 1
+    },
+    "skill-guides/orca-plugin-authoring/references/manifest.md": {
+      "added": 1,
+      "removed": 1
     },
     "src/main/runtime/orca-runtime.ts": {
       "added": 5,
@@ -7882,7 +7827,7 @@
     },
     "src/main/ipc/native-chat.ts": {
       "added": 22,
-      "removed": 20
+      "removed": 19
     },
     "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
       "added": 2,
@@ -8357,8 +8302,8 @@
       "removed": 0
     },
     "src/main/persistence/scheduling-automations/automation-definition-operations.ts": {
-      "added": 35,
-      "removed": 6
+      "added": 33,
+      "removed": 5
     },
     "src/main/persistence/scheduling-automations/automation-run-operations.ts": {
       "added": 5,
@@ -8553,19 +8498,15 @@
       "removed": 0
     },
     "src/renderer/src/lib/launch-agent-background-session.ts": {
-      "added": 29,
-      "removed": 17
-    },
-    "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
-      "added": 27,
-      "removed": 0
-    },
-    "src/renderer/src/lib/launch-agent-in-new-tab.ts": {
-      "added": 4,
+      "added": 26,
       "removed": 1
     },
+    "src/renderer/src/lib/launch-agent-in-new-tab.ts": {
+      "added": 15,
+      "removed": 10
+    },
     "src/renderer/src/lib/launch-agent-web-host-tab.ts": {
-      "added": 21,
+      "added": 18,
       "removed": 6
     },
     "src/renderer/src/lib/launch-work-item-direct-agent.ts": {
@@ -8581,10 +8522,10 @@
       "removed": 1
     },
     "src/renderer/src/lib/runtime-agent-background-create.ts": {
-      "added": 13,
-      "removed": 5
+      "added": 11,
+      "removed": 6
     },
-    "src/shared/agent-session-host-authority.ts": {
+    "src/shared/agent-session/agent-session-host-authority.ts": {
       "added": 2,
       "removed": 0
     },
@@ -8697,8 +8638,8 @@
       "removed": 0
     },
     "src/main/runtime/rpc/methods/orchestration/worker/worker-launch-preferences.test.ts": {
-      "added": 2,
-      "removed": 1
+      "added": 11,
+      "removed": 7
     },
     "src/main/runtime/runtime-worktree-agent-startup.ts": {
       "added": 27,
@@ -8713,7 +8654,7 @@
       "removed": 0
     },
     "src/renderer/src/components/automations/automation-orca-save.ts": {
-      "added": 16,
+      "added": 15,
       "removed": 1
     },
     "src/renderer/src/components/automations/automation-save-context.ts": {
@@ -8788,10 +8729,6 @@
       "added": 3,
       "removed": 1
     },
-    "src/renderer/src/components/terminal-pane/pty-connection/pane-host-capability-flags.ts": {
-      "added": 14,
-      "removed": 5
-    },
     "config/scripts/pr-aggregate-gate-context.mjs": {
       "added": 12,
       "removed": 2
@@ -8818,7 +8755,7 @@
     },
     ".github/workflows/preflight-benchmark.yml": {
       "added": 2,
-      "removed": 3
+      "removed": 4
     },
     "src/main/daemon/macos-daemon-launchd.test.ts": {
       "added": 2,
@@ -8912,10 +8849,6 @@
       "added": 1,
       "removed": 1
     },
-    "src/main/updater-latest-stable-feed.test.ts": {
-      "added": 9,
-      "removed": 9
-    },
     "src/renderer/src/components/native-chat/NativeChatComposerPane.tsx": {
       "added": 2,
       "removed": 2
@@ -8927,6 +8860,10 @@
     "src/renderer/src/lib/launch-agent-in-new-tab-args.ts": {
       "added": 1,
       "removed": 0
+    },
+    "src/renderer/src/lib/agent-launch-through-host.test.ts": {
+      "added": 7,
+      "removed": 1
     }
   }
 }

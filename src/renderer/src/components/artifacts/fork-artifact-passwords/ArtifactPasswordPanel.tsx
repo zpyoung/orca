@@ -82,7 +82,7 @@ export function ArtifactPasswordPanel({
             setError(
               translate(
                 'auto.components.artifacts.ArtifactPasswordPanel.rotationIncomplete',
-                'The new link works, but the old link may still work. Retry while online.'
+                'The new link is protected, but Orca could not confirm deletion of the old link. The old link may still work; Orca will retry.'
               )
             )
           }

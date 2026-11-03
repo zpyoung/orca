@@ -25,8 +25,14 @@ import {
   type KnownExecutionHostPlatform
 } from '@/lib/execution-host-facts'
 import { beginStructuredAgentSessionProvisionalLaunch } from '@/lib/agent-session/structured-agent-session-provisional-tab'
+<<<<<<< fork
 import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { DeclinedStructuredLaunchTerminalOptions } from '@/lib/structured-agent-session-launch-admission'
+||||||| base
+import type { DeclinedStructuredLaunchTerminalOptions } from '@/lib/structured-agent-session-launch-admission'
+=======
+import type { DeclinedStructuredLaunchTerminalOptions } from '@/lib/agent-session/launch/structured-agent-session-launch-admission'
+>>>>>>> upstream
 import {
   ensureDetectedAgentsForNewWorktree,
   type RepoHostFields

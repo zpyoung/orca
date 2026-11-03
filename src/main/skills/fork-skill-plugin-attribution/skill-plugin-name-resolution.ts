@@ -1,5 +1,5 @@
 import type { SkillScanRoot } from '../skill-discovery-sources'
-import { stripUnsafeDisplayCharacters } from '../../../shared/skill-display-text'
+import { stripUnsafeDisplayCharacters } from '../../../shared/display-text-safety'
 
 type SkillRelativePathApi = { relative: (from: string, to: string) => string; sep: string }
 

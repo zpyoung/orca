@@ -4,7 +4,7 @@ import {
   type HostedReviewAgentLaunchResult
 } from '../../shared/fork-hosted-review-sitter/agent-prompt'
 import { sanitizeWorktreeDisplayName } from '../ipc/worktree-display-name'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 
 /**

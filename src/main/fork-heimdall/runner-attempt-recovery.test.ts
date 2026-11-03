@@ -15,7 +15,7 @@ import type { ObjectiveSnapshotBinding } from '../fork-heimdall-objective/execut
 import type { ObjectiveForgeAccess } from '../fork-heimdall-objective/objective-forge-access'
 import type { ObjectiveStore } from '../fork-heimdall-objective/objective-store'
 import { decideObjective } from '../../shared/fork-heimdall-objective/decision'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { WatcherAttemptRecovery } from './runner-attempt-recovery'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'

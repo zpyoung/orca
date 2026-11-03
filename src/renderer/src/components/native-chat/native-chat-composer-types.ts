@@ -2,8 +2,8 @@ import type { CaptureStructuredAgentSessionPresentation } from './use-structured
 import type { StructuredAgentSessionSendRequest } from './structured-agent-session-send-slot'
 import type { NativeChatComposerNotice } from './native-chat-composer-notice'
 import type { AgentSessionConversationCommand } from '../../../../shared/agent-session/agent-session-conversation-command'
-import type { StructuredAgentContextUsage } from '../../../../shared/structured-agent-session-context-usage'
-import type { AgentSessionSlashCommand } from '../../../../shared/agent-session-wire'
+import type { StructuredAgentContextUsage } from '../../../../shared/agent-session/structured-agent-session-context-usage'
+import type { AgentSessionSlashCommand } from '../../../../shared/agent-session/agent-session-wire'
 import type {
   StructuredAgentSessionCommandOutcome,
   StructuredAgentSessionCommandRefusalCause
@@ -13,7 +13,7 @@ import type {
   SessionOptionsSurface
 } from '../../../../shared/native-chat/input/native-chat-session-options'
 import type { NativeChatLaunchDraft } from '@/lib/native-chat-launch-prompt'
-import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
+import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat/native-chat-types'
 import type {
   AgentComposerCoreProps,
   AgentComposerHandle

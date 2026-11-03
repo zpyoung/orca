@@ -69,7 +69,8 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
       null
     )
       .then((projection) => {
-        if (!this.terminalWaiters.get(waiter.handle)?.has(waiter)) {
+        const pty = this.ptysById.get(waiter.ptyId)
+        if (!pty || !this.terminalWaiters.has(waiter)) {
           return
         }
         // Why re-arm on a missing screen too: a fresh pane's first snapshot can time out or come
@@ -118,19 +119,17 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
       return
     }
     setTimeout(() => {
-      if (!this.terminalWaiters.get(waiter.handle)?.has(waiter)) {
+      const pty = this.ptysById.get(waiter.ptyId)
+      if (!pty || !this.terminalWaiters.has(waiter)) {
         return
       }
       // Why try: the handle can go stale between looks; the waiter's own timeout then settles it.
       try {
-        const record =
-          this.getLivePtyForHandle(waiter.handle)?.pty ??
-          this.getLiveLeafForHandle(waiter.handle).leaf
         if (
           !tuiIdleNeedsVisibleScreenProbe(
-            record.lastAgentStatus,
-            buildTerminalWaitText(record.tailBuffer, record.tailPartialLine, record.preview),
-            this.getPaneAgentForTuiIdle(record.ptyId)
+            pty.lastAgentStatus,
+            buildTerminalWaitText(pty.tailBuffer, pty.tailPartialLine, pty.preview),
+            this.getPaneAgentForTuiIdle(pty.ptyId)
           )
         ) {
           return

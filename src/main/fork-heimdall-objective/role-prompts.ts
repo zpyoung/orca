@@ -32,7 +32,7 @@ import {
 import type { ObjectivePlanDiff } from '../../shared/fork-heimdall-objective/plan-diff'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import { buildPlannerPromptPolicySection } from './planner-prompt-policy'
 import { fitRepairPlanContext, type RepairPlanContext } from './repair-plan-context'
 import { MAX_OBJECTIVE_REPORT_BYTES } from './report-ingestion'

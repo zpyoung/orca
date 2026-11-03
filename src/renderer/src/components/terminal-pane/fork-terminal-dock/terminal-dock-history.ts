@@ -1,5 +1,8 @@
 import type { AgentStatusEntry } from '../../../../../shared/agent-status-types'
-import { isTextBlock, type NativeChatMessage } from '../../../../../shared/native-chat-types'
+import {
+  isTextBlock,
+  type NativeChatMessage
+} from '../../../../../shared/native-chat/native-chat-types'
 
 function messagePrompt(message: NativeChatMessage): string {
   return message.blocks

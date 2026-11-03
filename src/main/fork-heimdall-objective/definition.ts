@@ -20,7 +20,7 @@ import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import type { Repo } from '../../shared/repo-types'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import { getAutomationSchedulerOwnerForExecutionHost } from '../persistence/scheduling-automations/automation-context-migration'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {

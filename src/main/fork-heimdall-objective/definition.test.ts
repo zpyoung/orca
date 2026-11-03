@@ -15,7 +15,7 @@ import {
 import { authorizeKindEnrollment } from '../fork-heimdall/kernel-enrollment'
 import { type RegisteredWatcherKind, WatcherKindRegistry } from '../fork-heimdall/registry'
 import { enrollmentPayloadSchema } from '../fork-hosted-review-sitter/definition-store'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { authorizeObjectiveEnrollment, ObjectiveOwnerNotExecutableError } from './definition'
 import {

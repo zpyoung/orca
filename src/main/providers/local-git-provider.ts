@@ -76,14 +76,12 @@ export function createLocalGitProvider(options: LocalGitProviderOptions = {}): L
     commit: (worktreePath, message) => commitChanges(worktreePath, message, interactive),
     completeMerge: (worktreePath) => completeMerge(worktreePath, interactive),
     getStagedCommitContext: (worktreePath) => getStagedCommitContext(worktreePath, interactive),
-    getDiff: (worktreePath, filePath, staged, compareAgainstHead, diffOptions) =>
-      getDiff(
-        worktreePath,
-        filePath,
-        staged,
-        compareAgainstHead,
-        diffOptions?.signal ? { ...interactive, signal: diffOptions.signal } : interactive
-      ),
+    getDiff: (worktreePath, filePath, staged, compareAgainstHead, oldPath, diffOptions) =>
+      getDiff(worktreePath, filePath, staged, compareAgainstHead, {
+        ...interactive,
+        ...(oldPath ? { oldPath } : {}),
+        ...(diffOptions?.signal ? { signal: diffOptions.signal } : {})
+      }),
     stageFile: (worktreePath, filePath) => stageFile(worktreePath, filePath, interactive),
     resolveConflict: (worktreePath, filePath, resolution) =>
       resolveConflict(worktreePath, filePath, resolution, interactive),

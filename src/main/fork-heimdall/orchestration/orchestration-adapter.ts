@@ -6,6 +6,7 @@ import {
   resolveRunScope
 } from '../../runtime/rpc/methods/orchestration/runs/run-scope'
 import { startLocalWorker } from '../../runtime/rpc/methods/orchestration/worker/local-worker-start'
+import { parseTaskDeps } from '../../runtime/rpc/methods/orchestration/worker/task-deps-argument'
 import { inspectWorkerTerminal } from '../../runtime/rpc/methods/orchestration/worker/worker-observation'
 import type { WorkerReleaseReceipt } from '../../runtime/rpc/methods/orchestration/worker/worker-release-completion'
 import { assertWorkerStartTaskSpecWithinPromptBudget } from '../../runtime/rpc/methods/orchestration/worker/worker-start-prompt-budget'
@@ -176,7 +177,8 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
               workspaceRuntimeId(input.enrollment)
             ),
             db,
-            run,
+            bindRun: () => run,
+            taskDeps: parseTaskDeps(params.deps),
             coordinator: orchestrationCallerIdentity(this.runtime, {
               handle: identity.handle,
               paneKey: identity.paneKey,

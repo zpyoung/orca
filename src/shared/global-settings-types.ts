@@ -203,8 +203,6 @@ export type GlobalSettings = GlobalSettingsBase & {
   terminalLinkClickBehavior?: 'actions' | 'open' | 'none'
   /** Middle mouse URL behavior; defaults to opening the primary routed destination. */
   terminalUrlMiddleClickBehavior?: 'open' | 'actions' | 'none'
-  /** New supported agent launches use structured Chat UI; off defaults to terminal UI. */
-  experimentalNativeChat?: boolean
   /** Experimental per-pane docked composer for agent terminals; off by default. */
   experimentalTerminalDock?: boolean
   /** Open the terminal composer automatically for new agent sessions; mounted panes are unchanged. */

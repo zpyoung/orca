@@ -3894,7 +3894,7 @@ const ORCA_PLUGIN_AUTHORING_MANIFEST_REFERENCE_MARKDOWN = [
   "- `id` (string, required, since 1.4.160): Command id, unique among this plugin's commands. Dotted namespaces are allowed.",
   "- `title` (string, required, since 1.4.160): Title shown in the command palette.",
   "- `when` (\"global\" | \"workspace\", since 1.4.160): Where the command is available. `workspace` hides it when no workspace is active. Defaults to `global`.",
-  "- `action` (one of worktree.history.back, worktree.history.forward, sidebar.left.toggle, sidebar.sleepingWorkspaces.toggle, floatingWorkspace.maximize, tab.rename, workspace.rename, workspace.openBoard, view.tasks, sidebar.right.toggle, sidebar.explorer.toggle, sidebar.search.toggle, sidebar.sourceControl.toggle, sidebar.checks.toggle, sidebar.ports.toggle, since 1.4.160): Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker; one without needs `main`.",
+  "- `action` (one of worktree.history.back, worktree.history.forward, sidebar.left.toggle, sidebar.sleepingWorkspaces.toggle, floatingWorkspace.maximize, tab.rename, workspace.rename, workspace.openBoard, view.tasks, view.ledger, sidebar.right.toggle, sidebar.explorer.toggle, sidebar.search.toggle, sidebar.sourceControl.toggle, sidebar.checks.toggle, sidebar.ports.toggle, since 1.4.160): Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker; one without needs `main`.",
   "",
   "## EventContribution",
   "",

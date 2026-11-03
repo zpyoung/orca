@@ -14,7 +14,7 @@ import type {
 } from '../../shared/fork-heimdall/fleet-types'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import {
   HeimdallCommandCapabilityError,
   HeimdallEnrollOwnerCapabilityError,

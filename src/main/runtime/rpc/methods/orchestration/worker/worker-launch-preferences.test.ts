@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getAgentSessionOptionCatalog } from '../../../../../../shared/agent-session/options/agent-session-option-catalog'
 import { resolveAgentSessionOptionLaunch } from '../../../../../../shared/agent-session/options/agent-session-option-launch'
+import { withoutForkOptionValues } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-preferences-with-option-values'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../../../../../shared/protocol-version'
 import {
   assertWorkerLaunchPreferencesCreateTerminal,
@@ -258,12 +259,14 @@ describe('orchestration worker launch preferences', () => {
     })
 
     expect(launch.preferences).toEqual({ model: 'grok-4.7', effort: 'high' })
-    expect(resolveAgentSessionOptionLaunch('grok', launch.preferences, [], false).args).toEqual([
-      '-m',
-      'grok-4.7',
-      '--reasoning-effort',
-      'high'
-    ])
+    expect(
+      resolveAgentSessionOptionLaunch(
+        'grok',
+        withoutForkOptionValues(launch.preferences),
+        [],
+        false
+      ).args
+    ).toEqual(['-m', 'grok-4.7', '--reasoning-effort', 'high'])
   })
 
   it('rejects model selection for agents without a launch catalog', () => {

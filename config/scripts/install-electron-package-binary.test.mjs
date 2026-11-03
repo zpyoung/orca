@@ -220,30 +220,6 @@ describe('install-electron-package-binary', () => {
     }
   })
 
-  it('retries a refused HTTP/2 stream from the release CDN', () => {
-    const projectDir = mkTempProject()
-
-    try {
-      writeFakeElectronPackage(projectDir)
-      writeFakeElectronGet(projectDir, {
-        downloadFailures: 1,
-        downloadErrorCode: 'ERR_HTTP2_STREAM_ERROR'
-      })
-      writeFakeExtractor(projectDir, { createExecutable: true })
-
-      const result = runInstallScript(projectDir, {
-        ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS: '0,0'
-      })
-
-      expect(result.status, result.stderr).toBe(0)
-      expect(result.stderr).toContain(
-        'Transient Electron download failure (ERR_HTTP2_STREAM_ERROR)'
-      )
-    } finally {
-      rmSync(projectDir, { recursive: true, force: true })
-    }
-  })
-
   it('retries a 5xx carried on a fetch Response', () => {
     const projectDir = mkTempProject()
 

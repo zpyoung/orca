@@ -311,6 +311,9 @@ export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerCo
               {
                 ...gitOptions,
                 admissionTier: 'interactive',
+                ...(args.oldPath
+                  ? { oldPath: validateGitRelativeFilePath(worktreePath, args.oldPath) }
+                  : {}),
                 ...(controller ? { signal: controller.signal } : {})
               }
             )

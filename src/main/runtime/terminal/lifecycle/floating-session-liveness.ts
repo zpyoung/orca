@@ -6,6 +6,7 @@ import type {
   RuntimePtyWorktreeRecord
 } from '../../runtime-terminal-state-records'
 import { DISCONNECTED_PTY_RECORD_MAX } from '../../orca-runtime-postlude'
+import { questionAnswerWaitPrefix } from '../../orchestration/question-answer-delivery'
 import { notifyHeimdallMailboxArrival } from '../../../fork-heimdall/mailbox-wake-registry'
 
 export abstract class OrcaRuntimeWithRefreshFloatingWorkspacePtyLiveness extends OrcaRuntimeWithRefreshPtyWorktreeRecordsWithControllerInventory {

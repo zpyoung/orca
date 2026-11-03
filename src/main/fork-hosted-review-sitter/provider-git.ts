@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import {
   getSshTargetIdForExecutionHost,
   LOCAL_EXECUTION_HOST_ID,

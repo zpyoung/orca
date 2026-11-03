@@ -75,7 +75,7 @@ type AutomationEditorDialogProps = {
   isEditing: boolean
   isSaving: boolean
   canSave: boolean
-  launchOverridesGate: AutomationLaunchOverridesGate
+  launchOverridesGate?: AutomationLaunchOverridesGate
   repos: readonly Repo[]
   projectHostSetups: readonly ProjectHostSetup[]
   automationYamlHooksByRepoKey: Record<string, OrcaHooks | null>

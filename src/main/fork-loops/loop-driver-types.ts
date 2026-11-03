@@ -7,7 +7,7 @@ import type {
   UsageTotals
 } from '../../shared/fork-loops/loop-types'
 import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
-import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../../shared/agent-session/agent-session-host-authority'
 import type {
   RuntimeTerminalCreate,
   RuntimeTerminalResolvePane,

@@ -4,15 +4,13 @@
 // `opus[1m]`). Resolving between them needs the host's model list, which is why this
 // mapping lives in the renderer and never in the transcript readers.
 
-import {
-  getAgentSessionOptionCatalog,
-  type CatalogModel,
-  type CatalogOption
-} from '../../../../../shared/agent-session-option-catalog'
+import { getAgentSessionOptionCatalog } from '../../../../../shared/agent-session/options/agent-session-option-catalog'
 import type {
-  AgentType,
-  NativeChatSessionOptionObservation
-} from '../../../../../shared/native-chat-types'
+  CatalogModel,
+  CatalogOption
+} from '../../../../../shared/agent-session/options/agent-session-option-catalog-types'
+import type { NativeChatSessionOptionObservation } from '../../../../../shared/native-chat/native-chat-types'
+import type { AgentType } from '../../../../../shared/agent-status-types'
 import type { SessionOptionValue } from '../../../../../shared/native-chat/input/native-chat-session-options'
 import { matchNativeChatCatalogModelId } from '../../../../../shared/native-chat/input/native-chat-session-option-state'
 
