@@ -178,13 +178,25 @@ export async function prepareDirectWorkItemAgentLaunch(args: {
   })
 
 =======
-  const agentArgs =
-    effectiveAgent && args.resolveAgentArgs ? args.resolveAgentArgs(effectiveAgent) : args.agentArgs
-  const sessionOptions = effectiveAgent
-    ? args.resolveSessionOptions
-      ? args.resolveSessionOptions(effectiveAgent)
-      : args.sessionOptions
-    : undefined
+  const inputs =
+    effectiveAgent && args.resolveLaunchInputs
+      ? args.preflightPlan?.agent === effectiveAgent && args.preflightInputs
+        ? args.preflightInputs
+        : structuredClone(args.resolveLaunchInputs(effectiveAgent))
+      : undefined
+  const agentArgs = inputs
+    ? inputs.agentArgs
+    : effectiveAgent && args.resolveAgentArgs
+      ? args.resolveAgentArgs(effectiveAgent)
+      : args.agentArgs
+  const sessionOptions = inputs
+    ? inputs.sessionOptions
+    : effectiveAgent
+      ? args.resolveSessionOptions
+        ? args.resolveSessionOptions(effectiveAgent)
+        : args.sessionOptions
+      : undefined
+  const chatSessionOptions = inputs ? inputs.chatSessionOptions : args.chatSessionOptions
 >>>>>>> upstream
   const plan =
     effectiveAgent === null

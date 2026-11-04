@@ -15,12 +15,15 @@ import { useAppStore } from '@/store/index'
 import {
   trackAgentDefaultSurfaceChanged,
   wasChatUiLaunchTipShown
-} from '../feature-tips/feature-tip-telemetry'
-import { ChatSurfacePreview, TerminalSurfacePreview } from './AgentDefaultSurfacePreviews'
-import { AGENT_DEFAULT_SURFACE_SECTION_ID, AGENTS_INSTALLED_SECTION_ID } from './agents-search'
-import { Card, CardContent } from '../ui/card'
-import { SettingsRow } from './SettingsFormControls'
-import { Button } from '../ui/button'
+} from '../../../feature-tips/feature-tip-telemetry'
+import {
+  ChatSurfacePreview,
+  TerminalSurfacePreview
+} from '../../../agent/launch-settings/AgentDefaultSurfacePreviews'
+import { AGENT_DEFAULT_SURFACE_SECTION_ID, AGENTS_INSTALLED_SECTION_ID } from '../agents-search'
+import { Card, CardContent } from '../../../ui/card'
+import { SettingsRow } from '../../form-controls/SettingsFormControls'
+import { Button } from '../../../ui/button'
 import {
   agentsKeepingOwnSurface,
   followAgentDefaultSurface,

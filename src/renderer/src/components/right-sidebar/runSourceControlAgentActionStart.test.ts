@@ -179,50 +179,6 @@ describe('runSourceControlAgentActionStart', () => {
     expect(onLaunchAborted).toHaveBeenCalledTimes(1)
     expect(mocks.onLaunched).not.toHaveBeenCalled()
     expect(mocks.onClose).not.toHaveBeenCalled()
-<<<<<<< fork
-    expect(mocks.toastError).not.toHaveBeenCalled()
-  })
-
-  it('logs and treats a rejected promptDeliveryResult as a launch failure', async () => {
-    const error = new Error('boom')
-    const originalConsole = console
-    const consoleError = vi.fn()
-    vi.stubGlobal('console', { ...originalConsole, error: consoleError })
-    mocks.launchAgentInNewTab.mockReturnValue({
-      surface: { kind: 'local-terminal', tabId: 'tab-1' },
-      startupPlan: {} as never,
-      pasteDraftAfterLaunch: true,
-      promptDeliveryResult: Promise.reject(error)
-    })
-
-    try {
-      await expect(runSourceControlAgentActionStart(buildArgs())).resolves.toBe(false)
-
-      expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('tab-1')
-      expect(consoleError).toHaveBeenCalledWith('promptDeliveryResult rejected', error)
-      expect(mocks.onLaunched).not.toHaveBeenCalled()
-      expect(mocks.onClose).not.toHaveBeenCalled()
-      expect(mocks.toastError).toHaveBeenCalledWith('Could not start the selected agent.')
-    } finally {
-      vi.stubGlobal('console', originalConsole)
-    }
-  })
-
-  it('keeps non-deferred tab launches immediate', async () => {
-    mocks.launchAgentInNewTab.mockReturnValue({
-      surface: { kind: 'local-terminal', tabId: 'tab-1' },
-      startupPlan: {} as never,
-      pasteDraftAfterLaunch: true
-    })
-
-    await expect(
-      runSourceControlAgentActionStart(buildArgs({ promptDelivery: 'draft' }))
-    ).resolves.toBe(true)
-
-    expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('tab-1')
-    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
-    expect(mocks.onClose).toHaveBeenCalledTimes(1)
-    expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
   it('keeps injected onStart successes immediate', async () => {
@@ -240,196 +196,22 @@ describe('runSourceControlAgentActionStart', () => {
     ).resolves.toBe(true)
 
     expect(onStart).toHaveBeenCalledWith({
-      agent: 'codex',
-      commandInput: 'Fix the bug',
-      agentArgs: '--model gpt-5',
-      launchOptions: { model: 'gpt-5.3', optionValues: { effort: 'high' } }
-    })
-    expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
-    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
-    expect(mocks.onClose).toHaveBeenCalledTimes(1)
-  })
-
-  // onStart awaits no delivery result, so acceptance is terminal for that route.
-  it('accepts an onStart launch and never aborts it', async () => {
-    const onLaunchAccepted = vi.fn()
-    const onLaunchAborted = vi.fn()
-    const onStart = vi.fn().mockResolvedValue(true)
-
-    await expect(
-      runSourceControlAgentActionStart(
-        buildArgs({
-          onStart,
-          worktreeId: undefined,
-          groupId: undefined,
-          onLaunchAccepted,
-          onLaunchAborted
-        })
-      )
-    ).resolves.toBe(true)
-
-    expect(onLaunchAccepted).toHaveBeenCalledTimes(1)
-    expect(onLaunchAborted).not.toHaveBeenCalled()
-    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
-  })
-
-  it('reports neither callback when onStart declines the launch', async () => {
-    const onLaunchAccepted = vi.fn()
-    const onLaunchAborted = vi.fn()
-    const onStart = vi.fn().mockResolvedValue(false)
-
-    await expect(
-      runSourceControlAgentActionStart(
-        buildArgs({
-          onStart,
-          worktreeId: undefined,
-          groupId: undefined,
-          onLaunchAccepted,
-          onLaunchAborted
-        })
-      )
-    ).resolves.toBe(false)
-
-    expect(onLaunchAccepted).not.toHaveBeenCalled()
-    expect(onLaunchAborted).not.toHaveBeenCalled()
-||||||| base
-    expect(mocks.toastError).not.toHaveBeenCalled()
-  })
-
-  it('logs and treats a rejected promptDeliveryResult as a launch failure', async () => {
-    const error = new Error('boom')
-    const originalConsole = console
-    const consoleError = vi.fn()
-    vi.stubGlobal('console', { ...originalConsole, error: consoleError })
-    mocks.launchAgentInNewTab.mockReturnValue({
-      surface: { kind: 'local-terminal', tabId: 'tab-1' },
-      startupPlan: {} as never,
-      pasteDraftAfterLaunch: true,
-      promptDeliveryResult: Promise.reject(error)
-    })
-
-    try {
-      await expect(runSourceControlAgentActionStart(buildArgs())).resolves.toBe(false)
-
-      expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('tab-1')
-      expect(consoleError).toHaveBeenCalledWith('promptDeliveryResult rejected', error)
-      expect(mocks.onLaunched).not.toHaveBeenCalled()
-      expect(mocks.onClose).not.toHaveBeenCalled()
-      expect(mocks.toastError).toHaveBeenCalledWith('Could not start the selected agent.')
-    } finally {
-      vi.stubGlobal('console', originalConsole)
-    }
-  })
-
-  it('keeps non-deferred tab launches immediate', async () => {
-    mocks.launchAgentInNewTab.mockReturnValue({
-      surface: { kind: 'local-terminal', tabId: 'tab-1' },
-      startupPlan: {} as never,
-      pasteDraftAfterLaunch: true
-    })
-
-    await expect(
-      runSourceControlAgentActionStart(buildArgs({ promptDelivery: 'draft' }))
-    ).resolves.toBe(true)
-
-    expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('tab-1')
-    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
-    expect(mocks.onClose).toHaveBeenCalledTimes(1)
-    expect(mocks.toastError).not.toHaveBeenCalled()
-  })
-
-  it('keeps injected onStart successes immediate', async () => {
-    const onStart = vi.fn().mockResolvedValue(true)
-
-    await expect(
-      runSourceControlAgentActionStart(
-        buildArgs({
-          onStart,
-          worktreeId: undefined,
-          groupId: undefined
-        })
-      )
-    ).resolves.toBe(true)
-
-    expect(onStart).toHaveBeenCalledWith({
-      agent: 'codex',
-      commandInput: 'Fix the bug',
-      agentArgs: '--model gpt-5'
-    })
-    expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
-    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
-    expect(mocks.onClose).toHaveBeenCalledTimes(1)
-  })
-
-  // onStart awaits no delivery result, so acceptance is terminal for that route.
-  it('accepts an onStart launch and never aborts it', async () => {
-    const onLaunchAccepted = vi.fn()
-    const onLaunchAborted = vi.fn()
-    const onStart = vi.fn().mockResolvedValue(true)
-
-    await expect(
-      runSourceControlAgentActionStart(
-        buildArgs({
-          onStart,
-          worktreeId: undefined,
-          groupId: undefined,
-          onLaunchAccepted,
-          onLaunchAborted
-        })
-      )
-    ).resolves.toBe(true)
-
-    expect(onLaunchAccepted).toHaveBeenCalledTimes(1)
-    expect(onLaunchAborted).not.toHaveBeenCalled()
-    expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
-  })
-
-  it('reports neither callback when onStart declines the launch', async () => {
-    const onLaunchAccepted = vi.fn()
-    const onLaunchAborted = vi.fn()
-    const onStart = vi.fn().mockResolvedValue(false)
-
-    await expect(
-      runSourceControlAgentActionStart(
-        buildArgs({
-          onStart,
-          worktreeId: undefined,
-          groupId: undefined,
-          onLaunchAccepted,
-          onLaunchAborted
-        })
-      )
-    ).resolves.toBe(false)
-
-    expect(onLaunchAccepted).not.toHaveBeenCalled()
-    expect(onLaunchAborted).not.toHaveBeenCalled()
-=======
->>>>>>> upstream
-  })
-
-  it('keeps injected onStart successes immediate', async () => {
-    const onStart = vi.fn().mockResolvedValue(true)
-
-    await expect(
-      runSourceControlAgentActionStart(
-        buildArgs({
-          onStart,
-          worktreeId: undefined,
-          groupId: undefined
-        })
-      )
-    ).resolves.toBe(true)
-
-    expect(onStart).toHaveBeenCalledWith({
       signal: undefined,
       onCreateAccepted: undefined,
       onFailureNotified: expect.any(Function),
       agent: 'codex',
       commandInput: 'Fix the bug',
+<<<<<<< fork
+      agentArgs: '--model gpt-5',
+      launchOptions: { model: 'gpt-5.3', optionValues: { effort: 'high' } }
+||||||| base
+      agentArgs: '--model gpt-5'
+=======
       agentArgs: '--model gpt-5',
       agentLaunchPreferences: undefined,
       chatSessionOptions: { model: 'gpt-5' },
       preferredSurface: undefined
+>>>>>>> upstream
     })
     expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
     expect(mocks.onLaunched).toHaveBeenCalledTimes(1)

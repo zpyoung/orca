@@ -409,6 +409,56 @@ it.each(['claude', 'codex'] as const)(
   }
 )
 
+it.each(['claude', 'codex'] as const)(
+  'launches exact pending-only %s Args after a pending-defaults refresh',
+  async (agent) => {
+    const own: AgentPickerEntry = {
+      ...entry,
+      agent,
+      label: agent,
+      terminal: {},
+      structured: {},
+      arguments: '',
+      ownerKey: 'pending-before',
+      worktreeId: 'repo::/pending-only',
+      rows: [{ agent, kind: 'cli', executionHostId: 'local' }]
+    }
+    const launch = vi.fn().mockReturnValue(true)
+    act(() =>
+      root.render(
+        <TooltipProvider>
+          <AgentLaunchSetupPanel entry={own} onUse={launch} />
+        </TooltipProvider>
+      )
+    )
+    const text = '--add-dir "pending exact path"'
+    fireEvent.change(host.querySelector('textarea')!, { target: { value: text } })
+    const held = readLaunchSetupOptions(agentLaunchPromptScopeKey(own))!
+    expect(held.arguments).toBeUndefined()
+    expect(held.pendingArguments).toBe(text)
+    const refreshed = {
+      ...own,
+      ownerKey: 'pending-current',
+      defaultsPending: true,
+      arguments: '--add-dir changed-default'
+    }
+    act(() =>
+      root.render(
+        <TooltipProvider>
+          <AgentLaunchSetupPanel entry={refreshed} onUse={launch} />
+        </TooltipProvider>
+      )
+    )
+    expect(host.querySelector('textarea')).toHaveProperty('disabled', false)
+    expect(host.querySelector('textarea')).toHaveProperty('value', text)
+    fireEvent.keyDown(host.querySelector('textarea')!, { key: 'Enter' })
+    await waitFor(() => expect(launch).toHaveBeenCalledOnce())
+    expect(launch.mock.lastCall![0].argumentsOwner).toBe(refreshed.ownerKey)
+    expect(launch.mock.lastCall![0].pendingArguments).toBeUndefined()
+    expect(agentPickerLaunchInputs(launch.mock.lastCall![0], refreshed).agentArgs).toBe(text)
+  }
+)
+
 it.each(['inline', 'menu'])(
   'focuses the setup prompt imperatively with the model list open in %s configuration',
   async (surface) => {

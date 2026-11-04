@@ -56,7 +56,8 @@ export type LaunchWorkItemDirectArgs = {
   resolveAgentArgs?: (agent: TuiAgent) => string | null | undefined
   resolveSessionOptions?: (agent: TuiAgent) => Readonly<Record<string, string>> | undefined
   /** For `agentOverride`: a picked surface and host, or a saved replay's terminal. */
-  launchChoice?: Pick<AgentLaunchChoice, 'requestedSurface' | 'executionHostId'>
+  launchChoice?: Pick<AgentLaunchChoice, 'requestedSurface' | 'executionHostId'> &
+    Pick<AgentSessionLaunchRequest, 'preferredSurface'>
 >>>>>>> upstream
   promptDelivery?: 'draft' | 'submit-after-ready'
   launchPlatform?: NodeJS.Platform

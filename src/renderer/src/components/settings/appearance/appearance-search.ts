@@ -1,7 +1,6 @@
-import type { SettingsSearchEntry } from './settings-search'
-import { getTerminalAppearanceSearchEntries } from './terminal-search'
-import { getLeftSidebarAppearanceEntry, getSidebarEntries } from './appearance-sidebar-search'
-import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'
+import type { SettingsSearchEntry } from '../search/settings-search'
+import { getTerminalAppearanceSearchEntries } from '../terminal/terminal-search'
+import { getSidebarEntries } from './appearance-sidebar-search'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from '../search/settings-search-keywords'
@@ -293,7 +292,6 @@ export function getAppearancePaneSearchEntries(
     ...getTitlebarEntries(),
     ...getReduceVisualEffectsEntries(),
     ...getStatusBarEntries(),
-    getSidebarSectionSeparatorEntry(),
     ...getSidebarEntries(),
     ...getAppIconEntries(),
     ...getSystemTrayEntries(options),

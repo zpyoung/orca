@@ -5,9 +5,17 @@ import {
   acquireAgentLaunchChoices
 } from '@/lib/host-chat-program-acquisition'
 import { toast } from 'sonner'
+<<<<<<< fork
 import { agentLaunchOverridesToSessionOptionValues } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { AppState } from '@/store'
 import { useAppStore } from '@/store'
+||||||| base
+import type { AppState } from '@/store'
+import { useAppStore } from '@/store'
+=======
+import { type AppState, useAppStore } from '@/store'
+
+>>>>>>> upstream
 import type { TuiAgent } from '../../../../../../shared/tui-agent'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'

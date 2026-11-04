@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDefaultSettings } from '../../../../shared/constants'
+import { getDefaultSettings } from '../../../../../shared/constants'
 import { buildSettingsNavigationMetadata } from '@/hooks/useSettingsNavigationMetadata'
 import { ChatSettingsSection } from './ChatSettingsSection'
 import { TooltipProvider } from '../../ui/tooltip'
@@ -11,12 +11,12 @@ import { ActiveSettingsSectionProvider } from '../section-layout/SettingsSection
 import { getChatAppearanceSearchEntries } from '../appearance/chat/chat-appearance-search'
 import { getChatNamingSearchEntry } from './chat-naming-search'
 import { getChatInlineVisualsSearchEntry } from './chat-inline-visuals-search'
-import { useSettingsRepoScrollEffects } from './use-settings-repo-scroll-effects'
-import type { SettingsStoreModel } from './use-settings-store-model'
-import type { SettingsInteractionController } from './use-settings-interaction-controller'
-import type { SettingsNavigationModel } from './use-settings-navigation-model'
-import type { SettingsTerminalModel } from './use-settings-terminal-model'
-import { useAppStore } from '@/store'
+import { useSettingsRepoScrollEffects } from '../navigation/use-settings-repo-scroll-effects'
+import type { SettingsStoreModel } from '../page/use-settings-store-model'
+import type { SettingsInteractionController } from '../page/use-settings-interaction-controller'
+import type { SettingsNavigationModel } from '../navigation/use-settings-navigation-model'
+import type { SettingsTerminalModel } from '../page/use-settings-terminal-model'
+import { useAppStore } from '@/store/index'
 
 vi.mock('@/lib/host-chat-program-acquisition', () => ({ useChatProgramFacts: () => {} }))
 beforeEach(() => {

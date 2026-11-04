@@ -313,32 +313,21 @@ async function launchFixChecksAgent(args: StartFixChecksAgentArgs): Promise<bool
     launchSource: args.launchSource,
     telemetrySource: args.telemetrySource,
     promptDelivery: 'submit-after-ready',
-    agentArgs: recipe().agentArgs,
 <<<<<<< fork
+    agentArgs: recipe().agentArgs,
     launchOptions: recipe().launchOptions,
-    ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
-    openModalFallback: args.openModalFallback
 ||||||| base
-    ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
-    openModalFallback: args.openModalFallback
+    agentArgs: recipe().agentArgs,
 =======
-    resolveAgentArgs: (agent) =>
-      sourceControlActionAgentArgs(recipe(), agent, useAppStore.getState().settings),
-    resolveSessionOptions: (agent) => resolveSourceControlActionSessionOptions(recipe(), agent),
-    ...(agentOverride.kind === 'agent'
-      ? {
-          agentOverride: agentOverride.agent,
-          launchChoice: {
-            requestedSurface: resolveSourceControlActionRequestedSurface(
-              recipe(),
-              agentOverride.agent
-            )
-          }
-        }
-      : {}),
+    resolveLaunchInputs: (agent) =>
+      projectSourceControlActionLaunch(recipe, agent, {
+        renderedPrompt: prompt,
+        settings: store.settings
+      }),
+>>>>>>> upstream
+    ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
     openModalFallback: args.openModalFallback,
     onSetupRequired: args.onSetupRequired
->>>>>>> upstream
   })
   return result === true
 }

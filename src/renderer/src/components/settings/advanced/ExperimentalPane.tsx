@@ -8,12 +8,12 @@ import { getExperimentalSearchEntry } from './experimental-search'
 import { HiddenExperimentalGroup } from './HiddenExperimentalGroup'
 import { NumberField, SettingsSwitch } from '../form-controls/SettingsFormControls'
 import { translate } from '@/i18n/i18n'
-import { TerminalDockExperimentalSetting } from './fork-terminal-dock/TerminalDockExperimentalSetting'
-import { AgentDashboardExperimentalSetting } from './AgentDashboardExperimentalSetting'
-import { EphemeralVmsExperimentalSetting } from './EphemeralVmsExperimentalSetting'
-import { BrowserExtensionsExperimentalSetting } from './BrowserExtensionsExperimentalSetting'
-import { WslHostsExperimentalSetting } from './WslHostsExperimentalSetting'
-import { wslHostsAvailable } from '../sidebar/use-wsl-hosts-enabled'
+import { AgentDashboardExperimentalSetting } from '../../dashboard/AgentDashboardExperimentalSetting'
+import { EphemeralVmsExperimentalSetting } from '../virtual-machines/recipes/EphemeralVmsExperimentalSetting'
+import { BrowserExtensionsExperimentalSetting } from '../browser/extensions/BrowserExtensionsExperimentalSetting'
+import { OrchestrationPanelExperimentalSetting } from '../orchestration/OrchestrationPanelExperimentalSetting'
+import { WslHostsExperimentalSetting } from '../wsl/hosts/WslHostsExperimentalSetting'
+import { wslHostsAvailable } from '../../sidebar/use-wsl-hosts-enabled'
 import {
   MAX_AGENT_HIBERNATION_IDLE_MS,
   MIN_AGENT_HIBERNATION_IDLE_MS,
@@ -36,9 +36,6 @@ export function ExperimentalPane({
 }: ExperimentalPaneProps): React.JSX.Element {
   const searchQuery = useAppStore((s) => s.settingsSearchQuery)
   const showPet = matchesSettingsSearch(searchQuery, [getExperimentalSearchEntry().pet])
-  const showTerminalDock = matchesSettingsSearch(searchQuery, [
-    getExperimentalSearchEntry().terminalDock
-  ])
   const showAgentDashboard = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().agentDashboard
   ])
@@ -96,10 +93,6 @@ export function ExperimentalPane({
             />
           </div>
         </SearchableSetting>
-      ) : null}
-
-      {showTerminalDock ? (
-        <TerminalDockExperimentalSetting settings={settings} updateSettings={updateSettings} />
       ) : null}
 
       {showTerminalAttention ? (
@@ -267,6 +260,8 @@ export function ExperimentalPane({
       <EphemeralVmsExperimentalSetting settings={settings} updateSettings={updateSettings} />
 
       <BrowserExtensionsExperimentalSetting settings={settings} updateSettings={updateSettings} />
+
+      <OrchestrationPanelExperimentalSetting settings={settings} updateSettings={updateSettings} />
 
       {wslHostsAvailable() ? (
         <WslHostsExperimentalSetting settings={settings} updateSettings={updateSettings} />

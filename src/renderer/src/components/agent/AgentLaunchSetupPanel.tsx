@@ -207,9 +207,22 @@ export function AgentLaunchSetupPanel({
           })}
         />
         <CommandList className="max-h-56" data-focus-behavior="page">
-          <CommandEmpty>
-            {translate('agentPicker.noModels', 'No models match your search.')}
-          </CommandEmpty>
+          {catalogMessage ? (
+            <div className="px-2 py-1.5 text-xs text-muted-foreground" role="status">
+              {catalogMessage}
+            </div>
+          ) : null}
+          {hasModels &&
+          modelQuery &&
+          entry.catalog.origin !== 'unknown' &&
+          !entry.catalog.listingInProgress &&
+          entry.catalogRead !== 'pending' &&
+          entry.catalogRead !== 'failed' &&
+          entry.catalogRead !== 'unsupported' ? (
+            <CommandEmpty>
+              {translate('agentPicker.noModels', 'No models match your search.')}
+            </CommandEmpty>
+          ) : null}
           <CommandGroup>
             <AgentLaunchTextModelDefault
               entry={entry}

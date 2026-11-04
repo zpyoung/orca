@@ -1,26 +1,25 @@
 // Keep Electron imports out: both desktop and orcad bundle these account services.
-import { getClaudeAgentViewService } from './claude/agent-view/agent-view-service'
-import type { Store } from './persistence/loading-store/store'
-import { RateLimitService } from './rate-limits/service'
-import { CodexRuntimeHomeService } from './codex-accounts/runtime-home-service'
-import { CodexAccountService } from './codex-accounts/service'
-import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
-import { ClaudeAccountService } from './claude-accounts/service'
-import { getInitialCodexRateLimitTarget } from './rate-limits/codex-rate-limit-target'
-import { getInitialClaudeRateLimitTarget } from './rate-limits/claude-rate-limit-target'
-import { getKimiRuntimeTarget, resolveKimiHome } from './kimi/kimi-runtime-home'
-import { resolveCodexRateLimitHomeUnlessStopped } from './rate-limits/codex-rate-limit-wsl-home-gate'
-import { inactiveCodexHomeUnlessStopped } from './rate-limits/inactive-codex-home'
-import { readMiniMaxSessionCookie } from './minimax/minimax-cookie-store'
-import { readMiniMaxApiKey } from './minimax/minimax-api-key-store'
-import { readZcodePlanApiKey } from './zcode/zcode-plan-api-key-store'
-import { readOpenCodeGoApiKey } from './opencode/opencode-go-api-key-store'
-import { setAntigravityNativeCredentialChangeListener } from './antigravity/native-account-host'
-import { createAccountRuntimeTargetSettingsSync } from './rate-limits/account-runtime-target-sync'
-import { normalizeCodexRuntimeSelection } from './codex-accounts/runtime-selection'
-import { normalizeClaudeRuntimeSelection } from './claude-accounts/runtime-selection'
-import type { ClaudeStatusLineRateLimits } from '../shared/claude-statusline-rate-limits'
-import { ingestSessionInfoPlanWindows as ingestPlanWindows } from './fork-session-info/session-info-plan-window-correlation'
+import { getClaudeAgentViewService } from '../../claude/agent-view/agent-view-service'
+import type { Store } from '../../persistence/loading-store/store'
+import { RateLimitService } from '../../rate-limits/service'
+import { CodexRuntimeHomeService } from '../../codex-accounts/runtime-home-service'
+import { CodexAccountService } from '../../codex-accounts/service'
+import { ClaudeRuntimeAuthService } from '../../claude-accounts/runtime-auth-service'
+import { ClaudeAccountService } from '../../claude-accounts/service'
+import { getInitialCodexRateLimitTarget } from '../../rate-limits/codex-rate-limit-target'
+import { getInitialClaudeRateLimitTarget } from '../../rate-limits/claude-rate-limit-target'
+import { getKimiRuntimeTarget, resolveKimiHome } from '../../kimi/kimi-runtime-home'
+import { resolveCodexRateLimitHomeUnlessStopped } from '../../rate-limits/codex-rate-limit-wsl-home-gate'
+import { inactiveCodexHomeUnlessStopped } from '../../rate-limits/inactive-codex-home'
+import { readMiniMaxSessionCookie } from '../../minimax/minimax-cookie-store'
+import { readMiniMaxApiKey } from '../../minimax/minimax-api-key-store'
+import { readZcodePlanApiKey } from '../../zcode/zcode-plan-api-key-store'
+import { readOpenCodeGoApiKey } from '../../opencode/opencode-go-api-key-store'
+import { setAntigravityNativeCredentialChangeListener } from '../../antigravity/native-account-host'
+import { createAccountRuntimeTargetSettingsSync } from '../../rate-limits/account-runtime-target-sync'
+import { normalizeCodexRuntimeSelection } from '../../codex-accounts/runtime-selection'
+import { normalizeClaudeRuntimeSelection } from '../../claude-accounts/runtime-selection'
+import type { ClaudeStatusLineRateLimits } from '../../../shared/claude-statusline-rate-limits'
 
 export type ProviderAccountServices = {
   rateLimits: RateLimitService
@@ -105,7 +104,9 @@ export function createProviderAccountServices(
     claudeRuntimeAuth.prepareForRateLimitFetch(target)
   )
   // Live statusLine usage avoids OAuth endpoint polling and its 429s.
-  options.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))
+  options.setClaudeStatusLineListener((event) => {
+    rateLimits.ingestLiveClaudeRateLimits(event)
+  })
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()
     return {

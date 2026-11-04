@@ -48,7 +48,7 @@ export type RunSourceControlAgentActionStartArgs = {
   agentArgsApply: boolean
   commandTemplate: string
 =======
-  /** The picker's choice: a deliberate surface stays explicit, a saved replay requests terminal only. */
+  /** Deliberate surface operations remain distinct from saved route preferences. */
   launchChoice?: AgentLaunchChoice
   recipe: SelectedSourceControlActionRecipe
 >>>>>>> upstream
@@ -116,7 +116,7 @@ export async function runSourceControlAgentActionStart({
   commandTemplate,
 =======
   launchChoice,
-  recipe,
+  recipe: submittedRecipe,
 >>>>>>> upstream
   saveTargetValue,
   actionId,

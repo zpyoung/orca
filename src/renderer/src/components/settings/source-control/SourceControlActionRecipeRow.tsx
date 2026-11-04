@@ -1,3 +1,20 @@
+<<<<<<< fork
+import { Terminal } from 'lucide-react'
+import type {
+  AgentLaunchOptionSelection,
+  AgentLaunchOverrides
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { CustomAgentId } from '../../../../shared/commit-message-agent-spec'
+import { CUSTOM_AGENT_ID, isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
+||||||| base
+import { Terminal } from 'lucide-react'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { CustomAgentId } from '../../../../shared/commit-message-agent-spec'
+import { CUSTOM_AGENT_ID, isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
+=======
 import { SourceControlTextActionAgentPicker } from '../SourceControlTextActionAgentPicker'
 import type { SourceControlAiModelEdits } from '../../../../../shared/source-control-ai-action-model-edits'
 import type {
@@ -12,21 +29,15 @@ import {
 import { canonicalSourceControlActionSelection } from '../../../../../shared/source-control-action-selection'
 import type { ActionArgumentChoices } from '../../../../../shared/source-control-action-argument-document'
 import { SourceControlActionAgentPicker } from './SourceControlActionAgentPicker'
-import { SourceControlActionArguments } from './SourceControlActionArguments'
-import { Terminal } from 'lucide-react'
-import type {
-  AgentLaunchOptionSelection,
-  AgentLaunchOverrides
-} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { TuiAgent } from '../../../../shared/tui-agent'
-import type { CustomAgentId } from '../../../../shared/commit-message-agent-spec'
-import { CUSTOM_AGENT_ID, isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
+import type { GlobalSettings } from '../../../../../shared/global-settings-types'
+import type { TuiAgent } from '../../../../../shared/tui-agent'
+import type { CustomAgentId } from '../../../../../shared/commit-message-agent-spec'
+import { isCustomAgentId } from '../../../../../shared/commit-message-agent-spec'
+>>>>>>> upstream
 import {
   SOURCE_CONTROL_ACTION_LABELS,
-  type SourceControlActionRecipe,
-  type AiActionId,
-  type SourceControlActionLaunchPreferences
+<<<<<<< fork
+  type AiActionId
 } from '../../../../shared/source-control-ai-actions'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
@@ -40,6 +51,27 @@ import {
   agentLaunchOptionSelectionFromOverrides,
   type ActionRecipeDraftValue
 } from './source-control-ai-action-recipe-draft'
+||||||| base
+  type AiActionId
+} from '../../../../shared/source-control-ai-actions'
+import { AgentIcon } from '@/lib/agent-catalog'
+import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import type { ActionRecipeDraftValue } from './source-control-ai-action-recipe-draft'
+=======
+  type SourceControlActionRecipe,
+  type AiActionId,
+  type SourceControlActionLaunchPreferences
+} from '../../../../../shared/source-control-ai-actions'
+import { SourceControlActionVariableChips } from '../../source-control/SourceControlActionVariableChips'
+import { Button } from '../../ui/button'
+import { Input } from '../../ui/input'
+import { Label } from '../../ui/label'
+import type { ActionRecipeDraftValue } from './source-control-ai-action-recipe-draft'
+>>>>>>> upstream
 import {
   getActionDescriptions,
   AI_TEXT_ACTION_ID_SET,
@@ -166,10 +198,12 @@ export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
     }
   }
   const agentArgsPlaceholder = getSourceControlAgentArgsPlaceholder(launchAgent)
+  const agentOptions = getAgentCatalogForAction(actionId, selectedAgent)
 ||||||| base
   const agentArgsPlaceholder = getSourceControlAgentArgsPlaceholder(
     resolveAgentArgsPlaceholderAgent(selectedAgent, defaultTuiAgent)
   )
+  const agentOptions = getAgentCatalogForAction(actionId, selectedAgent)
 =======
   const agentArgsPlaceholder =
     (!selectedAgent && defaultAgentArgsPlaceholder) ||
@@ -177,7 +211,6 @@ export function SourceControlActionRecipeRow<ActionId extends AiActionId>({
       resolveAgentArgsPlaceholderAgent(selectedAgent, defaultTuiAgent)
     )
 >>>>>>> upstream
-  const agentOptions = getAgentCatalogForAction(actionId, selectedAgent)
   const agentWarningText = getSourceControlActionAgentWarningText(actionId, selectedAgent)
   const agentSupportText =
     (!selectedAgent && defaultAgentSupportText) || getSourceControlActionAgentSupportText(actionId)

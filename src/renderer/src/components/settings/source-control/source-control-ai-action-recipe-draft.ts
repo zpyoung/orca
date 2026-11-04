@@ -1,9 +1,19 @@
+<<<<<<< fork
 import type {
   AgentLaunchOptionSelection,
   AgentLaunchOverrides
 } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { SourceControlAiSettings } from '../../../../shared/source-control-ai-types'
-import { readActionModelSelection } from '../../../../shared/source-control-action-model-selection'
+||||||| base
+import type { SourceControlAiSettings } from '../../../../shared/source-control-ai-types'
+=======
+import type {
+  SourceControlAiSettings,
+  SourceControlAiModelChoice
+} from '../../../../../shared/source-control-ai-types'
+import { readActionModelSelection } from '../../../../../shared/source-control-action-model-selection'
+import type { SourceControlAiModelEdits } from '../../../../../shared/source-control-ai-action-model-edits'
+>>>>>>> upstream
 import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
   SOURCE_CONTROL_ACTION_IDS,

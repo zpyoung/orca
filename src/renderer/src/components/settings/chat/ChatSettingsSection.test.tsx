@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../../shared/constants'
@@ -21,8 +22,8 @@ import {
   getSettingsScrollTarget
 } from '../navigation/settings-navigation-foundations'
 import ja from '@/i18n/locales/ja.json'
-import { getSettingsSectionSearchEntries, matchesSettingsSearch } from './settings-search'
-import { useAppStore } from '@/store'
+import { getSettingsSectionSearchEntries, matchesSettingsSearch } from '../search/settings-search'
+import { useAppStore } from '@/store/index'
 import { getChatLaunchSearchEntries } from './chat-launch-search'
 
 vi.mock('@/lib/host-chat-program-acquisition', () => ({ useChatProgramFacts: () => {} }))

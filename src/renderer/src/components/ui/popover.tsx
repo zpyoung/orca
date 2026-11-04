@@ -5,6 +5,7 @@ import * as PopoverPrimitive from 'radix-ui/popover'
 
 import { cn } from '@/lib/utils'
 import { handleOverlayCloseAutoFocus } from '@/lib/overlay-focus-ownership'
+import { getWheelScrollDeltaY } from '@/lib/wheel-scroll-delta'
 import { OverlayFocusScope, useOverlayFocusScope } from './use-overlay-focus-scope'
 import { handleImeOverlayEscape } from '@/lib/ime-overlay-escape'
 

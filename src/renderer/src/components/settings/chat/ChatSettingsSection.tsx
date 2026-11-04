@@ -13,10 +13,10 @@ import { useAppStore } from '../../../store/index'
 import { Card, CardContent } from '../../ui/card'
 import { getChatAppearanceSearchEntries } from '../appearance/chat/chat-appearance-search'
 import { getChatBehaviorTitle } from './chat-behavior-search'
-import { AgentDefaultSurfaceSection } from './AgentDefaultSurfaceSection'
+import { AgentDefaultSurfaceSection } from '../agents/surfaces/AgentDefaultSurfaceSection'
 import { ChatAgentLaunchSettings } from './ChatAgentLaunchSettings'
 import { getChatLaunchEntriesByKey } from './chat-launch-search'
-import { SearchableSetting } from './SearchableSetting'
+import { SearchableSetting } from '../section-layout/SearchableSetting'
 
 export function ChatSettingsSection({
   settings,

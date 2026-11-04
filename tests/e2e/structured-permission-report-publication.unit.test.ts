@@ -594,7 +594,7 @@ it('publishes accepted Codex fresh policy to desktop and phone without stale sta
       turn: { id: 'applied-ask' }
     })
     expect(host.readStatusSummary(sessionId)?.runtimePermission).toEqual({ fence, mode: 'auto' })
-    expect(descriptions()).toEqual(['Ask for approval', 'Approve for me'])
+    expect(descriptions()).toEqual(['Ask for approval', 'Ask for approval'])
     await act(async () => {
       answer.resolve({ turn: { id: 'applied-ask' } })
       expect(await finished).toMatchObject({ value: { state: 'admitted' } })

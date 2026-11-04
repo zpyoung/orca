@@ -22,7 +22,12 @@ import {
   getTypographyEntries,
   getZoomEntries
 } from './appearance-search'
-import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'
+import { getMenuBarIconEntries, getSystemTrayEntries } from './appearance-system-presence-search'
+import {
+  getSidebarEntries,
+  getLeftSidebarAppearanceEntry,
+  getWorkspaceCardLayoutEntry
+} from './appearance-sidebar-search'
 import { getReduceVisualEffectsEntries } from './appearance-reduce-visual-effects-search'
 import { getTerminalAppearanceSearchEntries } from '../terminal/terminal-search'
 import { TerminalAppearanceSection } from '../terminal/appearance/TerminalAppearanceSection'
@@ -150,7 +155,6 @@ export function AppearancePane({
     },
     ...getStatusBarEntries(),
     ...getSidebarEntries(),
-    getSidebarSectionSeparatorEntry(),
     ...getLayoutEntries(),
     getLeftSidebarAppearanceEntry(),
     getWorkspaceCardLayoutEntry()

@@ -83,6 +83,7 @@ export function useSourceControlActionRecipeDraftState({
   const persistedActionRecipeValues = useMemo(() => readActionRecipeInputValues(config), [config])
   const persistedActionRecipeValuesRef = useRef(persistedActionRecipeValues)
   persistedActionRecipeValuesRef.current = persistedActionRecipeValues
+<<<<<<< fork
   const [actionRecipeDraftState, setActionRecipeDraftState] = useState<ActionRecipeDraftState>(
     () => ({
       values: persistedActionRecipeValues,
@@ -90,6 +91,34 @@ export function useSourceControlActionRecipeDraftState({
     })
   )
   const [savingActionRecipeIds, setSavingActionRecipeIds] = useState<
+||||||| base
+  const [actionRecipeDraftState, setActionRecipeDraftState] = useState<ActionRecipeDraftState>(
+    () => ({
+      values: persistedActionRecipeValues,
+      baseValues: persistedActionRecipeValues
+    })
+  )
+  const [savingActionTemplateIds, setSavingActionTemplateIds] = useState<
+=======
+  const [storedDraftState, setActionRecipeDraftState] = useState<ActionRecipeDraftState>(() => ({
+    values: persistedActionRecipeValues,
+    baseValues: persistedActionRecipeValues
+  }))
+  // Adjusted during render so a newer save shows in the same frame the settings change.
+  const [followedPersisted, setFollowedPersisted] = useState(persistedActionRecipeValues)
+  let actionRecipeDraftState = storedDraftState
+  if (followedPersisted !== persistedActionRecipeValues) {
+    actionRecipeDraftState = followPersistedRecipeValues(
+      storedDraftState,
+      persistedActionRecipeValues
+    )
+    setFollowedPersisted(persistedActionRecipeValues)
+    setActionRecipeDraftState((current) =>
+      followPersistedRecipeValues(current, persistedActionRecipeValues)
+    )
+  }
+  const [savingActionTemplateIds, setSavingActionTemplateIds] = useState<
+>>>>>>> upstream
     Partial<Record<SourceControlActionId, boolean>>
   >({})
   const actionRecipeDraftSerialized = useMemo(
@@ -205,19 +234,6 @@ export function useSourceControlActionRecipeDraftState({
     }))
   }
 
-  const retireActionAgentDocument = (actionId: SourceControlActionId, agentId: unknown): void => {
-    setActionRecipeDraftState((current) => {
-      const value = current.values[actionId]
-      if (!value.argumentChoices || value.argumentChoices.syntaxAgent === agentId) {
-        return current
-      }
-      return {
-        ...current,
-        values: { ...current.values, [actionId]: demoteActionArgumentChoices(value) }
-      }
-    })
-  }
-
 <<<<<<< fork
   const onActionLaunchOptionsChange = (
     actionId: SourceControlActionId,
@@ -251,6 +267,19 @@ export function useSourceControlActionRecipeDraftState({
   const saveActionTemplateDraft = async (actionId: SourceControlActionId): Promise<void> => {
     const nextValue = actionRecipeDraftState.values[actionId]
 =======
+  const retireActionAgentDocument = (actionId: SourceControlActionId, agentId: unknown): void => {
+    setActionRecipeDraftState((current) => {
+      const value = current.values[actionId]
+      if (!value.argumentChoices || value.argumentChoices.syntaxAgent === agentId) {
+        return current
+      }
+      return {
+        ...current,
+        values: { ...current.values, [actionId]: demoteActionArgumentChoices(value) }
+      }
+    })
+  }
+
   const saveActionTemplateDraft = async (actionId: SourceControlActionId): Promise<void> => {
     const submitted = storedDraftState.values[actionId]
     const { agentId: _binding, ...nextValue } = liftActionPermissionArgs(
@@ -265,7 +294,17 @@ export function useSourceControlActionRecipeDraftState({
     ) {
       return
     }
+<<<<<<< fork
     setSavingActionRecipeIds((current) => ({ ...current, [actionId]: true }))
+||||||| base
+    setSavingActionTemplateIds((current) => ({ ...current, [actionId]: true }))
+=======
+    const textAction = SOURCE_CONTROL_TEXT_ACTION_IDS.find((id) => id === actionId)
+    const { modelEdits, ...recipeValue } = nextValue
+    const replayEdits = textAction && modelEdits?.length ? modelEdits : undefined
+    let savedValue = recipeValue
+    setSavingActionTemplateIds((current) => ({ ...current, [actionId]: true }))
+>>>>>>> upstream
     try {
       await writeConfig((current) => {
         const choices: Partial<Record<string, SourceControlAiModelChoice>> =

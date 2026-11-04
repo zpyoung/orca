@@ -7,7 +7,6 @@ import type { DiscoveredSkill } from '../../../../../shared/skills'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '../../ui/tooltip'
 import { LinearAgentSkillInstallCta } from './linear-agent-skill-install-cta'
-import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 const mocks = vi.hoisted(() => ({
   agentRuntime: ((): ProjectAgentSkillRuntime | undefined => undefined)(),
@@ -134,7 +133,7 @@ describe('LinearAgentSkillInstallCta', () => {
     mocks.agentRuntime = { runtime: 'wsl', wslDistro: 'Debian', label: 'WSL Debian' }
     const rendered = await renderCta()
     expect(rendered.textContent).toContain(
-      `npx skills@1.7.2 add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${'0'.repeat(40)} --skill orca-linear --global`
+      `npx skills@1.7.2 add https://github.com/stablyai/orca/tree/${'0'.repeat(40)} --skill orca-linear --global`
     )
     expect(rendered.textContent).not.toContain('Install skill')
     expect(mocks.plan).not.toHaveBeenCalled()

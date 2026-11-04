@@ -122,12 +122,7 @@ export function NativeChatResolvedView({
     () => ({ paneKey, agent, sessionId }),
     [paneKey, agent, sessionId]
   )
-  const delivery = useNativeChatPendingDelivery({
-    paneKey,
-    agent,
-    session,
-    workingEpoch: sendWorkingEpoch
-  })
+  const delivery = useNativeChatPendingDelivery({ paneKey, agent, session })
   const { pending, record, clear } = delivery
   // Slash commands are local session-scoped feedback, not user turns; cap and cache their markers.
   const [commandMarkers, setCommandMarkers] = useState<NativeChatCommandMarker[]>(() =>
@@ -210,25 +205,28 @@ export function NativeChatResolvedView({
     composerReady
   })
 
+  // Match mobile ordering: hook preview before optimistic user echoes.
   const pendingMessages = useMemo(
-    () => pendingSendsAsMessages(pending, sessionAfterCommandBoundaries.messages, sendWorkingEpoch),
-    [pending, sessionAfterCommandBoundaries.messages, sendWorkingEpoch]
-  )
-  const messagesWithPending = useMemo(
-    () =>
-      pendingMessages.length === 0
-        ? sessionAfterCommandBoundaries.messages
-        : [...sessionAfterCommandBoundaries.messages, ...pendingMessages],
-    [sessionAfterCommandBoundaries.messages, pendingMessages]
+    () => pendingSendsAsMessages(pending, sessionAfterCommandBoundaries.messages),
+    [pending, sessionAfterCommandBoundaries.messages]
   )
   const streamingText = useMemo(() => {
     return deriveNativeChatStreamingText({
-      messages: messagesWithPending,
+      messages:
+        pendingMessages.length > 0
+          ? [...sessionAfterCommandBoundaries.messages, ...pendingMessages]
+          : sessionAfterCommandBoundaries.messages,
       previewText: hookPreview,
       working: liveWorking,
       previewIsToolOutput: hookPreviewIsToolOutput
     })
-  }, [messagesWithPending, hookPreview, liveWorking, hookPreviewIsToolOutput])
+  }, [
+    sessionAfterCommandBoundaries.messages,
+    pendingMessages,
+    hookPreview,
+    liveWorking,
+    hookPreviewIsToolOutput
+  ])
   const sessionWithPending = useMemo<typeof session>(() => {
     if (pending.length === 0 && commandMarkers.length === 0 && !streamingText) {
       return sessionAfterCommandBoundaries

@@ -16,13 +16,6 @@ import { useAvailableStatusBarToggles } from '../../status-bar/use-available-sta
 import { getLayoutEntries, getFollowSymlinkedDirectoriesEntry } from './appearance-search'
 import {
   getSidebarEntries,
-  getStatusBarToggles,
-  getUsagePercentageDisplayEntry
-} from './appearance-search'
-import { USAGE_PERCENTAGE_DISPLAY_SETTING_ID } from './appearance-usage-percentage-search'
-import { LeftSidebarAppearanceSetting } from './LeftSidebarAppearanceSetting'
-import { SidebarSectionSeparatorSetting } from './fork-sidebar-section-separator/SidebarSectionSeparatorSetting'
-import {
   getLeftSidebarAppearanceEntry,
   getShowPinnedWorktreesInGroupsEntry,
   getWorkspaceCardLayoutEntry
@@ -135,11 +128,6 @@ export function AppearanceWindowSidebarSection({
           <LeftSidebarAppearanceSetting settings={settings} updateSettings={updateSettings} />
         </SearchableSetting>
 
-        <SidebarSectionSeparatorSetting
-          settings={settings}
-          updateSettings={updateSettings}
-          forceVisible={forceVisiblePrimary}
-        />
         <SearchableSetting
           title={statusBarTitle}
           keywords={statusBarKeywords}

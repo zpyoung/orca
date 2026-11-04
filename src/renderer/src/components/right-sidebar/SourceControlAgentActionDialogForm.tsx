@@ -29,13 +29,6 @@ import type { SourceControlAiWriteTarget } from '../../../../shared/source-contr
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-<<<<<<< fork
-||||||| base
-import { SourceControlAgentCliArgsField } from './SourceControlAgentCliArgsField'
-=======
-import type { AgentComboboxSurfaceRows } from '@/components/agent/agent-combobox-surface-items'
-import { SourceControlAgentCliArgsField } from './SourceControlAgentCliArgsField'
->>>>>>> upstream
 import { SourceControlActionVariableChips } from '../source-control/SourceControlActionVariableChips'
 import { sourceControlActionRecipeSaveMatchesTarget } from './source-control-action-recipe-match'
 import type {
@@ -90,7 +83,7 @@ type SourceControlAgentActionDialogFormProps = {
   onSelectedAgentChange: (agent: TuiAgent | null) => void
   onAgentArgsChange: (value: string) => void
 =======
-  onAgentPick: (agent: TuiAgent) => void
+  onAgentPick: UseSourceControlAgentActionDialogResult['onAgentPick']
   onAgentArgsChange: (value: string) => void
 >>>>>>> upstream
   onCommandTemplateChange: (value: string) => void
@@ -123,11 +116,13 @@ export function SourceControlAgentActionDialogForm({
   detecting,
   surfaceRows,
   statusCopy,
+<<<<<<< fork
   agentArgs,
   agentArgsApply,
-<<<<<<< fork
   launchOptions,
 ||||||| base
+  agentArgs,
+  agentArgsApply,
 =======
   recipe,
 >>>>>>> upstream
@@ -152,7 +147,6 @@ export function SourceControlAgentActionDialogForm({
   onAgentArgsChange,
 =======
   onAgentPick,
-  onAgentArgsChange,
 >>>>>>> upstream
   onCommandTemplateChange,
   onSaveLaunchRecipeChange,
@@ -182,9 +176,6 @@ export function SourceControlAgentActionDialogForm({
     : null
 =======
   const selectedRecipe = recipe
-  const selectedPreferences = selectedAgent
-    ? selectedSourceControlActionPreferences(selectedRecipe, selectedAgent)
-    : undefined
 >>>>>>> upstream
   const selectedSaveTarget = sourceControlLaunchSaveTargetFromValue(saveTargetValue, repo)
   // Copy describes only the selected save target, which is the only one start/save writes.
@@ -293,6 +284,7 @@ export function SourceControlAgentActionDialogForm({
           ) : null}
         </div>
 
+<<<<<<< fork
         <SourceControlAgentLaunchOverridesFields
           agent={selectedAgent}
           agentArgs={agentArgs}
@@ -302,6 +294,15 @@ export function SourceControlAgentActionDialogForm({
           onChange={onLaunchOverridesChange}
         />
 
+||||||| base
+        <SourceControlAgentCliArgsField
+          applies={agentArgsApply}
+          value={agentArgs}
+          onChange={onAgentArgsChange}
+        />
+
+=======
+>>>>>>> upstream
         <div className="space-y-2">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
