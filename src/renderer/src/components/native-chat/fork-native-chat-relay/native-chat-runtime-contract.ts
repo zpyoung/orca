@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-runtime-contract.ts
-// FORK-COPY-SHA: 55ccff19ad4cd8ba28b6f3d2be798c1e626a2c2c
+// FORK-COPY-SHA: 965978bc78bf03a6a43187c1ed28fcffe0e01bb5
 import type {
   NativeChatAppendedMessages,
   NativeChatReadSessionResult

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/shared/native-chat/native-chat-live-status.ts
-// FORK-COPY-SHA: 97b9bb3613a333450a38057d745628323f3ad185
+// FORK-COPY-SHA: 965978bc78bf03a6a43187c1ed28fcffe0e01bb5
 // Reconcile live working state with provider turn boundaries so a dropped final hook cannot leave Stop stuck.
 
 import type { AgentStatusState, AgentType } from '../../../../../shared/agent-status-types'
@@ -29,7 +29,10 @@ export type NativeChatLiveMergeInput = {
   error?: string
 }
 
-export type NativeChatLiveMergedSession = NativeChatSession & { hookAwaitingInput: boolean }
+export type NativeChatLiveMergedSession = NativeChatSession & {
+  hookAwaitingInput: boolean
+  hookWorking: boolean
+}
 
 /** Errors win; working hooks override loading until their turn ends, with provider lifecycle settling dropped Stop hooks. */
 export function mergeNativeChatLiveSession(
@@ -51,13 +54,6 @@ export function mergeNativeChatLiveSession(
     stateStartedAt,
     transcriptLifecycle
   )
-  if (error) {
-    return {
-      ...assembleNativeChatSession({ sources, sessionId, agent, status: 'error', error }),
-      hookAwaitingInput
-    }
-  }
-
   const status = liveStatusOverride(
     agent,
     hookState,
@@ -66,11 +62,18 @@ export function mergeNativeChatLiveSession(
     transcriptLifecycle,
     hookHasWorkingSubagents ?? false
   )
+  const activity = { hookAwaitingInput, hookWorking: status === 'working' }
+  if (error) {
+    return {
+      ...assembleNativeChatSession({ sources, sessionId, agent, status: 'error', error }),
+      ...activity
+    }
+  }
   // Keep Stop/activity live while loading; view-state selection separately holds empty transcripts on their loading surface.
   if (loading && status !== 'working') {
     return {
       ...assembleNativeChatSession({ sources, sessionId, agent, status: 'loading' }),
-      hookAwaitingInput
+      ...activity
     }
   }
   return {
@@ -80,7 +83,7 @@ export function mergeNativeChatLiveSession(
       agent,
       ...(status ? { status } : {})
     }),
-    hookAwaitingInput
+    ...activity
   }
 }
 

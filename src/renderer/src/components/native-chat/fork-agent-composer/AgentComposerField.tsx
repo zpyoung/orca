@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 97b9bb3613a333450a38057d745628323f3ad185
+// FORK-COPY-SHA: 965978bc78bf03a6a43187c1ed28fcffe0e01bb5
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/main/automations/precheck-runner.ts
-// FORK-COPY-SHA: 1c6ac8c3c4d2c3dec2cb5966d225ca2a0e0471d3
+// FORK-COPY-SHA: 965978bc78bf03a6a43187c1ed28fcffe0e01bb5
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { ClientChannel } from 'ssh2'
 import type { AutomationPrecheck, AutomationPrecheckResult } from '../../shared/automations-types'
