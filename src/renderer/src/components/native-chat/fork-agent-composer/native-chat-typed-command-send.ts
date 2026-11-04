@@ -100,7 +100,7 @@ export function sendNativeChatTypedCommand(
           }
         }).then(finish, () => finish('rejected'))
       }
-      if (options?.clearInput) {
+      if (options?.clearInput !== undefined && options.clearInput !== '') {
         clearThenWrite(target.ptyId, options, delay, typeCommand, markSubmitted)
       } else {
         typeCommand()

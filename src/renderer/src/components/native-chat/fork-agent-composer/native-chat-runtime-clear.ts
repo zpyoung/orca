@@ -5,7 +5,7 @@ import {
 import { AGENT_TUI_CLEAR_INPUT_MAX } from '../../../../../shared/agent-tui-input-clear'
 import type { NativeChatSendOptions } from '../native-chat-runtime-send'
 
-export const NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT = '\x15'
+export const NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT = AGENT_TUI_CLEAR_INPUT_MAX
 export const NATIVE_CHAT_CLEAR_CONFIRM_MS = 140
 
 /**
@@ -37,6 +37,9 @@ export function clearUnsubmittedAgentInput(
   options: NativeChatSendOptions | undefined,
   delay: (ms: number, fn: () => void) => void
 ): Promise<void> {
+  if (options?.clearInput === null) {
+    return Promise.resolve()
+  }
   const [first = '', ...rest] = splitClearBurst(
     options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
   )
@@ -95,6 +98,12 @@ export function clearThenWrite(
   writeBody: () => void,
   rejectSend: () => void
 ): void {
+  if (options?.clearInput === null) {
+    options.onWriteRejected?.()
+    options.onDeliverySettled?.(false)
+    rejectSend()
+    return
+  }
   sendClearBurstAccepted(ptyId, options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, delay)
     .then((cleared) => {
       if (!cleared) {

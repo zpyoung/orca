@@ -157,7 +157,7 @@ function mergeSendOptions(
   return {
     ...base,
     ...tier,
-    clearInput: base?.clearInput ?? tier.clearInput,
+    clearInput: base?.clearInput === undefined ? tier.clearInput : base.clearInput,
     confirmCleared: base?.confirmCleared ?? tier.confirmCleared,
     confirmSubmitted: base?.confirmSubmitted ?? tier.confirmSubmitted,
     onOutcome: (outcome) => {
