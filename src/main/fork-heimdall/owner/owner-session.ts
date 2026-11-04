@@ -44,7 +44,6 @@ export async function ensureOwnerSession(args: {
   watcherId: string
   worktreeId: string
   owner: WatcherOwnerConfig
-  onJournalActivity: (sessionId: string) => void
 }): Promise<OwnerSessionHandle> {
   const existing = sessionsByWatcherId.get(args.watcherId)
   if (existing) {
@@ -66,8 +65,7 @@ export async function ensureOwnerSession(args: {
     worktreeId: args.worktreeId,
     agent: 'claude',
     dispatchId: holdId,
-    ...(Object.keys(options).length > 0 ? { options } : {}),
-    onJournalActivity: args.onJournalActivity
+    ...(Object.keys(options).length > 0 ? { options } : {})
   })
   const created: OwnerSessionHandle = {
     watcherId: args.watcherId,

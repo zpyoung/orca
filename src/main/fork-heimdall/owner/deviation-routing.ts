@@ -470,8 +470,7 @@ async function sendOwnerBrief(
     runtime: deps.owner.runtime,
     watcherId: enrollment.watcherId,
     worktreeId: workspaceRuntimeId(enrollment),
-    owner: enrollment.owner,
-    onJournalActivity: () => {}
+    owner: enrollment.owner
   })
   await sendOwnerTurn({ session, turnText: promptText })
   if (cachedRejection?.escalationId === current.escalationId) {
