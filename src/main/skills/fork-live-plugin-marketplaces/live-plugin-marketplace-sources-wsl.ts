@@ -1,5 +1,5 @@
 import { posix as pathPosix } from 'node:path'
-import { runWslProcess } from '../../wsl/wsl-runner'
+import { runWslProcess } from '../../wsl/execution/wsl-runner'
 import {
   buildWslClaudePluginMetadataCommand,
   parseWslClaudePluginMetadataOutput

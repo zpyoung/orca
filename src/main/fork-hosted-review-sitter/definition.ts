@@ -10,7 +10,7 @@ import type {
 import { HostedReviewEnrollmentCandidateSchema } from '../../shared/fork-hosted-review-sitter/enrollment-candidate'
 import type { Store } from '../persistence/loading-store/store'
 import { getAutomationSchedulerOwner } from '../persistence/scheduling-automations/automation-context-migration'
-import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
+import { getLocalProjectWorktreeGitOptions } from '../workspaces/execution-host/project-runtime-git-options'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { getHostedReviewForBranch } from '../source-control/hosted-review'
 import { parseHostedReviewEnrollmentPayload } from './definition-store'

@@ -2,8 +2,8 @@ import type React from 'react'
 
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import { isSidebarSectionSeparatorEnabled } from '../../../../../shared/fork-sidebar-section-separator/sidebar-section-separator-setting'
-import { SearchableSetting } from '../SearchableSetting'
-import { SettingsSwitchRow } from '../SettingsFormControls'
+import { SearchableSetting } from '../section-layout/SearchableSetting'
+import { SettingsSwitchRow } from '../form-controls/SettingsFormControls'
 import { getSidebarSectionSeparatorEntry } from './section-separator-search'
 
 type SidebarSectionSeparatorSettingProps = {

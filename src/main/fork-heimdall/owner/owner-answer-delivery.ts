@@ -1,6 +1,6 @@
 import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
 import type { AnswerWorkerIntervention } from '../../../shared/fork-heimdall/owner/intervention'
-import { getErrorCode } from '../../git/worktree-operation-options'
+import { getErrorCode } from '../../git/worktrees/worktree-operation-options'
 import type { WatcherQuestionState } from '../orchestration/orchestration-contract'
 import { classifyOwnerAnswerTarget, type OwnerAnswerTarget } from '../question-resolution'
 import { OWNER_STALL_THRESHOLD_MS } from './stall-detector'

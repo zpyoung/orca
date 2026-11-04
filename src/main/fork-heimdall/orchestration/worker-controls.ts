@@ -16,7 +16,7 @@ import { WorkerDispatchParams } from '../../../shared/rpc-contract/orchestration
 import { ORCHESTRATION_WORKER_STOP_METHODS } from '../../runtime/rpc/methods/orchestration/worker/worker-stop'
 import { getOrchestrationMutationExecutor } from '../../runtime/rpc/orchestration-mutation-executor'
 import type { RpcRequest } from '../../runtime/rpc/core'
-import { getErrorCode } from '../../git/worktree-operation-options'
+import { getErrorCode } from '../../git/worktrees/worktree-operation-options'
 import { coordinatorIdentityFingerprint } from './coordinator-identity'
 
 type OrchestrationWorkerListRow = {

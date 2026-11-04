@@ -24,17 +24,19 @@ import {
   isUnsupportedMergeTreeMergeBaseError,
   isUnsupportedMergeTreeWriteTreeError
 } from '../../shared/git-merge-tree-capability'
-import type { LocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
-import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
+import type { LocalProjectWorktreeGitOptions } from '../workspaces/execution-host/project-runtime-git-options'
+import { getLocalProjectWorktreeGitOptions } from '../workspaces/execution-host/project-runtime-git-options'
 import {
   requireLocalRuntimeGitRoute,
   type RuntimeGitTarget
 } from '../runtime/runtime-git-command-target'
 import { runtimePathsEqual } from '../runtime/runtime-worktree-path-identity'
 import { resolveWorktreeHostRouting } from '../runtime/worktree-launch-host-repo'
-import { getLocalGitCapabilityCache } from '../git/git-capability-state'
+import { getLocalGitCapabilityCache } from '../git/command-runner/git-capability-state'
 import { gitExecFileAsync } from '../git/runner'
-import { getStatus, bulkStageFiles, commitChanges } from '../git/status'
+import { getStatus } from '../git/source-control/status-read'
+import { bulkStageFiles } from '../git/source-control/staging'
+import { commitChanges } from '../git/source-control/commit-changes'
 import { resolveHostedReviewSitterPushTarget } from './provider-push-target'
 
 export type HostedReviewSitterExecutionContext = {

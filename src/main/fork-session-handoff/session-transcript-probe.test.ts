@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ForkHandoffTranscriptProbeRequest } from '../../shared/fork-session-handoff/session-transcript-probe-types'
-import { encodeClaudeProjectPath } from '../ai-vault/claude-project-dir-encoding'
+import { encodeClaudeProjectPath } from '../ai-vault/scanners/claude/claude-project-dir-encoding'
 import { resolveHandoffTranscript } from './session-transcript-probe'
 
 let root: string

@@ -33,7 +33,7 @@ import {
 } from './orchestration/orchestration-contract'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { WatcherRunner } from './runner-state'
-import { getErrorCode } from '../git/worktree-operation-options'
+import { getErrorCode } from '../git/worktrees/worktree-operation-options'
 
 type ControlPlaneDependencies = {
   enrollments: EnrollmentStore

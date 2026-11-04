@@ -21,8 +21,8 @@ import { gitExecFileAsync } from '../git/runner'
 import {
   getLocalWorktreePathAccess,
   toLocalWorktreeRuntimePath
-} from '../local-worktree-filesystem'
-import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
+} from '../workspaces/removal/local-worktree-filesystem'
+import { getLocalProjectWorktreeGitOptions } from '../workspaces/execution-host/project-runtime-git-options'
 import type {
   ExpectedLedgerRevision,
   LedgerCatalogRemovalResult,

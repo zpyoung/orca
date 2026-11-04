@@ -1,4 +1,4 @@
-import { encodeClaudeProjectPaths } from '../ai-vault/claude-project-dir-encoding'
+import { encodeClaudeProjectPaths } from '../ai-vault/scanners/claude/claude-project-dir-encoding'
 import type { ForkTranscriptStat } from './session-transcript-host'
 
 /** Two transcripts written this close together are both plausibly a live

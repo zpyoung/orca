@@ -1,5 +1,5 @@
 import { translate } from '@/i18n/i18n'
-import { SettingsSection } from '../SettingsSection'
+import { SettingsSection } from '../section-layout/SettingsSection'
 import { getForkSessionHandoffSearchEntries } from './handoff-settings-search'
 import { HandoffTemplatesPane } from './HandoffTemplatesPane'
 

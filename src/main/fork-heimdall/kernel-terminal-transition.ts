@@ -18,7 +18,7 @@ import {
   type EnrollmentStore
 } from './enrollment-store'
 import type { KindEnrollmentAuthorization } from './kernel-enrollment'
-import { getErrorCode } from '../git/worktree-operation-options'
+import { getErrorCode } from '../git/worktrees/worktree-operation-options'
 import type { HeimdallLedgerStore } from './ledger-store'
 import type { RegisteredWatcherKind } from './registry'
 import { WatcherDeletePendingError } from './runner-control-lifecycle'

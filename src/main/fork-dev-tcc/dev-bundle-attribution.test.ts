@@ -3,7 +3,7 @@ import {
   getDevBundlePlistPatches,
   getDevHelperPlistPatches
 } from '../../../config/scripts/dev-electron-bundle-identity.mjs'
-import { isOrcaAttributedPrompt } from '../macos-tcc-prompt-watch'
+import { isOrcaAttributedPrompt } from '../macos-permissions/macos-tcc-prompt-watch'
 
 describe('dev bundle TCC attribution', () => {
   it('counts prompts attributed to the app and helper identities emitted by the dev runner', () => {

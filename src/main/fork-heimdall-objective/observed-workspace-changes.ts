@@ -2,8 +2,8 @@ import { chmod, lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/prom
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { objectivePathMatchesTerritory } from '../../shared/fork-heimdall-objective/plan-schema'
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
-import { checkIgnoredPaths } from '../git/check-ignored-paths'
-import { isENOENT } from '../ipc/filesystem/filesystem-path-containment'
+import { checkIgnoredPaths } from '../git/source-control/check-ignored-paths'
+import { isENOENT } from '../ipc/filesystem/access/filesystem-path-containment'
 import {
   localGitOptionsForTarget,
   requireLocalRuntimeGitRoute

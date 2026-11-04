@@ -6,7 +6,7 @@ import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { SearchableSetting } from './SearchableSetting'
+import { SearchableSetting } from './section-layout/SearchableSetting'
 import { getRepositoryLedgerSectionId } from './repository/repository-settings-targets'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'

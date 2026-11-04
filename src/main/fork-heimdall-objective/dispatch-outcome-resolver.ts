@@ -11,7 +11,7 @@ import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import { requireObjectiveOriginalDispatchFingerprint } from '../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import { judgmentFailureClassification } from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
-import { getErrorCode } from '../git/worktree-operation-options'
+import { getErrorCode } from '../git/worktrees/worktree-operation-options'
 import {
   classifyValidatedReportFailure,
   dispatchReportRole,

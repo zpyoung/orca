@@ -1,4 +1,4 @@
-import type { WslResult } from '../../wsl/wsl-runner'
+import type { WslResult } from '../../wsl/execution/wsl-runner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const runWslProcessMock = vi.hoisted(() => vi.fn())

@@ -1,6 +1,6 @@
 import type { HostedReviewSitterDefinition } from '../../shared/fork-hosted-review-sitter/types'
 import type { GitPushTarget } from '../../shared/worktree/types'
-import type { LocalProjectWorktreeGitOptions } from '../project-runtime-git-options'
+import type { LocalProjectWorktreeGitOptions } from '../workspaces/execution-host/project-runtime-git-options'
 import {
   acquire as acquireGitHub,
   ghExecFileAsync,

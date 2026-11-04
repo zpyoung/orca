@@ -2,7 +2,7 @@ import { readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { JudgmentProviderSchema } from '../../../shared/fork-heimdall/judgment/types'
-import { getErrorCode } from '../../git/worktree-operation-options'
+import { getErrorCode } from '../../git/worktrees/worktree-operation-options'
 
 const JudgmentAccessSchema = z.discriminatedUnion('enabled', [
   z.object({ enabled: z.literal(false) }).strict(),

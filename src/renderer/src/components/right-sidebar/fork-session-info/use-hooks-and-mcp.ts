@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import { loadMcpConfigInspections } from '@/components/settings/mcp-config-inspection'
+import { loadMcpConfigInspections } from '@/runtime/mcp-config-inspection'
 import type {
   SessionInfoHooksAndMcp,
   SessionInfoStatusLineChainStatus

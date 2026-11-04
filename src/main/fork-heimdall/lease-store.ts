@@ -5,7 +5,7 @@ import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { WorkspaceKey } from '../../shared/fork-heimdall/watcher-types'
 import { resolveGitDir } from '../git/source-control/resolve-git-dir'
 import type { GitRuntimeOptions } from '../git/git-runtime-options'
-import { getErrorCode } from '../git/worktree-operation-options'
+import { getErrorCode } from '../git/worktrees/worktree-operation-options'
 import { ExecutionHostNotDispatchableError } from '../providers/execution-host-provider-dispatch'
 import {
   requireLocalRuntimeGitRoute,

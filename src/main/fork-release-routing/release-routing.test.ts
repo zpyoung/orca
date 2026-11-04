@@ -4,7 +4,7 @@ import { getReleaseNotesUrlForVersion } from '../../shared/release-channel'
 const fetchMock = vi.hoisted(() => vi.fn())
 vi.mock('electron', () => ({ net: { fetch: fetchMock } }))
 
-import { listReleaseBuilds, resolveTargetBuild } from '../updater-release-builds'
+import { listReleaseBuilds, resolveTargetBuild } from '../updater/releases/updater-release-builds'
 
 const version = '1.4.201-rc.0.zy03'
 const tag = `v${version}`

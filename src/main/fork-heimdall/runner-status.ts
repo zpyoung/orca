@@ -5,7 +5,7 @@ import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { FiredStopPredicate } from '../../shared/fork-heimdall/stop-policy'
 import type { WatcherParkReason } from '../../shared/fork-heimdall/watcher-types'
 import { WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND } from '../../shared/fork-heimdall/worker-escalation-consumption'
-import { getErrorCode } from '../git/worktree-operation-options'
+import { getErrorCode } from '../git/worktrees/worktree-operation-options'
 import { durableWatcherBudget } from './debug-report'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 

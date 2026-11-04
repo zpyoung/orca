@@ -3,7 +3,7 @@ import type { HeimdallKernelHost } from './kernel-host'
 import { requireLeaseStore } from './kernel-service-dependencies'
 import type { HeimdallKernelService } from './kernel-service-contract'
 import type { LeaseStore } from './lease-store'
-import { settleWithinMs } from '../quit-teardown-deadline'
+import { settleWithinMs } from '../startup/quit/quit-teardown-deadline'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { WatcherRunner } from './runner-state'
 

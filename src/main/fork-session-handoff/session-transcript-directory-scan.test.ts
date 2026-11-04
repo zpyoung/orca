@@ -3,7 +3,7 @@ import { readdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { encodeClaudeProjectPath } from '../ai-vault/claude-project-dir-encoding'
+import { encodeClaudeProjectPath } from '../ai-vault/scanners/claude/claude-project-dir-encoding'
 import { scanForkClaudeProjectTranscript } from './session-transcript-directory-scan'
 
 const workspacePath = '/workspace/repo'

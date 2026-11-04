@@ -6,7 +6,7 @@ import type {
   RuntimeTerminalListResult
 } from '../../shared/runtime-terminal-contracts'
 import type { TerminalExitCause } from '../../shared/terminal-exit-cause'
-import { getStoredRepoExecutionHostId } from '../repo-execution-host'
+import { getStoredRepoExecutionHostId } from '../workspaces/execution-host/repo-execution-host'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import type {
   HostedReviewSitterContention,
