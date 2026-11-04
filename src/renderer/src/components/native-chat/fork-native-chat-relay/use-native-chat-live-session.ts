@@ -51,6 +51,8 @@ export type NativeChatLiveSession = NativeChatSession & {
   /** The pane's hook says the agent stopped mid-turn for the reader, and the transcript
    *  has not since ended that turn. */
   hookAwaitingInput?: boolean
+  /** Reconciled host work before read errors or retained-history presentation override status. */
+  hookWorking?: boolean
   /** True when an older page may still exist (the last read filled the window). */
   hasMore: boolean
   /** Whether an older-history page is currently loading. */
