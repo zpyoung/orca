@@ -31,6 +31,7 @@ import { answerNativeChatCommandInComposer } from './use-native-chat-local-comma
 import { seedHistory } from './fork-agent-composer/agent-composer-history'
 import { useAgentComposerStructuredHistory } from './fork-agent-composer/use-agent-composer-structured-history'
 import { NativeChatComposerPane } from './NativeChatComposerPane'
+import { NativeChatTextAttachmentScope } from './NativeChatTextAttachments'
 import type {
   NativeChatComposerHandle,
   NativeChatComposerProps
@@ -444,6 +445,13 @@ const AgentChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCom
 export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
   function NativeChatComposer(props, ref): React.JSX.Element {
     const Pane = props.editSession ? NativeChatComposerPane : AgentChatComposerPane
-    return <Pane key={props.paneKey} {...props} ref={ref} />
+    return (
+      <NativeChatTextAttachmentScope
+        key={props.paneKey}
+        enabled={Boolean(props.structuredTransport)}
+      >
+        <Pane {...props} ref={ref} />
+      </NativeChatTextAttachmentScope>
+    )
   }
 )

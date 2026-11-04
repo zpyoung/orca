@@ -20,6 +20,7 @@ import { createAccountRuntimeTargetSettingsSync } from '../../rate-limits/accoun
 import { normalizeCodexRuntimeSelection } from '../../codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from '../../claude-accounts/runtime-selection'
 import type { ClaudeStatusLineRateLimits } from '../../../shared/claude-statusline-rate-limits'
+import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../../fork-session-info/session-info-plan-window-correlation'
 
 export type ProviderAccountServices = {
   rateLimits: RateLimitService
@@ -104,9 +105,7 @@ export function createProviderAccountServices(
     claudeRuntimeAuth.prepareForRateLimitFetch(target)
   )
   // Live statusLine usage avoids OAuth endpoint polling and its 429s.
-  options.setClaudeStatusLineListener((event) => {
-    rateLimits.ingestLiveClaudeRateLimits(event)
-  })
+  options.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()
     return {

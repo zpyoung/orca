@@ -27,6 +27,7 @@ import {
 } from './appearance-usage-percentage-search'
 
 import { LeftSidebarAppearanceSetting } from './LeftSidebarAppearanceSetting'
+import { SidebarSectionSeparatorSetting } from '../fork-sidebar-section-separator/SidebarSectionSeparatorSetting'
 
 import { translate } from '@/i18n/i18n'
 import { matchesSettingsSearch, normalizeSettingsSearchQuery } from '../search/settings-search'
@@ -128,6 +129,11 @@ export function AppearanceWindowSidebarSection({
           <LeftSidebarAppearanceSetting settings={settings} updateSettings={updateSettings} />
         </SearchableSetting>
 
+        <SidebarSectionSeparatorSetting
+          settings={settings}
+          updateSettings={updateSettings}
+          forceVisible={forceVisiblePrimary}
+        />
         <SearchableSetting
           title={statusBarTitle}
           keywords={statusBarKeywords}

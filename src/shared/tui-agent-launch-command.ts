@@ -143,7 +143,8 @@ export function resolveAgentLaunchCommand(args: {
     args.sessionOptions,
     args.sessionOptionsOverrideAgentArgs ? [] : trailingTokens.tokens,
     args.includeSessionOptionCatalogDefaults ?? !args.sessionOptionsOverrideAgentArgs,
-    trailingTokens.tokens
+    trailingTokens.tokens,
+    modelContext
   )
   if (override && args.sessionOptionsOverrideAgentArgs) {
     const overrideTokens = tokenizeStartupCommand(override, args.shell)

@@ -27,7 +27,6 @@ import { useGitHubWorkItemDetails } from '@/components/github-item-dialog/load-i
 import { GHEditSection } from '../edit/section'
 import { PullRequestPageHeader } from './header'
 import { PullRequestPageTabs } from './tabs-shell'
-import { syncPullRequestFileViewed } from './viewed-sync'
 import { HostedReviewSitterPullRequestPanel } from '@/fork-hosted-review-sitter/HostedReviewSitterPullRequestPanel'
 
 export default function PullRequestPage(props: PullRequestPageProps): React.JSX.Element {

@@ -2,10 +2,7 @@ import { Terminal } from '@xterm/headless'
 import { describe, expect, it } from 'vitest'
 import {
   buildWindowsPtyCompatibilityOptions,
-  isLocalNativeWindowsConpty,
-  isLocalNativeWindowsPty,
-  isRemoteWindowsConptyStatusUnverified,
-  resolveWindowsShellOverride
+  isRemoteWindowsConptyStatusUnverified
 } from './windows-pty-compatibility'
 
 function writeTerminal(terminal: Terminal, data: string): Promise<void> {

@@ -7,7 +7,7 @@
     "count": 1
   },
   {
-    "filePath": "src/renderer/src/components/settings/appearance-search.ts",
+    "filePath": "src/renderer/src/components/settings/appearance/appearance-search.ts",
     "kind": "object-property:keywords",
     "text": "Idioma",
     "dynamic": false,

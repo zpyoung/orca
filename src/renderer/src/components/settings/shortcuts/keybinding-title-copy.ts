@@ -11,6 +11,8 @@ import {
 } from '../../../../../shared/tui-agent-display-names'
 import { translate } from '@/i18n/i18n'
 import { uniqueKeywords } from '../search/settings-search-keywords'
+import { LEDGER_KEYBINDING_TITLE_COPY } from '../fork-project-ledger/keybinding-title-copy'
+import { TERMINAL_DOCK_KEYBINDING_TITLE_COPY } from '../fork-terminal-dock/keybinding-title-copy'
 
 type StaticKeybindingActionId = Exclude<
   KeybindingActionId,
@@ -162,7 +164,9 @@ const STATIC_TITLE_COPY = {
     translate(
       'keybindings.title.terminalSwitchInputSource',
       'Switch input source / language (native)'
-    )
+    ),
+  ...LEDGER_KEYBINDING_TITLE_COPY,
+  ...TERMINAL_DOCK_KEYBINDING_TITLE_COPY
 } satisfies Record<StaticKeybindingActionId, () => string>
 
 const GROUP_COPY = {

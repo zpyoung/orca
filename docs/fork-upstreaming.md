@@ -456,8 +456,8 @@ that do not supply a signal.
 - `src/main/runtime/orca-runtime-git-diff-budget.test.ts`
 - `src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts`
 - `src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts`
-- `src/main/git/status-submodule-path-cache.test.ts`
-- `src/main/git/status-diff-settled-cache.test.ts`
+- `src/main/git/source-control/status-submodule-path-cache.test.ts`
+- `src/main/git/source-control/status-diff-settled-cache.test.ts`
 - `src/renderer/src/web/web-preload-api-git.test.ts`
 
 The handoff caller and its cancellation regression remain in the existing
@@ -489,8 +489,8 @@ namespace remains accepted, and only exact roots or dot-delimited children quali
 
 **Paths:**
 
-- `src/main/macos-press-and-hold-default.ts`
-- `src/main/macos-press-and-hold-default.test.ts`
+- `src/main/window/desktop-integration/macos-press-and-hold-default.ts`
+- `src/main/window/desktop-integration/macos-press-and-hold-default.test.ts`
 - `tests/e2e/macos-press-and-hold-startup.spec.ts`
 
 **Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds

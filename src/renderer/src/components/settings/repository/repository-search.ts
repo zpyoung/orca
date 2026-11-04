@@ -11,6 +11,7 @@ import { getRepositoryGitAuthorSearchEntries } from './repository-git-author-sea
 import { getRepositoryGitHooksSearchEntries } from './execution/repository-git-hooks-search-entries'
 import { getRepositoryGitWorktreeSearchEntries } from './execution/repository-git-worktree-search-entries'
 import { getRepositoryLedgerSearchEntries } from '../repository-ledger-search-entries'
+import { getRepositoryFormatterSearchEntry } from './RepositoryFormatterSection'
 
 type RepositoryPaneSearchOptions = {
   isLocalWindowsProject?: boolean

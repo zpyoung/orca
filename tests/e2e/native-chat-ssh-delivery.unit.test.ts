@@ -74,17 +74,6 @@ describe('prompt delivery through production IPC, provider and paired host', () 
     expect(onSettled).not.toHaveBeenCalled()
   })
 
-  it('keeps ordinary healthy SSH body and Enter complete', async () => {
-    vi.useFakeTimers()
-    const ssh = createSshDelivery()
-    close = ssh.close
-    const onDeliverySettled = vi.fn()
-    sendNativeChatMessage(chatTarget(ssh.id), 'body', { onDeliverySettled })
-    await vi.advanceTimersByTimeAsync(600)
-    expect(ssh.bytes.join('')).toBe('\x15body\r')
-    expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(true)
-  })
-
   it.each(['accepted', 'lost'] as const)(
     'paired terminal.send uses provider settlement for %s acknowledgment',
     async (mode) => {

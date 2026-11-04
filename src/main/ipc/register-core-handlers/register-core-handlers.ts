@@ -31,7 +31,7 @@ import {
   invalidateRuntimeEnvironmentTransport,
   registerRuntimeEnvironmentHandlers
 } from '../runtime-environments/runtime-environments'
-import { registerWslHostHandlers } from '../wsl-host-handlers'
+import { registerWslHostHandlers } from '../wsl/wsl-host-handlers'
 import { registerLedgerHandlers } from '../ledger'
 import { registerEphemeralVmHandlers } from '../ephemeral-vm'
 import { registerAiVaultHandlers } from '../ai-vault/ai-vault'

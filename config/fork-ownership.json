@@ -222,8 +222,7 @@
       "kind": "passthrough",
       "lines": [
         "const chatTarget = (ptyId: string) => ({ terminalTabId: 'tab-ssh', ptyId })",
-        "    sendNativeChatAskAnswer(chatTarget(ssh.id), groups, onSettled)",
-        "    sendNativeChatMessage(chatTarget(ssh.id), 'body', { onDeliverySettled })"
+        "    sendNativeChatAskAnswer(chatTarget(ssh.id), groups, onSettled)"
       ]
     },
     {
@@ -487,7 +486,7 @@
         "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY,",
         "  HEIMDALL_HOSTED_REVIEW_DERIVED_PAYLOAD_RUNTIME_CAPABILITY,",
         "  HEIMDALL_HOSTED_REVIEW_CHECK_SCOPE_RUNTIME_CAPABILITY,",
-        "  HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,"
+        "    HEIMDALL_OBJECTIVE_NEW_WORKTREE_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -928,13 +927,13 @@
       "lines": ["      appId: 'com.zpyoung.orca',"]
     },
     {
-      "path": "src/main/macos-tcc-prompt-watch.test.ts",
+      "path": "src/main/macos-permissions/macos-tcc-prompt-watch.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["    expect(event?.responsibleIdentifier).toBe('com.zpyoung.orca')"]
     },
     {
-      "path": "src/main/macos-tcc-prompt-watch.ts",
+      "path": "src/main/macos-permissions/macos-tcc-prompt-watch.ts",
       "feature": "fork-infra",
       "kind": "registration",
       "lines": [
@@ -956,12 +955,6 @@
         "} from './fork-native-chat-session-options/transcript-companion-decoder'",
         "} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'"
       ]
-    },
-    {
-      "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": ["const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'"]
     },
     {
       "path": "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
@@ -1193,7 +1186,7 @@
       ]
     },
     {
-      "path": "src/main/updater.publishing-window-feed.test.ts",
+      "path": "src/main/updater/updater.publishing-window-feed.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["      url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
@@ -1389,20 +1382,20 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/ExperimentalPane.tsx",
+      "path": "src/renderer/src/components/settings/advanced/ExperimentalPane.tsx",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { TerminalDockExperimentalSetting } from './fork-terminal-dock/TerminalDockExperimentalSetting'",
+        "import { TerminalDockExperimentalSetting } from '../fork-terminal-dock/TerminalDockExperimentalSetting'",
         "      {showTerminalDock ? ("
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/experimental-search.ts",
+      "path": "src/renderer/src/components/settings/advanced/experimental-search.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { getTerminalDockExperimentalSearchEntry } from './fork-terminal-dock/terminal-dock-experimental-search-entry'",
+        "import { getTerminalDockExperimentalSearchEntry } from '../fork-terminal-dock/terminal-dock-experimental-search-entry'",
         "    terminalDock: findEntry("
       ]
     },
@@ -1749,12 +1742,6 @@
       "lines": ["    dockContainer: {} as never,"]
     },
     {
-      "path": "src/renderer/src/lib/pane-manager/pane-tree-reparent-frame.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["    dockContainer: createMockElement(),"]
-    },
-    {
       "path": "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
@@ -1777,7 +1764,7 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "  isRemoteWindowsConptyStatusUnverified,",
+        "  isRemoteWindowsConptyStatusUnverified",
         "describe('isRemoteWindowsConptyStatusUnverified', () => {"
       ]
     },
@@ -1963,7 +1950,7 @@
       ]
     },
     {
-      "path": "src/main/updater/updater-setup.ts",
+      "path": "src/main/updater/lifecycle/updater-setup.ts",
       "feature": "fork-infra",
       "kind": "registration",
       "lines": ["        url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
@@ -2459,11 +2446,11 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/settings-page-renderer.tsx",
+      "path": "src/renderer/src/components/settings/page/settings-page-renderer.tsx",
       "feature": "session-handoff",
       "kind": "registration",
       "lines": [
-        "import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'",
+        "import { ForkSessionHandoffSettingsSection } from '../fork-session-handoff/ForkSessionHandoffSettingsSection'",
         "                  <ForkSessionHandoffSettingsSection />"
       ]
     },
@@ -2602,11 +2589,11 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx",
+      "path": "src/renderer/src/components/settings/appearance/AppearanceWindowSidebarSection.tsx",
       "feature": "sidebar-section-separator",
       "kind": "registration",
       "lines": [
-        "import { SidebarSectionSeparatorSetting } from './fork-sidebar-section-separator/SidebarSectionSeparatorSetting'",
+        "import { SidebarSectionSeparatorSetting } from '../fork-sidebar-section-separator/SidebarSectionSeparatorSetting'",
         "        <SidebarSectionSeparatorSetting",
         "          settings={settings}",
         "          updateSettings={updateSettings}",
@@ -2615,20 +2602,20 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/AppearancePane.tsx",
+      "path": "src/renderer/src/components/settings/appearance/AppearancePane.tsx",
       "feature": "sidebar-section-separator",
       "kind": "registration",
       "lines": [
-        "import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'",
+        "import { getSidebarSectionSeparatorEntry } from '../fork-sidebar-section-separator/section-separator-search'",
         "    getSidebarSectionSeparatorEntry(),"
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/appearance-search.ts",
+      "path": "src/renderer/src/components/settings/appearance/appearance-search.ts",
       "feature": "sidebar-section-separator",
       "kind": "registration",
       "lines": [
-        "import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'",
+        "import { getSidebarSectionSeparatorEntry } from '../fork-sidebar-section-separator/section-separator-search'",
         "    getSidebarSectionSeparatorEntry(),"
       ]
     },
@@ -2639,7 +2626,7 @@
       "lines": [
         "import { ASK_REGISTRY_RUNTIME_CAPABILITY } from './fork-ask-question-tool/ask-question-capability'",
         "  AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,",
-        "  ASK_REGISTRY_RUNTIME_CAPABILITY,"
+        "    ASK_REGISTRY_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -3355,17 +3342,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts",
-      "feature": "workspace-activity-window",
-      "kind": "passthrough",
-      "lines": [
-        "import { WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
-        "    ...WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE,",
-        "import { WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
-        "    ...WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE,"
-      ]
-    },
-    {
       "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts",
       "feature": "workspace-activity-window",
       "kind": "registration",
@@ -3524,12 +3500,6 @@
       "feature": "project-ledger",
       "kind": "registration",
       "lines": ["export const ProjectGroupDeleteArgs = ProjectGroupSelectorArgs.extend({"]
-    },
-    {
-      "path": "src/main/persistence/applying-settings/persistence-right-sidebar-tab.test.ts",
-      "feature": "project-ledger",
-      "kind": "registration",
-      "lines": ["    expect(normalizeRightSidebarTab('ledger')).toBe('ledger')"]
     },
     {
       "path": "src/main/persistence/applying-settings/persistence-ui-state.test.ts",
@@ -3707,11 +3677,11 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/linear-agent-skill-install-cta.test.tsx",
+      "path": "src/renderer/src/components/skills/setup/linear-agent-skill-install-cta.test.tsx",
       "feature": "skills-repository",
       "kind": "import-swap",
       "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
+        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../../shared/fork-skills-repository/skills-repository-url'"
       ]
     },
     {
@@ -3813,14 +3783,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/store/right-sidebar-route.test.ts",
-      "feature": "project-ledger",
-      "kind": "registration",
-      "lines": [
-        "      JSON.stringify({ rightSidebarTab: 'ledger', rightSidebarExplorerView: 'files' })"
-      ]
-    },
-    {
       "path": "src/renderer/src/store/slices/ui/ui-slice-contract-core.ts",
       "feature": "project-ledger",
       "kind": "registration",
@@ -3878,11 +3840,11 @@
       "lines": ["  'session-info',"]
     },
     {
-      "path": "src/main/provider-account-services.ts",
+      "path": "src/main/providers/accounts/provider-account-services.ts",
       "feature": "session-info",
       "kind": "registration",
       "lines": [
-        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from './fork-session-info/session-info-plan-window-correlation'",
+        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../../fork-session-info/session-info-plan-window-correlation'",
         "  options.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))"
       ]
     },
@@ -4068,7 +4030,7 @@
       "lines": ["  if (request.method === 'terminal.wait' || request.method === 'ask.wait') {"]
     },
     {
-      "path": "src/main/updater-release-builds.test.ts",
+      "path": "src/main/updater/releases/updater-release-builds.test.ts",
       "feature": "release-routing",
       "kind": "passthrough",
       "lines": ["      'https://github.com/zpyoung/orca/releases/download/v1.4.159'"]
@@ -4612,7 +4574,7 @@
       "lines": [
         "import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from './fork-automation-launch-settings/agent-launch-overrides-capability'",
         "export { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY }",
-        "  AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY,"
+        "    AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -5402,7 +5364,7 @@
       "kind": "registration",
       "lines": [
         "import { LOOPS_RUNTIME_CAPABILITY } from './fork-loops/capability'",
-        "  LOOPS_RUNTIME_CAPABILITY,"
+        "    LOOPS_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -5464,20 +5426,20 @@
       "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
     },
     {
-      "path": "src/renderer/src/components/settings/keybinding-title-copy.ts",
+      "path": "src/renderer/src/components/settings/shortcuts/keybinding-title-copy.ts",
       "feature": "project-ledger",
       "kind": "registration",
       "lines": [
-        "import { LEDGER_KEYBINDING_TITLE_COPY } from './fork-project-ledger/keybinding-title-copy'",
+        "import { LEDGER_KEYBINDING_TITLE_COPY } from '../fork-project-ledger/keybinding-title-copy'",
         "  ...LEDGER_KEYBINDING_TITLE_COPY,"
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/keybinding-title-copy.ts",
+      "path": "src/renderer/src/components/settings/shortcuts/keybinding-title-copy.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { TERMINAL_DOCK_KEYBINDING_TITLE_COPY } from './fork-terminal-dock/keybinding-title-copy'",
+        "import { TERMINAL_DOCK_KEYBINDING_TITLE_COPY } from '../fork-terminal-dock/keybinding-title-copy'",
         "  ...TERMINAL_DOCK_KEYBINDING_TITLE_COPY"
       ]
     },
@@ -5495,6 +5457,15 @@
       "kind": "passthrough",
       "lines": [
         "  `(params: { action: \"worktree.history.back\" | \"worktree.history.forward\" | \"sidebar.left.toggle\" | \"sidebar.sleepingWorkspaces.toggle\" | \"floatingWorkspace.maximize\" | \"tab.rename\" | \"workspace.rename\" | \"workspace.openBoard\" | \"view.tasks\" | \"view.ledger\" | \"sidebar.right.toggle\" | \"sidebar.explorer.toggle\" | \"sidebar.search.toggle\" | \"sidebar.sourceControl.toggle\" | \"sidebar.checks.toggle\" | \"sidebar.ports.toggle\" }) => { ran: true }`"
+      ]
+    },
+    {
+      "path": "src/main/updater/releases/updater-release-readiness.ts",
+      "feature": "release-routing",
+      "kind": "registration",
+      "lines": [
+        "const RELEASES_DOWNLOAD_BASE = 'https://github.com/zpyoung/orca/releases/download'",
+        "      /^https:\\/\\/github\\.com\\/zpyoung\\/orca\\/releases\\/download\\//i.test(assetName))"
       ]
     }
   ],
@@ -5925,22 +5896,22 @@
       "status": "permanent"
     },
     {
-      "path": "src/main/updater-prerelease-feed-readiness.test.ts",
+      "path": "src/main/updater/releases/updater-prerelease-feed-readiness.test.ts",
       "reason": "Tests for the fork's own prerelease update feed readiness.",
       "status": "permanent"
     },
     {
-      "path": "src/main/updater-prerelease-feed.test.ts",
+      "path": "src/main/updater/releases/updater-prerelease-feed.test.ts",
       "reason": "Tests for the fork's own prerelease update feed.",
       "status": "permanent"
     },
     {
-      "path": "src/main/updater-prerelease-feed.ts",
+      "path": "src/main/updater/releases/updater-prerelease-feed.ts",
       "reason": "Fork's own prerelease update feed.",
       "status": "permanent"
     },
     {
-      "path": "src/main/updater.check-failure.test.ts",
+      "path": "src/main/updater/updater.check-failure.test.ts",
       "reason": "Tests for the fork's own update-check failure handling.",
       "status": "permanent"
     },
@@ -6207,13 +6178,13 @@
       "status": "permanent"
     },
     {
-      "path": "src/main/macos-press-and-hold-default.test.ts",
+      "path": "src/main/window/desktop-integration/macos-press-and-hold-default.test.ts",
       "reason": "Covers bug-35's domain-ownership regression: the fork and upstream namespaces and their dot-children are accepted while lookalike and unrelated bundle identifiers remain foreign.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#bug-35"
     },
     {
-      "path": "src/main/macos-press-and-hold-default.ts",
+      "path": "src/main/window/desktop-integration/macos-press-and-hold-default.ts",
       "reason": "Fixes bug-35 by recognizing com.zpyoung.orca and its dot-children as owned press-and-hold preference domains while retaining com.stablyai.orca and its dot-children.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#bug-35"
@@ -6231,7 +6202,7 @@
       "ledger": "bug-12"
     },
     {
-      "path": "src/main/git/status-submodule-path-cache.test.ts",
+      "path": "src/main/git/source-control/status-submodule-path-cache.test.ts",
       "reason": "Regression coverage ensuring an aborted diff discovery cannot poison the next submodule lookup.",
       "status": "pending-upstream",
       "ledger": "bug-12"
@@ -6351,7 +6322,7 @@
       "ledger": "bug-12"
     },
     {
-      "path": "src/main/git/status-diff-settled-cache.test.ts",
+      "path": "src/main/git/source-control/status-diff-settled-cache.test.ts",
       "reason": "Regression coverage for cancelling one reader of a coalesced local diff read.",
       "status": "pending-upstream",
       "ledger": "bug-12"
@@ -6605,8 +6576,8 @@
       "removed": 0
     },
     "tests/e2e/native-chat-ssh-delivery.unit.test.ts": {
-      "added": 8,
-      "removed": 7
+      "added": 7,
+      "removed": 6
     },
     "tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts": {
       "added": 5,
@@ -6896,21 +6867,9 @@
       "added": 1,
       "removed": 1
     },
-    "src/main/macos-tcc-prompt-watch.test.ts": {
-      "added": 4,
-      "removed": 4
-    },
-    "src/main/macos-tcc-prompt-watch.ts": {
-      "added": 6,
-      "removed": 4
-    },
     "src/main/native-chat/transcript-tail-reader.ts": {
       "added": 25,
       "removed": 19
-    },
-    "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": {
-      "added": 4,
-      "removed": 1
     },
     "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": {
       "added": 4,
@@ -7020,10 +6979,6 @@
       "added": 8,
       "removed": 2
     },
-    "src/main/updater.publishing-window-feed.test.ts": {
-      "added": 3,
-      "removed": 3
-    },
     "src/preload/api/native-chat-api.ts": {
       "added": 49,
       "removed": 28
@@ -7119,14 +7074,6 @@
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
       "added": 19,
       "removed": 2
-    },
-    "src/renderer/src/components/settings/ExperimentalPane.tsx": {
-      "added": 8,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/experimental-search.ts": {
-      "added": 5,
-      "removed": 0
     },
     "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
       "added": 5,
@@ -7304,10 +7251,6 @@
       "added": 1,
       "removed": 0
     },
-    "src/renderer/src/lib/pane-manager/pane-tree-reparent-frame.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
     "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts": {
       "added": 1,
       "removed": 0
@@ -7321,8 +7264,8 @@
       "removed": 0
     },
     "src/renderer/src/lib/pane-manager/windows-pty-compatibility.test.ts": {
-      "added": 17,
-      "removed": 0
+      "added": 20,
+      "removed": 1
     },
     "src/renderer/src/lib/pane-manager/windows-pty-compatibility.ts": {
       "added": 12,
@@ -7411,10 +7354,6 @@
     "src/shared/global-settings-types.ts": {
       "added": 7,
       "removed": 0
-    },
-    "src/main/updater/updater-setup.ts": {
-      "added": 1,
-      "removed": 1
     },
     "src/main/rate-limits/service/service-fetch-policy.ts": {
       "added": 8,
@@ -7636,10 +7575,6 @@
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/settings/settings-page-renderer.tsx": {
-      "added": 2,
-      "removed": 0
-    },
     "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
       "added": 2,
       "removed": 0
@@ -7690,18 +7625,6 @@
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx": {
       "added": 9,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx": {
-      "added": 6,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/AppearancePane.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/appearance-search.ts": {
-      "added": 2,
       "removed": 0
     },
     "src/shared/tui-agent-launch-command.ts": {
@@ -7904,10 +7827,6 @@
       "added": 5,
       "removed": 1
     },
-    "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
-      "added": 4,
-      "removed": 0
-    },
     "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
       "added": 4,
       "removed": 3
@@ -7974,10 +7893,6 @@
     },
     "src/main/ipc/repos/repo-ipc-arg-schemas.ts": {
       "added": 6,
-      "removed": 0
-    },
-    "src/main/persistence/applying-settings/persistence-right-sidebar-tab.test.ts": {
-      "added": 4,
       "removed": 0
     },
     "src/main/persistence/applying-settings/persistence-ui-state.test.ts": {
@@ -8060,10 +7975,6 @@
       "added": 7,
       "removed": 0
     },
-    "src/renderer/src/components/settings/linear-agent-skill-install-cta.test.tsx": {
-      "added": 2,
-      "removed": 1
-    },
     "src/renderer/src/components/settings/repository/repository-search.ts": {
       "added": 2,
       "removed": 0
@@ -8112,10 +8023,6 @@
       "added": 11,
       "removed": 1
     },
-    "src/renderer/src/store/right-sidebar-route.test.ts": {
-      "added": 21,
-      "removed": 0
-    },
     "src/renderer/src/store/slices/ui/ui-slice-contract.ts": {
       "added": 3,
       "removed": 1
@@ -8139,10 +8046,6 @@
     "src/shared/rpc-contract/artifacts-params.ts": {
       "added": 1,
       "removed": 0
-    },
-    "src/main/provider-account-services.ts": {
-      "added": 2,
-      "removed": 3
     },
     "src/shared/rpc-contract/session-tabs-schemas-params.ts": {
       "added": 50,
@@ -8213,10 +8116,6 @@
       "removed": 1
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/main/updater-release-builds.test.ts": {
       "added": 1,
       "removed": 1
     },
@@ -8812,10 +8711,6 @@
       "added": 2,
       "removed": 2
     },
-    "src/renderer/src/components/settings/keybinding-title-copy.ts": {
-      "added": 5,
-      "removed": 1
-    },
     "src/renderer/src/lib/launch-agent-in-new-tab-args.ts": {
       "added": 1,
       "removed": 0
@@ -8827,6 +8722,66 @@
     "skill-guides/orca-plugin-authoring/references/host-api.md": {
       "added": 1,
       "removed": 1
+    },
+    "src/main/macos-permissions/macos-tcc-prompt-watch.test.ts": {
+      "added": 4,
+      "removed": 4
+    },
+    "src/main/macos-permissions/macos-tcc-prompt-watch.ts": {
+      "added": 6,
+      "removed": 4
+    },
+    "src/main/providers/accounts/provider-account-services.ts": {
+      "added": 2,
+      "removed": 3
+    },
+    "src/main/updater/releases/updater-release-builds.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/updater/updater.publishing-window-feed.test.ts": {
+      "added": 3,
+      "removed": 3
+    },
+    "src/main/updater/lifecycle/updater-setup.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/settings/appearance/AppearancePane.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/appearance/AppearanceWindowSidebarSection.tsx": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/advanced/ExperimentalPane.tsx": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/appearance/appearance-search.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/advanced/experimental-search.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/shortcuts/keybinding-title-copy.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/skills/setup/linear-agent-skill-install-cta.test.tsx": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/settings/page/settings-page-renderer.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/updater/releases/updater-release-readiness.ts": {
+      "added": 2,
+      "removed": 2
     }
   }
 }

@@ -19,6 +19,7 @@ const DEFAULTS_TIMEOUT_MS = 5_000
 const DEFAULTS_MISSING_STATUS = 1
 
 const ORCA_BUNDLE_ID = 'com.stablyai.orca'
+const FORK_BUNDLE_ID = 'com.zpyoung.orca'
 
 export type PressAndHoldDecision =
   | 'not-macos'
@@ -51,7 +52,12 @@ export type PressAndHoldHost = {
 
 // Unpackaged Electron apps share com.github.Electron; do not change that domain.
 export function isOrcaPreferencesDomain(domain: string): boolean {
-  return domain === ORCA_BUNDLE_ID || domain.startsWith(`${ORCA_BUNDLE_ID}.`)
+  return (
+    domain === ORCA_BUNDLE_ID ||
+    domain.startsWith(`${ORCA_BUNDLE_ID}.`) ||
+    domain === FORK_BUNDLE_ID ||
+    domain.startsWith(`${FORK_BUNDLE_ID}.`)
+  )
 }
 
 export function readBundleIdentifierFromExecutablePath(execPath: string): string | null {
