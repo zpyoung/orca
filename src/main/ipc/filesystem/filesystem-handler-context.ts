@@ -2,7 +2,10 @@ import type { ChildProcess } from 'node:child_process'
 import type { FileHandle } from 'node:fs/promises'
 import type { Store } from '../../persistence/loading-store/store'
 import type { CommitMessageAgentEnvironmentResolvers } from '../../text-generation/commit-message-agent-environment'
-import type { SenderScopedRequestCancellations } from '../sender-scoped-request-cancellation'
+import {
+  createSenderScopedRequestCancellations,
+  type SenderScopedRequestCancellations
+} from '../sender-scoped-request-cancellation'
 import { cleanupLocalTransferPath } from './filesystem-download-promotion'
 
 export type DownloadSession = {
@@ -33,7 +36,8 @@ export function createFilesystemHandlerContext(
   commitMessageAgentEnv: CommitMessageAgentEnvironmentResolvers | undefined,
   listFilesCancellations: SenderScopedRequestCancellations,
   gitStatusCancellations: SenderScopedRequestCancellations,
-  gitDiffCancellations: SenderScopedRequestCancellations
+  // optional so upstream's four-argument callers keep compiling against the fork's diff registry
+  gitDiffCancellations: SenderScopedRequestCancellations = createSenderScopedRequestCancellations()
 ): FilesystemHandlerContext {
   const activeTextSearches = new Map<string, ChildProcess>()
   const downloadSessions = new Map<string, DownloadSession>()
