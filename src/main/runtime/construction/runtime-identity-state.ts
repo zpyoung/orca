@@ -69,11 +69,13 @@ import { RuntimeTerminalWait as RuntimeTerminalWaitController } from '../termina
 import type { PtyLivenessVerdict } from '../../../shared/pty-liveness-verdict'
 import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 import type { HostScopedWorktreeKey } from '../../../shared/worktree/host-qualified-identity'
+import type { TerminalHandleAccess } from '../runtime-agent-sender-associations'
 
 import { RuntimeConstructionServices } from './runtime-construction-services'
 
 export abstract class OrcaRuntimeWithRuntimeId extends RuntimeConstructionServices {
   protected abstract claimIdleShellPromptForPty(ptyId: string): Promise<boolean>
+  protected abstract terminalHandleAccess(): TerminalHandleAccess
   protected readonly runtimeId = randomUUID()
 
   protected readonly startedAt = Date.now()
@@ -243,6 +245,7 @@ export abstract class OrcaRuntimeWithRuntimeId extends RuntimeConstructionServic
   protected mobileSessionTabListeners = new Set<{
     listener: (snapshot: RuntimeMobileSessionTabsResult, changeSequence: number) => void
     clientNavigationId?: string
+    clientKind?: 'mobile' | 'runtime'
   }>()
 
   protected pendingMobileSessionTabsChangeSequenceByWorktree = new Map<string, number>()

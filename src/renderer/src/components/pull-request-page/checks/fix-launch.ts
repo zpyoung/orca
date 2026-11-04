@@ -50,6 +50,8 @@ export async function startFixChecksFromDialog(args: {
 }): Promise<boolean> {
 =======
   sessionOptions?: Readonly<Record<string, string>>
+  chatSessionOptions?: Readonly<Record<string, string>>
+  preferredSurface?: 'chat'
   launchChoice?: Parameters<typeof launchWorkItemDirect>[0]['launchChoice']
   agentLaunchPreferences?: Parameters<typeof launchWorkItemDirect>[0]['agentLaunchPreferences']
   sessionOptionsYieldToAgentArgs?: true
@@ -75,7 +77,17 @@ export async function startFixChecksFromDialog(args: {
 ||||||| base
 =======
     ...(args.sessionOptions ? { sessionOptions: args.sessionOptions } : {}),
-    ...(args.launchChoice ? { launchChoice: args.launchChoice } : {}),
+    ...(args.chatSessionOptions !== undefined
+      ? { chatSessionOptions: args.chatSessionOptions }
+      : {}),
+    ...(args.launchChoice || args.preferredSurface
+      ? {
+          launchChoice: {
+            ...args.launchChoice,
+            ...(args.preferredSurface ? { preferredSurface: args.preferredSurface } : {})
+          }
+        }
+      : {}),
     sessionOptionsYieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
 >>>>>>> upstream
     openModalFallback: () => {

@@ -32,6 +32,7 @@ import {
 } from './fork-agent-composer/native-chat-send-outcome'
 import {
   AGENT_TUI_CLEAR_INPUT_MAX,
+  AGENT_TUI_CLEAR_INPUT_LINE,
   buildAgentTuiClearInputForText
 } from '../../../../shared/agent-tui-input-clear'
 import {

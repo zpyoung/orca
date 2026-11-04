@@ -1,4 +1,5 @@
-import type { AgentLaunchPreferences } from '@/components/settings/use-host-agent-launch-preferences'
+import type { AgentLaunchInputViews } from '../../../shared/agent-launch-choices'
+import type { AgentLaunchPreferences } from '@/runtime/agent-launch-settings/host-agent-launch-preferences-resource'
 import type { LinkedWorkItemContext } from '@/lib/linked-work-item-context'
 import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { TaskProvider } from '../../../shared/task-providers'
@@ -6,6 +7,10 @@ import type { TuiAgent } from '../../../shared/tui-agent'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { AgentLaunchChoice } from '@/lib/agent-menu-selection'
+import type { AgentSessionLaunchRequest } from './agent-session-launch-plan'
+
+export type DirectWorkItemLaunchInputs = AgentLaunchInputViews &
+  Pick<AgentSessionLaunchRequest, 'requestedSurface' | 'preferredSurface'>
 
 export type LaunchableWorkItem = {
   provider?: TaskProvider
@@ -44,6 +49,8 @@ export type LaunchWorkItemDirectArgs = {
 =======
   /** The saved choice for `agentOverride`; a chat seeds it and a terminal applies it as flags. */
   sessionOptions?: Readonly<Record<string, string>>
+  chatSessionOptions?: Readonly<Record<string, string>>
+  resolveLaunchInputs?: (agent: TuiAgent) => DirectWorkItemLaunchInputs
   /** On terminals, a flag `agentArgs` sets itself wins over the inherited saved choice. */
   sessionOptionsYieldToAgentArgs?: true
   resolveAgentArgs?: (agent: TuiAgent) => string | null | undefined

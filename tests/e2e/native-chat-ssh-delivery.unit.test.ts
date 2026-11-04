@@ -8,7 +8,6 @@ import {
 } from './__mocks__/native-chat-ssh-delivery'
 import {
   sendNativeChatAskAnswer,
-  sendNativeChatMessage,
   sendNativeChatMessageVerified,
   resetNativeChatPtySendQueuesForTests
 } from '../../src/renderer/src/components/native-chat/native-chat-runtime-send'

@@ -70,13 +70,15 @@ export function structuredAgentSessionPermissionDescriptor(state: {
         ? undefined
         : (state.permissionMode ?? undefined)
   const reported = support.modes.find((mode) => mode === current)
-  const label = reported
-    ? MODE_COPY[reported].label
-    : current === 'plan'
-      ? 'Plan mode'
-      : current === 'read-only'
-        ? 'Read only'
-        : (current ?? 'Permissions')
+  const label = own
+    ? "Agent's own settings"
+    : reported
+      ? MODE_COPY[reported].label
+      : current === 'plan'
+        ? 'Plan mode'
+        : current === 'read-only'
+          ? 'Read only'
+          : (current ?? 'Permissions')
   return {
     description: label,
     id: AGENT_CHAT_PERMISSION_MODE_OPTION_ID,
@@ -98,7 +100,7 @@ export function structuredAgentSessionPermissionDescriptor(state: {
           ? 'reported'
           : 'applied',
     transport: 'agent-session',
-    settable: state.permissionOwnSupported !== null && current !== undefined
+    settable: state.permissionOwnSupported !== null
   }
 }
 

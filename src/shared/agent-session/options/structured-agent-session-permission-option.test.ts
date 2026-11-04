@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentSessionOptionsResult } from './agent-session-options-result'
-import { sortNativeChatSessionOptions } from '../../native-chat/input/native-chat-session-option-snapshot'
+import '../../native-chat/input/native-chat-session-option-snapshot'
 import {
   canSetStructuredAgentSessionOption,
   structuredAgentSessionOptionSnapshot
 } from './structured-agent-session-option-snapshot'
 import {
   applyStructuredAgentSessionOptions,
-  createStructuredAgentSessionOptionState,
-  structuredAgentSessionOptionPicks
+  createStructuredAgentSessionOptionState
 } from './structured-agent-session-options'
-import { structuredAgentSessionOptionView } from './structured-agent-session-option-view'
+import './structured-agent-session-option-view'
 import { structuredAgentSessionSeedCatalog } from './structured-agent-session-seed-catalog'
 
 const permission = (state: Parameters<typeof structuredAgentSessionOptionSnapshot>[0]) =>
@@ -50,9 +49,9 @@ describe('the permission mode picker', () => {
     for (const reportedPermissionMode of [undefined, null, 'full-access', 'read-only']) {
       const descriptor = permission({ ...capable, reportedPermissionMode })
       expect(descriptor).toMatchObject({
-        settable: typeof reportedPermissionMode === 'string',
+        settable: true,
         kind: {
-          currentValue: reportedPermissionMode ?? undefined,
+          currentValue: 'own',
           choices: expect.not.arrayContaining([expect.objectContaining({ value: 'own' })])
         }
       })
@@ -68,7 +67,7 @@ describe('the permission mode picker', () => {
     ).toMatchObject({ settable: true, kind: { currentValue: 'full-access' } })
   })
 
-  it('admits supported Own reset through the same descriptor/readiness predicate', () => {
+  it('admits supported Own delegation through the same descriptor/readiness predicate', () => {
     const state = { ...live('codex', { permissionMode: 'ask' }), permissionOwnSupported: true }
     expect(canSetStructuredAgentSessionOption(state, 'permissionMode', 'own')).toBe(true)
     for (const permissionOwnSupported of [false, null]) {

@@ -23,7 +23,8 @@ import {
   resolveDirectPrStartPoint,
   prepareDirectLaunchContext,
   planDirectWorkItemLaunch,
-  resolveDirectProspectiveAgent
+  resolveDirectProspectiveAgent,
+  captureDirectWorkItemLaunchArgs
 } from '@/lib/launch-work-item-direct-preflight'
 import type { LaunchWorkItemDirectArgs } from '@/lib/launch-work-item-direct-types'
 import {
@@ -154,6 +155,7 @@ export async function launchWorkItemDirect(
 ): Promise<DirectWorkItemLaunchResult> {
   const { item, repoId, openModalFallback, baseBranch } = args
   const { telemetrySource, launchSource, agentOverride } = args
+  args = captureDirectWorkItemLaunchArgs(args)
   let agentArgs = args.agentArgs
   let creationAccepted = false
   const reportFailure = (message: string): false => {
@@ -241,6 +243,10 @@ export async function launchWorkItemDirect(
     if (args.signal?.aborted) {
       return 'cancelled'
     }
+    const preflightInputs =
+      prospectiveAgent && args.resolveLaunchInputs
+        ? structuredClone(args.resolveLaunchInputs(prospectiveAgent))
+        : undefined
     const preflightPlan = await planDirectWorkItemLaunch({
       requestId,
       prospectiveAgent,
@@ -251,13 +257,15 @@ export async function launchWorkItemDirect(
       promptDelivery,
       resolveSessionOptions: args.resolveSessionOptions,
       sessionOptions: args.sessionOptions,
+      chatSessionOptions: args.chatSessionOptions,
+      ...(preflightInputs ? { launchInputs: preflightInputs } : {}),
       launchChoice: args.launchChoice
     })
     if (args.signal?.aborted) {
       return 'cancelled'
     }
     const agentArgsError = directWorkItemAgentArgsError(
-      args.agentArgs,
+      preflightInputs ? preflightInputs.agentArgs : args.agentArgs,
       context.shell,
       Boolean(projectContext && preflightPlan?.route === 'structured-native-chat')
     )
@@ -318,6 +326,9 @@ export async function launchWorkItemDirect(
       agentLaunchPreferences: args.agentLaunchPreferences,
       agentArgs: args.agentArgs,
       ...(args.sessionOptions ? { sessionOptions: args.sessionOptions } : {}),
+      resolveLaunchInputs: args.resolveLaunchInputs,
+      ...(preflightInputs ? { preflightInputs } : {}),
+      chatSessionOptions: args.chatSessionOptions,
       resolveAgentArgs: args.resolveAgentArgs,
       resolveSessionOptions: args.resolveSessionOptions,
       launchChoice: args.launchChoice,

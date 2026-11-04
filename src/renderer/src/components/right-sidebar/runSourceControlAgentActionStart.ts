@@ -3,7 +3,7 @@ import {
   sourceControlActionRecipeEntry,
   type SelectedSourceControlActionRecipe
 } from '../../../../shared/source-control-action-selection'
-import type { AgentLaunchPreferences } from '@/components/settings/use-host-agent-launch-preferences'
+import type { AgentLaunchPreferences } from '@/runtime/agent-launch-settings/host-agent-launch-preferences-resource'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import {
   agentLaunchOverridesToSessionOptionValues,
@@ -83,6 +83,8 @@ export type RunSourceControlAgentActionStartArgs = {
 =======
     /** The action's saved choice, on either route. */
     sessionOptions?: Readonly<Record<string, string>>
+    chatSessionOptions?: Readonly<Record<string, string>>
+    preferredSurface?: 'chat'
     launchChoice?: AgentLaunchChoice
     sessionOptionsYieldToAgentArgs?: true
   }) => DirectWorkItemLaunchResult | Promise<DirectWorkItemLaunchResult>
@@ -137,6 +139,7 @@ export async function runSourceControlAgentActionStart({
   onLaunched,
   onClose
 }: RunSourceControlAgentActionStartArgs): Promise<boolean> {
+  const recipe = structuredClone(submittedRecipe)
   // Detection and delivery planning can outlive the state that opened the composer.
   if (signal?.aborted) {
     return false

@@ -301,6 +301,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.paneKeyAliasPersistenceListener = null
     this.ownerStateInitialized = false
     // Leave the endpoint: stale files fail open, and unlinking can race another Orca instance.
+    this.providerRowsByTab = null
     clearAllListenerCaches(this.state)
     if (!options?.keepStatus) {
       this.resetCanonicalStatus()

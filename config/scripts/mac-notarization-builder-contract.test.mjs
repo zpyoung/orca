@@ -1,8 +1,6 @@
 import { createRequire } from 'node:module'
-import { readFileSync } from 'node:fs'
 import { setImmediate } from 'node:timers/promises'
-import { describe, expect, it } from 'vitest'
-import { parse } from 'yaml'
+import { expect, it } from 'vitest'
 
 const builderRequire = createRequire(createRequire(import.meta.url).resolve('electron-builder'))
 const require = createRequire(builderRequire.resolve('app-builder-lib'))
@@ -14,7 +12,6 @@ const { DmgTarget } = require('dmg-builder/out/dmg')
 const { computeArchToTargetNamesMap } = require('app-builder-lib/out/targets/targetFactory')
 const { AsyncTaskManager } = require('builder-util')
 const { CancellationToken } = require('builder-util-runtime')
-const workflow = (name) => parse(readFileSync(`.github/workflows/${name}-mac-build.yml`, 'utf8'))
 
 it('the pinned builder reaches both signed slices before either real archive target passes its gate', async () => {
   let release

@@ -52,6 +52,8 @@ import {
 import type { NativeChatFileLinkContext } from './native-chat-file-link'
 import type { NativeChatMessageListHandle } from './use-native-chat-reveal-latest'
 import type { NativeChatRewindSurface } from './use-native-chat-rewind'
+import { useNativeChatStandaloneMenu } from './use-native-chat-standalone-menu'
+import type { NativeChatSessionMenuSource } from './use-native-chat-session-context-actions'
 
 type NativeChatContextMenuState = {
   open: boolean
@@ -75,7 +77,8 @@ type UseNativeChatContextMenuArgs = {
   actions: NativeChatContextMenuActions
   showTerminalPaneActions?: boolean
   splitShortcutLabels?: { right: string; down: string }
-  chatPane?: { tabId: string; worktreeId: string; groupId: string }
+  chatPane?: { tabId: string; worktreeId: string; groupId: string; sessionId: string }
+  chatSession?: NativeChatSessionMenuSource
   /** A structured chat tab's Orca session ID; a chat in a terminal pane is that terminal's agent. */
   resolveOrcaSessionId?: () => Promise<string | null>
 } & NativeChatContextMenuTargetArgs
@@ -145,6 +148,7 @@ export function useNativeChatContextMenu({
   showTerminalPaneActions = true,
   splitShortcutLabels,
   chatPane,
+  chatSession,
   resolveOrcaSessionId,
   messageListRef,
   fileLinkContext = null,
@@ -234,6 +238,11 @@ export function useNativeChatContextMenu({
     setState((prev) => ({ ...prev, open }))
   }, [])
 
+  const standaloneMenu = useNativeChatStandaloneMenu({
+    pane: showTerminalPaneActions ? undefined : chatPane,
+    source: showTerminalPaneActions ? undefined : chatSession,
+    close: () => setState((prev) => ({ ...prev, open: false }))
+  })
   return {
     onContextMenuCapture,
     onPointerDownCapture: keepSelectionThroughMenuPress,
@@ -304,9 +313,11 @@ export function useNativeChatContextMenu({
           ) : null}
           {hasEditItems && hasSessionItems ? <DropdownMenuSeparator /> : null}
           {onFind ? <NativeChatFindMenuItem onSelect={() => onFind(state.returnFocusTo)} /> : null}
+          {standaloneMenu.quickCommands}
           {onHandOff ? (
             <AgentSessionContinuationMenuItem disabled={handOffDisabled} onSelect={onHandOff} />
           ) : null}
+          {standaloneMenu.sessionItems}
           {showTerminalPaneActions ? (
             <>
               {onSwitchToTerminal ? (
@@ -353,6 +364,7 @@ export function useNativeChatContextMenu({
             </>
           ) : null}
         </DropdownMenuContent>
+        {standaloneMenu.dialogs}
       </DropdownMenu>
     )
   }
