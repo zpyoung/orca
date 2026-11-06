@@ -1,7 +1,8 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
-// FORK-COPY-SHA: 071747853f5995ee233b36751613f09a60007c2b
+// FORK-COPY-SHA: 47f77cf7018ebc0d046b82c6dde31cf704909162
 // Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
+import { acquireAgentLaunchChoices } from '@/lib/host-chat-program-acquisition'
 import { toast } from 'sonner'
 import {
   ensureDetectedAgentsForRepo,
@@ -9,6 +10,9 @@ import {
   type RepoHostFields
 } from '@/lib/agent-detection-target-inventory'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import { type ProspectiveWorkspace, worktreeLaunchWorkspace } from '@/lib/agent-launch-route-input'
+import { readAgentLaunchChoice } from '@/lib/host-chat-program'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../../shared/execution-host'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
@@ -27,9 +31,10 @@ import {
   renderSourceControlActionCommandTemplate
 } from '../../../shared/source-control-ai-actions'
 import { buildHostedReviewAgentPrompt } from '../../../shared/fork-hosted-review-sitter/agent-prompt'
-import { parseExecutionHostId } from '../../../shared/execution-host'
 import { isTuiAgentEnabled } from '../../../shared/tui-agent-selection'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
+import type { AppState } from '@/store/types'
+import type { SourceControlActionId } from '../../../shared/source-control-ai-actions'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
 import type { LaunchSource } from '../../../shared/telemetry-events'
@@ -51,26 +56,59 @@ type SavedAgentOverrideResult =
   | { kind: 'launch-default' }
   | { kind: 'blocked' }
 
-function isAgentAvailable(agent: TuiAgent, detectedAgents: TuiAgent[]): boolean {
-  return (
-    detectedAgents.includes(agent) &&
-    isTuiAgentEnabled(agent, useAppStore.getState().settings?.disabledTuiAgents)
+/** Button gates and execution use the same recipe and preserve strict saved Checks choices. */
+export function resolveChecksActionAgent(
+  state: AppState,
+  actionId: SourceControlActionId,
+  repoId: string | undefined,
+  workspace: ProspectiveWorkspace,
+  detected: readonly TuiAgent[] | null
+): TuiAgent | null {
+  const repo = state.repos.find((entry) => entry.id === repoId)
+  const savedAgent = readSourceControlLaunchRecipeAgentId(
+    resolveSourceControlActionRecipe({ settings: state.settings, repo, actionId })
   )
+  const usable = (agent: TuiAgent): boolean =>
+    isTuiAgentEnabled(agent, state.settings?.disabledTuiAgents) &&
+    (detected?.includes(agent) === true ||
+      readAgentLaunchChoice(state, agent, workspace, detected).chatEligibility !== 'no')
+  if (savedAgent && actionId === 'fixChecks') {
+    return usable(savedAgent) ? savedAgent : null
+  }
+  return pickSourceControlLaunchAgent({
+    savedAgent,
+    defaultAgent: state.settings?.defaultTuiAgent,
+    detectedAgents: [...(detected ?? [])],
+    disabledAgents: state.settings?.disabledTuiAgents,
+    chosenOpensAsChat: usable
+  })
 }
 
 async function resolveSavedAgentOverride(
-  savedAgent: TuiAgent | null | undefined,
-  repo: RepoHostFields | null
+  savedAgentId: () => TuiAgent | null | undefined,
+  repo: (RepoHostFields & { id: string }) | null
 ): Promise<SavedAgentOverrideResult> {
-  if (!savedAgent) {
+  if (!savedAgentId()) {
     return { kind: 'launch-default' }
   }
   const pendingAgents = ensureDetectedAgentsForRepo(useAppStore.getState(), repo ?? {})
+  const workspace: ProspectiveWorkspace = {
+    kind: 'git-worktree',
+    ...(repo ? { repoId: repo.id, executionHostId: getRepoExecutionHostId(repo) } : {})
+  }
   // Why: a paired server answers per workspace, so only the enabled check can run before it exists;
   // the direct launch checks installation on the new workspace.
+  const detected = pendingAgents
+    ? (await acquireAgentLaunchChoices(workspace, () => pendingAgents)).detected
+    : null
+  const current = useAppStore.getState()
+  const savedAgent = savedAgentId()
+  if (!savedAgent) {
+    return { kind: 'launch-default' }
+  }
   const available = pendingAgents
-    ? isAgentAvailable(savedAgent, await pendingAgents)
-    : isTuiAgentEnabled(savedAgent, useAppStore.getState().settings?.disabledTuiAgents)
+    ? resolveChecksActionAgent(current, 'fixChecks', repo?.id, workspace, detected) === savedAgent
+    : isTuiAgentEnabled(savedAgent, current.settings?.disabledTuiAgents)
   if (!available) {
     toast.error(
       translate(
@@ -83,35 +121,29 @@ async function resolveSavedAgentOverride(
   return { kind: 'agent', agent: savedAgent }
 }
 
-async function pickExistingWorktreeAgent(
-  worktreeId: string,
-  savedAgent: TuiAgent | null | undefined
-): Promise<TuiAgent | null> {
-  const detectedAgents = await ensureDetectedAgentsForWorktree(useAppStore.getState(), worktreeId)
-  if (savedAgent) {
-    if (isAgentAvailable(savedAgent, detectedAgents)) {
-      return savedAgent
-    }
-    toast.error(
-      translate(
-        'auto.lib.fix.checks.agent.launch.4c7f783a7a',
-        'Saved checks agent is not available on this workspace host.'
-      )
-    )
-    return null
-  }
-  const settings = useAppStore.getState().settings
-  const agent = pickSourceControlLaunchAgent({
-    defaultAgent: settings?.defaultTuiAgent,
-    detectedAgents,
-    disabledAgents: settings?.disabledTuiAgents
-  })
+async function pickExistingWorktreeAgent(worktreeId: string): Promise<TuiAgent | null> {
+  const workspace = worktreeLaunchWorkspace(worktreeId)
+  const choices = await acquireAgentLaunchChoices(workspace, () =>
+    ensureDetectedAgentsForWorktree(useAppStore.getState(), worktreeId)
+  )
+  const state = useAppStore.getState()
+  const repoId = state.allWorktrees().find((entry) => entry.id === worktreeId)?.repoId
+  const agent = resolveChecksActionAgent(state, 'fixChecks', repoId, workspace, choices.detected)
   if (!agent) {
+    const repo = state.repos.find((entry) => entry.id === repoId)
+    const savedAgent = readSourceControlLaunchRecipeAgentId(
+      resolveSourceControlActionRecipe({ settings: state.settings, repo, actionId: 'fixChecks' })
+    )
     toast.error(
-      translate(
-        'auto.lib.fix.checks.agent.launch.2ebf794906',
-        'No enabled AI agent was detected on this workspace host.'
-      )
+      savedAgent
+        ? translate(
+            'auto.lib.fix.checks.agent.launch.4c7f783a7a',
+            'Saved checks agent is not available on this workspace host.'
+          )
+        : translate(
+            'auto.lib.fix.checks.agent.launch.2ebf794906',
+            'No enabled AI agent was detected on this workspace host.'
+          )
     )
   }
   return agent
@@ -120,24 +152,27 @@ async function pickExistingWorktreeAgent(
 export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promise<boolean> {
   const store = useAppStore.getState()
   const repo = store.repos.find((candidate) => candidate.id === args.repoId) ?? null
-  const recipe = resolveSourceControlActionRecipe({
-    settings: store.settings,
-    repo,
-    actionId: 'fixChecks'
-  })
-  const savedAgentId = readSourceControlLaunchRecipeAgentId(recipe)
-  const commandInput = renderSourceControlActionCommandTemplate(
-    recipe.commandInputTemplate ?? DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES.fixChecks,
-    { basePrompt: args.basePrompt }
-  ).trim()
-  if (!commandInput) {
-    toast.error(
-      translate(
-        'auto.lib.fix.checks.agent.launch.9f00d7df0c',
-        'Fix checks prompt is empty. Update Source Control AI settings.'
+  const recipe = () =>
+    resolveSourceControlActionRecipe({
+      settings: useAppStore.getState().settings,
+      repo: useAppStore.getState().repos.find((entry) => entry.id === args.repoId),
+      actionId: 'fixChecks'
+    })
+  const savedAgentId = () => readSourceControlLaunchRecipeAgentId(recipe())
+  const commandInput = (): string => {
+    const prompt = renderSourceControlActionCommandTemplate(
+      recipe().commandInputTemplate ?? DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES.fixChecks,
+      { basePrompt: args.basePrompt }
+    ).trim()
+    if (!prompt) {
+      toast.error(
+        translate(
+          'auto.lib.fix.checks.agent.launch.9f00d7df0c',
+          'Fix checks prompt is empty. Update Source Control AI settings.'
+        )
       )
-    )
-    return false
+    }
+    return prompt
   }
 
   const attachedWorkspace =
@@ -164,8 +199,9 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     // Agent selection stays renderer-owned so manual host detection and saved recipes retain their
     // existing behavior. Desktop-owned workspaces use the shared main entry; web and paired-runtime
     // workspaces keep their owning-runtime launch and use the exact same mandatory policy builder.
-    const agent = await pickExistingWorktreeAgent(targetWorktreeId, savedAgentId)
-    if (!agent) {
+    const agent = await pickExistingWorktreeAgent(targetWorktreeId)
+    const prompt = agent ? commandInput() : ''
+    if (!agent || !prompt) {
       return false
     }
     // launchAgentInNewTab and the main-process entry each create the surface; seeding here would
@@ -184,7 +220,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     }
     const hostedReviewAgentApi = window.api?.hostedReviewAgent
     const executionHost = parseExecutionHostId(repo?.executionHostId)
-    if (hostedReviewAgentApi && executionHost?.kind !== 'runtime' && !recipe.agentArgs?.trim()) {
+    if (hostedReviewAgentApi && executionHost?.kind !== 'runtime' && !recipe().agentArgs?.trim()) {
       if (!revealTargetWorkspace()) {
         return false
       }
@@ -193,7 +229,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
           repoId: args.repoId,
           worktreeId: targetWorktreeId,
           agent,
-          basePrompt: commandInput
+          basePrompt: prompt
         })
       } catch (error) {
         toast.error(
@@ -226,7 +262,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       return false
     }
     const agentArgsPlan = planAgentCliArgsSuffix(
-      recipe.agentArgs,
+      recipe().agentArgs,
       launchPlatform === 'win32' ? 'powershell' : 'posix'
     )
     if (!agentArgsPlan.ok) {
@@ -241,10 +277,10 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       groupId: args.groupId ?? targetWorktreeId,
       prompt: buildHostedReviewAgentPrompt({
         task: 'fix-checks',
-        basePrompt: commandInput,
+        basePrompt: prompt,
         unattended: false
       }),
-      agentArgs: recipe.agentArgs,
+      agentArgs: recipe().agentArgs,
       promptDelivery: 'submit-after-ready',
       launchPlatform,
       launchSource: args.launchSource,
@@ -281,7 +317,8 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
   }
 
   const agentOverride = await resolveSavedAgentOverride(savedAgentId, repo)
-  if (agentOverride.kind === 'blocked') {
+  const prompt = agentOverride.kind === 'blocked' ? '' : commandInput()
+  if (!prompt) {
     return false
   }
 
@@ -290,7 +327,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       ...args.item,
       pasteContent: buildHostedReviewAgentPrompt({
         task: 'fix-checks',
-        basePrompt: commandInput,
+        basePrompt: prompt,
         unattended: false
       })
     },
@@ -298,7 +335,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     launchSource: args.launchSource,
     telemetrySource: args.telemetrySource,
     promptDelivery: 'submit-after-ready',
-    agentArgs: recipe.agentArgs,
+    agentArgs: recipe().agentArgs,
     ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
     openModalFallback: args.openModalFallback
   })

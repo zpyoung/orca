@@ -166,7 +166,9 @@ function mergeNativeChatSkills(
     if (!safeName) {
       continue
     }
-    byName.set(safeName, [...(byName.get(safeName) ?? []), { ...skill, name: safeName }])
+    const namedSkills = byName.get(safeName) ?? []
+    namedSkills.push({ ...skill, name: safeName })
+    byName.set(safeName, namedSkills)
   }
 
   // Why: when the running session reports its own skills, that report is the
@@ -177,8 +179,12 @@ function mergeNativeChatSkills(
   // A reported skill with its file is its own row: two skills may share a name, and the pick
   // tells the agent which file it means.
   const nameCounts = new Map<string, number>()
+  const firstReportedByName = new Map<string, NativeChatSessionSkill>()
   for (const skill of sessionSkills ?? []) {
     nameCounts.set(skill.name, (nameCounts.get(skill.name) ?? 0) + 1)
+    if (!firstReportedByName.has(skill.name)) {
+      firstReportedByName.set(skill.name, skill)
+    }
   }
   const located = (sessionSkills ?? []).flatMap((skill) =>
     skill.path && isTokenSafe(skill.name)
@@ -206,7 +212,7 @@ function mergeNativeChatSkills(
   return [
     ...located,
     ...[...new Set(names)].flatMap((name) => {
-      const reported = sessionSkills?.find((entry) => entry.name === name)?.description
+      const reported = firstReportedByName.get(name)?.description
       return pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills).map(
         (skill) =>
           skill.description === null && reported

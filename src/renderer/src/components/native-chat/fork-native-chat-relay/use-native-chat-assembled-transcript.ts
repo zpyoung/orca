@@ -5,7 +5,7 @@ import {
   createNativeChatTranscriptCache
 } from './native-chat-incremental-assembler'
 import { getVerifiedNativeChatCommands } from '../../../../../shared/native-chat-agent-profiles'
-import { surfaceSkillInvocationUserTurns } from '../../../../../shared/native-chat-command-envelope'
+import { surfaceSkillInvocationUserTurns } from '../../../../../shared/native-chat/native-chat-command-envelope'
 
 /**
  * The rendered transcript for a pane: the paged base list plus live appends,

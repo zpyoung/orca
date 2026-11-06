@@ -291,7 +291,7 @@ export function SourceControlTextGenerationDialogForm({
           }
           inheritedAgentArgs={
             selectedTuiAgent
-              ? resolveTuiAgentLaunchArgs(selectedTuiAgent, settings?.agentDefaultArgs)
+              ? resolveTuiAgentLaunchArgs(selectedTuiAgent, settings)
               : null
           }
           idPrefix={`source-control-${actionId}`}

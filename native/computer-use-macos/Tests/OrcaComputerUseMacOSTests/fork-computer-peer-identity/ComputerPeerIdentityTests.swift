@@ -8,12 +8,13 @@ final class ComputerPeerIdentityTests: XCTestCase {
 
     func testPreservesUpstreamAndDevelopmentApplications() {
         XCTAssertTrue(isTrustedComputerPeerBundleIdentifier("com.stablyai.orca"))
+        XCTAssertTrue(isTrustedComputerPeerBundleIdentifier("com.stablyai.orca.dev"))
         XCTAssertTrue(isTrustedComputerPeerBundleIdentifier("com.stablyai.orca.dev.worktree"))
         XCTAssertTrue(isTrustedComputerPeerBundleIdentifier("com.github.Electron"))
     }
 
     func testRejectsUnrelatedAndLookalikeApplications() {
-        for bundleId in ["", "com.example.app", "com.zpyoung.orca.evil", "com.zpyoung.orca-helper", "com.stablyai.orca.evil", "com.github.Electron.evil"] {
+        for bundleId in ["", "com.example.app", "com.zpyoung.orca.evil", "com.zpyoung.orca-helper", "com.stablyai.orca.evil", "com.stablyai.orca.devtools", "com.github.Electron.evil"] {
             XCTAssertFalse(isTrustedComputerPeerBundleIdentifier(bundleId), bundleId)
         }
     }

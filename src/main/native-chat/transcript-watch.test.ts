@@ -46,8 +46,6 @@ async function tempFile(initial: string): Promise<string> {
   return filePath
 }
 
-// A path inside a fresh temp dir with nothing written yet — simulates a
-// just-created session whose agent hasn't flushed its first JSONL line (#8401).
 async function pendingFilePath(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-watch-pending-'))
   tempRoots.push(root)
@@ -345,9 +343,6 @@ describe('subscribeNativeChatTranscript', () => {
   })
 
   it('recovers a completion marker even when trailing non-boundary rows follow it', async () => {
-    // The lifecycle scan walks newest-first; rows that decode to no boundary
-    // (tool-results, harness noise) must not hide an earlier real completion
-    // within the window, or a reconnect snapshot would fail to settle.
     const toolResult = `${JSON.stringify({
       type: 'user',
       uuid: 'tool-result-1',
@@ -544,9 +539,7 @@ describe('subscribeNativeChatTranscript', () => {
 
     sub.unsubscribe()
 
-    // Seed-at-0 means the first drain re-reads the whole file; the assembler
-    // dedups by id. The appended turn must appear; the pre-existing line may
-    // appear too (collapsed downstream by id).
+    // Offset-zero seed rereads existing rows; downstream ID dedup permits them beside new appends.
     const ids = batches.flat().map((m) => m.id)
     expect(ids).toContain('a-1')
   })
@@ -564,14 +557,11 @@ describe('subscribeNativeChatTranscript', () => {
       reconciliationIntervalMs: 20
     })
 
-    // Make the file unreadable mid-flight (EACCES on the read path). The drain's
-    // try/catch must break and reset `reading` in finally so a later append
-    // still tails once permissions are restored.
+    // Fail a drain mid-flight; finally must clear reading so later appends recover.
     await waitFor(() => seen.some((m) => m.id === 'u-1'))
     const { chmod } = await import('node:fs/promises')
     await chmod(filePath, 0o000)
     await appendFile(filePath, claudeLine('a-1', 'assistant', 'reply')).catch(() => {})
-    // Give the watcher a chance to attempt (and fail) a drain.
     await new Promise((resolve) => setTimeout(resolve, 40))
     await chmod(filePath, 0o644)
     await appendFile(filePath, claudeLine('a-2', 'assistant', 'recovered'))
@@ -598,7 +588,6 @@ describe('subscribeNativeChatTranscript', () => {
     sub.unsubscribe()
     expect(getActiveNativeChatWatcherCount()).toBe(before)
 
-    // Idempotent: a second unsubscribe must not under-count.
     sub.unsubscribe()
     expect(getActiveNativeChatWatcherCount()).toBe(before)
   })
@@ -616,7 +605,6 @@ describe('subscribeNativeChatTranscript', () => {
       reconciliationIntervalMs: 20
     })
 
-    // Fire several appends back-to-back within the debounce window.
     await appendFile(filePath, claudeLine('a-1', 'assistant', 'one'))
     await appendFile(filePath, claudeLine('a-2', 'assistant', 'two'))
     await appendFile(filePath, claudeLine('a-3', 'assistant', 'three'))
@@ -624,8 +612,6 @@ describe('subscribeNativeChatTranscript', () => {
     await waitFor(() => ['a-1', 'a-2', 'a-3'].every((id) => seen.some((m) => m.id === id)))
     sub.unsubscribe()
 
-    // Order is preserved for the appended turns (the seed re-read may also carry
-    // the pre-existing u-1, which the assembler dedups downstream).
     const appendedIds = seen.map((m) => m.id).filter((id) => id !== 'u-1')
     expect(appendedIds).toEqual(['a-1', 'a-2', 'a-3'])
   })
@@ -673,12 +659,9 @@ describe('subscribeNativeChatTranscript', () => {
       reconciliationIntervalMs: 20
     })
 
-    // Replace the file with shorter content (simulates rotation to a new,
-    // smaller session file at the same resolved path).
     await writeFile(filePath, claudeLine('u-2', 'user', 'fresh'))
     await waitFor(() => seen.some((m) => m.id === 'u-2'))
 
-    // A subsequent append on the rotated file is still tailed.
     await appendFile(filePath, claudeLine('a-2', 'assistant', 'fresh-reply'))
     await waitFor(() => seen.some((m) => m.id === 'a-2'))
 
@@ -701,8 +684,7 @@ describe('subscribeNativeChatTranscript', () => {
       filePath,
       onAppend: (messages) => {
         seen.push(...messages)
-        // Why: rewrite while the drain is paused in delivery, so no stat lands mid-write
-        // (Bun writes, then ftruncates) and replays a version this test already consumed.
+        // Rewrite during delivery so no mid-write stat sees Bun’s write-before-truncate intermediate version.
         for (const message of messages) {
           const next = replacements.get(message.id)
           replacements.delete(message.id)
@@ -813,16 +795,10 @@ describe('subscribeNativeChatTranscript', () => {
     })
     expect(sub.watching).toBe(false)
     expect(getActiveNativeChatWatcherCount()).toBe(before)
-    // Must not throw.
     sub.unsubscribe()
   })
 })
 
-// Regression for #8401: Claude Code (and other agents) can take from ~3s to
-// minutes to flush a brand-new session's first JSONL line, so the file
-// genuinely doesn't exist when native chat subscribes. Before this fix,
-// subscribeNativeChatTranscript returned a permanent no-op the instant the
-// file was missing and never recovered once it appeared.
 describe('subscribeNativeChatTranscript (resolve-poll for a not-yet-created file, #8401)', () => {
   it('keeps retrying resolve+install and tails the file once it is created', async () => {
     const filePath = await pendingFilePath()
@@ -838,10 +814,8 @@ describe('subscribeNativeChatTranscript (resolve-poll for a not-yet-created file
       resolvePollIntervalMs: 20
     })
 
-    // Nothing installed yet — the file doesn't exist on disk.
     expect(getActiveNativeChatWatcherCount()).toBe(0)
 
-    // The agent flushes its first turn well after subscribe.
     await new Promise((resolve) => setTimeout(resolve, 50))
     await writeFile(filePath, claudeLine('u-1', 'user', 'hello'))
 
@@ -863,7 +837,6 @@ describe('subscribeNativeChatTranscript (resolve-poll for a not-yet-created file
       resolvePollIntervalMs: 10
     })
 
-    // An unresolvable target must not spin the resolve poll forever.
     await new Promise((resolve) => setTimeout(resolve, 60))
     expect(getActiveNativeChatWatcherCount()).toBe(before)
     sub.unsubscribe()
@@ -885,11 +858,9 @@ describe('subscribeNativeChatTranscript (resolve-poll for a not-yet-created file
       resolvePollIntervalMs: 20
     })
 
-    // Unsubscribe while still polling — the file is never created in this test.
     sub.unsubscribe()
     expect(getActiveNativeChatWatcherCount()).toBe(before)
 
-    // Give any stray timer a chance to fire; it must not install a watcher.
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(getActiveNativeChatWatcherCount()).toBe(before)
   })

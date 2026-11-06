@@ -17,6 +17,7 @@ import { PRTriageStrip } from './triage-strip'
 import { ConflictingFilesSection, MergeConflictNotice } from './conflict-summary'
 import { ChecksList } from './checks-list'
 import { PRCommentsList } from './comments-list'
+import { openAnnotationLocation } from '@/components/editor/check-annotation-open'
 import { translate } from '@/i18n/i18n'
 import { HostedReviewSitterPanel } from '@/fork-hosted-review-sitter/HostedReviewSitterPanel'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
@@ -37,6 +38,7 @@ export function ChecksPanelActiveContent({
     activeWorktreeId,
     agentComposerState,
     aiActionDisabledReason,
+    fixChecksDisabledReason,
     canTargetPRComments,
     checks,
     checksError,
@@ -215,8 +217,8 @@ export function ChecksPanelActiveContent({
           resolveConflictsDisabledReason={aiActionDisabledReason}
           isFixingChecksWithAI={isFixingChecksWithAI}
           onFixChecksWithAI={() => void handleFixChecksWithAI()}
-          fixChecksDisabled={Boolean(aiActionDisabledReason)}
-          fixChecksDisabledReason={aiActionDisabledReason}
+          fixChecksDisabled={Boolean(fixChecksDisabledReason)}
+          fixChecksDisabledReason={fixChecksDisabledReason}
         />
       )}
       {activeConflictReview && (
@@ -261,6 +263,17 @@ export function ChecksPanelActiveContent({
         onEditComment={pr ? handleEditComment : undefined}
         onDeleteComment={pr ? handleDeleteComment : undefined}
         onSetReaction={canTargetPRComments ? handleSetReaction : undefined}
+        onOpenLocation={
+          activeWorktree
+            ? (path, line) =>
+                openAnnotationLocation({
+                  worktreeId: activeWorktree.id,
+                  executionHostId: activeWorktree.hostId,
+                  path,
+                  line
+                })
+            : undefined
+        }
       />
       <SourceControlAgentActionDialog
         open={sourceControlAiActionsVisible && agentComposerState !== null}

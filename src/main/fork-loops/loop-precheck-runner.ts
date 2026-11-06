@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/main/automations/precheck-runner.ts
-// FORK-COPY-SHA: 071747853f5995ee233b36751613f09a60007c2b
+// FORK-COPY-SHA: 47f77cf7018ebc0d046b82c6dde31cf704909162
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { ClientChannel } from 'ssh2'
 import type { AutomationPrecheck, AutomationPrecheckResult } from '../../shared/automations-types'
@@ -79,7 +79,6 @@ function failedPrecheckResult(
   })
 }
 
-/** Exported for the refusal-fallback test; the timeout path is otherwise unreachable. */
 export function killLocalPrecheckProcessTree(
   child: ChildProcess
 ): ReturnType<typeof setTimeout> | null {
@@ -97,14 +96,12 @@ export function killLocalPrecheckProcessTree(
         scope: 'win-taskkill-tree'
       })
     ) {
-      // Refusal blocks the tree walk, not the termination: killing the root by
-      // handle cannot reach a recycled pid, and a timed-out precheck must stop.
+      // A refused tree walk still permits killing the root through its child handle.
       child.kill()
       return null
     }
     try {
-      // Why: shell prechecks can launch child processes; taskkill walks the
-      // Windows process tree so timeout means the command is actually stopped.
+      // Shell prechecks can leave descendants running after the root exits.
       const killer = spawn('taskkill', ['/pid', String(pid), '/t', '/f'], {
         stdio: 'ignore',
         windowsHide: true
@@ -127,7 +124,7 @@ export function killLocalPrecheckProcessTree(
     try {
       process.kill(-pid, 'SIGKILL')
     } catch {
-      /* process group already exited */
+      /* Ignore errors from the final best-effort group kill. */
     }
   }, 2000)
   forceKillTimer.unref?.()

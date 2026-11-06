@@ -1,6 +1,6 @@
 import { agentImagePasteWrites, formatAgentImagePath } from '../../../../shared/agent-image-paste'
 import type { AgentType } from '../../../../shared/agent-status-types'
-import { buildNativeChatImagePasteBytes } from './native-chat-send'
+import { buildNativeChatImagePasteBytes } from '../../../../shared/native-chat-paste-bytes'
 import { formatImageDropPasteText } from '../terminal-pane/terminal-drop-image-path'
 import { isTerminalDropWindowsPathLike } from '../terminal-pane/terminal-drop-shell'
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'

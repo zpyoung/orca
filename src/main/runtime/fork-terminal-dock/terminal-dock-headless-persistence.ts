@@ -10,7 +10,7 @@ import {
  *  spawn-time bindings rather than RPC input, so a remote client can't forge
  *  one; a disconnected pane keeps its key until the PTY is actually torn down. */
 export function liveTerminalDockPaneKeysForTab(
-  ptys: Iterable<{ tabId: string | null; paneKey: string | null }>,
+  ptys: Iterable<{ tabId?: string | null; paneKey?: string | null }>,
   tabId: string
 ): Set<string> {
   const liveKeys = new Set<string>()

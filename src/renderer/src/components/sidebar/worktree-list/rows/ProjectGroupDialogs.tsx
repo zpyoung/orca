@@ -115,6 +115,7 @@ export function SidebarWorktreeListDialogs({
         ledgerPreview={deleteDialog?.ledgerPreview}
         ledgerPreviewLoading={deleteDialog?.ledgerPreviewLoading}
         ledgerPreviewError={deleteDialog?.ledgerPreviewError}
+        unsavedTargets={dialogs.deleteUnsavedTargets}
       />
     </>
   )

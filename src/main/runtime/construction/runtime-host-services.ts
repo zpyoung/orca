@@ -309,15 +309,14 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
     withCatalogRemoval: (removal, expectedLedgers, mutate) =>
       this.withLedgerCatalogRemoval(removal, expectedLedgers, mutate),
     resolveFolderConnectionId: (workspace) => this.resolveFolderWorkspaceConnectionId(workspace),
-    teardownFolderWorkspacePtys: (worktreeId, connectionId) =>
+    teardownFolderWorkspacePtys: (...target) =>
       teardownFolderWorkspacePtys(
         {
           runtime: this,
           getLocalProvider: () => this.getLocalProvider(),
           onPtyStopped: this.onPtyStopped
         },
-        worktreeId,
-        connectionId
+        ...target
       ),
     cleanupRemovedFolderWorkspaceState: (worktreeId) => {
       if (this.store) {
@@ -325,7 +324,8 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
       }
       // Why every host after the local-only hub: this store mints folder ids, so none is shared.
       this.dropAgentStatusForRemovedWorktreeFn?.(worktreeId, ALL_EXECUTION_HOSTS_SCOPE)
-    }
+    },
+    emitWorktreeLifecycle: (event) => this.worktreeLifecycleEvents.emit(event)
   })
 
   private readonly repositoryCatalogDeps = {

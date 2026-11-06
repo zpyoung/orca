@@ -4107,8 +4107,6 @@ private func isTrustedOrcaApplication(_ pid: pid_t) -> Bool {
     else {
         return false
     }
-    // Why: dev validation runs from per-worktree wrapper apps with stable
-    // Orca-owned bundle ids; the sidecar peer check must still authorize them.
     return isTrustedComputerPeerBundleIdentifier(bundleId)
 }
 

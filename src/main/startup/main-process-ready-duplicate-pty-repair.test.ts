@@ -40,7 +40,6 @@ vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: vi.fn(), removeListener: vi.fn() },
   nativeTheme: {}
 }))
-vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 vi.mock('./main-process-state', () => ({ mainProcessState: fixture.state }))
 vi.mock('../runtime/orca-runtime', () => ({
   OrcaRuntimeService: class {

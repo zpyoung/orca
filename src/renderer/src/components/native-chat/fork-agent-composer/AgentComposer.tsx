@@ -160,8 +160,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     contains
   } = useNativeChatTypedInsertion({
     textareaRef,
-    caret,
-    draft,
+    isComposing: imeEnterGesture.isComposing,
     setDraft,
     setCaret,
     setActiveSuggestion

@@ -25,6 +25,7 @@ import {
   listSessionLineage,
   subscribeSessionLineage
 } from '@/lib/fork-session-handoff/session-lineage-actions'
+import { selectFolderWorkspaces, selectWorktreesByRepo } from '@/store/workspace-record-selectors'
 
 export type SessionLineageMatch = {
   record: ForkSessionHandoffLineageRecord
@@ -231,7 +232,7 @@ export function useLineageWorktreeRemoved(endpoint: LineageEndpointIdentity | nu
     const workspaceScope = parseWorkspaceKey(endpoint.worktreeId)
     if (workspaceScope?.type === 'folder') {
       if (
-        state.folderWorkspaces.some(
+        selectFolderWorkspaces(state).some(
           (workspace) => workspace.id === workspaceScope.folderWorkspaceId
         )
       ) {
@@ -242,7 +243,7 @@ export function useLineageWorktreeRemoved(endpoint: LineageEndpointIdentity | nu
     if (!state.hasHydratedWorktreePurge) {
       return false
     }
-    return getIndexedWorktreesById(state.worktreesByRepo, endpoint.worktreeId).length === 0
+    return getIndexedWorktreesById(selectWorktreesByRepo(state), endpoint.worktreeId).length === 0
   })
 }
 

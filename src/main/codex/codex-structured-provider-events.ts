@@ -11,7 +11,6 @@ type EmitCodexEvent = (
   event: CodexStructuredSessionEvent
 ) => CodexJournalTranslationAdmission
 
-/** One live notification's journal entry: rewind bookkeeping, delivery. */
 export function translateCodexNotification(input: {
   sessionId: string
   session: CodexSession
@@ -48,8 +47,7 @@ export function deliverCodexNotification(
     return { accepted: true }
   }
   const threadId = readCodexThreadId(params) ?? session.threadId
-  // Dispatch identity settles on the user-message echo inside the translator,
-  // which is where the ordinal a replay will compute is minted.
+  // Settle echoes in the translator, where replay-stable ordinals are assigned.
   return emit(session, {
     type: 'notification',
     sessionId,
@@ -128,9 +126,7 @@ export function deliverCodexUnhandledFrame(
     payload
   })
   if (!admission.accepted) {
-    // There is no safe replay cursor for malformed/unhandled frames. Close the
-    // provider so host recovery records a truthful terminal failure instead of
-    // silently dropping the diagnostic under sink backpressure.
+    // Unhandled frames have no replay cursor; recover the provider rather than drop diagnostics.
     void session.forceCloseUnexpected?.(
       new Error(`Codex provider frame ${kind} could not be durably recorded (${admission.reason})`)
     )

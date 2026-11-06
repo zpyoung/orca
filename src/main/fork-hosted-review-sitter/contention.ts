@@ -6,7 +6,7 @@ import type {
   RuntimeTerminalListResult
 } from '../../shared/runtime-terminal-contracts'
 import type { TerminalExitCause } from '../../shared/terminal-exit-cause'
-import { getRepoHostedReviewExecutionHostId } from '../source-control/hosted-review-execution-host'
+import { getStoredRepoExecutionHostId } from '../repo-execution-host'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import type {
   HostedReviewSitterContention,
@@ -82,7 +82,7 @@ export async function inspectHostedReviewSitterContention(
   if (!repo) {
     return { state: 'unverifiable', reason: 'repository-context-missing' }
   }
-  const executionHostId = getRepoHostedReviewExecutionHostId(repo)
+  const executionHostId = getStoredRepoExecutionHostId(repo)
   try {
     const workspace = await runtime.showManagedWorktree(`id:${definition.worktreeId}`)
     if (

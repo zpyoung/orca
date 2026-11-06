@@ -505,16 +505,16 @@
       ]
     },
     {
-      "path": "src/shared/remote-runtime-shared-control-protocol.ts",
+      "path": "src/shared/remote-runtime/control/remote-runtime-shared-control-protocol.ts",
       "feature": "heimdall",
       "kind": "registration",
       "lines": [
-        "import { getHeimdallSubscriptionCleanupRequest } from './fork-heimdall/subscription-routing'",
+        "import { getHeimdallSubscriptionCleanupRequest } from '../../fork-heimdall/subscription-routing'",
         "  return getHeimdallSubscriptionCleanupRequest(subscription)"
       ]
     },
     {
-      "path": "src/shared/remote-runtime-shared-control-subscriptions.ts",
+      "path": "src/shared/remote-runtime/requests/remote-runtime-shared-control-subscriptions.ts",
       "feature": "heimdall",
       "kind": "passthrough",
       "lines": ["    method === 'heimdall:subscribe' ||"]
@@ -594,7 +594,7 @@
       "kind": "registration",
       "lines": [
         "import { createHeimdallFleetSlice } from './fork-heimdall/fleet'",
-        "    ...createHeimdallFleetSlice(...a)"
+        "        ...createHeimdallFleetSlice(...a)"
       ]
     },
     {
@@ -1087,7 +1087,9 @@
         "} from '../fork-terminal-dock/terminal-dock-session-tab-props'",
         "} from '../fork-terminal-dock/terminal-dock-headless-persistence'",
         "                  ...terminalDockPatchFragment(",
-        "    const dockMintedTabs = hasUnifiedTab"
+        "    const dockMintedTabs = hasUnifiedTab",
+        "      terminalDock?: TerminalDockPropsPatch",
+        "      if (args.terminalDock !== undefined) {"
       ]
     },
     {
@@ -1097,15 +1099,6 @@
       "lines": [
         "} from '../fork-terminal-dock/terminal-dock-session-tab-props'",
         "      const dockMergedSnapshot = mergeRendererTerminalDockAcrossSnapshot("
-      ]
-    },
-    {
-      "path": "src/main/runtime/session-tabs/headless-terminal-tab-close.ts",
-      "feature": "terminal-dock",
-      "kind": "registration",
-      "lines": [
-        "import type { TerminalDockPropsPatch } from '../fork-terminal-dock/terminal-dock-session-tab-props'",
-        "      terminalDock?: TerminalDockPropsPatch"
       ]
     },
     {
@@ -1999,7 +1992,7 @@
       "kind": "registration",
       "lines": [
         "import { removeTabPaneKeysFromPendingMutations } from '../fork-terminal-dock/tab-terminal-dock-state'",
-        "          const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations("
+        "            const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations("
       ]
     },
     {
@@ -2980,7 +2973,7 @@
       "kind": "registration",
       "lines": [
         "import { createAsksSlice } from './fork-ask-question-tool/asks'",
-        "    ...createAsksSlice(...a),"
+        "        ...createAsksSlice(...a),"
       ]
     },
     {
@@ -3586,14 +3579,6 @@
       "lines": ["    const ledgerHelp = describeLedgerFlag(command, flag)"]
     },
     {
-      "path": "src/cli/skills.test.ts",
-      "feature": "skills-repository",
-      "kind": "import-swap",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from '../shared/fork-skills-repository/skills-repository-url'"
-      ]
-    },
-    {
       "path": "src/main/agent-hooks/server/server-listeners.ts",
       "feature": "session-info",
       "kind": "registration",
@@ -3816,22 +3801,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/onboarding/onboarding-feature-setup.test.ts",
-      "feature": "skills-repository",
-      "kind": "import-swap",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/settings/OrchestrationPane.test.tsx",
-      "feature": "skills-repository",
-      "kind": "import-swap",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/settings/RepositoryPane.tsx",
       "feature": "project-ledger",
       "kind": "registration",
@@ -3966,24 +3935,10 @@
       "lines": ["import type { UISliceLedgerPage } from './ui-slice-contract-ledger-page'"]
     },
     {
-      "path": "src/renderer/src/web/web-preload-api-composition.test.ts",
-      "feature": "project-ledger",
-      "kind": "registration",
-      "lines": ["      'ledger',"]
-    },
-    {
       "path": "src/renderer/src/web/web-preload-api.ts",
       "feature": "project-ledger",
       "kind": "registration",
       "lines": ["import { createWebLedgerApi } from './web-ledger-api'"]
-    },
-    {
-      "path": "src/shared/agent-feature-install-commands.test.ts",
-      "feature": "skills-repository",
-      "kind": "import-swap",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'"
-      ]
     },
     {
       "path": "src/shared/agent-feature-install-commands.ts",
@@ -3992,15 +3947,6 @@
       "lines": [
         "import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'",
         "export { ORCA_SKILLS_REPOSITORY_URL }"
-      ]
-    },
-    {
-      "path": "config/scripts/run-node-server-tests.mjs",
-      "feature": "skills-repository",
-      "kind": "import-swap",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../src/shared/fork-skills-repository/skills-repository-url.ts'",
-        "  const source = `${ORCA_SKILLS_REPOSITORY_URL}/tree/${resolveBuildSourceCommit()}`"
       ]
     },
     {
@@ -4167,7 +4113,7 @@
       "path": ".github/workflows/ci-cache-warmup-platform-jobs.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["        runner: [ubuntu-24.04-arm, ubuntu-latest]"]
+      "lines": ["        runner: [ubuntu-24.04-arm, ubuntu-latest]", "    runs-on: ubuntu-latest"]
     },
     {
       "path": "src/renderer/src/components/cmd-j/palette-live-status.tsx",
@@ -4271,7 +4217,7 @@
       "kind": "registration",
       "lines": [
         "import { HEIMDALL_REMOTE_CLIENT_CAPABILITIES } from '../../shared/fork-heimdall/capability'",
-        "          ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES"
+        "          ...HEIMDALL_REMOTE_CLIENT_CAPABILITIES,"
       ]
     },
     {
@@ -5170,32 +5116,15 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": [
-        "        run: git fetch --no-tags --depth=1 https://github.com/stablyai/orca.git +refs/tags/v1.4.224:refs/tags/v1.4.224"
+        "        run: git fetch --no-tags --depth=1 https://github.com/stablyai/orca.git +refs/tags/v1.4.224:refs/tags/v1.4.224",
+        "    runs-on: ubuntu-latest"
       ]
     },
     {
       "path": ".github/workflows/preflight-benchmark.yml",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    timeout-minutes: 60"]
-    },
-    {
-      "path": "config/scripts/verify-skill-update-roundtrip.test.mjs",
-      "feature": "skills-repository",
-      "kind": "passthrough",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_SLUG } from '../../src/shared/fork-skills-repository/skills-repository-url'",
-        "    expect(roundTripAddArgs(ORCA_SKILLS_REPOSITORY_SLUG, COMMIT, 'orca-cli')).toEqual("
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/LinearAgentSkillSetupPrompt.test.tsx",
-      "feature": "skills-repository",
-      "kind": "import-swap",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'",
-        "        installedCommand: `npx skills@${SKILLS_CLI_VERSION} add ${ORCA_SKILLS_REPOSITORY_URL}/tree/${ORCA_BUILD_COMMIT} --skill orca-linear --global`,"
-      ]
+      "lines": ["    timeout-minutes: 60", "    runs-on: ubuntu-24.04-arm"]
     },
     {
       "path": "src/shared/host-operation-ownership.ts",
@@ -5271,15 +5200,6 @@
         "} from '../fork-loops/wsl-move-storage-dispositions'",
         "  ...LOOPS_SQLITE_SCHEMA_FILE_DATABASES,",
         "    ...Object.entries(LOOPS_SQLITE_TABLE_DISPOSITIONS),"
-      ]
-    },
-    {
-      "path": "src/main/skills/skill-update-run.test.ts",
-      "feature": "skills-repository",
-      "kind": "import-swap",
-      "lines": [
-        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../shared/fork-skills-repository/skills-repository-url'",
-        "      `${ORCA_SKILLS_REPOSITORY_URL}/tree/0123456789abcdef0123456789abcdef01234567`,"
       ]
     },
     {
@@ -5583,7 +5503,7 @@
       "kind": "registration",
       "lines": [
         "import { createLoopsSlice } from '@/fork-loops/loops-slice'",
-        "    ...createLoopsSlice(...a),"
+        "        ...createLoopsSlice(...a),"
       ]
     },
     {
@@ -5609,6 +5529,200 @@
         "import type { LoopWorktreeSummary } from './fork-loops/loop-types'",
         "  loop?: LoopWorktreeSummary"
       ]
+    },
+    {
+      "path": ".github/workflows/ci-cache-warmup.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/ci-runner-demand.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-slim"]
+    },
+    {
+      "path": ".github/workflows/ci-xterm-cache.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-24.04-arm"]
+    },
+    {
+      "path": ".github/workflows/cloud-verify.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-22.04"]
+    },
+    {
+      "path": ".github/workflows/computer-e2e.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "    runs-on: ${{ matrix.os }}",
+        "    runs-on: macos-15",
+        "    runs-on: ubuntu-22.04"
+      ]
+    },
+    {
+      "path": ".github/workflows/dependency-security.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "        default: ubuntu-latest",
+        "    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}"
+      ]
+    },
+    {
+      "path": ".github/workflows/docs.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/macos-updater-tests.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: macos-15"]
+    },
+    {
+      "path": ".github/workflows/mobile.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-24.04-arm"]
+    },
+    {
+      "path": ".github/workflows/node-next-compat.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/node-server-tests.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}",
+        "      ${{ inputs.fast_runners && fromJSON('{\"ubuntu-22.04\":\"blacksmith-8vcpu-ubuntu-2204\",\"ubuntu-24.04-arm\":\"blacksmith-8vcpu-ubuntu-2404-arm\",\"macos-15\":\"blacksmith-6vcpu-macos-15\",\"macos-15-intel\":\"macos-15-intel\",\"windows-2022\":\"blacksmith-8vcpu-windows-2025\",\"windows-11-arm\":\"windows-11-arm\"}')[matrix.os] || matrix.os }}",
+        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-8vcpu-ubuntu-2404' || 'ubuntu-latest' }}",
+        "    runs-on: ${{ inputs.fast_runners && (matrix.os == 'ubuntu-22.04' && 'blacksmith-8vcpu-ubuntu-2204' || 'blacksmith-8vcpu-ubuntu-2404-arm') || matrix.os }}",
+        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-8vcpu-ubuntu-2204' || 'ubuntu-22.04' }}",
+        "    runs-on: ${{ inputs.fast_runners && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}"
+      ]
+    },
+    {
+      "path": ".github/workflows/packaged-browser-e2e.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/performance-contracts.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ${{ matrix.os }}"]
+    },
+    {
+      "path": ".github/workflows/pi-owner-runtime.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ${{ matrix.os }}"]
+    },
+    {
+      "path": ".github/workflows/pi-provider-runtime.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ${{ matrix.os }}"]
+    },
+    {
+      "path": ".github/workflows/pr-test-loc.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-slim"]
+    },
+    {
+      "path": ".github/workflows/preflight-cli-platforms.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ${{ matrix.os }}"]
+    },
+    {
+      "path": ".github/workflows/release-javascript.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["        default: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/release-ref-validation.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ${{ matrix.os }}"]
+    },
+    {
+      "path": ".github/workflows/ssh-hostile-hosts.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-22.04", "    runs-on: ubuntu-24.04"]
+    },
+    {
+      "path": ".github/workflows/ssh-windows-hosts.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/terminal-ime-e2e.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-22.04"]
+    },
+    {
+      "path": ".github/workflows/terminal-perf.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/unit-plan.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/unit-selection-evidence.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-slim"]
+    },
+    {
+      "path": ".github/workflows/unit-tests.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["        default: ubuntu-latest", "    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/windows-typecheck-parity.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: windows-2022"]
+    },
+    {
+      "path": ".github/workflows/wsl-orcad-e2e.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ubuntu-latest"]
+    },
+    {
+      "path": ".github/workflows/zcode-credential-contract.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ${{ matrix.os }}"]
+    },
+    {
+      "path": ".github/workflows/zcode-transcript-contract.yml",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    runs-on: ${{ matrix.os }}"]
     }
   ],
   "exceptions": [
@@ -6047,6 +6161,16 @@
     {
       "path": "resources/skills/current-manifest.json",
       "reason": "Lists the fork's shipped skills, including fork-only ones upstream's manifest lacks; regenerated from the working tree by generate-skill-bundle-manifest.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/skills/bundled-skill-install/bundled-skill-sources.ts",
+      "reason": "Bundled installer payload listing the fork's shipped skills, including fork-only ones upstream's lacks; regenerated from the working tree by generate-skill-bundle-manifest.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/skills/released-digests.json",
+      "reason": "Add-only digest record of every SKILL.md the fork shipped, including fork-only skills upstream's record lacks; regenerated from the working tree by generate-skill-bundle-manifest.",
       "status": "permanent"
     },
     {
@@ -6601,7 +6725,7 @@
       "ledger": "bug-1"
     },
     {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx",
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-attachments-test-probe.tsx",
       "reason": "Migrates attachment-send coverage to terminal-tab-scoped runtime targets.",
       "status": "pending-upstream",
       "ledger": "bug-1"
@@ -6862,14 +6986,6 @@
       "added": 2,
       "removed": 0
     },
-    "src/shared/remote-runtime-shared-control-protocol.ts": {
-      "added": 2,
-      "removed": 1
-    },
-    "src/shared/remote-runtime-shared-control-subscriptions.ts": {
-      "added": 1,
-      "removed": 0
-    },
     "src/main/ipc/runtime-environments/runtime-environment-support-routing.ts": {
       "added": 1,
       "removed": 0
@@ -7056,7 +7172,7 @@
     },
     "src/main/native-chat/transcript-tail-reader.ts": {
       "added": 25,
-      "removed": 23
+      "removed": 20
     },
     "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": {
       "added": 4,
@@ -7119,16 +7235,12 @@
       "removed": 0
     },
     "src/main/runtime/session-tabs/headless-tab-properties.ts": {
-      "added": 55,
+      "added": 63,
       "removed": 12
     },
     "src/main/runtime/session-tabs/mobile-session-reconciliation.ts": {
       "added": 18,
       "removed": 2
-    },
-    "src/main/runtime/session-tabs/headless-terminal-tab-close.ts": {
-      "added": 9,
-      "removed": 0
     },
     "src/main/runtime/runtime-artifact-controller.ts": {
       "added": 2,
@@ -7188,7 +7300,7 @@
     },
     "src/preload/api/native-chat-api.ts": {
       "added": 47,
-      "removed": 30
+      "removed": 29
     },
     "src/preload/api/pty-api.ts": {
       "added": 1,
@@ -7579,7 +7691,7 @@
       "removed": 1
     },
     "src/renderer/src/store/slices/tabs/tabs-close-actions.ts": {
-      "added": 11,
+      "added": 13,
       "removed": 0
     },
     "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
@@ -7611,8 +7723,8 @@
       "removed": 1
     },
     "src/main/rate-limits/service/service-fetch-policy.ts": {
-      "added": 7,
-      "removed": 6
+      "added": 8,
+      "removed": 7
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
       "added": 9,
@@ -8142,10 +8254,6 @@
       "added": 7,
       "removed": 0
     },
-    "src/cli/skills.test.ts": {
-      "added": 14,
-      "removed": 13
-    },
     "src/main/agent-hooks/server/server-listeners.ts": {
       "added": 4,
       "removed": 0
@@ -8250,21 +8358,13 @@
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/onboarding/onboarding-feature-setup.test.ts": {
-      "added": 2,
-      "removed": 1
-    },
-    "src/renderer/src/components/settings/OrchestrationPane.test.tsx": {
-      "added": 3,
-      "removed": 2
-    },
     "src/renderer/src/components/settings/RepositoryPane.tsx": {
       "added": 7,
       "removed": 0
     },
     "src/renderer/src/components/settings/linear-agent-skill-install-cta.test.tsx": {
-      "added": 5,
-      "removed": 4
+      "added": 2,
+      "removed": 1
     },
     "src/renderer/src/components/settings/repository-search.ts": {
       "added": 2,
@@ -8275,12 +8375,12 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/ProjectGroupDeleteDialog.tsx": {
-      "added": 35,
-      "removed": 2
+      "added": 34,
+      "removed": 1
     },
     "src/renderer/src/components/sidebar/RemoveFolderDialog.tsx": {
-      "added": 95,
-      "removed": 6
+      "added": 96,
+      "removed": 10
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/ProjectGroupDialogs.tsx": {
       "added": 3,
@@ -8322,20 +8422,12 @@
       "added": 3,
       "removed": 1
     },
-    "src/renderer/src/web/web-preload-api-composition.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
     "src/renderer/src/web/web-preload-api.ts": {
       "added": 12,
       "removed": 2
     },
-    "src/shared/agent-feature-install-commands.test.ts": {
-      "added": 2,
-      "removed": 1
-    },
     "src/shared/agent-feature-install-commands.ts": {
-      "added": 2,
+      "added": 3,
       "removed": 1
     },
     "src/shared/keybindings/definitions-core-1.ts": {
@@ -8403,8 +8495,8 @@
       "removed": 1
     },
     ".github/workflows/ci-cache-warmup-platform-jobs.yml": {
-      "added": 1,
-      "removed": 1
+      "added": 2,
+      "removed": 2
     },
     "src/renderer/src/components/cmd-j/palette-live-status.tsx": {
       "added": 13,
@@ -8420,7 +8512,7 @@
     },
     "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
       "added": 1,
-      "removed": 3
+      "removed": 1
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts": {
       "added": 1,
@@ -8447,8 +8539,8 @@
       "removed": 5
     },
     "src/cli/runtime/websocket-transport.test.ts": {
-      "added": 3,
-      "removed": 1
+      "added": 2,
+      "removed": 0
     },
     "src/main/daemon/serialize-grid-transcript-replay.test.ts": {
       "added": 1,
@@ -8914,10 +9006,6 @@
       "added": 5,
       "removed": 1
     },
-    "config/scripts/run-node-server-tests.mjs": {
-      "added": 2,
-      "removed": 1
-    },
     "config/scripts/benchmark-ci-preflight-critical-path.mjs": {
       "added": 27,
       "removed": 3
@@ -8935,22 +9023,10 @@
       "removed": 0
     },
     ".github/workflows/preflight-benchmark.yml": {
-      "added": 1,
-      "removed": 1
-    },
-    "config/scripts/verify-skill-update-roundtrip.test.mjs": {
       "added": 2,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/LinearAgentSkillSetupPrompt.test.tsx": {
-      "added": 2,
-      "removed": 1
+      "removed": 3
     },
     "src/main/daemon/macos-daemon-launchd.test.ts": {
-      "added": 2,
-      "removed": 1
-    },
-    "src/main/skills/skill-update-run.test.ts": {
       "added": 2,
       "removed": 1
     },
@@ -9015,6 +9091,134 @@
       "removed": 0
     },
     ".github/workflows/e2e.yml": {
+      "added": 7,
+      "removed": 7
+    },
+    "src/shared/remote-runtime/control/remote-runtime-shared-control-protocol.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/shared/remote-runtime/requests/remote-runtime-shared-control-subscriptions.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    ".github/workflows/ci-cache-warmup.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/ci-runner-demand.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/ci-xterm-cache.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/cloud-verify.yml": {
+      "added": 4,
+      "removed": 4
+    },
+    ".github/workflows/computer-e2e.yml": {
+      "added": 3,
+      "removed": 3
+    },
+    ".github/workflows/dependency-security.yml": {
+      "added": 4,
+      "removed": 4
+    },
+    ".github/workflows/docs.yml": {
+      "added": 3,
+      "removed": 3
+    },
+    ".github/workflows/macos-updater-tests.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/mobile.yml": {
+      "added": 2,
+      "removed": 2
+    },
+    ".github/workflows/node-next-compat.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/node-server-tests.yml": {
+      "added": 7,
+      "removed": 7
+    },
+    ".github/workflows/packaged-browser-e2e.yml": {
+      "added": 2,
+      "removed": 2
+    },
+    ".github/workflows/performance-contracts.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/pi-owner-runtime.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/pi-provider-runtime.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/pr-test-loc.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/preflight-cli-platforms.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/release-javascript.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/release-ref-validation.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/ssh-hostile-hosts.yml": {
+      "added": 4,
+      "removed": 4
+    },
+    ".github/workflows/ssh-windows-hosts.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/terminal-ime-e2e.yml": {
+      "added": 2,
+      "removed": 2
+    },
+    ".github/workflows/terminal-perf.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/unit-plan.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/unit-selection-evidence.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/unit-tests.yml": {
+      "added": 2,
+      "removed": 2
+    },
+    ".github/workflows/windows-typecheck-parity.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/wsl-orcad-e2e.yml": {
+      "added": 2,
+      "removed": 2
+    },
+    ".github/workflows/zcode-credential-contract.yml": {
+      "added": 1,
+      "removed": 1
+    },
+    ".github/workflows/zcode-transcript-contract.yml": {
       "added": 1,
       "removed": 1
     }

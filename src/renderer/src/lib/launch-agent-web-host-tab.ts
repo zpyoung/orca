@@ -83,17 +83,14 @@ export async function launchAgentInWebHostTab(args: {
     ...(useLaunchOverrides
       ? { hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY }
       : {}),
-    ...(hasPrompt
-      ? {
-          launchAgent: agent,
-          command: startupPlan.launchCommand,
-          ...(startupPlan.env ? { env: startupPlan.env } : {}),
-          launchConfig: startupPlan.launchConfig,
-          ...(startupPlan.startupCommandDelivery
-            ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
-            : {})
-        }
-      : { agent }),
+    // Why: with or without a prompt, the desktop's launch settings decide args (#31986).
+    launchAgent: agent,
+    command: startupPlan.launchCommand,
+    ...(startupPlan.env ? { env: startupPlan.env } : {}),
+    launchConfig: startupPlan.launchConfig,
+    ...(startupPlan.startupCommandDelivery
+      ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
+      : {}),
     ...(hasPrompt && pastePromptAfterReady === null ? { prompt } : {}),
     ...(hasPrompt && pastePromptAfterReady === null
       ? { promptDelivery: structuredPromptDelivery }

@@ -11,7 +11,7 @@ import {
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS
 } from '../../../../../shared/native-chat-answer-stepping'
-import { buildNativeChatPasteBytes } from '../native-chat-send'
+import { buildNativeChatPasteBytes } from '../../../../../shared/native-chat-paste-bytes'
 import type { NativeChatSendHandle } from '../native-chat-runtime-send'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 

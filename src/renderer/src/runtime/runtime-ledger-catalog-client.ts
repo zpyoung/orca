@@ -8,13 +8,13 @@ import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 export type LedgerCatalog = {
   projects: Project[]
   groups: ProjectGroup[]
-  folderWorkspaces: FolderWorkspace[]
+  folders: FolderWorkspace[]
   worktrees: RuntimeWorktreeListResult['worktrees']
 }
 
 /** Reads all owner/location choices from the selected runtime; incomplete worktree catalogs fail closed. */
 export async function readLedgerCatalog(target: RuntimeClientTarget): Promise<LedgerCatalog> {
-  const [projects, groups, folders, worktreeResult] = await Promise.all([
+  const [projects, groups, { folderWorkspaces: folders }, worktreeResult] = await Promise.all([
     callRuntimeRpc<{ projects: Project[] }>(target, 'project.list'),
     callRuntimeRpc<{ groups: ProjectGroup[] }>(target, 'projectGroup.list'),
     callRuntimeRpc<{ folderWorkspaces: FolderWorkspace[] }>(target, 'folderWorkspace.list'),
@@ -28,7 +28,7 @@ export async function readLedgerCatalog(target: RuntimeClientTarget): Promise<Le
   return {
     projects: projects.projects,
     groups: groups.groups,
-    folderWorkspaces: folders.folderWorkspaces,
+    folders,
     worktrees: worktreeResult.worktrees
   }
 }

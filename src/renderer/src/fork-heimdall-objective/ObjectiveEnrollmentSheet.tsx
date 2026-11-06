@@ -25,6 +25,7 @@ import {
 import { buildObjectiveEnrollmentSubmission } from './objective-enrollment-request'
 import { describeObjectiveError, getObjectiveHeimdallApi } from './objective-heimdall-api'
 import { buildObjectiveWorkspaceOptions } from './objective-workspace-options'
+import { selectFolderWorkspaces, selectWorktreesByRepo } from '@/store/workspace-record-selectors'
 
 const DEFAULT_ACTIVE_BUDGET_HOURS = 4
 const DEFAULT_TURN_BUDGET = '40'
@@ -216,8 +217,8 @@ export function ObjectiveEnrollmentSheet({
   onOpenChange
 }: ObjectiveEnrollmentSheetProps): React.JSX.Element {
   const repos = useAppStore((state) => state.repos)
-  const worktreesByRepo = useAppStore((state) => state.worktreesByRepo)
-  const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
+  const worktreesByRepo = useAppStore(selectWorktreesByRepo)
+  const folderWorkspaces = useAppStore(selectFolderWorkspaces)
   const projectGroups = useAppStore((state) => state.projectGroups)
   const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const detectedAgentIds = useAppStore((state) => state.detectedAgentIds)
