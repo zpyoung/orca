@@ -385,3 +385,40 @@ A test red in CI whose file and inputs all match the tag (`git diff --quiet "$UP
 and test. For a fork-owned workflow such as `pr.yml`, rebuild from the parent too, or strip that
 commit's hunks out of it by hand. Do not take main's version of the scripts to match the workflows,
 and do not edit the red tests: they are upstream-owned and correct for the release they ship in.
+
+## A dead run's worktree is a head start
+
+**What happened.** The 2026-10-30 run was killed about 15 minutes in (see "A run ends only at Step
+16"), leaving 298 dirty paths in its worktree: its scripted three-way re-merges, plus about five
+minutes of six resolver agents' work. The 2026-10-31 run merged the same tag onto the same base and
+reused it, which left 87 of 149 conflict files to resolve from scratch instead of 149.
+
+**The tell.** Your merge commit's tree equals the dead run's, and the classifier lists are identical:
+
+```sh
+git log -1 --format=%T HEAD; git log -1 --format=%T <dead run's merge commit>
+cmp <your out-dir>/checkout.txt <its scratchpad>/own/checkout.txt
+```
+
+A `claude --resume <id>` process idling in that worktree is Orca's resume for the slept pane, not a
+live writer. Its transcript's modification time settles that.
+
+**The right move.** Copy every path that differs between the two worktrees' `git status` into yours,
+read-only on its side, and tell resolvers that a marker-free file is unverified rather than done. The
+dead run's prompts and subagent reports are in its transcript, so re-dispatching costs little. If the
+trees differ, don't copy anything: the work was done against other inputs.
+
+## Checking the rest of the tree while a decision parks part of it
+
+**What happened.** On v1.4.245 an owner decision parked 33 files with their conflict markers in place.
+`pnpm run typecheck:*` then reports only `TS1185` for those files and stops, so nothing else in the
+tree gets checked. A probe that temporarily swapped the parked files for the tag's copy found 86
+real errors, 41 of them fixable without the decision, and `pnpm lint` found a new rule firing on 12
+fork files plus two reused localization keys.
+
+**The tell.** Typecheck output that is nothing but `TS1185`, in seconds.
+
+**The right move.** In one script, copy the parked files aside, write the tag's copy over them, run the
+check, and restore them in a `finally`. Commit none of it and let nothing else edit the tree meanwhile.
+Run it before the ask window ends, so anything new goes to the owner in the same 12 hours rather than
+in the next run. Errors in code that reads the parked feature's fields will stay until the decision.

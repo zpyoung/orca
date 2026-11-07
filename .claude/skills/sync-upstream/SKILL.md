@@ -28,8 +28,8 @@ Arguments: `--unattended` suppresses every confirmation prompt. It does **not** 
 latitude: the decisions this skill routes to a human stay routed to a human.
 
 **Escalating a decision means asking and waiting, attended or not.** Put the decision to the human
-through `orca ask` (load the `orca-ask` skill for the CLI), then wait with
-`orca-ask-wait <ask_id> 43200` run as a background command, which polls for up to 12 hours. On an
+through `orca ask` (load the `orca-ask` skill for the CLI), then wait up to 12 hours the way the next
+paragraph says. On an
 answer, continue as the human chose. On `declined`, `timed_out` or `unavailable`, stop and report
 "needs attention: <the decision>" — that is the only path to a decision-shaped stop. Build each
 option from what you have read, naming the files it touches and which local and remote callers
@@ -38,10 +38,21 @@ depend on them, never from a feature's name: v1.4.230's first relay ask offered 
 catch it. Read the gating code before asking at all — a second ask that run was withdrawn after one
 `rg` showed the new store was dark by default.
 
-**A run ends only at Step 16.** Every wait — on CI, on an ask, on a release build — is a background
-command whose exit re-invokes you. Never end the turn, schedule a wakeup, or hand back to the human
-while the run's PR is open. The 2026-10-16 run ended its turn behind a background poll; its green PR
-#120 then sat unmerged for 68 hours while the next three daily runs stopped behind it.
+**A run ends only at Step 16, and so does its turn.** Never end the turn, schedule a wakeup, or hand
+back to the human before then, whether or not a PR is open. In an Orca automation run, ending the
+turn reports the agent `done`: `createAutomationDispatchCompletion` marks the run completed and sleeps
+its workspace, and every background command and subagent dies with exit 144. The runs of 2026-10-28,
+10-29 and 10-30 each ended a turn "waiting on background agents" and died 9s, 3s and 74s later, and
+the next day's run redid their work. The 2026-10-16 run ended its turn behind a background poll; its
+green PR #120 then sat unmerged for 68 hours while the next three daily runs stopped behind it.
+
+**So every wait is a bounded foreground command, repeated until it resolves:** a loop around
+`orca ask wait --id <id> --json` that returns after about nine minutes, and `wait-pr-checks.mjs` with
+`--timeout-minutes 9`. Foreground Bash tops out at ten minutes. Completion notifications from
+background commands and subagents don't arrive during these calls, so check on that work between
+waits: a subagent's report is the last assistant text in
+`~/.claude/projects/<slug>/<session>/subagents/agent-*.jsonl`. Snapshot dirty work to a tag as you go,
+so a kill can't lose it.
 
 The run needs a disposable branch in a workspace of its own; the scheduled automation supplies one by
 creating a fresh worktree per run. This skill never creates, renames, or deletes a branch or a
@@ -623,19 +634,17 @@ drop the exception. Never delete the new upstream files to match, and never repo
 import at the fork's replacement unless that module really provides the same surface. See
 [`references/sync-lessons.md`](./references/sync-lessons.md) for the v1.4.200 case.
 
-**A reset upstream test may pin an upstream release tag this remote does not have.** The
-cross-version-wire harness resolves refs against git, so a constant naming a bare `vX.Y.Z` aborts
-the whole suite in PR CI — three releases have now added one. Sweep after the reset:
+**A bare upstream tag pinned in a cross-version test needs no repoint.** The exception-owned
+`tests/e2e/cross-version-wire/release-checkout.ts` has `resolveUpstreamStableTag`, which fetches a
+strict `vX.Y.Z` from stablyai/orca into `refs/remotes/upstream-releases/`. Upstream's pins therefore
+resolve in PR CI even though this remote has none of those tags: #131's `cross-version wire
+compatibility` passed with `v1.4.218` absent from origin. Only confirm the function survived the merge:
 
 ```sh
-git grep -nE "'v[0-9]+\.[0-9]+\.[0-9]+'" -- tests/e2e/cross-version-wire/
+git grep -n resolveUpstreamStableTag -- tests/e2e/cross-version-wire/release-checkout.ts
 ```
 
-A hit only matters where the string reaches `materializeReleaseCheckout`; fixture inputs to
-`selectLatestStableReleaseTag` are pure and stay as they are. For a real one, pick the fork release
-that contains that upstream tag and nothing newer (`merge-base --is-ancestor` both ways), prove the
-modules the harness loads are byte-identical across the two, repoint the constant, and declare it as
-a seam beside its siblings.
+If it's gone, restore it rather than repointing constants.
 
 **Sweep the release for upstream identity the fork must not inherit.** Upstream hardcodes its own
 signing team, bundle ids, runners and repository, and every new hardcode resets to the tag here.
@@ -900,18 +909,19 @@ failed advisory check is re-run once when its log shows a runner or network faul
 the report either way. Don't fix one in a sync PR: the benchmark workflows already carry fork-aware
 baselines (`fork-benchmark-baseline`), and they still fail on a sync-sized diff by construction.
 
-Wait with one background command, which polls every two minutes (`gh` shares the account's API rate
-limit, so do not tighten it):
+Wait with this bounded foreground command, repeated, which polls every two minutes (`gh` shares the
+account's API rate limit, so do not tighten it):
 
 ```sh
 node config/scripts/fork-sync-gate/wait-pr-checks.mjs --pr "$PR_NUMBER" --head "$(git rev-parse HEAD)" \
-  --advisory-minutes 15 --timeout-minutes <minutes left in the budget>
+  --advisory-minutes 15 --timeout-minutes 9
 ```
 
 It exits `1` on the first failed gating job and names it, which is usually well before `verify`
 settles. It exits `0` once the gate is green and the advisory checks have settled, or 15 minutes
 after the gate went green, whichever comes first. It exits `3` when the head moves under you (see
-*One writer per sync PR*), `4` when the PR closes, and `2` at the deadline. Read `verify`'s own log
+_One writer per sync PR_), `4` when the PR closes, and `2` at its own deadline, which only means run
+it again while the 4-hour budget lasts. Read `verify`'s own log
 when it fails: it is not a rollup, and its last lines name the selection or job that failed.
 
 This is where the test suite runs, so a failing `tests node <version> <shard>/<total>` check is the
